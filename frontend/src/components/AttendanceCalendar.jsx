@@ -1,0 +1,323 @@
+// src/components/AttendanceCalendar.jsx
+import React, { useMemo } from 'react';
+import { Typography, Box } from '@mui/material';
+import { getAttendanceStatus, formatLeaveRequestType } from '../utils/saturdayUtils';
+import '../styles/AttendanceCalendar.css';
+
+const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [], leaves = [], saturdayPolicy = 'All Saturdays Working' }) => {
+    // Helper function to check if a date is a holiday
+    const getHolidayForDate = (date) => {
+        // Use local date formatting to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const holiday = holidays.find(holiday => {
+            const holidayDate = new Date(holiday.date);
+            const holidayYear = holidayDate.getFullYear();
+            const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
+            const holidayDay = String(holidayDate.getDate()).padStart(2, '0');
+            const holidayDateStr = `${holidayYear}-${holidayMonth}-${holidayDay}`;
+            return holidayDateStr === dateStr;
+        });
+        return holiday;
+    };
+
+    // Helper function to check if a date is a leave
+    const getLeaveForDate = (date) => {
+        // Use local date formatting to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        return leaves.find(leave => {
+            if (leave.status !== 'Approved') return false;
+            return leave.leaveDates.some(leaveDateItem => {
+                const leaveDate = new Date(leaveDateItem);
+                const leaveYear = leaveDate.getFullYear();
+                const leaveMonth = String(leaveDate.getMonth() + 1).padStart(2, '0');
+                const leaveDay = String(leaveDate.getDate()).padStart(2, '0');
+                const leaveDateStr = `${leaveYear}-${leaveMonth}-${leaveDay}`;
+                return leaveDateStr === dateStr;
+            });
+        });
+    };
+
+    // Generate calendar data for the current month
+    const calendarData = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        
+        // Get first day of month and last day of month
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        
+        // Get first Sunday of the calendar view
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+        
+        // Get last Saturday of the calendar view
+        const endDate = new Date(lastDay);
+        endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
+        
+        const days = [];
+        const current = new Date(startDate);
+        
+        while (current <= endDate) {
+            // Use local date formatting to avoid timezone issues
+            const year = current.getFullYear();
+            const month = String(current.getMonth() + 1).padStart(2, '0');
+            const day = String(current.getDate()).padStart(2, '0');
+            const dateKey = `${year}-${month}-${day}`;
+            const log = logs.find(l => l.attendanceDate === dateKey);
+            
+            // Calculate attendance status and hours
+            let status = 'blank';
+            let hoursWorked = '';
+            let isCurrentMonth = current.getMonth() === currentDate.getMonth();
+            let isToday = current.toDateString() === now.toDateString();
+            
+            if (isCurrentMonth) {
+                if (log && log.sessions && log.sessions.length > 0) {
+                    status = 'present';
+                    
+                    // Calculate total work time
+                    let totalWorkTime = 0;
+                    let totalBreakTime = 0;
+                    
+                    log.sessions.forEach(session => {
+                        if (session.startTime) {
+                            const start = new Date(session.startTime);
+                            const end = session.endTime ? new Date(session.endTime) : now;
+                            totalWorkTime += (end - start) / (1000 * 60 * 60);
+                        }
+                    });
+                    
+                    if (log.breaks && log.breaks.length > 0) {
+                        log.breaks.forEach(breakLog => {
+                            if (breakLog.startTime && breakLog.endTime) {
+                                const start = new Date(breakLog.startTime);
+                                const end = new Date(breakLog.endTime);
+                                totalBreakTime += (end - start) / (1000 * 60 * 60);
+                            }
+                        });
+                    }
+                    
+                    const netHours = Math.max(0, totalWorkTime - totalBreakTime);
+                    const hours = Math.floor(netHours);
+                    const minutes = Math.round((netHours - hours) * 60);
+                    hoursWorked = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} Hrs`;
+                    
+                    // Check if employee has clocked out (has clockOutTime or all sessions have endTime)
+                    const hasClockOut = log.clockOutTime || (log.sessions && log.sessions.length > 0 && log.sessions.every(s => s.endTime));
+                    
+                    // Check if working hours are less than 8 hours - mark as half-day ONLY if clocked out
+                    const MINIMUM_FULL_DAY_HOURS = 8;
+                    const isHalfDayByHours = hasClockOut && netHours > 0 && netHours < MINIMUM_FULL_DAY_HOURS;
+                    const isHalfDayMarked = hasClockOut && (log.isHalfDay || log.attendanceStatus === 'Half-day' || isHalfDayByHours);
+                    
+                    if (isHalfDayMarked) {
+                        status = 'half-day';
+                    }
+                } else {
+                    // Use centralized attendance status function
+                    const statusInfo = getAttendanceStatus(current, log, saturdayPolicy, holidays, leaves);
+                    
+                    // Map status to calendar status
+                    if (statusInfo.status.startsWith('Holiday -')) {
+                        status = 'holiday';
+                    } else if (statusInfo.status === 'Comp Off') {
+                        status = 'comp-off';
+                    } else if (statusInfo.status === 'Swap Leave') {
+                        status = 'swap-leave';
+                    } else if (statusInfo.status.startsWith('Leave -')) {
+                        status = 'leave';
+                    } else if (statusInfo.status === 'Week Off') {
+                        status = 'week-off';
+                    } else if (statusInfo.status === 'Weekend') {
+                        status = 'weekend';
+                    } else if (statusInfo.status === 'Working Day') {
+                        status = 'working-day';
+                    } else {
+                        status = 'absent';
+                    }
+                }
+            }
+            
+            // Determine leave/holiday for this date
+            const leaveForDate = getLeaveForDate(current);
+            const holidayForDate = getHolidayForDate(current);
+
+            // Check for holidays and leaves even if there's a log (holidays/leaves take priority)
+            if (status === 'present') {
+                const statusInfo = getAttendanceStatus(current, log, saturdayPolicy, holidays, leaves);
+                
+                if (statusInfo.status.startsWith('Holiday -')) {
+                    status = 'holiday';
+                } else if (statusInfo.status === 'Comp Off') {
+                    status = 'comp-off';
+                } else if (statusInfo.status === 'Swap Leave') {
+                    status = 'swap-leave';
+                } else if (statusInfo.status.startsWith('Leave -')) {
+                    status = 'leave';
+                }
+            }
+            
+            days.push({
+                date: new Date(current),
+                dayNumber: current.getDate(),
+                status,
+                hoursWorked,
+                isCurrentMonth,
+                isToday,
+                log,
+                leave: leaveForDate || null,
+                holiday: holidayForDate || null
+            });
+            
+            current.setDate(current.getDate() + 1);
+        }
+        
+        return days;
+    }, [logs, currentDate, now, holidays, leaves]);
+
+    const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    return (
+        <div className="attendance-calendar-container">
+            <div className="calendar-header">
+                <Typography variant="h5" className="calendar-title">
+                    {monthName}
+                </Typography>
+            </div>
+            
+            <div className="calendar-grid">
+                {/* Day names header */}
+                <div className="calendar-header-row">
+                    {dayNames.map(day => (
+                        <div key={day} className="calendar-day-header">
+                            {day}
+                        </div>
+                    ))}
+                </div>
+                
+                {/* Calendar days */}
+                <div className="calendar-days">
+                    {calendarData.map((day, index) => {
+                        // Check if this day should be clickable
+                        const today = new Date(now);
+                        today.setHours(0, 0, 0, 0);
+                        const clickedDate = new Date(day.date);
+                        clickedDate.setHours(0, 0, 0, 0);
+                        const isFutureDate = clickedDate > today;
+                        const hasNoAttendanceData = !day.log || !day.log.sessions || day.log.sessions.length === 0;
+                        const isNotHolidayOrLeave = !day.status || (!day.status.startsWith('holiday') && !day.status.startsWith('leave') && day.status !== 'comp-off' && day.status !== 'swap-leave');
+                        const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave);
+
+                        const holiday = day.holiday || getHolidayForDate(day.date);
+                        const leave = day.leave || getLeaveForDate(day.date);
+                        const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
+                        const leaveInitial = leave ? (isHalfDayLeave ? 'HF' : 'FF') : null;
+
+                        const dayData = {
+                            log: day.log,
+                            date: day.date,
+                            status: day.status,
+                            holiday,
+                            leave,
+                            hoursWorked: day.hoursWorked
+                        };
+                        
+                        return (
+                            <div 
+                                key={index}
+                                className={`calendar-day ${day.status} ${day.isToday ? 'today' : ''} ${!day.isCurrentMonth ? 'other-month' : ''} ${!isClickable ? 'non-clickable' : ''}`}
+                                onClick={isClickable ? () => onDayClick(dayData) : undefined}
+                            >
+                            <div className={`day-number-wrapper ${leaveInitial ? 'has-leave' : ''}`}>
+                                <div className="day-number">{day.dayNumber}</div>
+                                {leaveInitial && (
+                                    <span className={`leave-initial-chip ${isHalfDayLeave ? 'half-day' : 'full-day'}`}>
+                                        {leaveInitial}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {day.status === 'present' && (
+                                <div className="attendance-status present">
+                                    <div className="status-label">Present</div>
+                                    <div className="hours-worked">{day.hoursWorked}</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'half-day' && (
+                                <div className="attendance-status half-day">
+                                    <div className="status-label">Half Day</div>
+                                    <div className="hours-worked">{day.hoursWorked}</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'absent' && (
+                                <div className="attendance-status absent">
+                                    <div className="status-label">Absent</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'weekend' && (
+                                <div className="attendance-status weekend">
+                                    <div className="status-label">Weekend</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'week-off' && (
+                                <div className="attendance-status week-off">
+                                    <div className="status-label">Week Off</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'working-day' && (
+                                <div className="attendance-status working-day">
+                                    <div className="status-label">Working Day</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'holiday' && (
+                                <div className="attendance-status holiday">
+                                    <div className="status-label">Holiday</div>
+                                    <div className="holiday-name">{holiday?.name}</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'leave' && (
+                                <div className="attendance-status leave">
+                                    <div className="status-label">Leave</div>
+                                    <div className="leave-type">{formatLeaveRequestType(leave?.requestType || getLeaveForDate(day.date)?.requestType)}</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'comp-off' && (
+                                <div className="attendance-status comp-off">
+                                    <div className="status-label">⚙️ Comp Off</div>
+                                    <div className="comp-off-type">Comp Off</div>
+                                </div>
+                            )}
+                            
+                            {day.status === 'swap-leave' && (
+                                <div className="attendance-status swap-leave">
+                                    <div className="status-label">🔁 Swap Leave</div>
+                                    <div className="swap-leave-type">Swap Leave</div>
+                                </div>
+                            )}
+                        </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AttendanceCalendar;

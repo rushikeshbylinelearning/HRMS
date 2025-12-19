@@ -1,0 +1,702 @@
+/* frontend/src/styles/AnalyticsPage.css */
+
+/* ============================================
+   1. CSS VARIABLES (from COLORS object)
+   ============================================ */
+:root {
+  --color-primary: #2C3E50;
+  --color-secondary: #ffffff;
+  --color-background: #f8f9fa;
+  --color-navy: #2C3E50;
+  --color-success: #2C3E50;
+  --color-warning: #2C3E50;
+  --color-error: #2C3E50;
+  --color-info: #2C3E50;
+  --color-card-background: #ffffff;
+  --color-card-hover: #f5f5f5;
+  --color-text-primary: #343a40;
+  --color-text-secondary: #6c757d;
+  --color-border-color: #dee2e6;
+  --color-shadow-color: rgba(0, 0, 0, 0.05);
+  
+  /* Chart colors - intuitive and accessible */
+  --color-on-time: #28a745;
+  --color-late: #ffc107;
+  --color-half-day: #17a2b8;
+  --color-absent: #dc3545;
+  
+  /* Additional theme colors */
+  --color-theme-red: #dc3545;
+  --color-theme-red-hover: #b02a37;
+  --color-primary-hover: #34495e;
+  
+  /* Transition */
+  --transition-duration: 250ms;
+  --transition-easing: ease-in-out;
+  --transition-smooth: all var(--transition-duration) var(--transition-easing);
+}
+
+/* ============================================
+   2. BASE STYLES & UTILITIES
+   ============================================ */
+.analytics-page {
+  background-color: var(--color-background);
+  min-height: 100vh;
+}
+
+/* Smooth fade-in animation for content */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.analytics-page-content {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.transition-smooth {
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  will-change: opacity, transform;
+}
+
+/* ============================================
+   3. HEADER SECTION
+   ============================================ */
+.analytics-header {
+  background: linear-gradient(135deg, #2C3E50 0%, #34495e 100%);
+  color: var(--color-secondary);
+  padding: 24px;
+  margin-bottom: 32px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(44, 62, 80, 0.3);
+}
+
+.analytics-header__title {
+  color: var(--color-secondary);
+  font-weight: bold;
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.analytics-header__subtitle {
+  color: var(--color-secondary);
+  opacity: 0.9;
+}
+
+.analytics-button--refresh {
+  background-color: var(--color-secondary);
+  color: var(--color-primary);
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: bold;
+  text-transform: none;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--refresh:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(44, 62, 80, 0.3);
+}
+
+/* ============================================
+   4. TAB NAVIGATION
+   ============================================ */
+.analytics-page__tab-navigation {
+  margin-bottom: 32px;
+  background-color: var(--color-secondary);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border-color);
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  will-change: opacity, transform;
+}
+
+.analytics-page__tab-navigation .MuiTab-root {
+  text-transform: none;
+  font-weight: bold;
+  font-size: 1rem;
+  padding: 16px 24px;
+  color: var(--color-text-secondary);
+  transition: var(--transition-smooth);
+}
+
+.analytics-page__tab-navigation .MuiTab-root:hover {
+  color: var(--color-primary);
+  background-color: var(--color-card-hover);
+}
+
+.analytics-page__tab-navigation .Mui-selected {
+  color: var(--color-primary) !important;
+  background-color: var(--color-card-hover);
+}
+
+.analytics-page__tab-navigation .MuiTabs-indicator {
+  background-color: var(--color-primary);
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* ============================================
+   5. SEARCH BAR
+   ============================================ */
+.analytics-page__search-bar {
+  margin-bottom: 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.analytics-page__search-field {
+  width: 100%;
+  max-width: 600px;
+}
+
+.analytics-page__search-field .MuiOutlinedInput-root {
+  border-radius: 12px;
+  background-color: var(--color-secondary);
+}
+
+.analytics-page__search-field .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--color-theme-red);
+}
+
+.analytics-page__search-field .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--color-theme-red);
+}
+
+/* ============================================
+   6. SERVICE GRID CARDS
+   ============================================ */
+.analytics-page__services-title {
+  color: var(--color-theme-red);
+  font-weight: bold;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.analytics-page__service-card {
+  background-color: var(--color-secondary);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border-color);
+  transition: var(--transition-smooth);
+  cursor: pointer;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 16px;
+}
+
+.analytics-page__service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(220, 53, 69, 0.2);
+  border-color: var(--color-theme-red);
+}
+
+.analytics-page__service-card__icon-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--color-theme-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: white;
+}
+
+.analytics-page__service-card__icon-wrapper--payroll {
+  background-color: #1a237e;
+}
+
+.analytics-page__service-card__title {
+  font-weight: bold;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+}
+
+/* ============================================
+   7. METRICS CARDS (Personal Metrics)
+   ============================================ */
+.analytics-page__metrics-card {
+  background-color: var(--color-secondary);
+  color: var(--color-text-primary);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: var(--transition-smooth);
+  cursor: pointer;
+  min-height: 280px;
+  width: 100%;
+}
+
+.analytics-page__metrics-card:hover {
+  transform: translateY(-4px);
+}
+
+.analytics-page__metrics-card--on-time {
+  border: 2px solid #4CAF50;
+}
+
+.analytics-page__metrics-card--on-time:hover {
+  box-shadow: 0 8px 30px rgba(76, 175, 80, 0.2);
+  border-color: #4CAF50;
+}
+
+.analytics-page__metrics-card--late {
+  border: 2px solid #FFC107;
+}
+
+.analytics-page__metrics-card--late:hover {
+  box-shadow: 0 8px 30px rgba(255, 193, 7, 0.2);
+  border-color: #FFC107;
+}
+
+.analytics-page__metrics-card--half-day {
+  border: 2px solid #FF9800;
+}
+
+.analytics-page__metrics-card--half-day:hover {
+  box-shadow: 0 8px 30px rgba(255, 152, 0, 0.2);
+  border-color: #FF9800;
+}
+
+.analytics-page__metrics-card--absent {
+  border: 2px solid #F44336;
+}
+
+.analytics-page__metrics-card--absent:hover {
+  box-shadow: 0 8px 30px rgba(244, 67, 54, 0.2);
+  border-color: #F44336;
+}
+
+.analytics-page__metrics-card--leaves {
+  border: 2px solid var(--color-primary);
+}
+
+.analytics-page__metrics-card--leaves:hover {
+  box-shadow: 0 8px 30px rgba(44, 62, 80, 0.2);
+  border-color: var(--color-primary);
+}
+
+.analytics-page__metrics-card__content {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.analytics-page__metrics-card__icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-page__metrics-card__icon-wrapper--on-time {
+  background-color: #4CAF50;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.analytics-page__metrics-card__icon-wrapper--late {
+  background-color: #FFC107;
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.analytics-page__metrics-card__icon-wrapper--half-day {
+  background-color: #FF9800;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.analytics-page__metrics-card__icon-wrapper--absent {
+  background-color: #F44336;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.analytics-page__metrics-card__icon-wrapper--leaves {
+  background-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
+}
+
+/* ============================================
+   8. BUTTONS
+   ============================================ */
+.analytics-button--primary {
+  background-color: var(--color-primary);
+  border-radius: 12px;
+  text-transform: none;
+  font-weight: bold;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--primary:hover {
+  background-color: var(--color-theme-red-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.analytics-button--primary-small {
+  background-color: var(--color-primary);
+  border-radius: 12px;
+  text-transform: none;
+  font-weight: bold;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--primary-small:hover {
+  background-color: var(--color-theme-red-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.analytics-button--outlined {
+  border-color: var(--color-border-color);
+  color: var(--color-text-primary);
+  border-radius: 12px;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--outlined:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-card-hover);
+}
+
+.analytics-button--back {
+  background-color: var(--color-secondary);
+  color: var(--color-theme-red);
+  border-radius: 12px;
+  padding: 12px 24px;
+  text-transform: none;
+  font-weight: bold;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--back:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+}
+
+.analytics-button--export {
+  background-color: var(--color-theme-red);
+  border-radius: 12px;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--export:hover {
+  background-color: var(--color-theme-red-hover);
+}
+
+.analytics-button--save {
+  background-color: var(--color-primary);
+  border-radius: 8px;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--save:hover {
+  background-color: var(--color-theme-red-hover);
+}
+
+.analytics-button--add {
+  background-color: var(--color-primary);
+  border-radius: 8px;
+  transition: var(--transition-smooth);
+}
+
+.analytics-button--add:hover {
+  background-color: var(--color-theme-red-hover);
+}
+
+/* ============================================
+   9. DIALOGS & MODALS
+   ============================================ */
+.analytics-dialog__paper {
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.analytics-dialog__title {
+  background-color: var(--color-navy);
+  color: var(--color-secondary);
+  font-weight: bold;
+}
+
+.analytics-dialog__title--settings {
+  background-color: var(--color-navy);
+  color: var(--color-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 16px 16px 0 0;
+}
+
+.analytics-dialog__content {
+  padding: 24px;
+}
+
+.analytics-dialog__content--background {
+  padding: 24px;
+  background-color: var(--color-background);
+}
+
+.analytics-dialog__actions {
+  padding: 24px;
+  background-color: var(--color-background);
+}
+
+.analytics-dialog__actions--rounded {
+  padding: 24px;
+  background-color: var(--color-background);
+  border-radius: 0 0 16px 16px;
+}
+
+.analytics-settings-card {
+  margin-bottom: 24px;
+  background-color: var(--color-secondary);
+  border-radius: 12px;
+}
+
+.analytics-settings-card__content {
+  padding: 24px;
+}
+
+.analytics-settings-card__title {
+  margin-bottom: 16px;
+  font-weight: bold;
+  color: var(--color-navy);
+}
+
+.analytics-settings-card__description {
+  margin-bottom: 16px;
+  color: var(--color-text-secondary);
+}
+
+.analytics-text-field--rounded .MuiOutlinedInput-root {
+  border-radius: 8px;
+}
+
+.analytics-text-field--rounded-12 .MuiOutlinedInput-root {
+  border-radius: 12px;
+}
+
+.analytics-select--rounded {
+  border-radius: 12px;
+}
+
+/* ============================================
+   10. TABLES
+   ============================================ */
+.analytics-page__table-head {
+  background-color: var(--color-background);
+}
+
+.analytics-page__table-head__cell {
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+/* ============================================
+   11. CHARTS CONTAINERS
+   ============================================ */
+.analytics-chart-container {
+  width: 100%;
+  position: relative;
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  will-change: opacity, transform;
+}
+
+.analytics-card-container {
+  min-height: 280px;
+  width: 100%;
+  position: relative;
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  will-change: opacity, transform;
+}
+
+/* ============================================
+   12. EMPLOYEE ANALYTICS SECTION
+   ============================================ */
+.analytics-page__employee-section__title {
+  color: var(--color-navy);
+  font-weight: bold;
+  text-align: center;
+  flex: 1;
+}
+
+.analytics-page__employee-section__settings-button {
+  background-color: var(--color-primary);
+  color: var(--color-secondary);
+  border-radius: 12px;
+  transition: var(--transition-smooth);
+}
+
+.analytics-page__employee-section__settings-button:hover {
+  background-color: var(--color-theme-red-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 53, 69, 0.3);
+}
+
+/* ============================================
+   13. VIEW HEADERS (Employee Muster Roll, etc.)
+   ============================================ */
+.analytics-view-header {
+  background-color: var(--color-theme-red);
+  color: var(--color-secondary);
+  padding: 24px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(220, 53, 69, 0.3);
+}
+
+.analytics-view-header__title {
+  color: var(--color-secondary);
+  font-weight: bold;
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.analytics-view-header__subtitle {
+  color: var(--color-secondary);
+  opacity: 0.9;
+}
+
+/* ============================================
+   14. LOADING ANIMATIONS (Smooth Skeleton Only)
+   ============================================ */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Smooth chart skeleton animation */
+.analytics-chart-skeleton {
+  background-color: #f5f5f5;
+  background: linear-gradient(
+    90deg,
+    #f5f5f5 0%,
+    #f0f0f0 20%,
+    #f5f5f5 40%,
+    #f5f5f5 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Smooth skeleton animations - use consistent shimmer for all Material-UI skeletons */
+/* Override Material-UI's default skeleton animations completely */
+.analytics-page .MuiSkeleton-root {
+  /* Apply shimmer gradient background */
+  background: linear-gradient(
+    90deg,
+    #f5f5f5 0%,
+    #e8e8e8 50%,
+    #f5f5f5 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  /* Apply shimmer animation */
+  animation: shimmer 1.2s ease-in-out infinite !important;
+  /* Remove any Material-UI default backgrounds */
+  background-color: transparent !important;
+}
+
+/* Hide Material-UI's default wave animation overlay */
+.analytics-page .MuiSkeleton-wave::after {
+  display: none !important;
+}
+
+/* Hide Material-UI's pulse animation effects */
+.analytics-page .MuiSkeleton-pulse {
+  animation: shimmer 1.2s ease-in-out infinite !important;
+}
+
+/* Ensure all skeleton variants use the same smooth shimmer animation */
+.analytics-page .MuiSkeleton-text,
+.analytics-page .MuiSkeleton-circular,
+.analytics-page .MuiSkeleton-rectangular {
+  background: linear-gradient(
+    90deg,
+    #f5f5f5 0%,
+    #e8e8e8 50%,
+    #f5f5f5 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 1.2s ease-in-out infinite !important;
+}
+
+/* Disable animations for better performance on slow devices */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes shimmer {
+    0%, 100% {
+      background-position: 0 0;
+    }
+  }
+  
+  .MuiSkeleton-root {
+    animation: none !important;
+  }
+  
+  .transition-smooth {
+    transition: none !important;
+  }
+}
+
+/* ============================================
+   15. RESPONSIVE STYLES
+   ============================================ */
+@media (max-width: 768px) {
+  .analytics-header {
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .analytics-header__title {
+    font-size: 1.5rem;
+  }
+  
+  .analytics-page__service-card {
+    height: 180px;
+  }
+  
+  .analytics-page__metrics-card {
+    min-height: 200px;
+  }
+  
+  .analytics-page__metrics-card__content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .analytics-header {
+    padding: 12px;
+  }
+  
+  .analytics-header__title {
+    font-size: 1.25rem;
+  }
+  
+  .analytics-button--refresh {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+  }
+}

@@ -1,0 +1,155 @@
+/* src/styles/AdminLeavesPage.css */
+
+.admin-leaves-page {
+  padding: 24px;
+}
+
+/* --- Pill Header --- */
+.admin-leaves-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background-color: #2c3e50;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 50px;
+  margin-bottom: 24px;
+}
+
+.admin-leaves-page .page-title {
+  font-weight: 600 !important;
+  color: #ffffff;
+}
+
+.admin-leaves-page .page-header .MuiButton-contained {
+  background-color: var(--theme-red);
+}
+.admin-leaves-page .page-header .MuiButton-contained:hover {
+  background-color: #a02020;
+}
+
+/* --- Manager Cards (HR Email, Holiday) --- */
+.admin-leaves-page .hr-email-manager-card {
+  padding: 24px;
+  border-radius: 12px;
+  height: 100%; /* Make cards in the same row equal height */
+}
+
+.admin-leaves-page .hr-email-manager-title-box {
+  margin-bottom: 8px;
+}
+
+.admin-leaves-page .hr-email-manager-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.admin-leaves-page .hr-email-manager-title .MuiSvgIcon-root {
+  margin-right: 12px;
+  color: var(--theme-text-secondary);
+}
+
+.admin-leaves-page .hr-email-manager-subtitle {
+  color: var(--theme-text-secondary);
+  margin-bottom: 24px;
+}
+
+.admin-leaves-page .hr-email-manager-divider {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.admin-leaves-page .recipients-box {
+  padding: 16px;
+  background-color: #f5f5f5; /* grey.100 */
+  border-radius: 8px;
+  min-height: 76px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
+.admin-leaves-page .no-recipients-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text-secondary);
+  height: 100%;
+  width: 100%;
+}
+
+.admin-leaves-page .no-recipients-box .MuiSvgIcon-root {
+  margin-right: 8px;
+}
+
+/* --- Requests Table Card --- */
+.admin-leaves-page .requests-card {
+  background-color: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow: hidden; /* Important for border-radius on children */
+  margin-top: 24px; /* Space between manager cards and table */
+}
+
+.admin-leaves-page .table-container {
+  max-height: calc(100vh - 450px); /* Adjust based on your layout */
+}
+
+.admin-leaves-page .requests-table-head .MuiTableCell-root {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Table Row and Cell Styling */
+.admin-leaves-page .employee-name {
+    font-weight: 500;
+}
+.admin-leaves-page .employee-code {
+    color: var(--theme-text-secondary);
+    font-size: 0.8rem;
+}
+
+.admin-leaves-page .actions-cell {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* --- Tabs Styling --- */
+.admin-leaves-page .MuiPaper-root .MuiTabs-root .MuiTab-root {
+    border: none !important;
+    border-top: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.admin-leaves-page .MuiPaper-root .MuiTabs-root .MuiTab-root.Mui-selected {
+    border: none !important;
+    border-top: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.admin-leaves-page .MuiPaper-root .MuiTabs-root .MuiTab-root::before,
+.admin-leaves-page .MuiPaper-root .MuiTabs-root .MuiTab-root::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* --- Utility --- */
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
