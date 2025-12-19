@@ -6,7 +6,7 @@ const leaveRequestSchema = new mongoose.Schema({
     requestType: {
         type: String,
         // --- START OF FIX: Added 'Casual' to the enum ---
-        enum: ['Planned', 'Sick', 'Unpaid', 'Compensatory', 'Backdated Leave', 'Casual'],
+        enum: ['Planned', 'Sick', 'Unpaid', 'Compensatory', 'Backdated Leave', 'Casual', 'YEAR_END'],
         // --- END OF FIX ---
         required: true,
     },
@@ -34,6 +34,51 @@ const leaveRequestSchema = new mongoose.Schema({
         enum: ['First Half', 'Second Half'], 
         // Tracks which half of the year for Planned leaves (Jan-Jun or Jul-Dec)
     },
+    // Year-End specific fields
+    yearEndSubType: {
+        type: String,
+        enum: ['CARRY_FORWARD', 'ENCASH'],
+        // Only used when requestType is 'YEAR_END'
+    },
+    yearEndLeaveType: {
+        type: String,
+        enum: ['Sick', 'Casual', 'Planned'],
+        // The leave type for Year-End action (maps to leaveBalances: sick, casual, paid)
+    },
+    yearEndDays: {
+        type: Number,
+        // Number of days for Year-End action
+    },
+    yearEndYear: {
+        type: Number,
+        // Year for which the Year-End request is made (e.g., 2025)
+    },
+    isProcessed: {
+        type: Boolean,
+        default: false,
+        // Prevents double processing of Year-End approvals
+    },
 }, { timestamps: true });
+
+// Compound unique index to prevent duplicate Year-End requests
+// Ensures one request per employee, leaveType, and year for YEAR_END type
+// Only applies to Pending and Approved requests (allows Rejected to be resubmitted)
+leaveRequestSchema.index(
+    { 
+        employee: 1, 
+        requestType: 1, 
+        yearEndLeaveType: 1, 
+        yearEndYear: 1 
+    },
+    { 
+        unique: true,
+        partialFilterExpression: {
+            requestType: 'YEAR_END',
+            status: { $in: ['Pending', 'Approved'] }
+        },
+        name: 'unique_year_end_request',
+        background: true
+    }
+);
 
 module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);

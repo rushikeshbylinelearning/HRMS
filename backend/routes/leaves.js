@@ -299,4 +299,145 @@ router.get('/my-requests', authenticateToken, async (req, res) => {
     }
 });
 
+// POST /api/leaves/year-end-request
+// Employee submits Year-End leave request (Carry Forward or Encash)
+router.post('/year-end-request', authenticateToken, async (req, res) => {
+    const { leaveType, subType, days } = req.body;
+    const { userId } = req.user;
+
+    if (!leaveType || !subType || !days || days <= 0) {
+        return res.status(400).json({ error: 'Missing required fields: leaveType, subType, and days.' });
+    }
+
+    if (!['CARRY_FORWARD', 'ENCASH'].includes(subType)) {
+        return res.status(400).json({ error: 'Invalid subType. Must be CARRY_FORWARD or ENCASH.' });
+    }
+
+    if (!['Sick', 'Casual', 'Planned'].includes(leaveType)) {
+        return res.status(400).json({ error: 'Invalid leaveType. Must be Sick, Casual, or Planned.' });
+    }
+
+    try {
+        // CRITICAL YEAR-END REQUEST YEAR DETECTION:
+        // Year-End requests are for the CLOSING year (the year that's ending)
+        // If we're in December 2025, the request is for 2025 (closing year)
+        // If we're in January 2026, we might still process 2025 year-end requests (late submissions)
+        // Rule: Use current year if in December, otherwise use previous year if in January
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth(); // 0-11 (0 = January, 11 = December)
+        
+        // Determine the closing year for the year-end request
+        // If we're in December, use current year (closing year)
+        // If we're in January, use previous year (still processing last year's year-end)
+        // Otherwise, use current year (assume we're processing current year's year-end)
+        const closingYear = (currentMonth === 0) ? (currentYear - 1) : currentYear;
+        
+        // CRITICAL: Check for duplicate requests FIRST, before any other logic
+        // This prevents duplicate submissions even if API is called manually
+        const existingRequest = await LeaveRequest.findOne({
+            employee: userId,
+            requestType: 'YEAR_END',
+            yearEndLeaveType: leaveType,
+            yearEndYear: closingYear,
+            status: { $in: ['Pending', 'Approved'] }
+        });
+
+        if (existingRequest) {
+            return res.status(409).json({ 
+                error: `Year-End request already submitted for ${leaveType} leave for ${closingYear}.`,
+                existingRequest: {
+                    _id: existingRequest._id,
+                    status: existingRequest.status,
+                    yearEndSubType: existingRequest.yearEndSubType,
+                    yearEndDays: existingRequest.yearEndDays,
+                    yearEndYear: existingRequest.yearEndYear
+                }
+            });
+        }
+
+        const employee = await User.findById(userId);
+        if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+        // Check if Year-End feature is enabled
+        const Setting = require('../models/Setting');
+        const yearEndSetting = await Setting.findOne({ key: 'yearEndFeature' });
+        if (!yearEndSetting || !yearEndSetting.value) {
+            return res.status(403).json({ error: 'Year-End leave actions are currently disabled by Admin.' });
+        }
+
+        // Map leaveType to balance field
+        const balanceField = leaveType === 'Sick' ? 'sick' : leaveType === 'Casual' ? 'casual' : 'paid';
+        const remainingBalance = employee.leaveBalances[balanceField] || 0;
+
+        if (remainingBalance <= 0) {
+            return res.status(400).json({ error: `No remaining ${leaveType} leave balance available.` });
+        }
+
+        if (days > remainingBalance) {
+            return res.status(400).json({ error: `Requested days (${days}) exceed remaining balance (${remainingBalance}).` });
+        }
+
+        // Create Year-End leave request
+        // Store the closing year (e.g., 2025) - this is the year that's ending
+        // The target year (e.g., 2026) will be calculated during approval
+        const leaveRequestData = {
+            employee: userId,
+            requestType: 'YEAR_END',
+            leaveType: 'Full Day', // Default for Year-End
+            leaveDates: [], // Year-End doesn't use specific dates
+            reason: `Year-End ${subType === 'CARRY_FORWARD' ? 'Carry Forward' : 'Encash'} request for ${leaveType} leave (${closingYear} → ${closingYear + 1})`,
+            yearEndSubType: subType,
+            yearEndLeaveType: leaveType,
+            yearEndDays: days,
+            yearEndYear: closingYear, // Store the closing year (e.g., 2025)
+            status: 'Pending',
+            isProcessed: false
+        };
+
+        const newRequest = await LeaveRequest.create(leaveRequestData);
+
+        // Send notification to admins
+        await NewNotificationService.broadcastToAdmins({
+            message: `${employee.fullName} submitted a Year-End ${subType === 'CARRY_FORWARD' ? 'Carry Forward' : 'Encash'} request for ${days} day(s) of ${leaveType} leave.`,
+            type: 'leave_request',
+            category: 'leave',
+            priority: 'high',
+            navigationData: { 
+                page: '/admin/leaves',
+                params: { 
+                    requestId: newRequest._id.toString(),
+                    tab: 'year-end',
+                    actionId: newRequest._id.toString()
+                }
+            },
+            metadata: {
+                type: 'YEAR_END_LEAVE',
+                requestId: newRequest._id.toString(),
+                targetTab: 'year-end'
+            }
+        }, userId);
+
+        res.status(201).json({ 
+            message: 'Year-End leave request submitted successfully!', 
+            request: newRequest
+        });
+    } catch (error) {
+        console.error('Error submitting Year-End leave request:', error);
+        res.status(500).json({ error: 'Internal server error while submitting Year-End request.' });
+    }
+});
+
+// GET /api/leaves/year-end-feature-status
+// Check if Year-End feature is enabled
+router.get('/year-end-feature-status', authenticateToken, async (req, res) => {
+    try {
+        const Setting = require('../models/Setting');
+        const yearEndSetting = await Setting.findOne({ key: 'yearEndFeature' });
+        res.json({ enabled: yearEndSetting ? yearEndSetting.value : false });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch Year-End feature status.' });
+    }
+});
+
 module.exports = router;

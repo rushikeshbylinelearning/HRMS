@@ -17250,3 +17250,3407 @@
   message: 'Response',
   timestamp: '2025-12-16 16:27:25'
 }
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '174ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:31:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '40ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '68ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059319179',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:31:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:31:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059319113',
+  statusCode: 200,
+  duration: '78ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '37ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059319179',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '215ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059319298',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:31:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:31:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059319298',
+  statusCode: 200,
+  duration: '15ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '80ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '93ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:31:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/planned-leave-history',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  path: '/leaves/planned-leave-history',
+  query: [Object: null prototype] {},
+  headers: { authorization: 'present', origin: undefined },
+  level: 'warn',
+  message: '[404] API route not found: GET /leaves/planned-leave-history',
+  timestamp: '2025-12-18 17:32:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/planned-leave-history',
+  statusCode: 404,
+  duration: '2ms',
+  contentLength: '188',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:02',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:02',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '55ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:02'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '44ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:02'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/admin/settings/year-end-feature',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/year-end-feature',
+  statusCode: 200,
+  duration: '17ms',
+  contentLength: '17',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '30ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '14ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '53ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '88ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '82ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '3ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '9ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325308',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '5ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325335',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '8ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325308',
+  statusCode: 200,
+  duration: '38ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '38ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status',
+  statusCode: 304,
+  duration: '55ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325335',
+  statusCode: 200,
+  duration: '53ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '29ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '31ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '58ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325385',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '27ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '47ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325385',
+  statusCode: 200,
+  duration: '41ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '28ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status',
+  statusCode: 304,
+  duration: '79ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325439',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '31ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '163ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '17ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '34ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325439',
+  statusCode: 200,
+  duration: '30ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325503',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '29ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325503',
+  statusCode: 200,
+  duration: '13ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '173ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325592',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:05',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059325592',
+  statusCode: 200,
+  duration: '8ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '85ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '92ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:05'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:06',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:06',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '88ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:06'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '34ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:06'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/admin/settings/year-end-feature',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:07',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/year-end-feature',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '16',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:07'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '35ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '31ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '49ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '71ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '94ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '4ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '6ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059330974',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '3ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059330999',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me',
+  statusCode: 304,
+  duration: '9ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059330974',
+  statusCode: 200,
+  duration: '36ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059330999',
+  statusCode: 200,
+  duration: '47ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '63ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status',
+  statusCode: 304,
+  duration: '71ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '110ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '225ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '204ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '33ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331080',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '16ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status',
+  statusCode: 304,
+  duration: '143ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331080',
+  statusCode: 200,
+  duration: '55ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '52ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '389ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331399',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331073',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '27ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331399',
+  statusCode: 200,
+  duration: '13ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331073',
+  statusCode: 200,
+  duration: '6ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatars/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331488',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar-687f797fcac0a473f5b46e07-1765892275142.jpg?v=1766059331488',
+  statusCode: 200,
+  duration: '6ms',
+  contentLength: 81463,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '419ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:32:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '79ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '95ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '54ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '52ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '46ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '52ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:17'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/leaves/69423a96552b09f5bdb854e9',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/leaves/69423a96552b09f5bdb854e9',
+  statusCode: 200,
+  duration: '19ms',
+  contentLength: '644',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:32:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '37ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 200,
+  duration: '48ms',
+  contentLength: '6635',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:32:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '66ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '69ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '97ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '49ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:33:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '257ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '126ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:33:57'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/admin/settings/year-end-feature',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:34:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/year-end-feature',
+  statusCode: 200,
+  duration: '29ms',
+  contentLength: '17',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:34:00'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/admin/settings/year-end-feature',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:34:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/year-end-feature',
+  statusCode: 200,
+  duration: '18ms',
+  contentLength: '16',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:34:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '24ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '55ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '16',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 200,
+  duration: '93ms',
+  contentLength: '158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 200,
+  duration: '108ms',
+  contentLength: '2',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:35:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:35:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '201ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '79ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:35:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:35:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '275ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '125ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '18ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:35:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '29ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '13ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '79ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '101ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:35:58',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '15ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '13ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '26ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '77ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '94ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:35:58'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:08',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:08',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '63ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '53ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '55ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '51ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:11',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '110ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '27ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '115ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '135ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '32ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:12',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '38ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '62ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '18ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '105ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '118ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:16',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:16',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '39ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '44ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '61ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '56ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '26ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '108ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '113ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '135ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '39ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '36ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '18ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '67ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '106ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '131ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:36:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '37ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '79ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0',
+  timestamp: '2025-12-18 17:36:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '17ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '17ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '27ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '13ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '73ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '93ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-leave-balances',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/holidays',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/carryforward-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/pending',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leave/year-end/feature-status',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-18 17:36:54',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-leave-balances',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/holidays',
+  statusCode: 304,
+  duration: '15ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/feature-status',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests?page=1&limit=10',
+  statusCode: 304,
+  duration: '27ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/carryforward-status',
+  statusCode: 304,
+  duration: '73ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/pending',
+  statusCode: 304,
+  duration: '91ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:36:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:37:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-18 17:37:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10',
+  statusCode: 304,
+  duration: '62ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:37:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true',
+  statusCode: 304,
+  duration: '54ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-18 17:37:13'
+}

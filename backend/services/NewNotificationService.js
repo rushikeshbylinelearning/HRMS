@@ -208,6 +208,29 @@ class NewNotificationService {
             navigationData: { page: 'dashboard' }
         });
     }
+
+    static async notifyYearEndLeaveResponse(userId, userName, status, leaveType, days, subType) {
+        const action = subType === 'CARRY_FORWARD' ? 'carry forward' : 'encashment';
+        let message = `Your Year-End ${action} request for ${days} day(s) of ${leaveType} leave has been ${status.toLowerCase()}.`;
+        
+        await this.createAndEmitNotification({
+            message,
+            userId,
+            userName,
+            type: status === 'Approved' ? 'leave_approval' : 'leave_rejection',
+            recipientType: 'user',
+            category: 'leave',
+            priority: 'high',
+            navigationData: { page: '/leaves' },
+            metadata: { 
+                type: 'YEAR_END_LEAVE_RESPONSE',
+                status,
+                leaveType,
+                days,
+                subType
+            }
+        });
+    }
 }
 
 module.exports = NewNotificationService;

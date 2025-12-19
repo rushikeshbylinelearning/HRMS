@@ -36,8 +36,11 @@ router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => 
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         
-        const totalCount = await LeaveRequest.countDocuments({});
-        const allRequests = await LeaveRequest.find({})
+        // Exclude YEAR_END requests from normal leave requests
+        const query = { requestType: { $ne: 'YEAR_END' } };
+        
+        const totalCount = await LeaveRequest.countDocuments(query);
+        const allRequests = await LeaveRequest.find(query)
             .populate('employee', 'fullName employeeCode')
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -98,7 +101,11 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
 // GET /leaves/pending
 router.get('/leaves/pending', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
-        const pendingRequests = await LeaveRequest.find({ status: 'Pending' })
+        // Exclude YEAR_END requests from normal pending requests
+        const pendingRequests = await LeaveRequest.find({ 
+            status: 'Pending',
+            requestType: { $ne: 'YEAR_END' }
+        })
             .populate('employee', 'fullName employeeCode')
             .sort({ createdAt: 1 });
         res.json(pendingRequests);
@@ -156,6 +163,12 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         if (!request) {
             await session.abortTransaction();
             return res.status(404).json({ error: 'Request not found.' });
+        }
+
+        // Block YEAR_END requests from being processed through normal leave status endpoint
+        if (request.requestType === 'YEAR_END') {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'Year-End requests must be processed through the Year-End specific endpoint.' });
         }
 
         const oldStatus = request.status;
@@ -286,6 +299,91 @@ router.post('/leaves/allocate', [authenticateToken, isAdminOrHr], async (req, re
     } catch (error) {
         console.error('Error allocating leaves:', error);
         res.status(500).json({ error: 'Failed to allocate leaves.' });
+    }
+});
+
+// @route   POST /api/admin/leaves/bulk-allocate
+// @desc    Bulk allocate leave balances to multiple employees for a year
+// @access  Private (Admin/HR)
+router.post('/leaves/bulk-allocate', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const {
+        employeeIds,
+        year,
+        sickLeaveEntitlement,
+        casualLeaveEntitlement,
+        paidLeaveEntitlement,
+    } = req.body;
+
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+        return res.status(400).json({ error: 'Employee IDs array is required and must not be empty.' });
+    }
+
+    const results = {
+        successful: [],
+        failed: []
+    };
+
+    try {
+        const sick = sickLeaveEntitlement || 0;
+        const casual = casualLeaveEntitlement || 0;
+        const paid = paidLeaveEntitlement || 0;
+
+        // Process each employee
+        for (const employeeId of employeeIds) {
+            try {
+                if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+                    results.failed.push({
+                        employeeId,
+                        error: 'Invalid employee ID format.'
+                    });
+                    continue;
+                }
+
+                const user = await User.findById(employeeId);
+                if (!user) {
+                    results.failed.push({
+                        employeeId,
+                        error: 'Employee not found.'
+                    });
+                    continue;
+                }
+
+                // Set entitlements and balances
+                user.leaveEntitlements = {
+                    sick: sick,
+                    casual: casual,
+                    paid: paid,
+                };
+
+                user.leaveBalances = {
+                    sick: sick,
+                    casual: casual,
+                    paid: paid,
+                };
+
+                await user.save();
+
+                results.successful.push({
+                    employeeId: user._id,
+                    fullName: user.fullName,
+                    employeeCode: user.employeeCode
+                });
+            } catch (error) {
+                console.error(`Error allocating leaves for employee ${employeeId}:`, error);
+                results.failed.push({
+                    employeeId,
+                    error: error.message || 'Failed to allocate leaves for this employee.'
+                });
+            }
+        }
+
+        res.status(200).json({
+            message: `Bulk allocation completed: ${results.successful.length} successful, ${results.failed.length} failed.`,
+            results
+        });
+    } catch (error) {
+        console.error('Error in bulk allocating leaves:', error);
+        res.status(500).json({ error: 'Failed to bulk allocate leaves.' });
     }
 });
 
@@ -1203,6 +1301,331 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         res.status(500).json({ error: 'Server error while updating log.' });
     } finally {
         dbSession.endSession();
+    }
+});
+
+// --- YEAR-END LEAVE MANAGEMENT ROUTES ---
+
+// GET /api/admin/leaves/year-end-requests
+// Get all Year-End leave requests
+router.get('/leaves/year-end-requests', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        
+        const query = { requestType: 'YEAR_END' };
+        
+        // Filter by status if provided
+        if (req.query.status) {
+            query.status = req.query.status;
+        }
+        
+        // Filter by year if provided
+        if (req.query.year) {
+            query.yearEndYear = parseInt(req.query.year);
+        }
+        
+        const totalCount = await LeaveRequest.countDocuments(query);
+        const requests = await LeaveRequest.find(query)
+            .populate('employee', 'fullName employeeCode department designation')
+            .populate('approvedBy', 'fullName')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+            
+        res.json({
+            requests,
+            totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit)
+        });
+    } catch (error) {
+        console.error('Error fetching Year-End leave requests:', error);
+        res.status(500).json({ error: 'Failed to fetch Year-End requests.' });
+    }
+});
+
+// PATCH /api/admin/leaves/year-end/:id/status
+// Approve or reject Year-End leave request
+router.patch('/leaves/year-end/:id/status', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { id } = req.params;
+    const { status: newStatus, rejectionNotes } = req.body;
+
+    if (!['Approved', 'Rejected'].includes(newStatus)) {
+        return res.status(400).json({ error: 'Invalid status provided.' });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const request = await LeaveRequest.findById(id).session(session);
+        if (!request) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Year-End request not found.' });
+        }
+
+        if (request.requestType !== 'YEAR_END') {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'This is not a Year-End leave request.' });
+        }
+
+        if (request.status !== 'Pending') {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'This request has already been processed.' });
+        }
+
+        // CRITICAL: Prevent double processing
+        if (request.isProcessed === true) {
+            await session.abortTransaction();
+            return res.status(409).json({ error: 'This request has already been processed and cannot be modified.' });
+        }
+
+        const employee = await User.findById(request.employee).session(session);
+        if (!employee) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+
+        const oldStatus = request.status;
+        const leaveType = request.yearEndLeaveType;
+        const days = request.yearEndDays;
+        const subType = request.yearEndSubType;
+
+        // Map leaveType to balance field
+        const balanceField = leaveType === 'Sick' ? 'sick' : leaveType === 'Casual' ? 'casual' : 'paid';
+
+        if (newStatus === 'Approved') {
+            // Only process if not already processed
+            if (!request.isProcessed) {
+                // CRITICAL YEAR-END ROLLOVER LOGIC:
+                // Year-End request is for the CLOSING year (e.g., 2025)
+                // The result MUST be applied to the NEXT year (e.g., 2026)
+                const closingYear = request.yearEndYear; // e.g., 2025
+                const targetYear = closingYear + 1; // e.g., 2026
+                const currentDate = new Date();
+                const currentYear = currentDate.getFullYear();
+                const currentMonth = currentDate.getMonth(); // 0-11 (0 = January, 11 = December)
+                
+                // Determine if we're in the target year or later
+                // If we're in December of closing year or January+ of target year, apply to target year
+                const isInTargetYearOrLater = currentYear >= targetYear;
+                const isInDecemberOfClosingYear = currentYear === closingYear && currentMonth === 11;
+                
+                if (subType === 'CARRY_FORWARD') {
+                    // CARRY FORWARD: Add remaining days to NEXT year's opening balance
+                    // Opening balance for target year = default entitlement for target year + carried forward days
+                    const defaultEntitlementForTargetYear = employee.leaveEntitlements[balanceField] || 0;
+                    const carriedForwardDays = days;
+                    
+                    // Calculate the target year's opening balance
+                    // This is what the employee will have from January 1st of target year
+                    const targetYearOpeningBalance = defaultEntitlementForTargetYear + carriedForwardDays;
+                    
+                    // Apply the carry forward to the balance
+                    // If we're in the target year or later, set the balance to the target year opening balance
+                    // If we're in December of closing year, prepare the balance for next year
+                    if (isInTargetYearOrLater || isInDecemberOfClosingYear) {
+                        // Set balance to target year opening balance (entitlement + carry forward)
+                        employee.leaveBalances[balanceField] = targetYearOpeningBalance;
+                    } else {
+                        // If we're still earlier in the closing year, add carry forward to current balance
+                        // This will be the balance when the new year starts
+                        employee.leaveBalances[balanceField] = (employee.leaveBalances[balanceField] || 0) + carriedForwardDays;
+                    }
+                } else if (subType === 'ENCASH') {
+                    // ENCASH: No balance change - leaves are encashed (paid out)
+                    // The balance was already reduced when leaves were used during the closing year
+                    // Encashment means the remaining balance is paid out, not carried forward
+                    // The employee gets the monetary value, but no leave days are added to next year
+                    // No balance update needed - the days are already deducted from closing year balance
+                    // The encashment is tracked in the request record for audit purposes
+                }
+                // Mark as processed to prevent double credit
+                request.isProcessed = true;
+            }
+        }
+        // If rejected, no balance changes and no processing flag
+
+        request.status = newStatus;
+        request.approvedBy = req.user.userId;
+        request.approvedAt = new Date();
+        
+        if (newStatus === 'Rejected' && rejectionNotes) {
+            request.rejectionNotes = rejectionNotes;
+        } else if (newStatus === 'Approved') {
+            request.rejectionNotes = undefined;
+        }
+        
+        await employee.save({ session });
+        await request.save({ session });
+
+        await session.commitTransaction();
+        
+        // Send notification to employee
+        const NewNotificationService = require('../services/NewNotificationService');
+        await NewNotificationService.notifyYearEndLeaveResponse(
+            request.employee,
+            employee.fullName,
+            newStatus,
+            leaveType,
+            days,
+            subType
+        ).catch(err => console.error('Error sending Year-End response notification:', err));
+        
+        // Include year-to-year mapping information in response
+        const closingYear = request.yearEndYear;
+        const targetYear = closingYear + 1;
+        
+        res.json({ 
+            message: `Year-End request has been ${newStatus.toLowerCase()}.`, 
+            request,
+            yearMapping: {
+                closingYear: closingYear,
+                targetYear: targetYear,
+                action: subType === 'CARRY_FORWARD' 
+                    ? `${days} ${leaveType} leaves carried forward from ${closingYear} → ${targetYear}`
+                    : `${days} ${leaveType} leaves encashed for ${closingYear}`,
+                affectedYear: targetYear
+            }
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        console.error(`Error updating Year-End request status for ID ${id}:`, error);
+        res.status(500).json({ error: 'Failed to update Year-End request status.' });
+    } finally {
+        session.endSession();
+    }
+});
+
+// DELETE /api/admin/leaves/year-end/:id
+// Delete Year-End request (Pending or Approved with rollback)
+router.delete('/leaves/year-end/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { id } = req.params;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const request = await LeaveRequest.findById(id).session(session);
+        if (!request) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Year-End request not found.' });
+        }
+
+        if (request.requestType !== 'YEAR_END') {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'This is not a Year-End leave request.' });
+        }
+
+        // Block deletion of Rejected requests (they don't affect balances anyway)
+        if (request.status === 'Rejected') {
+            await session.abortTransaction();
+            return res.status(403).json({ 
+                error: 'Cannot delete a Rejected Year-End request.' 
+            });
+        }
+
+        const employee = await User.findById(request.employee).session(session);
+        if (!employee) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+
+        // Handle APPROVED requests with rollback
+        if (request.status === 'Approved') {
+            const leaveType = request.yearEndLeaveType;
+            const days = request.yearEndDays;
+            const subType = request.yearEndSubType;
+
+            if (!leaveType || !days || !subType) {
+                await session.abortTransaction();
+                return res.status(400).json({ 
+                    error: 'Invalid Year-End request data. Cannot perform rollback.' 
+                });
+            }
+
+            // Map leaveType to balance field
+            const balanceField = leaveType === 'Sick' ? 'sick' : leaveType === 'Casual' ? 'casual' : 'paid';
+
+            // Perform rollback based on action type
+            // CRITICAL: Rollback must reverse the year-end action correctly
+            // For CARRY_FORWARD: Balance was set to (defaultEntitlement + days)
+            // Rollback: Set back to defaultEntitlement (remove carried forward days)
+            // For ENCASH: No balance change was made (leaves were already used)
+            // Rollback: No change needed (encashment doesn't affect balance)
+            const defaultEntitlement = employee.leaveEntitlements[balanceField] || 0;
+            
+            if (subType === 'CARRY_FORWARD') {
+                // Rollback: Remove the carried-forward days
+                // The balance was set to: defaultEntitlement + days
+                // Rollback to: defaultEntitlement (remove the carry forward)
+                employee.leaveBalances[balanceField] = defaultEntitlement;
+            } else if (subType === 'ENCASH') {
+                // Rollback: No balance change needed for encashment
+                // Encashment doesn't add to balance - it just pays out the remaining days
+                // The balance was already reduced when leaves were used during the closing year
+                // No rollback needed
+            }
+
+            await employee.save({ session });
+        }
+        // For PENDING requests, no balance changes needed
+
+        // Store request data for notification before deletion
+        const requestData = {
+            employeeId: request.employee,
+            employeeName: employee.fullName,
+            leaveType: request.yearEndLeaveType,
+            year: request.yearEndYear || new Date().getFullYear(),
+            status: request.status
+        };
+
+        // Delete the request
+        await LeaveRequest.findByIdAndDelete(id).session(session);
+
+        await session.commitTransaction();
+
+        // Send notification to employee (only for APPROVED requests that were rolled back)
+        if (requestData.status === 'Approved') {
+            const NewNotificationService = require('../services/NewNotificationService');
+            await NewNotificationService.createAndEmitNotification({
+                message: `Your Year-End leave request for ${requestData.leaveType} (${requestData.year}) has been deleted by Admin. Leave balance changes have been reverted.`,
+                userId: requestData.employeeId,
+                userName: requestData.employeeName,
+                type: 'leave_rejection',
+                recipientType: 'user',
+                category: 'leave',
+                priority: 'high',
+                navigationData: { page: '/leaves' },
+                metadata: {
+                    type: 'YEAR_END_LEAVE_DELETED',
+                    leaveType: requestData.leaveType,
+                    year: requestData.year
+                }
+            });
+        }
+
+        res.json({ 
+            message: requestData.status === 'Approved' 
+                ? 'Year-End request deleted successfully. Leave balance changes have been reverted.' 
+                : 'Year-End request deleted successfully.',
+            deletedRequest: {
+                _id: id,
+                employee: requestData.employeeId,
+                yearEndLeaveType: requestData.leaveType,
+                yearEndYear: requestData.year,
+                status: requestData.status,
+                rolledBack: requestData.status === 'Approved'
+            }
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        console.error(`Error deleting Year-End request for ID ${id}:`, error);
+        res.status(500).json({ error: 'Failed to delete Year-End request.' });
+    } finally {
+        session.endSession();
     }
 });
 

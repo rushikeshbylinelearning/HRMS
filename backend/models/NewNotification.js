@@ -39,6 +39,9 @@ const newNotificationSchema = new mongoose.Schema({
         params: { type: mongoose.Schema.Types.Mixed }
     },
     
+    // Additional metadata for notification routing and context
+    metadata: { type: mongoose.Schema.Types.Mixed },
+    
     // Metadata
     priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
     category: { type: String, enum: ['attendance', 'leave', 'break', 'system', 'admin'], default: 'system' },

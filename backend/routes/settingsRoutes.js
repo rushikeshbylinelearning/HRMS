@@ -9,6 +9,7 @@ const Setting = require('../models/Setting');
 
 const HR_EMAIL_KEY = 'hrNotificationEmails';
 const HIRING_EMAIL_KEY = 'hiringNotificationEmails';
+const YEAR_END_FEATURE_KEY = 'yearEndFeature';
 
 // GET /api/admin/settings/hr-emails - Get the list of HR emails
 router.get('/hr-emails', async (req, res) => {
@@ -107,6 +108,36 @@ router.delete('/hiring-emails', async (req, res) => {
         res.json(updatedSetting ? updatedSetting.value : []);
     } catch (error) {
         res.status(500).json({ error: 'Server error deleting hiring email.' });
+    }
+});
+
+// GET /api/admin/settings/year-end-feature - Get the year-end feature enabled status
+router.get('/year-end-feature', async (req, res) => {
+    try {
+        const setting = await Setting.findOne({ key: YEAR_END_FEATURE_KEY });
+        res.json({ enabled: setting ? setting.value : false }); // Return enabled status, default to false if not found
+    } catch (error) {
+        res.status(500).json({ error: 'Server error fetching year-end feature setting.' });
+    }
+});
+
+// POST /api/admin/settings/year-end-feature - Update the year-end feature enabled status
+router.post('/year-end-feature', async (req, res) => {
+    const { enabled } = req.body;
+    
+    if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Enabled must be a boolean value.' });
+    }
+    
+    try {
+        const updatedSetting = await Setting.findOneAndUpdate(
+            { key: YEAR_END_FEATURE_KEY },
+            { value: enabled },
+            { upsert: true, new: true }
+        );
+        res.json({ enabled: updatedSetting.value });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error updating year-end feature setting.' });
     }
 });
 
