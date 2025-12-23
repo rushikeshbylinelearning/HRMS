@@ -219,22 +219,25 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
             return finalLogout.toISOString();
         }
         
-        // If clock-in is at or after 10:00 AM, use normal 9-hour logic
-        // If break not taken yet → no break deduction
+        // If clock-in is at or after 10:00 AM, ensure logout never goes below 7 PM
+        // Calculate base logout time using normal 9-hour logic
+        let baseLogout;
         if (!hasTakenPaidBreak) {
-            const baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
-            // Add unpaid break extension
-            if (totalUnpaidBreakMinutes > 0) {
-                return addMinutes(baseLogout, totalUnpaidBreakMinutes).toISOString();
-            }
-            return baseLogout.toISOString();
+            // No break taken yet → clockIn + 9 hours
+            baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
+        } else {
+            // Break taken → adjust logout based on actual total paid break minutes taken
+            const savedBreak = EXPECTED_BREAK_MINUTES - totalPaidBreakMinutes; // positive = saved, negative = extra
+            baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES - savedBreak);
         }
         
-        // Break taken → adjust logout based on actual total paid break minutes taken
-        const savedBreak = EXPECTED_BREAK_MINUTES - totalPaidBreakMinutes; // positive = saved, negative = extra
+        // CRITICAL: For 10 AM - 7 PM shift, logout time should NEVER go below 7 PM
+        // If calculated logout is before 7 PM, set it to 7 PM
+        if (baseLogout < sevenPM) {
+            baseLogout = sevenPM;
+        }
         
-        const baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES - savedBreak);
-        // Add unpaid break extension
+        // Add unpaid break extension (this will extend beyond 7 PM if more break is taken)
         if (totalUnpaidBreakMinutes > 0) {
             return addMinutes(baseLogout, totalUnpaidBreakMinutes).toISOString();
         }
