@@ -7,7 +7,7 @@ const newNotificationSchema = new mongoose.Schema({
     message: { type: String, required: true },
     type: { 
         type: String, 
-        enum: ['checkin', 'checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error'], 
+        enum: ['checkin', 'checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked'], 
         required: true 
     },
     
@@ -27,7 +27,7 @@ const newNotificationSchema = new mongoose.Schema({
     
     // Action data for interactive notifications
     actionData: {
-        actionType: { type: String, enum: ['start_break', 'navigate', 'approve', 'reject', 'none'] },
+        actionType: { type: String, enum: ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day'] },
         actionUrl: { type: String },
         actionParams: { type: mongoose.Schema.Types.Mixed },
         requiresAction: { type: Boolean, default: false }
@@ -65,6 +65,38 @@ newNotificationSchema.index({ recipientType: 1, read: 1, createdAt: -1 });
 
 // --- REMOVED pre('save') hook ---
 // The ID generation logic is now moved to the service layer for reliability.
+
+// Pre-save validation hook for defensive enum validation
+// This provides clear error messages and prevents server crashes
+newNotificationSchema.pre('save', function(next) {
+    // Validate type enum
+    const validTypes = ['checkin', 'checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked'];
+    if (this.type && !validTypes.includes(this.type)) {
+        const error = new mongoose.Error.ValidationError(this);
+        error.errors.type = new mongoose.Error.ValidatorError({
+            message: `Invalid notification type: "${this.type}". Valid types are: ${validTypes.join(', ')}`,
+            path: 'type',
+            value: this.type
+        });
+        return next(error);
+    }
+
+    // Validate actionData.actionType enum if actionData exists
+    if (this.actionData && this.actionData.actionType) {
+        const validActionTypes = ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day'];
+        if (!validActionTypes.includes(this.actionData.actionType)) {
+            const error = new mongoose.Error.ValidationError(this);
+            error.errors['actionData.actionType'] = new mongoose.Error.ValidatorError({
+                message: `Invalid actionType: "${this.actionData.actionType}". Valid actionTypes are: ${validActionTypes.join(', ')}`,
+                path: 'actionData.actionType',
+                value: this.actionData.actionType
+            });
+            return next(error);
+        }
+    }
+
+    next();
+});
 
 // Instance methods
 newNotificationSchema.methods.markAsRead = function() {

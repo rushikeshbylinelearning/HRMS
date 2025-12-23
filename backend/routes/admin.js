@@ -17,7 +17,7 @@ const BreakLog = require('../models/BreakLog');
 const Holiday = require('../models/Holiday');
 const Setting = require('../models/Setting');
 const NewNotificationService = require('../services/NewNotificationService');
-const { getUserDailyStatus } = require('../services/dailyStatusService');
+const { getUserDailyStatus, recalculateLateStatus } = require('../services/dailyStatusService');
 
 // Middleware to check for Admin/HR role
 const isAdminOrHr = (req, res, next) => {
@@ -1442,11 +1442,20 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         // CRITICAL: clockInTime is required in schema, so we must preserve it if not updating
         const sortedSessions = [...newSessions].sort((a, b) => a.startTime - b.startTime);
         
+        // Track if clockInTime changed so we can recalculate derived fields
+        const previousClockInTime = log.clockInTime ? new Date(log.clockInTime).getTime() : null;
+        let clockInTimeChanged = false;
+        
         // Only update clockInTime if we have valid sessions (preserve existing if not)
         // This prevents Mongoose validation errors: "Path `clockInTime` is required"
         if (sortedSessions.length > 0 && sortedSessions[0].startTime) {
-            // Update clockInTime from first session's startTime
-            log.clockInTime = sortedSessions[0].startTime;
+            const newClockInTime = sortedSessions[0].startTime;
+            const newClockInTimeMs = new Date(newClockInTime).getTime();
+            // Check if clockInTime actually changed
+            if (previousClockInTime !== newClockInTimeMs) {
+                clockInTimeChanged = true;
+                log.clockInTime = newClockInTime;
+            }
         }
         // If no sessions or empty sessions array, preserve existing clockInTime
         // (no assignment needed - log.clockInTime already has the existing value)
@@ -1462,7 +1471,30 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         log.paidBreakMinutesTaken = totalPaidBreak;
         log.unpaidBreakMinutesTaken = totalUnpaidBreak;
         log.notes = notes !== undefined ? notes : log.notes; // Only update if provided
-        log.penaltyMinutes = 0; 
+        log.penaltyMinutes = 0;
+        
+        // CRITICAL: If clockInTime changed, recalculate derived fields (isLate, isHalfDay, etc.)
+        // This ensures admin edits immediately update the status
+        if (clockInTimeChanged && log.clockInTime) {
+            try {
+                const user = await User.findById(log.user).populate('shiftGroup').lean();
+                if (user && user.shiftGroup && user.shiftGroup.startTime) {
+                    const recalculatedStatus = await recalculateLateStatus(
+                        log.clockInTime,
+                        user.shiftGroup
+                    );
+                    // Update derived fields with recalculated values
+                    log.isLate = recalculatedStatus.isLate;
+                    log.isHalfDay = recalculatedStatus.isHalfDay;
+                    log.lateMinutes = recalculatedStatus.lateMinutes;
+                    log.attendanceStatus = recalculatedStatus.attendanceStatus;
+                    console.log(`✅ Recalculated attendance status after clockInTime update: ${recalculatedStatus.attendanceStatus} (lateMinutes: ${recalculatedStatus.lateMinutes})`);
+                }
+            } catch (recalcError) {
+                console.error('Error recalculating late status after clockInTime update:', recalcError);
+                // Don't fail the request, but log the error
+            }
+        } 
 
         // Recalculate total working hours based on updated sessions and breaks
         if (log.clockInTime && log.clockOutTime) {
@@ -2000,6 +2032,185 @@ router.delete('/leaves/year-end/:id', [authenticateToken, isAdminOrHr], async (r
         res.status(500).json({ error: 'Failed to delete Year-End request.' });
     } finally {
         session.endSession();
+    }
+});
+
+// POST /api/admin/attendance/override-half-day - Override half-day marking for an attendance log
+router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const { attendanceLogId } = req.body;
+
+        // Validate required fields
+        if (!attendanceLogId) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'attendanceLogId is required.' 
+            });
+        }
+
+        // Validate ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(attendanceLogId)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid attendanceLogId format.' 
+            });
+        }
+
+        // Find the attendance log with user and shiftGroup populated
+        const log = await AttendanceLog.findById(attendanceLogId)
+            .populate({
+                path: 'user',
+                select: 'fullName employeeCode shiftGroup',
+                populate: {
+                    path: 'shiftGroup',
+                    select: 'startTime endTime durationHours shiftType name'
+                }
+            });
+        if (!log) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Attendance log not found.' 
+            });
+        }
+
+        // Store original values for audit logging
+        const originalStatus = log.attendanceStatus;
+        const originalIsHalfDay = log.isHalfDay;
+        const originalAdminOverride = log.adminOverride;
+
+        // Override half-day: Set adminOverride flag and recompute status
+        log.adminOverride = 'Override Half Day';
+        log.isHalfDay = false;
+
+        // CRITICAL: Recompute late/half-day status from CURRENT clockInTime
+        // This ensures derived state is always correct after override
+        if (log.clockInTime && log.user && log.user.shiftGroup && log.user.shiftGroup.startTime) {
+            const recalculatedStatus = await recalculateLateStatus(
+                log.clockInTime,
+                log.user.shiftGroup
+            );
+            
+            // Since we're overriding half-day, we need to determine the correct status
+            // If the employee was actually late (beyond grace period), mark as Late
+            // Otherwise, mark as On-time
+            if (recalculatedStatus.lateMinutes > 0) {
+                // Employee was late - check if within grace period
+                let GRACE_PERIOD_MINUTES = 30;
+                try {
+                    const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
+                    if (graceSetting && !isNaN(Number(graceSetting.value))) {
+                        GRACE_PERIOD_MINUTES = Number(graceSetting.value);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch late grace setting, using default 30 minutes', err);
+                }
+
+                if (recalculatedStatus.lateMinutes <= GRACE_PERIOD_MINUTES) {
+                    // Within grace period - On-time
+                    log.attendanceStatus = 'On-time';
+                    log.isLate = false;
+                    log.lateMinutes = recalculatedStatus.lateMinutes;
+                } else {
+                    // Beyond grace period - Late (but not half-day due to override)
+                    log.attendanceStatus = 'Late';
+                    log.isLate = true;
+                    log.lateMinutes = recalculatedStatus.lateMinutes;
+                }
+            } else {
+                // Not late - On-time
+                log.attendanceStatus = 'On-time';
+                log.isLate = false;
+                log.lateMinutes = 0;
+            }
+        } else {
+            // No clock-in time or shift info - default to On-time
+            log.attendanceStatus = 'On-time';
+            log.isLate = false;
+            log.lateMinutes = 0;
+        }
+
+        // Save the updated log
+        await log.save();
+
+        // Emit Socket.IO event to notify all clients about the attendance log update
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('attendance_log_updated', {
+                    logId: log._id,
+                    userId: log.user._id || log.user,
+                    attendanceDate: log.attendanceDate,
+                    attendanceStatus: log.attendanceStatus,
+                    isHalfDay: log.isHalfDay,
+                    isLate: log.isLate,
+                    totalWorkingHours: log.totalWorkingHours,
+                    clockInTime: log.clockInTime,
+                    clockOutTime: log.clockOutTime,
+                    adminOverride: log.adminOverride,
+                    previousStatus: originalStatus,
+                    updatedBy: req.user.userId,
+                    timestamp: new Date().toISOString(),
+                    message: `Half-day override applied: ${originalStatus} → ${log.attendanceStatus}`
+                });
+                console.log(`📡 Emitted attendance_log_updated event for override on log ${log._id}`);
+            }
+        } catch (socketError) {
+            console.error('Failed to emit Socket.IO event:', socketError);
+            // Don't fail the main request if Socket.IO fails
+        }
+
+        // Log the admin action for audit trail
+        try {
+            const logAction = require('../services/logAction');
+            await logAction(
+                req.user.userId,
+                'OVERRIDE_HALF_DAY',
+                {
+                    attendanceLogId: log._id,
+                    attendanceDate: log.attendanceDate,
+                    employeeId: log.user._id || log.user,
+                    employeeName: log.user.fullName || 'Unknown',
+                    previousStatus: originalStatus,
+                    previousIsHalfDay: originalIsHalfDay,
+                    newStatus: log.attendanceStatus,
+                    newIsHalfDay: log.isHalfDay,
+                    adminOverride: log.adminOverride,
+                    details: `Admin override: Half-day marking removed for ${log.attendanceDate}. Status changed from "${originalStatus}" to "${log.attendanceStatus}". Previous adminOverride: "${originalAdminOverride || 'None'}"`
+                }
+            );
+        } catch (logError) {
+            console.error('Failed to log override action:', logError);
+            // Don't fail the main request if logging fails
+        }
+
+        res.status(200).json({ 
+            success: true,
+            message: 'Half day overridden successfully.',
+            log: {
+                _id: log._id,
+                attendanceDate: log.attendanceDate,
+                attendanceStatus: log.attendanceStatus,
+                isHalfDay: log.isHalfDay,
+                isLate: log.isLate,
+                lateMinutes: log.lateMinutes,
+                adminOverride: log.adminOverride,
+                previousStatus: originalStatus
+            }
+        });
+
+    } catch (error) {
+        console.error('Error overriding half-day status:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Request details:', {
+            attendanceLogId: req.body.attendanceLogId,
+            userId: req.user?.userId
+        });
+        res.status(500).json({ 
+            success: false,
+            error: 'Server error while overriding half-day status.',
+            details: error.message 
+        });
     }
 });
 

@@ -12,6 +12,17 @@ class NewNotificationService {
             console.log('[SVC] Step 1: Notification document created in DB. ID:', notification.id);
             return notification;
         } catch (error) {
+            // Handle Mongoose validation errors (enum validation failures)
+            if (error.name === 'ValidationError') {
+                const validationMessages = Object.values(error.errors).map(err => err.message).join('; ');
+                console.error('[SVC] Validation error in createNotification:', validationMessages);
+                // Create a structured error that can be handled by route handlers
+                const validationError = new Error(`Notification validation failed: ${validationMessages}`);
+                validationError.name = 'ValidationError';
+                validationError.statusCode = 400;
+                validationError.errors = error.errors;
+                throw validationError;
+            }
             console.error('[SVC] CRITICAL ERROR in createNotification:', error);
             throw error;
         }

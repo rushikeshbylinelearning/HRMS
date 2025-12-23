@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { getCurrentLocation, getCachedLocationOnly } from '../services/locationService';
 import { getAvatarUrl } from '../utils/avatarUtils';
+import socket from '../socket';
 import WorkTimeTracker from '../components/WorkTimeTracker';
 import BreakTimer from '../components/BreakTimer';
 import ShiftInfoDisplay from '../components/ShiftInfoDisplay';
@@ -142,6 +143,38 @@ const EmployeeDashboardPage = () => {
             window.history.replaceState({}, document.title);
         }
     }, [location.state, fetchAllData]);
+
+    // Socket.IO listener for real-time attendance updates
+    useEffect(() => {
+        if (!contextUser) return;
+
+        // Listen for attendance log updates
+        const handleAttendanceLogUpdate = (data) => {
+            console.log('📡 EmployeeDashboardPage received attendance_log_updated event:', data);
+            
+            // Check if the update affects the current user
+            const isRelevantUpdate = (
+                data.userId === contextUser.id || // Update affects current user
+                data.userId === contextUser._id || // Alternative ID format
+                data.userId?.toString() === contextUser.id?.toString() ||
+                data.userId?.toString() === contextUser._id?.toString()
+            );
+
+            if (isRelevantUpdate) {
+                console.log('🔄 Refreshing EmployeeDashboardPage data due to attendance log update');
+                // Refetch all data to get updated attendance status
+                fetchAllData(false);
+            }
+        };
+
+        // Set up event listener
+        socket.on('attendance_log_updated', handleAttendanceLogUpdate);
+
+        // Cleanup on unmount
+        return () => {
+            socket.off('attendance_log_updated', handleAttendanceLogUpdate);
+        };
+    }, [contextUser, fetchAllData]);
 
     // Reset avatar error state when profile image URL changes
     useEffect(() => {

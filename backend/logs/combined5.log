@@ -20654,3 +20654,529 @@
   message: 'Response',
   timestamp: '2025-12-18 17:37:13'
 }
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:51:39',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:51:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '19ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:51:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '63ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:51:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:52:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '21ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/status?date=2025-12-23',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/my-weekly-log',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '16ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '69ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/status?date=2025-12-23',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:39',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/my-weekly-log',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:39',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:52:39',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '23ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '26ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '76ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:39'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:52:49',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:52:49'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/status?date=2025-12-23',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:53:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/my-weekly-log',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:53:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:53:09',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:53:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:53:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '70ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:53:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:53:34',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:53:34'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/status?date=2025-12-23',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:54:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/my-weekly-log',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:54:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:54:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:54:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '26ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:54:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '74ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:54:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:54:19',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '24ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:54:19'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:55:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/status?date=2025-12-23',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:55:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/my-weekly-log',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:55:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/leaves/my-requests',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2025-12-23 11:55:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-weekly-log',
+  statusCode: 304,
+  duration: '23ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:55:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '42ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:55:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/my-requests',
+  statusCode: 304,
+  duration: '26ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:55:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status?date=2025-12-23',
+  statusCode: 304,
+  duration: '76ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:55:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:56:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:56:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:57:04',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '24ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:57:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications/activity-log?page=1&limit=25&search=',
+  ip: '::1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2025-12-23 11:57:30',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/activity-log?page=1&limit=25&search=',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2025-12-23 11:57:30'
+}

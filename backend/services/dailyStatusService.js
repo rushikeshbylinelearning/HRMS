@@ -4,6 +4,7 @@ const AttendanceLog = require('../models/AttendanceLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
+const Setting = require('../models/Setting');
 
 const DEFAULT_OPTIONS = {
     includeSessions: true,
@@ -25,13 +26,77 @@ const getShiftDateTimeIST = (onDate, shiftTime) => {
     return new Date(shiftDateTimeISO_IST);
 };
 
+/**
+ * Recalculates late/half-day status based on current clockInTime.
+ * This is the SINGLE SOURCE OF TRUTH for derived attendance status.
+ * 
+ * @param {Date} clockInTime - The actual clock-in time
+ * @param {Object} shift - The user's shift object with startTime
+ * @param {number} gracePeriodMinutes - Grace period in minutes (default: 30)
+ * @returns {Object} { lateMinutes, isLate, isHalfDay, attendanceStatus }
+ */
+const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = null) => {
+    if (!clockInTime || !shift || !shift.startTime) {
+        return {
+            lateMinutes: 0,
+            isLate: false,
+            isHalfDay: false,
+            attendanceStatus: 'On-time'
+        };
+    }
+
+    const clockIn = new Date(clockInTime);
+    const shiftStartTime = getShiftDateTimeIST(clockIn, shift.startTime);
+    const lateMinutes = Math.max(0, Math.floor((clockIn - shiftStartTime) / (1000 * 60)));
+
+    // Get grace period from settings if not provided
+    let GRACE_PERIOD_MINUTES = gracePeriodMinutes;
+    if (GRACE_PERIOD_MINUTES === null || GRACE_PERIOD_MINUTES === undefined) {
+        try {
+            const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
+            if (graceSetting && !isNaN(Number(graceSetting.value))) {
+                GRACE_PERIOD_MINUTES = Number(graceSetting.value);
+            } else {
+                GRACE_PERIOD_MINUTES = 30; // Default
+            }
+        } catch (err) {
+            console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
+            GRACE_PERIOD_MINUTES = 30;
+        }
+    }
+
+    // Consistent rules:
+    // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
+    // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day
+    let isLate = false;
+    let isHalfDay = false;
+    let attendanceStatus = 'On-time';
+
+    if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+        isLate = false;
+        isHalfDay = false;
+        attendanceStatus = 'On-time';
+    } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
+        isHalfDay = true;
+        isLate = false;
+        attendanceStatus = 'Half-day';
+    }
+
+    return {
+        lateMinutes,
+        isLate,
+        isHalfDay,
+        attendanceStatus
+    };
+};
+
 const buildBaseResponse = (options) => ({
     status: 'Not Clocked In',
+    hasLog: false, // CRITICAL: Explicitly set to false to prevent stale UI state
     sessions: options.includeSessions ? [] : undefined,
     breaks: options.includeBreaks ? [] : undefined,
     shift: null,
-    attendanceLog: null,
-    hasLog: false, // Explicit flag to indicate no attendance log exists
+    attendanceLog: null, // CRITICAL: Must be null when no log exists
     calculatedLogoutTime: null,
     pendingExtraBreakRequest: options.includeRequests ? null : undefined,
     approvedExtraBreak: options.includeRequests ? null : undefined,
@@ -39,14 +104,18 @@ const buildBaseResponse = (options) => ({
     activeBreak: options.includeBreaks ? null : undefined,
 });
 
+/**
+ * Maps attendance log data for response.
+ * NOTE: isLate, isHalfDay, lateMinutes, and attendanceStatus are NOT included here
+ * because they must be recalculated from clockInTime on every request.
+ * See getUserDailyStatus for recalculation logic.
+ */
 const mapAttendanceLog = (attendanceLog) => ({
     penaltyMinutes: attendanceLog?.penaltyMinutes || 0,
     paidBreakMinutesTaken: attendanceLog?.paidBreakMinutesTaken || 0,
     unpaidBreakMinutesTaken: attendanceLog?.unpaidBreakMinutesTaken || 0,
-    isLate: attendanceLog?.isLate || false,
-    lateMinutes: attendanceLog?.lateMinutes || 0,
-    attendanceStatus: attendanceLog?.attendanceStatus || 'On-time',
-    isHalfDay: attendanceLog?.isHalfDay || false,
+    // CRITICAL: Do NOT include isLate, isHalfDay, lateMinutes, attendanceStatus here
+    // These must be recalculated from clockInTime on every request
 });
 
 const mapAutoBreak = (autoBreakDoc) => autoBreakDoc ? ({
@@ -242,14 +311,44 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     const attendanceLog = await AttendanceLog.findOne({ user: userId, attendanceDate: targetDate }).lean();
     if (!attendanceLog) {
-        // Explicitly return clean state when no log exists
-        // This ensures frontend knows there's no log and doesn't show stale late/half-day messages
-        return response; // hasLog: false is already set in buildBaseResponse
+        // HARD RULE: When no attendance log exists, explicitly set all flags to false/null
+        // This prevents ANY late/half-day logic from executing without a log
+        // CRITICAL: Do NOT compute lateness based on shift start time alone
+        response.hasLog = false;
+        response.attendanceLog = null; // Must be null, not undefined
+        response.sessions = resolvedOptions.includeSessions ? [] : undefined;
+        response.breaks = resolvedOptions.includeBreaks ? [] : undefined;
+        response.status = 'Not Clocked In';
+        response.calculatedLogoutTime = null;
+        // Ensure no late/half-day flags leak through
+        // (already null from buildBaseResponse, but being explicit)
+        return response;
     }
 
-    // Log exists - mark it and map the data
+    // ONLY reach here if attendance log exists
+    // Log exists - set hasLog to true and map attendance data
     response.hasLog = true;
     response.attendanceLog = mapAttendanceLog(attendanceLog);
+
+    // CRITICAL: Recalculate late/half-day status from CURRENT clockInTime
+    // This ensures admin edits to clockInTime immediately affect the response
+    if (attendanceLog.clockInTime && response.shift && response.shift.startTime) {
+        const recalculatedStatus = await recalculateLateStatus(
+            attendanceLog.clockInTime,
+            response.shift
+        );
+        // Override stored values with recalculated values
+        response.attendanceLog.isLate = recalculatedStatus.isLate;
+        response.attendanceLog.isHalfDay = recalculatedStatus.isHalfDay;
+        response.attendanceLog.lateMinutes = recalculatedStatus.lateMinutes;
+        response.attendanceLog.attendanceStatus = recalculatedStatus.attendanceStatus;
+    } else {
+        // Fallback if shift or clockInTime is missing
+        response.attendanceLog.isLate = false;
+        response.attendanceLog.isHalfDay = false;
+        response.attendanceLog.lateMinutes = 0;
+        response.attendanceLog.attendanceStatus = 'On-time';
+    }
 
     let sessions = [];
     if (resolvedOptions.includeSessions) {
@@ -313,5 +412,6 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 module.exports = {
     getUserDailyStatus,
     computeCalculatedLogoutTime, // Export for testing
+    recalculateLateStatus, // Export for use in admin routes
 };
 
