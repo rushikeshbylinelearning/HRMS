@@ -1,10 +1,11 @@
 // frontend/src/pages/EmployeeDashboardPage.jsx
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef, forwardRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Typography, Button, CircularProgress, Alert, Stack, Box, Grid, Paper, 
     Avatar, Divider, Chip, IconButton, Dialog, DialogTitle, DialogContent, 
-    DialogActions, Slide, TextField, Snackbar, Tooltip
+    DialogActions, Slide, Fade, TextField, Snackbar, Tooltip, Skeleton
 } from '@mui/material';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ import LiveClock from '../components/LiveClock';
 import SaturdaySchedule from '../components/SaturdaySchedule';
 import RecentActivityCard from '../components/RecentActivityCard';
 import ShiftProgressBar from '../components/ShiftProgressBar';
+import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, WeeklyTimeCardsSkeleton } from '../components/DashboardSkeletons';
 import '../styles/EmployeeDashboardPage.css';
 
 // Icons
@@ -42,6 +44,31 @@ const MemoizedShiftProgressBar = memo(ShiftProgressBar);
 const DialogTransition = forwardRef(function Transition(props, ref) {
     return <Slide direction="up" ref={ref} {...props} />;
 });
+const BreakModalTransition = forwardRef(function Transition(props, ref) {
+    return <Fade ref={ref} {...props} timeout={400} />;
+});
+
+// Framer Motion variants for break modal items
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.07 }
+    }
+};
+
+const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+        y: 0, 
+        opacity: 1, 
+        transition: { 
+            type: "spring", 
+            stiffness: 100,
+            damping: 15
+        } 
+    }
+};
 const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -174,10 +201,11 @@ const EmployeeDashboardPage = () => {
             let location = getCachedLocationOnly();
             if (!location) location = await getCurrentLocation();
 
-            // Optimistic UI update
+            // Immediate optimistic UI update for instant feedback
             setActionLoading(true);
             const previousDailyData = dailyData;
             setDailyData(prev => ({ ...prev, status: 'Clocked In', sessions: [{ startTime: new Date().toISOString(), endTime: null }] }));
+            setSnackbar({ open: true, message: 'Checked in successfully!' });
 
             try {
                 const res = await api.post('/attendance/clock-in', location);
@@ -194,6 +222,7 @@ const EmployeeDashboardPage = () => {
                 // Revert optimistic update on error and show message
                 setDailyData(previousDailyData);
                 setError(err.response?.data?.error || 'Failed to clock in.');
+                setSnackbar({ open: true, message: 'Check in failed. Please try again.' });
             } finally {
                 setActionLoading(false);
             }
@@ -201,12 +230,57 @@ const EmployeeDashboardPage = () => {
             setError('Location access is required to clock in. Please enable location permissions.');
         }
     };
-    const handleClockOut = () => handleActionWithOptimisticUpdate(() => api.post('/attendance/clock-out'), () => setDailyData(prev => ({ ...prev, status: 'Clocked Out' })));
-    const handleStartBreak = (breakType) => {
-        setIsBreakModalOpen(false);
-        handleActionWithOptimisticUpdate(() => api.post('/breaks/start', { breakType }), () => setDailyData(prev => ({ ...prev, status: 'On Break', breaks: [...(prev.breaks || []), { breakType, startTime: new Date().toISOString(), endTime: null }] })));
+    const handleClockOut = async () => {
+        const previousDailyData = dailyData;
+        // Immediate optimistic update
+        setDailyData(prev => ({ ...prev, status: 'Clocked Out' }));
+        setSnackbar({ open: true, message: 'Checked out successfully!' });
+        
+        try {
+            await api.post('/attendance/clock-out');
+            await fetchAllData();
+        } catch (err) {
+            // Revert on error
+            setDailyData(previousDailyData);
+            setError(err.response?.data?.error || 'Failed to clock out. Please try again.');
+            setSnackbar({ open: true, message: 'Check out failed. Please try again.' });
+        }
     };
-    const handleEndBreak = () => handleActionWithOptimisticUpdate(() => api.post('/breaks/end'), () => setDailyData(prev => ({ ...prev, status: 'Clocked In' })));
+
+    const handleStartBreak = async (breakType) => {
+        setIsBreakModalOpen(false);
+        const previousDailyData = dailyData;
+        // Immediate optimistic update
+        setDailyData(prev => ({ ...prev, status: 'On Break', breaks: [...(prev.breaks || []), { breakType, startTime: new Date().toISOString(), endTime: null }] }));
+        setSnackbar({ open: true, message: `Break started successfully!` });
+        
+        try {
+            await api.post('/breaks/start', { breakType });
+            await fetchAllData();
+        } catch (err) {
+            // Revert on error
+            setDailyData(previousDailyData);
+            setError(err.response?.data?.error || 'Failed to start break. Please try again.');
+            setSnackbar({ open: true, message: 'Failed to start break. Please try again.' });
+        }
+    };
+
+    const handleEndBreak = async () => {
+        const previousDailyData = dailyData;
+        // Immediate optimistic update
+        setDailyData(prev => ({ ...prev, status: 'Clocked In' }));
+        setSnackbar({ open: true, message: 'Break ended successfully!' });
+        
+        try {
+            await api.post('/breaks/end');
+            await fetchAllData();
+        } catch (err) {
+            // Revert on error
+            setDailyData(previousDailyData);
+            setError(err.response?.data?.error || 'Failed to end break. Please try again.');
+            setSnackbar({ open: true, message: 'Failed to end break. Please try again.' });
+        }
+    };
     
     const handleRequestExtraBreak = async () => {
         if (!breakReason.trim()) { setError("Please provide a reason."); return; }
@@ -266,23 +340,28 @@ const EmployeeDashboardPage = () => {
                                         {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${dailyData.status}`}
                                     </Typography>
                                 </Box>
-                                {isClockedInSession && (
-                                    <Box sx={{ my: 'auto' }}>
-                                        <MemoizedShiftProgressBar workedMinutes={workedMinutes} extraMinutes={serverCalculated.unpaidBreakMinutesTaken} status={dailyData.status} breaks={dailyData.breaks} sessions={dailyData.sessions} />
-                                        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                                            <Grid item xs={12} md={6}>
-                                                <Typography variant="overline" color="text.secondary">WORK DURATION</Typography>
-                                                <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={dailyData.breaks} status={dailyData.status}/>
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <Typography variant="overline" color="text.secondary">BREAK TIMER</Typography>
-                                                <MemoizedBreakTimer breaks={dailyData.breaks} paidBreakAllowance={paidBreakAllowance}/>
-                                            </Grid>
+                                <Box 
+                                    className={`time-tracking-content ${isClockedInSession ? 'visible' : 'hidden'}`}
+                                    sx={{ my: 'auto' }}
+                                >
+                                    <MemoizedShiftProgressBar workedMinutes={workedMinutes} extraMinutes={serverCalculated.unpaidBreakMinutesTaken} status={dailyData.status} breaks={dailyData.breaks} sessions={dailyData.sessions} />
+                                    <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                                        <Grid item xs={12} md={6}>
+                                            <Typography variant="overline" color="text.secondary">WORK DURATION</Typography>
+                                            <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={dailyData.breaks} status={dailyData.status}/>
                                         </Grid>
-                                    </Box>
-                                )}
+                                        <Grid item xs={12} md={6}>
+                                            <Typography variant="overline" color="text.secondary">BREAK TIMER</Typography>
+                                            <MemoizedBreakTimer breaks={dailyData.breaks} paidBreakAllowance={paidBreakAllowance}/>
+                                        </Grid>
+                                    </Grid>
+                                </Box>
                                 <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
-                                    {actionLoading ? ( <CircularProgress /> ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
+                                    {actionLoading ? ( 
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', py: 1 }}>
+                                            <CircularProgress size={24} />
+                                        </Box>
+                                    ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
                                         canAccess.checkIn() ? (
                                             <Button fullWidth className="theme-button-red" onClick={handleClockIn}>Check In</Button>
                                         ) : (
@@ -292,7 +371,7 @@ const EmployeeDashboardPage = () => {
                                         <>
                                             <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
                                                 <span>
-                                                    <Button variant="contained" className="theme-button-red" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
+                                                    <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
                                                 </span>
                                             </Tooltip>
                                             {canAccess.checkOut() ? (
@@ -302,12 +381,16 @@ const EmployeeDashboardPage = () => {
                                             )}
                                         </>
                                     ) : dailyData.status === 'On Break' ? (
-                                        <Button fullWidth variant="contained" color="success" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
+                                        <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
                                     ) : null}
                                 </Stack>
                             </Paper>
                             <Paper className="dashboard-card-base weekly-view-card">
-                                <MemoizedWeeklyTimeCards logs={weeklyLogs} shift={dailyData?.shift || contextUser?.shift} />
+                                {loading ? (
+                                    <WeeklyTimeCardsSkeleton />
+                                ) : (
+                                    <MemoizedWeeklyTimeCards logs={weeklyLogs} shift={dailyData?.shift || contextUser?.shift} />
+                                )}
                             </Paper>
                         </Stack>
                     </Grid>
@@ -318,11 +401,11 @@ const EmployeeDashboardPage = () => {
                                     src={!avatarImageError ? (() => {
                                         const avatarUrl = getAvatarUrl(contextUser?.profileImageUrl);
                                         // Add cache-busting query parameter to force browser to fetch fresh image
-                                        // Use profileImageUpdatedAt if available, otherwise use current timestamp
-                                        const cacheBuster = contextUser?.profileImageUpdatedAt || Date.now();
+                                        // Use profileImageUpdatedAt if available, otherwise use a stable value
+                                        const cacheBuster = contextUser?.profileImageUpdatedAt || 'default';
                                         return avatarUrl ? `${avatarUrl}?v=${cacheBuster}` : undefined;
                                     })() : undefined} 
-                                    key={`dashboard-avatar-${contextUser?.profileImageUrl || 'no-image'}-${contextUser?.profileImageUpdatedAt || Date.now()}`}
+                                    key={`dashboard-avatar-${contextUser?.profileImageUrl || 'no-image'}-${contextUser?.profileImageUpdatedAt || 'default'}`}
                                     className="profile-avatar"
                                     onError={() => {
                                         setAvatarImageError(true);
@@ -353,7 +436,11 @@ const EmployeeDashboardPage = () => {
                                 <Typography variant="h6" gutterBottom className="theme-text-black">Today's Shift</Typography>
                                 <Divider sx={{ mb: 2 }} />
                                 <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1 }}>
-                                    <MemoizedShiftInfoDisplay dailyData={dailyData} />
+                                    {loading ? (
+                                        <ShiftInfoSkeleton />
+                                    ) : (
+                                        <MemoizedShiftInfoDisplay dailyData={dailyData} />
+                                    )}
                                     <MemoizedLiveClock />
                                 </Stack>
                             </Paper>
@@ -362,35 +449,58 @@ const EmployeeDashboardPage = () => {
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3} sx={{ height: '100%' }}>
                             <Paper className="dashboard-card-base recent-activity-card" sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}><MemoizedRecentActivityCard dailyData={dailyData} /></Box>
+                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                                    {loading ? (
+                                        <RecentActivitySkeleton />
+                                    ) : (
+                                        <MemoizedRecentActivityCard dailyData={dailyData} />
+                                    )}
+                                </Box>
                             </Paper>
                             <Paper className="dashboard-card-base saturday-schedule-card" sx={{ display: 'flex', flexDirection: 'column' }}>
                                 <Typography variant="h6" gutterBottom className="theme-text-black">Upcoming Saturdays</Typography>
                                 <Divider sx={{ mb: 2.5 }} />
-                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}><MemoizedSaturdaySchedule policy={contextUser?.alternateSaturdayPolicy || 'All Saturdays Working'} requests={myRequests} /></Box>
+                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                                    {loading ? (
+                                        <SaturdayScheduleSkeleton />
+                                    ) : (
+                                        <MemoizedSaturdaySchedule policy={contextUser?.alternateSaturdayPolicy || 'All Saturdays Working'} requests={myRequests} />
+                                    )}
+                                </Box>
                             </Paper>
                         </Stack>
                     </Grid>
                 </Grid>
 
-                <Dialog open={isBreakModalOpen} onClose={handleCloseBreakModal} TransitionComponent={DialogTransition} PaperProps={{ className: 'break-modal-paper' }}>
+                <Dialog 
+                    open={isBreakModalOpen} 
+                    onClose={handleCloseBreakModal} 
+                    TransitionComponent={BreakModalTransition} 
+                    PaperProps={{ className: 'break-modal-paper' }}
+                >
                     <DialogTitle className="break-modal-title">Choose Your Break Type<IconButton aria-label="close" onClick={handleCloseBreakModal} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton></DialogTitle>
                     <DialogContent dividers>
-                        <Stack spacing={2}>
+                        <Stack 
+                            spacing={2} 
+                            component={motion.div}
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="visible"
+                        >
                             <Tooltip title={!paidBreakCheck.allowed ? paidBreakCheck.message : (hasExhaustedPaidBreak ? 'You have used all your paid break time' : '')} arrow placement="left">
-                                <Box>
+                                <Box component={motion.div} variants={itemVariants}>
                                     <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6">Paid Break</Typography><Typography variant="body2" color="text.secondary">{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
                             
                             <Tooltip title={!unpaidBreakCheck.allowed ? unpaidBreakCheck.message : (hasTakenUnpaidBreak ? 'You have already taken an unpaid break today' : '')} arrow placement="left">
-                                <Box>
+                                <Box component={motion.div} variants={itemVariants}>
                                     <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6">Unpaid Break</Typography><Typography variant="body2" color="text.secondary">10 minute break</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
 
                             <Tooltip title={!extraBreakCheck.allowed ? extraBreakCheck.message : (hasPendingExtraBreak ? 'Your request is pending' : hasTakenExtraBreak ? 'You have already used an extra break' : '')} arrow placement="left">
-                                <Box>
+                                <Box component={motion.div} variants={itemVariants}>
                                     <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6">{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary">{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
@@ -425,7 +535,13 @@ const EmployeeDashboardPage = () => {
                     </DialogActions>
                 </Dialog>
                 
-                <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
+                <Snackbar 
+                    open={snackbar.open} 
+                    autoHideDuration={4000} 
+                    onClose={() => setSnackbar({ ...snackbar, open: false })} 
+                    message={snackbar.message}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                />
             </Box>
         </Box>
     );

@@ -7,6 +7,7 @@ const AttendanceLog = require('../models/AttendanceLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
+const Setting = require('../models/Setting');
 const NewNotificationService = require('../services/NewNotificationService');
 const logAction = require('../services/logAction');
 const { getUserDailyStatus } = require('../services/dailyStatusService');
@@ -85,18 +86,29 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         let isHalfDay = false;
         let attendanceStatus = 'On-time';
 
-        // Grace period: 30 minutes (configurable)
-        const GRACE_PERIOD_MINUTES = 30;
-        
-        if (lateMinutes > GRACE_PERIOD_MINUTES) {
-            isLate = true;
-            attendanceStatus = 'Late';
-            
-            // If 30+ minutes late (after grace period), mark as half day
-            if (lateMinutes >= 30) {
-                isHalfDay = true;
-                attendanceStatus = 'Half-day';
+        // Grace period: configurable via settings (default 30 minutes)
+        let GRACE_PERIOD_MINUTES = 30;
+        try {
+            const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
+            if (graceSetting && !isNaN(Number(graceSetting.value))) {
+                GRACE_PERIOD_MINUTES = Number(graceSetting.value);
             }
+        } catch (err) {
+            console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
+        }
+
+        // Consistent rules:
+        // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
+        // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day
+        // Grace period allows employees to arrive late without penalty
+        if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+            isLate = false;
+            isHalfDay = false;
+            attendanceStatus = 'On-time';
+        } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
+            isHalfDay = true;
+            isLate = false;
+            attendanceStatus = 'Half-day';
         }
 
         // Update the attendance log with analytics data

@@ -1,8 +1,9 @@
 // frontend/src/components/RecentActivityCard.jsx
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Typography, Paper, Box } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot, timelineItemClasses } from '@mui/lab';
+import '../styles/RecentActivityCard.css';
 
 // Icons for different activity types
 import LoginIcon from '@mui/icons-material/Login';
@@ -32,6 +33,8 @@ const getActivityProps = (type) => {
 };
 
 const RecentActivityCard = ({ dailyData }) => {
+    const [isVisible, setIsVisible] = useState(false);
+
     const activities = useMemo(() => {
         if (!dailyData) return [];
         
@@ -64,6 +67,13 @@ const RecentActivityCard = ({ dailyData }) => {
 
     }, [dailyData]);
 
+    // Trigger animation when activities change
+    useEffect(() => {
+        setIsVisible(false);
+        const timer = setTimeout(() => setIsVisible(true), 10);
+        return () => clearTimeout(timer);
+    }, [activities.length]);
+
     return (
         <Paper elevation={3} sx={{ p: 2.5, borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
             <Typography variant="h6" gutterBottom>Recent Activity</Typography>
@@ -81,7 +91,15 @@ const RecentActivityCard = ({ dailyData }) => {
                     {activities.map((activity, index) => {
                         const { icon, color } = getActivityProps(activity.type);
                         return (
-                            <TimelineItem key={index}>
+                            <TimelineItem 
+                                key={index}
+                                className={`activity-item ${isVisible ? 'visible' : ''}`}
+                                sx={{
+                                    '&.activity-item': {
+                                        transitionDelay: `${index * 30}ms`
+                                    }
+                                }}
+                            >
                                 <TimelineSeparator>
                                     <TimelineDot color={color} variant="outlined">
                                         {icon}

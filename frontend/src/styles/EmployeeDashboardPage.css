@@ -18,6 +18,9 @@
 
     --shadow-light: 0 8px 24px rgba(0, 0, 0, 0.06);
     --shadow-hover: 0 14px 30px rgba(0, 0, 0, 0.12);
+    
+    /* Custom easing curve for snappy, natural animations */
+    --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* --- Page Container --- */
@@ -106,6 +109,8 @@
     background-color: var(--theme-red-light);
     color: var(--theme-red);
     box-shadow: inset 0 0 0 2px rgba(220,53,69,0.15);
+    /* Prevent blinking by ensuring stable rendering */
+    will-change: auto;
 }
 .profile-avatar-letter { font-size: 3rem; font-weight: bold; }
 
@@ -133,6 +138,13 @@
     transition: all 0.2s ease-in-out !important;
 }
 .theme-button-red:hover { background-color: var(--theme-red-hover) !important; transform: translateY(-2px); box-shadow: var(--shadow-hover) !important; }
+
+/* Smooth transition for Start Break / End Break button */
+.theme-button-break,
+.theme-button-break-end {
+    transition: background-color 0.3s ease !important;
+}
+
 .theme-button-checkout { border-color: var(--theme-red) !important; color: var(--theme-red) !important; font-weight: 700 !important; border-radius: 10px !important; }
 .theme-button-checkout:hover { background-color: var(--theme-red-light) !important; border-color: var(--theme-red-hover) !important; }
 
@@ -150,8 +162,52 @@
 .recent-activity-card > div::-webkit-scrollbar-thumb,
 .saturday-schedule-card > div::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 999px; }
 
+/* Time Tracking Content Fade Animation */
+.time-tracking-content {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s var(--ease-out-quint), visibility 0.3s var(--ease-out-quint);
+    will-change: opacity;
+}
+
+.time-tracking-content.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.time-tracking-content.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
 /* Break modal styles */
-.break-modal-paper { border-radius: 16px !important; min-width: 360px; }
+/* Material-UI Dialog backdrop fade animation */
+.MuiDialog-root .MuiBackdrop-root {
+    transition: opacity 0.3s ease !important;
+}
+
+.break-modal-paper { 
+    border-radius: 16px !important; 
+    min-width: 360px;
+    transform: scale(0.95);
+    transition: transform 0.4s var(--ease-out-quint), opacity 0.4s var(--ease-out-quint) !important;
+    will-change: transform, opacity;
+}
+
+/* When Material-UI Fade transition enters (dialog opening) - add scale */
+.MuiDialog-root .MuiFadeTransition-entering .break-modal-paper,
+.MuiDialog-root .MuiFadeTransition-entered .break-modal-paper {
+    transform: scale(1) !important;
+}
+
+/* Ensure the transition works when dialog closes */
+.MuiDialog-root .MuiFadeTransition-exiting .break-modal-paper {
+    transform: scale(0.95) !important;
+}
+
+/* Break modal card styles - animations handled by Framer Motion */
+
 .break-modal-title { color: var(--theme-black); font-weight: 700 !important; }
 .break-modal-card { padding: 20px; border: 1px solid var(--theme-border); border-radius: 12px !important; cursor: pointer; transition: all 0.2s ease-in-out; display: flex; align-items: center; gap: 16px; background-color: var(--theme-white); }
 .break-modal-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover) !important; border-color: var(--theme-red); background-color: #fff; }

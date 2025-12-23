@@ -217,15 +217,65 @@ const AdminAttendanceSummaryPage = () => {
         window.location.href = '/employee-muster-roll';
     };
 
+    /**
+     * Save attendance log with proper error handling
+     * Handles 400 Bad Request and other errors gracefully
+     * Never crashes the application
+     */
     const handleSaveLog = async (logId, updatedData) => {
         try {
+            // Validate logId exists
+            if (!logId) {
+                throw new Error('Attendance log ID is missing. Cannot save changes.');
+            }
+
+            // Log request in development mode
+            if (process.env.NODE_ENV === 'development') {
+                console.log('📤 Saving attendance log:', {
+                    logId,
+                    sessionsCount: updatedData?.sessions?.length || 0,
+                    breaksCount: updatedData?.breaks?.length || 0,
+                    hasNotes: !!updatedData?.notes
+                });
+            }
+
+            // Make API call
             await api.put(`/admin/attendance/log/${logId}`, updatedData);
+            
+            // Success - show success message and refresh data
             setSnackbar({ open: true, message: 'Log updated successfully!' });
             handleCloseModal();
             fetchLogsForWeek(currentDate, selectedEmployeeId); // Refresh data
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to save changes.');
-            console.error("Failed to save log:", err);
+            // Extract error message safely - handle different error response structures
+            let errorMessage = 'Failed to save changes. Please try again.';
+            
+            if (err?.response?.data) {
+                // Backend returned structured error
+                errorMessage = err.response.data.message || err.response.data.error || errorMessage;
+            } else if (err?.message) {
+                // Network error or other error with message
+                errorMessage = err.message;
+            }
+
+            // Show error to user
+            setError(errorMessage);
+            setSnackbar({ 
+                open: true, 
+                message: errorMessage, 
+                severity: 'error' 
+            });
+            
+            // Log error for debugging (only in development)
+            if (process.env.NODE_ENV === 'development') {
+                console.error('❌ Failed to save attendance log:', {
+                    logId,
+                    error: err,
+                    response: err?.response?.data,
+                    status: err?.response?.status,
+                    message: errorMessage
+                });
+            }
         }
     };
 

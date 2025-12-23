@@ -64,8 +64,10 @@ const getShiftStartDateTimeIST = (onDate, shiftStartTime) => {
 
 const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
     const [liveLogoutTime, setLiveLogoutTime] = useState(null);
-    const { shift, sessions, breaks, status } = dailyData || {};
-    const clockInTime = sessions?.[0]?.startTime;
+    const { shift, sessions, breaks, status, hasLog } = dailyData || {};
+    // CRITICAL: Only use clockInTime if log exists (hasLog === true)
+    // If log was deleted, sessions will be empty array but we should treat clockInTime as null
+    const clockInTime = (hasLog === true && sessions?.[0]?.startTime) ? sessions[0].startTime : null;
     
     // Use shift from dailyData, or fallback to the user's assigned shift
     const effectiveShift = shift || fallbackShift;
@@ -73,6 +75,12 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
 
 
     useEffect(() => {
+        // Reset logout time if log doesn't exist (log was deleted)
+        if (hasLog === false) {
+            setLiveLogoutTime(null);
+            return;
+        }
+
         // Fallback to the server-calculated time if it exists, especially on initial load.
         if (dailyData?.calculatedLogoutTime && !liveLogoutTime) {
             setLiveLogoutTime(new Date(dailyData.calculatedLogoutTime));
@@ -148,7 +156,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
         const timerId = setInterval(calculateLiveLogoutTime, 1000);
         return () => clearInterval(timerId); 
 
-    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime]);
+    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, hasLog]);
 
     if (!effectiveShift) {
         return <div className="shift-info-display-container no-shift">No shift assigned for today.</div>;
@@ -160,11 +168,18 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
     const formattedClockIn = formatTimeIST(clockInTime);
     const formattedLiveLogout = formatTimeIST(liveLogoutTime);
     
-    const penaltyMinutes = dailyData?.attendanceLog?.penaltyMinutes || 0;
-    const isLate = dailyData?.attendanceLog?.isLate || false;
-    const isHalfDay = dailyData?.attendanceLog?.isHalfDay || false;
-    const lateMinutes = dailyData?.attendanceLog?.lateMinutes || 0;
-    const attendanceStatus = dailyData?.attendanceLog?.attendanceStatus || 'On-time';
+    // CRITICAL: Check if log exists before reading late/half-day flags
+    // If log was deleted, hasLog will be false and we must not show late/half-day messages
+    const hasLog = dailyData?.hasLog === true;
+    const attendanceLog = hasLog ? dailyData?.attendanceLog : null;
+    
+    // Only read late/half-day flags if log actually exists
+    // This prevents showing stale late/half-day messages after log deletion
+    const penaltyMinutes = hasLog ? (attendanceLog?.penaltyMinutes || 0) : 0;
+    const isLate = hasLog && attendanceLog ? (attendanceLog.isLate || false) : false;
+    const isHalfDay = hasLog && attendanceLog ? (attendanceLog.isHalfDay || false) : false;
+    const lateMinutes = hasLog ? (attendanceLog?.lateMinutes || 0) : 0;
+    const attendanceStatus = hasLog ? (attendanceLog?.attendanceStatus || 'On-time') : 'On-time';
 
     const renderLogoutInfo = () => {
         if (!clockInTime) {
@@ -195,10 +210,11 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
                 <div className={`info-value clock-in-time ${formattedClockIn !== 'N/A' ? 'active' : ''} ${isLate ? 'late-highlight' : ''} ${isHalfDay ? 'half-day-highlight' : ''}`}>
                     <div className="clock-in-content">
                         <div className="clock-in-time-display">{formattedClockIn}</div>
-                        {isHalfDay && (
+                        {/* Only show late/half-day messages if log exists and flags are set */}
+                        {hasLog && isHalfDay && (
                             <div className="half-day-message">Half day marked as you are late than allowed grace period</div>
                         )}
-                        {isLate && !isHalfDay && (
+                        {hasLog && isLate && !isHalfDay && (
                             <div className="late-message-only">You're late today, let's not happen next time</div>
                         )}
                     </div>

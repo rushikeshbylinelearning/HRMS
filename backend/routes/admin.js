@@ -1176,12 +1176,207 @@ router.get('/attendance/user/:userId', [authenticateToken, isAdminOrHr], async (
     }
 });
 
+/**
+ * PUT /api/admin/attendance/log/:logId
+ * Update an attendance log with new sessions and breaks
+ * 
+ * Expected payload structure:
+ * {
+ *   sessions: Array<{ 
+ *     startTime: string (ISO 8601 date string, required),
+ *     endTime: string (ISO 8601 date string, optional, must be after startTime if provided)
+ *   }>,
+ *   breaks: Array<{
+ *     startTime: string (ISO 8601 date string, required),
+ *     endTime: string (ISO 8601 date string, required, must be after startTime),
+ *     breakType: 'Paid' | 'Unpaid' | 'Extra' (required)
+ *   }>,
+ *   notes: string (optional, defaults to empty string)
+ * }
+ * 
+ * Validation rules:
+ * - All time values must be valid ISO 8601 date strings
+ * - endTime must be after startTime for both sessions and breaks
+ * - Session duration cannot exceed 16 hours
+ * - Break duration cannot exceed 16 hours
+ * - breakType must be one of: 'Paid', 'Unpaid', 'Extra'
+ */
 router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { logId } = req.params;
-    const { sessions, breaks, notes } = req.body;
+    let { sessions, breaks, notes } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(logId)) {
-        return res.status(400).json({ error: 'Invalid log ID.' });
+        return res.status(400).json({ 
+            success: false,
+            message: 'Invalid log ID.',
+            error: 'Invalid log ID.'
+        });
+    }
+
+    // Log received data for debugging (remove in production if needed)
+    console.log('PUT /admin/attendance/log/:logId - Received data:', {
+        logId,
+        sessionsType: typeof sessions,
+        sessionsIsArray: Array.isArray(sessions),
+        sessionsLength: Array.isArray(sessions) ? sessions.length : 'N/A',
+        breaksType: typeof breaks,
+        breaksIsArray: Array.isArray(breaks),
+        breaksLength: Array.isArray(breaks) ? breaks.length : 'N/A',
+        hasNotes: notes !== undefined
+    });
+
+    // Validate and default required fields
+    if (sessions === undefined || sessions === null) {
+        sessions = [];
+    }
+    if (!Array.isArray(sessions)) {
+        console.error('Validation error: sessions is not an array:', sessions);
+        return res.status(400).json({ 
+            success: false,
+            message: 'Sessions must be an array.',
+            error: 'Sessions must be an array.'
+        });
+    }
+    
+    if (breaks === undefined || breaks === null) {
+        breaks = [];
+    }
+    if (!Array.isArray(breaks)) {
+        console.error('Validation error: breaks is not an array:', breaks);
+        return res.status(400).json({ 
+            success: false,
+            message: 'Breaks must be an array.',
+            error: 'Breaks must be an array.'
+        });
+    }
+
+    // Validate sessions with time ordering checks
+    for (let i = 0; i < sessions.length; i++) {
+        const s = sessions[i];
+        if (!s || typeof s !== 'object') {
+            return res.status(400).json({ 
+                success: false,
+                message: `Session #${i + 1} is invalid. Expected an object.`,
+                error: `Session #${i + 1} is invalid. Expected an object.`
+            });
+        }
+        if (!s.startTime) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Session #${i + 1} is missing startTime.`,
+                error: `Session #${i + 1} is missing startTime.`
+            });
+        }
+        const startTime = new Date(s.startTime);
+        if (isNaN(startTime.getTime())) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Session #${i + 1} has an invalid startTime: ${s.startTime}`,
+                error: `Session #${i + 1} has an invalid startTime: ${s.startTime}`
+            });
+        }
+        if (s.endTime) {
+            const endTime = new Date(s.endTime);
+            if (isNaN(endTime.getTime())) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: `Session #${i + 1} has an invalid endTime: ${s.endTime}`,
+                    error: `Session #${i + 1} has an invalid endTime: ${s.endTime}`
+                });
+            }
+            // Validate time ordering: endTime must be after startTime
+            if (endTime <= startTime) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: `Session #${i + 1} end time must be after start time.`,
+                    error: `Session #${i + 1} end time must be after start time.`
+                });
+            }
+            // Validate reasonable duration (max 16 hours)
+            const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+            if (durationHours > 16) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: `Session #${i + 1} duration cannot exceed 16 hours.`,
+                    error: `Session #${i + 1} duration cannot exceed 16 hours.`
+                });
+            }
+        }
+    }
+
+    // Validate breaks with time ordering and breakType checks
+    for (let i = 0; i < breaks.length; i++) {
+        const b = breaks[i];
+        if (!b || typeof b !== 'object') {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} is invalid. Expected an object.`,
+                error: `Break #${i + 1} is invalid. Expected an object.`
+            });
+        }
+        if (!b.startTime) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} is missing startTime.`,
+                error: `Break #${i + 1} is missing startTime.`
+            });
+        }
+        if (!b.endTime) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} is missing endTime.`,
+                error: `Break #${i + 1} is missing endTime.`
+            });
+        }
+        const startTime = new Date(b.startTime);
+        const endTime = new Date(b.endTime);
+        if (isNaN(startTime.getTime())) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} has an invalid startTime: ${b.startTime}`,
+                error: `Break #${i + 1} has an invalid startTime: ${b.startTime}`
+            });
+        }
+        if (isNaN(endTime.getTime())) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} has an invalid endTime: ${b.endTime}`,
+                error: `Break #${i + 1} has an invalid endTime: ${b.endTime}`
+            });
+        }
+        // Validate time ordering: endTime must be after startTime
+        if (endTime <= startTime) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} end time must be after start time.`,
+                error: `Break #${i + 1} end time must be after start time.`
+            });
+        }
+        // Validate reasonable duration (max 16 hours)
+        const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+        if (durationHours > 16) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} duration cannot exceed 16 hours.`,
+                error: `Break #${i + 1} duration cannot exceed 16 hours.`
+            });
+        }
+        // Handle both breakType and type for backward compatibility
+        const breakType = (b.breakType || b.type || '').toString().trim();
+        if (!breakType) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} is missing breakType.`,
+                error: `Break #${i + 1} is missing breakType.`
+            });
+        }
+        if (!['Paid', 'Unpaid', 'Extra'].includes(breakType)) {
+            return res.status(400).json({ 
+                success: false,
+                message: `Break #${i + 1} has an invalid breakType: ${breakType}. Must be 'Paid', 'Unpaid', or 'Extra'.`,
+                error: `Break #${i + 1} has an invalid breakType: ${breakType}. Must be 'Paid', 'Unpaid', or 'Extra'.`
+            });
+        }
     }
 
     const dbSession = await mongoose.startSession();
@@ -1191,7 +1386,11 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         const log = await AttendanceLog.findById(logId).session(dbSession);
         if (!log) {
             await dbSession.abortTransaction();
-            return res.status(404).json({ error: 'Attendance log not found.' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'Attendance log not found.',
+                error: 'Attendance log not found.'
+            });
         }
         
         await AttendanceSession.deleteMany({ attendanceLog: log._id }).session(dbSession);
@@ -1214,15 +1413,18 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             const endTime = new Date(b.endTime);
             const durationMinutes = (endTime - startTime) / 60000;
             
-            if (b.breakType === 'Paid') {
+            // Handle both breakType and type for backward compatibility
+            const breakType = b.breakType || b.type || 'Unpaid';
+            
+            if (breakType === 'Paid') {
                 totalPaidBreak += durationMinutes;
             } else {
                 totalUnpaidBreak += durationMinutes;
             }
             
             return {
-                type: b.breakType,
-                breakType: b.breakType,
+                type: breakType,
+                breakType: breakType,
                 startTime,
                 endTime,
                 durationMinutes,
@@ -1235,14 +1437,31 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             await BreakLog.insertMany(newBreaks, { session: dbSession });
         }
 
+        // Preserve existing clockInTime and clockOutTime if not updating from sessions
+        // This ensures required fields remain valid during partial updates
+        // CRITICAL: clockInTime is required in schema, so we must preserve it if not updating
         const sortedSessions = [...newSessions].sort((a, b) => a.startTime - b.startTime);
-        log.clockInTime = sortedSessions.length > 0 ? sortedSessions[0].startTime : null;
+        
+        // Only update clockInTime if we have valid sessions (preserve existing if not)
+        // This prevents Mongoose validation errors: "Path `clockInTime` is required"
+        if (sortedSessions.length > 0 && sortedSessions[0].startTime) {
+            // Update clockInTime from first session's startTime
+            log.clockInTime = sortedSessions[0].startTime;
+        }
+        // If no sessions or empty sessions array, preserve existing clockInTime
+        // (no assignment needed - log.clockInTime already has the existing value)
+        
+        // Update clockOutTime if we have valid sessions (clockOutTime is optional, so null is OK)
         const lastSession = sortedSessions[sortedSessions.length - 1];
-        log.clockOutTime = lastSession?.endTime ? lastSession.endTime : null;
+        if (sortedSessions.length > 0) {
+            // We have sessions - update clockOutTime based on last session
+            log.clockOutTime = lastSession?.endTime || null;
+        }
+        // If no sessions, preserve existing clockOutTime (no assignment needed)
 
         log.paidBreakMinutesTaken = totalPaidBreak;
         log.unpaidBreakMinutesTaken = totalUnpaidBreak;
-        log.notes = notes;
+        log.notes = notes !== undefined ? notes : log.notes; // Only update if provided
         log.penaltyMinutes = 0; 
 
         // Recalculate total working hours based on updated sessions and breaks
@@ -1255,7 +1474,26 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             log.totalWorkingHours = 0;
         }
 
-        await log.save({ session: dbSession });
+        // Save the log with validation - catch any Mongoose validation errors
+        try {
+            await log.save({ session: dbSession });
+        } catch (saveError) {
+            await dbSession.abortTransaction();
+            
+            // Handle Mongoose validation errors specifically
+            if (saveError.name === 'ValidationError') {
+                const validationMessages = Object.values(saveError.errors).map(err => err.message);
+                console.error('Mongoose validation error:', validationMessages);
+                return res.status(400).json({ 
+                    success: false,
+                    message: `Validation failed: ${validationMessages.join(', ')}`,
+                    error: `Validation failed: ${validationMessages.join(', ')}`
+                });
+            }
+            
+            // Re-throw other errors to be handled by outer catch block
+            throw saveError;
+        }
 
         await dbSession.commitTransaction();
 
@@ -1286,7 +1524,143 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             // Don't fail the main request if Socket.IO fails
         }
 
-        res.json({ message: 'Log updated successfully.' });
+        res.json({ 
+            success: true,
+            message: 'Log updated successfully.'
+        });
+
+    } catch (error) {
+        await dbSession.abortTransaction();
+        
+        // Handle different error types with structured responses
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ 
+                success: false,
+                message: `Validation failed: ${messages.join(', ')}`,
+                error: `Validation failed: ${messages.join(', ')}`
+            });
+        }
+        if (error.name === 'CastError') {
+            return res.status(400).json({ 
+                success: false,
+                message: `Invalid data format for field: ${error.path}. Please check your inputs.`,
+                error: `Invalid data format for field: ${error.path}. Please check your inputs.`
+            });
+        }
+        
+        // Log error for debugging but don't expose internal details to client
+        console.error('Error updating attendance log:', error);
+        return res.status(500).json({ 
+            success: false,
+            message: 'Server error while updating log. Please try again.',
+            error: 'Server error while updating log.'
+        });
+    } finally {
+        dbSession.endSession();
+    }
+});
+
+// DELETE /api/admin/attendance/log/:logId
+// Delete an attendance log and all associated sessions and breaks
+router.delete('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { logId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(logId)) {
+        return res.status(400).json({ error: 'Invalid log ID.' });
+    }
+
+    const dbSession = await mongoose.startSession();
+    dbSession.startTransaction();
+
+    try {
+        // Find the log and populate user info for audit logging
+        const log = await AttendanceLog.findById(logId)
+            .populate('user', 'fullName employeeCode')
+            .session(dbSession);
+        
+        if (!log) {
+            await dbSession.abortTransaction();
+            return res.status(404).json({ error: 'Attendance log not found.' });
+        }
+
+        // Store log data for audit logging before deletion
+        const logData = {
+            logId: log._id,
+            userId: log.user._id,
+            userName: log.user.fullName,
+            employeeCode: log.user.employeeCode,
+            attendanceDate: log.attendanceDate,
+            clockInTime: log.clockInTime,
+            clockOutTime: log.clockOutTime,
+            attendanceStatus: log.attendanceStatus,
+            totalWorkingHours: log.totalWorkingHours
+        };
+
+        // Delete all associated sessions
+        await AttendanceSession.deleteMany({ attendanceLog: log._id }).session(dbSession);
+        
+        // Delete all associated breaks
+        await BreakLog.deleteMany({ attendanceLog: log._id }).session(dbSession);
+        
+        // Delete the attendance log
+        await AttendanceLog.findByIdAndDelete(logId).session(dbSession);
+
+        await dbSession.commitTransaction();
+
+        // Log the admin action
+        try {
+            const auditLogger = require('../services/auditLogger');
+            await auditLogger.logAction({
+                userId: req.user.userId,
+                action: 'delete_attendance_log',
+                details: {
+                    deletedLogId: logData.logId,
+                    targetEmployeeId: logData.userId,
+                    targetEmployeeName: logData.userName,
+                    targetEmployeeCode: logData.employeeCode,
+                    attendanceDate: logData.attendanceDate,
+                    deletedClockInTime: logData.clockInTime,
+                    deletedClockOutTime: logData.clockOutTime,
+                    deletedAttendanceStatus: logData.attendanceStatus,
+                    deletedTotalWorkingHours: logData.totalWorkingHours
+                },
+                ipAddress: req.ip,
+                userAgent: req.get('User-Agent')
+            });
+        } catch (auditError) {
+            console.error('Failed to log audit action:', auditError);
+            // Don't fail the request if audit logging fails
+        }
+
+        // Emit Socket.IO event to notify all clients about the attendance log deletion
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('attendance_log_deleted', {
+                    logId: logData.logId,
+                    userId: logData.userId,
+                    attendanceDate: logData.attendanceDate,
+                    deletedBy: req.user.userId,
+                    timestamp: new Date().toISOString(),
+                    message: `Attendance log deleted by admin for ${logData.userName} on ${logData.attendanceDate}`
+                });
+                console.log(`📡 Emitted attendance_log_deleted event for log ${logData.logId}`);
+            }
+        } catch (socketError) {
+            console.error('Failed to emit Socket.IO event:', socketError);
+            // Don't fail the main request if Socket.IO fails
+        }
+
+        res.json({ 
+            message: 'Attendance log deleted successfully.',
+            deletedLog: {
+                logId: logData.logId,
+                attendanceDate: logData.attendanceDate,
+                employeeName: logData.userName
+            }
+        });
 
     } catch (error) {
         await dbSession.abortTransaction();
@@ -1295,10 +1669,10 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             return res.status(400).json({ error: `Validation failed: ${messages.join(', ')}` });
         }
         if (error.name === 'CastError') {
-            return res.status(400).json({ error: `Invalid data format for field: ${error.path}. Please check your inputs.` });
+            return res.status(400).json({ error: `Invalid data format: ${error.message}` });
         }
-        console.error('Error updating attendance log:', error);
-        res.status(500).json({ error: 'Server error while updating log.' });
+        console.error('Error deleting attendance log:', error);
+        res.status(500).json({ error: 'Server error while deleting log.' });
     } finally {
         dbSession.endSession();
     }

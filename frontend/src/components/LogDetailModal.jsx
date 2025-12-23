@@ -205,112 +205,189 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
         setEditableLog(prev => ({ ...prev, breaks: prev.breaks.filter(b => b._id !== id) }));
     };
 
-    const handleSaveChanges = async () => {
-        setLocalError('');
-        setIsSaving(true);
+    /**
+     * Centralized payload builder with strict validation
+     * Ensures all required fields exist and are properly formatted before API call
+     * 
+     * Expected payload structure:
+     * {
+     *   sessions: Array<{ startTime: string (ISO), endTime: string (ISO) | null }>
+     *   breaks: Array<{ startTime: string (ISO), endTime: string (ISO), breakType: 'Paid' | 'Unpaid' | 'Extra' }>
+     *   notes: string
+     *   attendanceDate: string (YYYY-MM-DD) - optional, for reference
+     * }
+     */
+    const buildValidatedPayload = () => {
+        try {
+            // Ensure sessions and breaks are arrays
+            const sessions = Array.isArray(editableLog?.sessions) ? editableLog.sessions : [];
+            const breaks = Array.isArray(editableLog?.breaks) ? editableLog.breaks : [];
 
-        // Validate and normalize sessions
-        for (const [index, session] of editableLog.sessions.entries()) {
-            if (!session.startTime) {
-                setLocalError(`Work Session #${index + 1} has an invalid or missing start time.`);
-                setIsSaving(false);
-                return;
-            }
+            // Validate and normalize sessions - strip extra fields, ensure valid times
+            const normalizedSessions = sessions.map((session, index) => {
+                if (!session || typeof session !== 'object') {
+                    throw new Error(`Session #${index + 1} is invalid. Expected an object.`);
+                }
 
-            const start = dayjs(session.startTime);
-            if (!start.isValid()) {
-                setLocalError(`Work Session #${index + 1} has an invalid start time.`);
-                setIsSaving(false);
-                return;
-            }
+                if (!session.startTime) {
+                    throw new Error(`Session #${index + 1} is missing startTime.`);
+                }
 
-            if (session.endTime) {
-                let end = dayjs(session.endTime);
+                // Convert to dayjs for validation
+                const start = dayjs(session.startTime);
+                if (!start.isValid()) {
+                    throw new Error(`Session #${index + 1} has an invalid startTime: ${session.startTime}`);
+                }
+
+                // Build clean session object (only include required fields)
+                const cleanSession = {
+                    startTime: start.toISOString() // Ensure ISO format
+                };
+
+                // End time is optional, but if provided must be valid
+                if (session.endTime) {
+                    let end = dayjs(session.endTime);
+                    if (!end.isValid()) {
+                        throw new Error(`Session #${index + 1} has an invalid endTime: ${session.endTime}`);
+                    }
+
+                    // Normalize: if end is before start, add 1 day (cross-day scenario)
+                    if (end.isBefore(start)) {
+                        end = end.add(1, 'day');
+                    }
+
+                    // Validate duration (max 16 hours)
+                    const durationHours = end.diff(start, 'hour', true);
+                    if (durationHours <= 0) {
+                        throw new Error(`Session #${index + 1} end time must be after start time.`);
+                    }
+                    if (durationHours > 16) {
+                        throw new Error(`Session #${index + 1} duration cannot exceed 16 hours.`);
+                    }
+
+                    cleanSession.endTime = end.toISOString();
+                } else {
+                    cleanSession.endTime = null;
+                }
+
+                return cleanSession;
+            });
+
+            // Validate and normalize breaks - strip extra fields, ensure valid times and breakType
+            const normalizedBreaks = breaks.map((brk, index) => {
+                if (!brk || typeof brk !== 'object') {
+                    throw new Error(`Break #${index + 1} is invalid. Expected an object.`);
+                }
+
+                if (!brk.startTime) {
+                    throw new Error(`Break #${index + 1} is missing startTime.`);
+                }
+
+                if (!brk.endTime) {
+                    throw new Error(`Break #${index + 1} is missing endTime.`);
+                }
+
+                const start = dayjs(brk.startTime);
+                if (!start.isValid()) {
+                    throw new Error(`Break #${index + 1} has an invalid startTime: ${brk.startTime}`);
+                }
+
+                let end = dayjs(brk.endTime);
                 if (!end.isValid()) {
-                    setLocalError(`Work Session #${index + 1} has an invalid end time.`);
-                    setIsSaving(false);
-                    return;
+                    throw new Error(`Break #${index + 1} has an invalid endTime: ${brk.endTime}`);
                 }
 
                 // Normalize: if end is before start, add 1 day (cross-day scenario)
                 if (end.isBefore(start)) {
                     end = end.add(1, 'day');
-                    // Update the session with normalized end time
-                    editableLog.sessions[index].endTime = end.toISOString();
                 }
 
-                // Validate duration (max 16 hours)
+                // Validate duration (max 16 hours for breaks too)
                 const durationHours = end.diff(start, 'hour', true);
                 if (durationHours <= 0) {
-                    setLocalError(`Work Session #${index + 1} end time must be after start time.`);
-                    setIsSaving(false);
-                    return;
+                    throw new Error(`Break #${index + 1} end time must be after start time.`);
                 }
                 if (durationHours > 16) {
-                    setLocalError(`Work Session #${index + 1} duration cannot exceed 16 hours.`);
-                    setIsSaving(false);
-                    return;
+                    throw new Error(`Break #${index + 1} duration cannot exceed 16 hours.`);
                 }
+
+                // Normalize breakType (handle both type and breakType for backward compatibility)
+                const breakType = (brk.breakType || brk.type || 'Unpaid').trim();
+                if (!['Paid', 'Unpaid', 'Extra'].includes(breakType)) {
+                    throw new Error(`Break #${index + 1} has an invalid breakType: ${breakType}. Must be 'Paid', 'Unpaid', or 'Extra'.`);
+                }
+
+                // Build clean break object (only include required fields)
+                return {
+                    startTime: start.toISOString(),
+                    endTime: end.toISOString(),
+                    breakType: breakType
+                };
+            });
+
+            // Build final payload - only send required fields to backend
+            const payload = {
+                sessions: normalizedSessions,
+                breaks: normalizedBreaks,
+                notes: (editableLog?.notes || '').toString().trim()
+            };
+
+            // Optional: include attendanceDate for reference (backend may not use it)
+            if (dateForApi) {
+                payload.attendanceDate = dateForApi;
+            }
+
+            // Log payload in development mode for debugging
+            if (process.env.NODE_ENV === 'development') {
+                console.log('📤 Payload being sent to backend:', {
+                    sessionsCount: payload.sessions.length,
+                    breaksCount: payload.breaks.length,
+                    hasNotes: !!payload.notes,
+                    sessions: payload.sessions,
+                    breaks: payload.breaks
+                });
+            }
+
+            return payload;
+        } catch (validationError) {
+            // Convert validation errors to user-friendly messages
+            throw new Error(validationError.message || 'Validation failed. Please check all fields.');
+        }
+    };
+
+    const handleSaveChanges = async () => {
+        setLocalError('');
+        setIsSaving(true);
+
+        try {
+            // Validate and build payload
+            const payload = buildValidatedPayload();
+
+            // Validate log ID exists
+            if (!log?._id) {
+                throw new Error('Attendance log ID is missing. Cannot save changes.');
+            }
+
+            // Call onSave with proper error handling
+            await onSave(log._id, payload);
+            
+            // Success - onSave will handle UI updates
+            setIsSaving(false);
+        } catch (error) {
+            // Handle validation errors and API errors safely
+            const errorMessage = error?.message || error?.response?.data?.error || error?.response?.data?.message || 'Failed to save changes. Please try again.';
+            setLocalError(errorMessage);
+            setIsSaving(false);
+            
+            // Log error for debugging (only in development)
+            if (process.env.NODE_ENV === 'development') {
+                console.error('❌ Error saving attendance log:', {
+                    error,
+                    message: errorMessage,
+                    logId: log?._id
+                });
             }
         }
-
-        // Validate and normalize breaks
-        for (const [index, brk] of editableLog.breaks.entries()) {
-            if (!brk.startTime) {
-                setLocalError(`Break #${index + 1} has an invalid or missing start time.`);
-                setIsSaving(false);
-                return;
-            }
-
-            const start = dayjs(brk.startTime);
-            if (!start.isValid()) {
-                setLocalError(`Break #${index + 1} has an invalid start time.`);
-                setIsSaving(false);
-                return;
-            }
-
-            if (!brk.endTime) {
-                setLocalError(`Break #${index + 1} has an invalid or missing end time.`);
-                setIsSaving(false);
-                return;
-            }
-
-            let end = dayjs(brk.endTime);
-            if (!end.isValid()) {
-                setLocalError(`Break #${index + 1} has an invalid end time.`);
-                setIsSaving(false);
-                return;
-            }
-
-            // Normalize: if end is before start, add 1 day (cross-day scenario)
-            if (end.isBefore(start)) {
-                end = end.add(1, 'day');
-                // Update the break with normalized end time
-                editableLog.breaks[index].endTime = end.toISOString();
-            }
-
-            // Validate duration (max 16 hours for breaks too, though unlikely)
-            const durationHours = end.diff(start, 'hour', true);
-            if (durationHours <= 0) {
-                setLocalError(`Break #${index + 1} end time must be after start time.`);
-                setIsSaving(false);
-                return;
-            }
-            if (durationHours > 16) {
-                setLocalError(`Break #${index + 1} duration cannot exceed 16 hours.`);
-                setIsSaving(false);
-                return;
-            }
-        }
-
-        const payload = {
-            sessions: editableLog.sessions,
-            breaks: editableLog.breaks,
-            notes: editableLog.notes || '',
-            attendanceDate: dateForApi
-        };
-        await onSave(log._id, payload);
-        setIsSaving(false);
     };
 
     const ReadOnlyView = () => {

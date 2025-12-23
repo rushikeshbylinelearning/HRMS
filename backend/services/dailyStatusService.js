@@ -31,6 +31,7 @@ const buildBaseResponse = (options) => ({
     breaks: options.includeBreaks ? [] : undefined,
     shift: null,
     attendanceLog: null,
+    hasLog: false, // Explicit flag to indicate no attendance log exists
     calculatedLogoutTime: null,
     pendingExtraBreakRequest: options.includeRequests ? null : undefined,
     approvedExtraBreak: options.includeRequests ? null : undefined,
@@ -241,9 +242,13 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     const attendanceLog = await AttendanceLog.findOne({ user: userId, attendanceDate: targetDate }).lean();
     if (!attendanceLog) {
-        return response;
+        // Explicitly return clean state when no log exists
+        // This ensures frontend knows there's no log and doesn't show stale late/half-day messages
+        return response; // hasLog: false is already set in buildBaseResponse
     }
 
+    // Log exists - mark it and map the data
+    response.hasLog = true;
     response.attendanceLog = mapAttendanceLog(attendanceLog);
 
     let sessions = [];
