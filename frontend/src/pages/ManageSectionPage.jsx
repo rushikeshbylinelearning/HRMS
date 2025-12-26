@@ -1015,15 +1015,7 @@ const privilegeOptions = useMemo(() => {
                   </Box>
                 </Grid>
                 
-                <Grid xs={12} sm={4}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">View Analytics</Typography>
-                    <Switch
-                      checked={safeFeaturePermissions.advancedFeatures.canViewAnalytics}
-                      onChange={(e) => handlePermissionChange(currentUser._id, 'advancedFeatures.canViewAnalytics', e.target.checked)}
-                    />
-                  </Box>
-                </Grid>
+                {/* Note: canViewAnalytics is a top-level field, not in advancedFeatures */}
               </Grid>
             </Paper>
           </Grid>
@@ -1049,26 +1041,6 @@ const privilegeOptions = useMemo(() => {
         description="Configure feature access, bulk update permissions, and maintain compliance-ready user roles."
         actionArea={
           <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-start">
-            <Button 
-              variant="contained" 
-              startIcon={<RefreshIcon />} 
-              onClick={fetchUsers}
-              sx={{
-                background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-                borderRadius: '25px',
-                padding: '8px 20px',
-                fontWeight: 600,
-                textTransform: 'none',
-                color: 'white',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)',
-                  boxShadow: '0 6px 16px rgba(229, 57, 53, 0.4)',
-                }
-              }}
-            >
-              Refresh
-            </Button>
             <IconButton
               onClick={(e) => setMenuAnchor(e.currentTarget)}
               sx={{
@@ -2197,24 +2169,7 @@ const privilegeOptions = useMemo(() => {
                       />
                     </Box>
                   </Grid>
-                  <Grid xs={4}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2">View Analytics</Typography>
-                      <Switch
-                        checked={bulkSettings.featurePermissions.advancedFeatures.canViewAnalytics}
-                        onChange={(e) => setBulkSettings(prev => ({
-                          ...prev,
-                          featurePermissions: { 
-                            ...prev.featurePermissions, 
-                            advancedFeatures: {
-                              ...prev.featurePermissions.advancedFeatures,
-                              canViewAnalytics: e.target.checked
-                            }
-                          }
-                        }))}
-                      />
-                    </Box>
-                  </Grid>
+                  {/* Note: canViewAnalytics is a top-level field, not in advancedFeatures */}
                 </Grid>
               </Paper>
             )}

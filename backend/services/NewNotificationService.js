@@ -133,11 +133,27 @@ class NewNotificationService {
         }, userId);
     }
 
-    static async notifyLeaveRequest(userId, userName, leaveType, startDate, endDate) {
+    static async notifyLeaveRequest(userId, userName, leaveType, startDate, endDate, requestId = null, leaveDates = null) {
+        // Format message: always use "from X to Y" format for consistency (even if single day shows "from X to X")
         const message = `${userName} requested ${leaveType} leave from ${startDate} to ${endDate}.`;
+        
         await this.broadcastToAdmins({
-            message, type: 'leave_request', category: 'leave', priority: 'high',
-            navigationData: { page: 'admin/leaves' }
+            message, 
+            type: 'leave_request', 
+            category: 'leave', 
+            priority: 'high',
+            navigationData: { 
+                page: 'admin/leaves',
+                params: requestId ? { requestId } : {}
+            },
+            metadata: {
+                requestId: requestId,
+                leaveType: leaveType,
+                fromDate: startDate,
+                toDate: endDate,
+                leaveDates: leaveDates, // Store actual ISO date strings for consistency
+                type: 'LEAVE_REQUEST'
+            }
         }, userId);
     }
     

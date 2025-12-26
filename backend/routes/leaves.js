@@ -238,9 +238,41 @@ router.post('/request', authenticateToken, async (req, res) => {
             .catch(err => console.error('Error in sendLeaveNotificationEmails:', err));
         
         // Send real-time notifications via socket
-        const startDate = new Date(leaveDatesArray[0]).toLocaleDateString();
-        const endDate = new Date(leaveDatesArray[leaveDatesArray.length - 1]).toLocaleDateString();
-        NewNotificationService.notifyLeaveRequest(userId, employee.fullName, requestType, startDate, endDate)
+        // Use the saved request's leaveDates to ensure consistency with database values
+        // Format dates consistently using the same format as email notifications
+        const formatDateForNotification = (date) => {
+            const d = new Date(date);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+        
+        // Use saved request's leaveDates (from database) to ensure consistency
+        // This prevents timezone conversion issues between request body and database storage
+        const savedLeaveDates = newRequest.leaveDates || leaveDatesArray;
+        if (!savedLeaveDates || savedLeaveDates.length === 0) {
+            console.error('Error: No leave dates found in saved request for notification');
+            return;
+        }
+        
+        const startDate = formatDateForNotification(savedLeaveDates[0]);
+        const endDate = savedLeaveDates.length === 1 
+            ? startDate 
+            : formatDateForNotification(savedLeaveDates[savedLeaveDates.length - 1]);
+        
+        // Store actual leave dates as ISO strings in metadata for consistency and future reference
+        const leaveDatesISO = savedLeaveDates.map(d => {
+            const dateObj = d instanceof Date ? d : new Date(d);
+            return dateObj.toISOString();
+        });
+        
+        NewNotificationService.notifyLeaveRequest(
+            userId, 
+            employee.fullName, 
+            requestType, 
+            startDate, 
+            endDate,
+            newRequest._id.toString(),
+            leaveDatesISO
+        )
             .catch(err => console.error('Error sending real-time leave request notification:', err));
 
         res.status(201).json({ 

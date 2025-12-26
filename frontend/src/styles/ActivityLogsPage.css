@@ -7,6 +7,11 @@
     flex-direction: column;
     gap: 24px;
     background-color: #f8f9fa;
+    /* Isolate this page from other page styles */
+    isolation: isolate;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .activity-overview {
@@ -19,26 +24,37 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.summary-card {
+/* Scoped to activity-logs-page to prevent conflicts with other pages */
+.activity-logs-page .summary-card {
     border-radius: 16px !important;
     box-shadow: 0 8px 24px rgba(23, 32, 90, 0.05) !important;
     border: 1px solid #eef2ff;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    /* Reset any inherited transforms or scales */
+    transform: none !important;
+    zoom: 1 !important;
 }
 
-.summary-label {
+/* Scoped to activity-logs-page to prevent conflicts */
+.activity-logs-page .summary-label {
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #94a3b8;
     font-weight: 600;
 }
 
-.summary-value {
+.activity-logs-page .summary-value {
     font-weight: 600;
 }
 
-.summary-sublabel {
+.activity-logs-page .summary-sublabel {
     color: #64748b;
 }
 

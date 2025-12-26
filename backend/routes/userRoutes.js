@@ -103,6 +103,102 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
     }
 });
 
+// @route   GET /api/users/avatar/:id
+// @desc    Get avatar image by GridFS ObjectId (serves from MongoDB GridFS)
+// @access  Public (no auth required for images)
+router.get('/avatar/:id', async (req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        const { ObjectId } = require('mongodb');
+        
+        // Extract ObjectId from parameter (handle query params like ?v=timestamp)
+        // Remove file extension if present (e.g., "id.jpg" -> "id")
+        let avatarId = req.params.id;
+        if (avatarId.includes('.')) {
+            avatarId = avatarId.split('.')[0];
+        }
+        
+        console.log(`[Avatar GET] Requested avatar ID: ${avatarId}`);
+        
+        // Validate ObjectId format
+        if (!ObjectId.isValid(avatarId)) {
+            console.log(`[Avatar GET] Invalid ObjectId format: ${avatarId}`);
+            return res.status(400).json({ error: 'Invalid avatar ID format' });
+        }
+        
+        const objectId = new ObjectId(avatarId);
+        console.log(`[Avatar GET] Converted to ObjectId: ${objectId}`);
+        
+        // Get GridFS bucket
+        const db = mongoose.connection.db;
+        if (!db) {
+            console.error('[Avatar GET] MongoDB connection not available');
+            return res.status(503).json({ error: 'Database connection unavailable' });
+        }
+        
+        const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'avatars' });
+        
+        // Find file in GridFS
+        const files = await bucket.find({ _id: objectId }).toArray();
+        
+        if (!files || files.length === 0) {
+            console.log(`[Avatar GET] File not found in GridFS for ID: ${avatarId}`);
+            return res.status(404).json({ error: 'Avatar image not found' });
+        }
+        
+        const file = files[0];
+        console.log(`[Avatar GET] File found in GridFS:`, {
+            id: file._id,
+            filename: file.filename,
+            contentType: file.contentType,
+            length: file.length
+        });
+        
+        // Determine content type from GridFS metadata or file extension
+        let contentType = file.contentType || 'image/jpeg';
+        if (!contentType.startsWith('image/')) {
+            // Fallback: determine from filename
+            const ext = file.filename ? file.filename.split('.').pop().toLowerCase() : '';
+            const contentTypes = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'webp': 'image/webp'
+            };
+            contentType = contentTypes[ext] || 'image/jpeg';
+        }
+        
+        // Set proper headers BEFORE streaming
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('Content-Length', file.length);
+        
+        console.log(`[Avatar GET] Streaming file with Content-Type: ${contentType}`);
+        
+        // Stream file from GridFS
+        const downloadStream = bucket.openDownloadStream(objectId);
+        
+        // Handle stream errors
+        downloadStream.on('error', (error) => {
+            console.error('[Avatar GET] GridFS stream error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Failed to stream avatar image' });
+            }
+        });
+        
+        // Pipe GridFS stream to response
+        downloadStream.pipe(res);
+        
+    } catch (error) {
+        console.error('[Avatar GET] Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to serve avatar image' });
+        }
+    }
+});
+
 // @route   POST /api/users/upload-avatar
 // @desc    Upload or update a profile picture for the logged-in user
 // @access  Private

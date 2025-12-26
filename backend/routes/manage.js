@@ -301,7 +301,7 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
         // Validate the feature permissions structure
         const validPermissionKeys = [
             'leaves', 'breaks', 'extraFeatures', 'maxBreaks', 'breakAfterHours',
-            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'privilegeLevel',
+            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'privilegeLevel',
             'restrictedFeatures', 'advancedFeatures', 'breakWindows',
             'autoBreakOnInactivity', 'inactivityThresholdMinutes'
         ];
@@ -441,6 +441,7 @@ router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => 
             canCheckIn: true,
             canCheckOut: true,
             canTakeBreak: true,
+            canViewAnalytics: false,
             privilegeLevel: 'normal',
             restrictedFeatures: {
                 canViewReports: false,
@@ -450,8 +451,7 @@ router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => 
             },
             advancedFeatures: {
                 canBulkActions: false,
-                canExportData: false,
-                canViewAnalytics: false
+                canExportData: false
             }
         };
 

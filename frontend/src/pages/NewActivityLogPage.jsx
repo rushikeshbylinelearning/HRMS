@@ -98,6 +98,55 @@ const NewActivityLogPage = () => {
         return () => clearInterval(refreshInterval);
     }, [fetchLogs]);
 
+    // Ensure clean layout state on mount and cleanup on unmount
+    useEffect(() => {
+        // Reset any potential global styles on mount
+        const body = document.body;
+        const html = document.documentElement;
+        const mainContent = document.querySelector('.main-content');
+        
+        if (body) {
+            body.style.transform = '';
+            body.style.zoom = '';
+            body.style.maxWidth = '';
+            body.style.width = '';
+        }
+        if (html) {
+            html.style.transform = '';
+            html.style.zoom = '';
+            html.style.maxWidth = '';
+            html.style.width = '';
+        }
+        if (mainContent) {
+            mainContent.style.transform = '';
+            mainContent.style.zoom = '';
+            mainContent.style.maxWidth = '';
+            mainContent.style.width = '';
+        }
+
+        // Cleanup on unmount
+        return () => {
+            if (body) {
+                body.style.transform = '';
+                body.style.zoom = '';
+                body.style.maxWidth = '';
+                body.style.width = '';
+            }
+            if (html) {
+                html.style.transform = '';
+                html.style.zoom = '';
+                html.style.maxWidth = '';
+                html.style.width = '';
+            }
+            if (mainContent) {
+                mainContent.style.transform = '';
+                mainContent.style.zoom = '';
+                mainContent.style.maxWidth = '';
+                mainContent.style.width = '';
+            }
+        };
+    }, []);
+
     const handleFilterChange = (filterName, value) => {
         setFilters(prev => ({ ...prev, [filterName]: value }));
         setPage(0);

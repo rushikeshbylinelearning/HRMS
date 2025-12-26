@@ -8,6 +8,13 @@
   overflow-x: hidden;
   box-sizing: border-box;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  /* Isolate this page from other page styles */
+  isolation: isolate;
+  position: relative;
+  width: 100%;
+  /* Ensure no transforms or scales leak out */
+  transform: none;
+  zoom: 1;
 }
 
 /* === MAIN HEADER === */

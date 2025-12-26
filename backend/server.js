@@ -652,9 +652,21 @@ app.use(express.static(path.join(__dirname, '../frontend/dist'), frontendStaticO
 
 // SPA fallback middleware: send back React's index.html file for client-side routing
 app.use((req, res, next) => {
-  // Skip if it's an API route, static file, or socket.io connection
-  if (req.path.startsWith('/api') || 
-      req.path.startsWith('/avatars') || 
+  // CRITICAL FIX: Skip API routes completely - Express will return 404 if route doesn't exist
+  // This prevents the SPA fallback from returning HTML for missing API endpoints
+  if (req.path.startsWith('/api')) {
+    // If we reach here, the API route doesn't exist
+    // Express will automatically return 404, but we need to ensure we don't return HTML
+    // Return 404 JSON response for API routes that don't exist
+    return res.status(404).json({ 
+      error: 'API endpoint not found',
+      path: req.path,
+      method: req.method 
+    });
+  }
+  
+  // Skip static file routes
+  if (req.path.startsWith('/avatars') || 
       req.path.startsWith('/medical-certificates') || 
       req.path.startsWith('/public') ||
       req.path.startsWith('/api/socket.io')) {

@@ -78,6 +78,28 @@ const AdminAttendanceSummaryPage = () => {
         return () => clearInterval(timerId);
     }, []);
 
+    // Cleanup on unmount to prevent style leakage
+    useEffect(() => {
+        return () => {
+            // Reset any potential global styles that might have been applied
+            // This ensures clean state when navigating away from this page
+            const body = document.body;
+            if (body) {
+                body.style.transform = '';
+                body.style.zoom = '';
+                body.style.maxWidth = '';
+                body.style.width = '';
+            }
+            const html = document.documentElement;
+            if (html) {
+                html.style.transform = '';
+                html.style.zoom = '';
+                html.style.maxWidth = '';
+                html.style.width = '';
+            }
+        };
+    }, []);
+
     const fetchLogsForWeek = useCallback(async (date, employeeId) => {
         if (!employeeId) return;
         setLoading(true);
