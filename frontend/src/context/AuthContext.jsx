@@ -58,6 +58,11 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
+        // CRITICAL FIX: Keep loading=true until auth check completes
+        // This prevents protected routes from rendering before auth is verified
+        setLoading(true);
+        authInitializedRef.current = true; // Mark as initialized to prevent duplicate calls
+
         // Check for token in order: ams_token (SSO preference) > token
         // Note: SSO tokens are handled by LoginPage which validates and converts to AMS token
         const amsToken = sessionStorage.getItem('ams_token');
@@ -68,15 +73,18 @@ export const AuthProvider = ({ children }) => {
         console.log('[AuthContext] Token found:', !!tokenToUse);
         console.log('[AuthContext] Token source:', amsToken ? 'ams_token' : (token ? 'token' : 'none'));
         
-        if (tokenToUse) {
-            try {
+        try {
+            if (tokenToUse) {
+                // Validate token expiry before making API call
                 const decoded = jwtDecode(tokenToUse);
                 if (decoded.exp * 1000 > Date.now()) {
                     api.defaults.headers.common['Authorization'] = `Bearer ${tokenToUse}`;
                     
-                    // Small delay to ensure token is set before making API call
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                    // Mark that we're in initial auth restoration phase
+                    // This prevents axios interceptor from logging out during legitimate auth check
+                    window.__AUTH_RESTORING__ = true;
                     
+                    // Don't delay - make API call immediately
                     console.log('[AuthContext] Calling /api/auth/me with token...');
                     const response = await api.get('/auth/me');
                     console.log('[AuthContext] ✅ /api/auth/me successful, user authenticated');
@@ -88,21 +96,47 @@ export const AuthProvider = ({ children }) => {
                     if (amsToken) {
                         sessionStorage.setItem('ams_token', tokenToUse);
                     }
-                    
-                    authInitializedRef.current = true;
                 } else {
                     console.warn('[AuthContext] Token expired');
-                    logout(); // Token expired
+                    // Clear expired token
+                    sessionStorage.removeItem('token');
+                    sessionStorage.removeItem('ams_token');
+                    delete api.defaults.headers.common['Authorization'];
+                    setUser(null);
+                    setIsAuthenticated(false);
                 }
-            } catch (error) {
-                console.error('[AuthContext] Auth initialization failed:', error);
-                console.error('[AuthContext] Error details:', error.response?.data || error.message);
-                logout(); // Logout on any error (like a 401 from /me)
+            } else {
+                console.log('[AuthContext] No token found, user not authenticated');
+                setUser(null);
+                setIsAuthenticated(false);
             }
-        } else {
-            console.log('[AuthContext] No token found, user not authenticated');
+        } catch (error) {
+            console.error('[AuthContext] Auth initialization failed:', error);
+            console.error('[AuthContext] Error details:', error.response?.data || error.message);
+            
+            // Only logout if it's a real auth error (401), not a network error
+            if (error.response?.status === 401) {
+                // Invalid token - clear everything
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('ams_token');
+                sessionStorage.removeItem('refreshToken');
+                delete api.defaults.headers.common['Authorization'];
+                setUser(null);
+                setIsAuthenticated(false);
+            } else {
+                // Network error or other issue - don't logout, just mark as unauthenticated
+                // User can retry by refreshing
+                console.warn('[AuthContext] Non-auth error during initialization, keeping user state');
+                setUser(null);
+                setIsAuthenticated(false);
+            }
+        } finally {
+            // CRITICAL: Always set loading to false after auth check completes
+            // This allows protected routes to render (or redirect to login)
+            setLoading(false);
+            // Clear the auth restoration flag
+            window.__AUTH_RESTORING__ = false;
         }
-        setLoading(false);
     }, [logout]);
 
     const loginWithToken = useCallback(async (token) => {
@@ -149,8 +183,8 @@ export const AuthProvider = ({ children }) => {
             window.removeEventListener('auth-error', handleAuthError);
         };
         // --- END OF NEW CODE ---
-
-    }, [initializeAuth, logout]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount to prevent refresh loops
 
     const updateUserContext = useCallback((newUserData) => {
         setUser((currentUser) => {
@@ -326,18 +360,18 @@ export const AuthProvider = ({ children }) => {
         refreshUserData,
     }), [user, isAuthenticated, loading, login, loginWithSSO, loginWithToken, logout, updateUserContext, refreshUserData]);
 
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
+    // Always provide the context, even during loading
+    // This prevents children from accessing null context
     return (
         <>
             <AuthContext.Provider value={value}>
-                {children}
+                {loading ? (
+                    <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
+                        {children}
+                    </Box>
+                ) : (
+                    children
+                )}
             </AuthContext.Provider>
             
             {/* Permission Update Notification */}

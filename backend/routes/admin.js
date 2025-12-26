@@ -1225,6 +1225,46 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         hasNotes: notes !== undefined
     });
 
+    // First, check if the attendance log exists and if it was auto-logged out
+    const log = await AttendanceLog.findById(logId);
+    if (!log) {
+        return res.status(404).json({ 
+            success: false,
+            message: 'Attendance log not found.',
+            error: 'Attendance log not found.'
+        });
+    }
+
+    // Prevent editing critical fields for auto-logged-out sessions
+    // Allow notes to be updated, but not sessions, breaks, or clockOutTime
+    if (log.logoutType === 'AUTO' && log.autoLogoutReason) {
+        // Only allow updating notes for auto-logged-out sessions
+        if (sessions !== undefined || breaks !== undefined) {
+            return res.status(403).json({ 
+                success: false,
+                message: 'Cannot edit sessions or breaks for auto-logged-out attendance. Only notes can be updated.',
+                error: 'This attendance was automatically logged out and cannot be edited to prevent policy abuse. Only notes can be updated.',
+                logoutType: 'AUTO',
+                autoLogoutReason: log.autoLogoutReason
+            });
+        }
+        // Allow notes update only
+        if (notes !== undefined) {
+            log.notes = notes;
+            await log.save();
+            return res.json({ 
+                success: true,
+                message: 'Notes updated successfully (attendance was auto-logged-out, only notes can be edited).',
+                attendanceLog: log
+            });
+        }
+        return res.json({ 
+            success: true,
+            message: 'No changes requested (attendance was auto-logged-out, only notes can be edited).',
+            attendanceLog: log
+        });
+    }
+
     // Validate and default required fields
     if (sessions === undefined || sessions === null) {
         sessions = [];
@@ -1383,8 +1423,9 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
     dbSession.startTransaction();
 
     try {
-        const log = await AttendanceLog.findById(logId).session(dbSession);
-        if (!log) {
+        // Reload log within transaction to ensure consistency
+        const logInTransaction = await AttendanceLog.findById(logId).session(dbSession);
+        if (!logInTransaction) {
             await dbSession.abortTransaction();
             return res.status(404).json({ 
                 success: false,
@@ -1392,6 +1433,20 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
                 error: 'Attendance log not found.'
             });
         }
+        
+        // Ensure logoutType check still applies (double-check within transaction)
+        if (logInTransaction.logoutType === 'AUTO' && logInTransaction.autoLogoutReason) {
+            await dbSession.abortTransaction();
+            return res.status(403).json({ 
+                success: false,
+                message: 'Cannot edit sessions or breaks for auto-logged-out attendance. Only notes can be updated.',
+                error: 'This attendance was automatically logged out and cannot be edited to prevent policy abuse. Only notes can be updated.',
+                logoutType: 'AUTO',
+                autoLogoutReason: logInTransaction.autoLogoutReason
+            });
+        }
+        
+        const log = logInTransaction;
         
         await AttendanceSession.deleteMany({ attendanceLog: log._id }).session(dbSession);
         await BreakLog.deleteMany({ attendanceLog: log._id }).session(dbSession);
@@ -1465,8 +1520,14 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         if (sortedSessions.length > 0) {
             // We have sessions - update clockOutTime based on last session
             log.clockOutTime = lastSession?.endTime || null;
+            // If admin is editing and setting clockOutTime, preserve logoutType appropriately
+            // Only set to MANUAL if clockOutTime is being set and logoutType was not AUTO
+            if (lastSession?.endTime && log.logoutType !== 'AUTO') {
+                log.logoutType = 'MANUAL'; // Admin edits are considered manual
+                log.autoLogoutReason = null; // Clear auto-logout reason if admin edits
+            }
         }
-        // If no sessions, preserve existing clockOutTime (no assignment needed)
+        // If no sessions, preserve existing clockOutTime and logoutType (no assignment needed)
 
         log.paidBreakMinutesTaken = totalPaidBreak;
         log.unpaidBreakMinutesTaken = totalUnpaidBreak;

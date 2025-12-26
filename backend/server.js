@@ -789,8 +789,10 @@ const startServer = async () => {
     console.log('');
     
     // Start HTTP server only after all initialization is complete
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
+    // In development, bind to 127.0.0.1 to ensure IPv4 connections work properly
+    const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+    httpServer.listen(PORT, HOST, () => {
+      console.log(`🚀 Server is running on ${HOST}:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log('✅ Server initialization complete');
     });

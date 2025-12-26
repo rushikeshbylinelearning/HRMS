@@ -18,7 +18,7 @@ import PermissionProtectedRoute from './components/PermissionProtectedRoute';
 import IdleDetectionProvider from './components/IdleDetectionProvider';
 
 // Lazy load pages for better performance
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { CircularProgress, Box } from '@mui/material';
 
 // Import error boundary
@@ -88,9 +88,17 @@ const RootRoute = () => {
 };
 
 function App() {
+    // Ref to prevent multiple redirects on refresh
+    const ssoTokenProcessedRef = useRef(false);
+    
     // Handle SSO token consumption on app startup
     // This handles both SSO tokens from SSO portal and AMS tokens from backend middleware auto-login
     useEffect(() => {
+        // Prevent multiple executions (especially in React StrictMode)
+        if (ssoTokenProcessedRef.current) {
+            return;
+        }
+        
         const urlParams = new URLSearchParams(window.location.search);
         
         // Check for AMS token from backend middleware auto-login
@@ -98,6 +106,9 @@ function App() {
         const ssoAutoLogin = urlParams.get('sso_auto_login') === 'true';
         
         if (amsToken && ssoAutoLogin) {
+            // Mark as processed immediately to prevent re-execution
+            ssoTokenProcessedRef.current = true;
+            
             console.log('[App] AMS token received from backend SSO auto-login - storing and redirecting');
             // Store the AMS token
             sessionStorage.setItem('ams_token', amsToken);
@@ -120,11 +131,17 @@ function App() {
         if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
             const ssoToken = urlParams.get('sso_token') || urlParams.get('token');
             if (ssoToken) {
+                // Mark as processed immediately to prevent re-execution
+                ssoTokenProcessedRef.current = true;
+                
                 console.log('[App] SSO token found in URL, but not on login page - redirecting to login');
                 window.location.href = `/login?${ssoToken ? `token=${ssoToken}` : ''}`;
                 return;
             }
         }
+        
+        // Mark as processed if no tokens found (to prevent re-checking)
+        ssoTokenProcessedRef.current = true;
     }, []);
 
     return (

@@ -30,7 +30,14 @@ const attendanceLogSchema = new mongoose.Schema({
   },
   overrideReason: { type: String, default: '' },
   // Track if late notification email has been sent
-  lateNotificationSent: { type: Boolean, default: false }
+  lateNotificationSent: { type: Boolean, default: false },
+  // Auto-logout tracking fields
+  logoutType: { 
+    type: String, 
+    enum: ['MANUAL', 'AUTO'], 
+    default: 'MANUAL' 
+  }, // Track if clock-out was manual or automatic
+  autoLogoutReason: { type: String }, // Reason for auto-logout
 }, { timestamps: true });
 
 // Ensure a user can only have one log per day

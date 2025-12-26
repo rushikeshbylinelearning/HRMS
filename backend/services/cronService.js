@@ -6,6 +6,7 @@ const LeaveRequest = require('../models/LeaveRequest'); // <-- NEW
 const { sendEmail } = require('./mailService');
 const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 const ProbationTrackingService = require('./probationTrackingService');
+const { checkAndAutoLogout } = require('./autoLogoutService');
 
 // --- CONFIGURATION (from .env) ---
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
@@ -155,6 +156,18 @@ const checkProbationCompletions = async () => {
 };
 
 /**
+ * Auto-logout check job - runs every 5 minutes
+ * This checks for employees who should be auto-logged out and performs the logout
+ */
+const startAutoLogoutJob = () => {
+    // Run immediately on startup, then every 5 minutes
+    checkAndAutoLogout();
+    const AUTO_LOGOUT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    setInterval(checkAndAutoLogout, AUTO_LOGOUT_INTERVAL_MS);
+    console.log('✅ Auto-logout job started (runs every 5 minutes)');
+};
+
+/**
  * Starts the scheduled jobs for the application.
  */
 const startScheduledJobs = () => {
@@ -170,7 +183,10 @@ const startScheduledJobs = () => {
     checkWeeklyLateWarnings();
     setInterval(checkWeeklyLateWarnings, 7 * 24 * 60 * 60 * 1000);
     
-    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings) have been started.');
+    // Auto-logout job (runs every 5 minutes)
+    startAutoLogoutJob();
+    
+    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout) have been started.');
 };
 
 module.exports = { startScheduledJobs, checkProbationAndInternshipEndings };

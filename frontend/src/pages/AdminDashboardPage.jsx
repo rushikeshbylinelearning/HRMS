@@ -65,10 +65,25 @@ const RequestItem = memo(({ request, onStatusChange, onRejectWithReason, onViewD
 const WhosInItem = memo(({ employee }) => {
     const [liveLogoutTime, setLiveLogoutTime] = useState(null);
     const dataReceivedTimeRef = useRef(null);
+    const intervalRef = useRef(null);
+    const rafRef = useRef(null);
+    const lastTimeStringRef = useRef('');
 
     useEffect(() => {
+        // Clear any existing timers
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+
         if (!employee.calculatedLogoutTime) {
-            setLiveLogoutTime(null);
+            if (liveLogoutTime !== null) {
+                setLiveLogoutTime(null);
+            }
             dataReceivedTimeRef.current = null;
             return;
         }
@@ -92,12 +107,36 @@ const WhosInItem = memo(({ employee }) => {
                 // Each second that passes adds 1 second to the logout time (1:1 extension)
                 const elapsedSinceDataReceived = now.getTime() - dataReceivedTimeRef.current.getTime();
                 const newLiveLogoutTime = new Date(baseLogoutTime.getTime() + elapsedSinceDataReceived);
-                setLiveLogoutTime(newLiveLogoutTime);
+                const timeString = newLiveLogoutTime.toISOString();
+                
+                // Only update state if time actually changed (prevents unnecessary re-renders)
+                if (lastTimeStringRef.current !== timeString) {
+                    lastTimeStringRef.current = timeString;
+                    setLiveLogoutTime(newLiveLogoutTime);
+                }
             };
 
-            // Update every second to account for ongoing active break
-            const timerId = setInterval(calculateLiveLogoutTime, 1000);
-            return () => clearInterval(timerId);
+            // Update immediately
+            calculateLiveLogoutTime();
+            
+            // Use requestAnimationFrame for smoother updates
+            intervalRef.current = setInterval(() => {
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current);
+                }
+                rafRef.current = requestAnimationFrame(calculateLiveLogoutTime);
+            }, 1000);
+            
+            return () => {
+                if (intervalRef.current) {
+                    clearInterval(intervalRef.current);
+                    intervalRef.current = null;
+                }
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current);
+                    rafRef.current = null;
+                }
+            };
         } else {
             // No active unpaid break, use static calculated time
             setLiveLogoutTime(baseLogoutTime);
@@ -180,7 +219,8 @@ const ActivityItem = memo(({ item, onClick }) => {
 
 
 const AdminDashboardPage = () => {
-    const { user } = useAuth();
+    // Get auth state at component level (will be used in useEffect)
+    const { user, loading: authLoading } = useAuth();
     const [summary, setSummary] = useState(null);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -211,7 +251,10 @@ const AdminDashboardPage = () => {
     // ### END OF FIX ###
     // =================================================================
 
-    const fetchAllData = useCallback(async (isInitialLoad = false) => {
+    const fetchAllDataRef = useRef(null);
+    
+    // Create stable fetch function
+    fetchAllDataRef.current = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
         setError('');
         try {
@@ -235,25 +278,69 @@ const AdminDashboardPage = () => {
         } finally {
             if (isInitialLoad) setLoading(false);
         }
+    };
+    
+    const fetchAllData = useCallback((isInitialLoad = false) => {
+        return fetchAllDataRef.current?.(isInitialLoad);
     }, []);
 
+    // Guard ref for React StrictMode duplicate execution prevention
+    const dataFetchedRef = useRef(false);
+    
     useEffect(() => {
-        fetchAllData(true);
-        const intervalId = setInterval(() => fetchAllData(false), 30000);
+        // CRITICAL FIX: Guard API calls - only execute if auth is ready and user is authenticated
+        // This prevents API calls during page refresh before auth state is restored
+        if (authLoading || !user) {
+            console.log('[AdminDashboard] Waiting for auth to initialize...');
+            return;
+        }
         
-        // Force layout refresh to prevent CSS conflicts from other pages
-        const forceLayoutRefresh = () => {
-            // Trigger a reflow to ensure proper layout calculation
-            document.body.offsetHeight;
-            // Force browser to recalculate styles
-            window.dispatchEvent(new Event('resize'));
+        let mounted = true;
+        let intervalId = null;
+        
+        const loadData = async () => {
+            // Prevent duplicate execution in React StrictMode
+            if (dataFetchedRef.current) {
+                console.log('[AdminDashboard] Data fetch already in progress, skipping duplicate call');
+                return;
+            }
+            dataFetchedRef.current = true;
+            
+            if (fetchAllDataRef.current) {
+                await fetchAllDataRef.current(true);
+            }
+            
+            if (mounted) {
+                // Force layout refresh to prevent CSS conflicts from other pages
+                const forceLayoutRefresh = () => {
+                    // Trigger a reflow to ensure proper layout calculation
+                    document.body.offsetHeight;
+                    // Force browser to recalculate styles
+                    window.dispatchEvent(new Event('resize'));
+                };
+                
+                // Run layout refresh after a short delay to ensure DOM is ready
+                setTimeout(forceLayoutRefresh, 100);
+                
+                // Start polling (reduced frequency for admin dashboard)
+                intervalId = setInterval(() => {
+                    if (mounted && fetchAllDataRef.current) {
+                        fetchAllDataRef.current(false);
+                    }
+                }, 60000); // Poll every 60 seconds instead of 30
+            }
         };
         
-        // Run layout refresh after a short delay to ensure DOM is ready
-        setTimeout(forceLayoutRefresh, 100);
+        loadData();
         
-        return () => clearInterval(intervalId);
-    }, [fetchAllData]);
+        return () => {
+            mounted = false;
+            dataFetchedRef.current = false; // Reset on unmount
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [user, authLoading]); // Depend on user and loading to trigger when auth is ready
 
     // Additional useEffect to handle navigation back to dashboard
     useEffect(() => {
@@ -335,7 +422,9 @@ const AdminDashboardPage = () => {
             await api.patch(endpoint, { status });
             setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
             handleCloseActivityModal();
-            await fetchAllData(); // Refresh data
+            if (fetchAllDataRef.current) {
+                await fetchAllDataRef.current(false); // Refresh data
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to action request.');
         } finally {
@@ -609,7 +698,9 @@ const AdminDashboardPage = () => {
                             ...(rejectionNotes && { rejectionNotes })
                         });
                         setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
-                        await fetchAllData();
+                        if (fetchAllDataRef.current) {
+                            await fetchAllDataRef.current(false);
+                        }
                         // Modal will close itself after successful status change
                     } catch (err) {
                         setPendingRequests(originalRequests);

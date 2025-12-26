@@ -21,8 +21,8 @@ const formatDuration = (totalMins) => {
     return `${hours}:${minutes} Hrs`;
 };
 
-// MODIFIED: The component signature now correctly accepts the 'now' prop.
-const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'All Saturdays Working', shiftInfo, isAdminView, now, holidays = [], leaves = [] }) => {
+// Optimized: Calculate 'now' internally to prevent unnecessary re-renders
+const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'All Saturdays Working', shiftInfo, isAdminView, holidays = [], leaves = [] }) => {
 
     // Helper function to check if a date is a holiday
     const getHolidayForDate = (date) => {
@@ -69,7 +69,7 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
         start.setHours(0, 0, 0, 0);
         start.setDate(start.getDate() - start.getDay());
 
-        const today = new Date(now);
+        const today = new Date(); // Calculate inline instead of using prop
         today.setHours(0, 0, 0, 0);
 
         const days = [];
@@ -145,7 +145,7 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
             });
         }
         return days;
-    }, [logs, currentDate, saturdayPolicy, now, holidays, leaves]);
+    }, [logs, currentDate, saturdayPolicy, holidays, leaves]);
 
     const summaryStats = useMemo(() => {
         const stats = { present: 0 };
@@ -164,6 +164,7 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
             if (day.log && day.log.sessions) {
                 const totalSessionMs = day.log.sessions.reduce((acc, s) => {
                     const sessionStart = new Date(s.startTime);
+                    const now = new Date(); // Calculate inline for ongoing session check
                     const isTodayOngoing = !s.endTime && new Date(s.startTime).toDateString() === now.toDateString();
                     const sessionEnd = s.endTime ? new Date(s.endTime) : (isTodayOngoing ? now : sessionStart);
                     
@@ -180,7 +181,7 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
             }
         });
         return formatDuration(totalMinutes);
-    }, [weekDays, now]);
+    }, [weekDays]);
 
     const timeAxisLabels = ['10AM', '11AM', '12PM', '01PM', '02PM', '03PM', '04PM', '05PM', '06PM', '07PM'];
 
@@ -193,7 +194,6 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
                         key={day.date.toISOString()} 
                         dayData={day}
                         onClick={() => onDayClick(day)}
-                        now={now}
                         shiftInfo={shiftInfo}
                     />
                 ))}

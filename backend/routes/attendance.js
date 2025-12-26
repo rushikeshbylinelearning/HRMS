@@ -214,9 +214,15 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         });
         if (activeAutoBreak) return res.status(400).json({ error: 'You must end your auto-break before clocking out.' });
         
+        const clockOutTime = new Date();
         const updatedSession = await AttendanceSession.findOneAndUpdate(
             { attendanceLog: log._id, endTime: null },
-            { $set: { endTime: new Date() } },
+            { 
+                $set: { 
+                    endTime: clockOutTime,
+                    logoutType: 'MANUAL' // Mark as manual logout
+                } 
+            },
             { new: true, sort: { startTime: -1 } }
         );
         if (!updatedSession) return res.status(400).json({ error: 'You are not currently clocked in.' });
@@ -248,8 +254,10 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         
         await AttendanceLog.findByIdAndUpdate(log._id, { 
             $set: { 
-                clockOutTime: new Date(),
-                totalWorkingHours: totalWorkingHours
+                clockOutTime: clockOutTime,
+                totalWorkingHours: totalWorkingHours,
+                logoutType: 'MANUAL', // Mark as manual logout
+                autoLogoutReason: null // Clear any auto-logout reason
             } 
         });
         

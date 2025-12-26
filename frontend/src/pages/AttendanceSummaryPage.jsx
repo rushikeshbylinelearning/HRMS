@@ -38,17 +38,13 @@ const AttendanceSummaryPage = () => {
     const [selectedHoliday, setSelectedHoliday] = useState(null);
     const [selectedLeave, setSelectedLeave] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '' });
-    const [now, setNow] = useState(new Date());
     const [viewMode, setViewMode] = useState('timeline'); // 'timeline', 'list', or 'calendar'
     const [notesModal, setNotesModal] = useState({ open: false, logId: null, notes: '', date: '' });
 
-    // Continuous timer to update the 'now' state
-    useEffect(() => {
-        const timerId = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(timerId);
-    }, []);
-
-    const fetchLogsForWeek = useCallback(async (date) => {
+    const fetchLogsForWeekRef = useRef(null);
+    
+    // Create stable fetch function
+    fetchLogsForWeekRef.current = async (date) => {
         setLoading(true);
         setError('');
         try {
@@ -94,11 +90,17 @@ const AttendanceSummaryPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+    
+    const fetchLogsForWeek = useCallback((date) => {
+        return fetchLogsForWeekRef.current?.(date);
     }, [viewMode]);
 
     useEffect(() => {
-        fetchLogsForWeek(currentDate);
-    }, [currentDate, fetchLogsForWeek]);
+        if (fetchLogsForWeekRef.current) {
+            fetchLogsForWeekRef.current(currentDate);
+        }
+    }, [currentDate, viewMode]); // Include viewMode to refetch when view changes
 
     const handleWeekChange = (direction) => {
         setCurrentDate(prevDate => {
@@ -310,6 +312,7 @@ const AttendanceSummaryPage = () => {
                 
                 // Calculate total work time
                 let totalWorkTime = 0;
+                const now = new Date(); // Calculate inline instead of using state
                 sortedSessions.forEach(session => {
                     if (session.startTime) {
                         const start = new Date(session.startTime);
@@ -443,7 +446,6 @@ const AttendanceSummaryPage = () => {
                         currentDate={currentDate}
                         onDayClick={handleDayClick}
                         isAdminView={false}
-                        now={now}
                         saturdayPolicy={user?.alternateSaturdayPolicy || 'All Saturdays Working'}
                         shiftInfo={mappedShiftInfo}
                         holidays={holidays}
@@ -602,7 +604,6 @@ const AttendanceSummaryPage = () => {
                         logs={logs}
                         currentDate={currentDate}
                         onDayClick={handleDayClick}
-                        now={now}
                         holidays={holidays}
                         leaves={leaves}
                         saturdayPolicy={user?.alternateSaturdayPolicy || 'All Saturdays Working'}

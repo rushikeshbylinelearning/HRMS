@@ -88,7 +88,6 @@ const EmployeeDashboardPage = () => {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
-    const [now, setNow] = useState(new Date()); 
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
     
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
@@ -97,52 +96,136 @@ const EmployeeDashboardPage = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '' });
     const [weeklyLateDialog, setWeeklyLateDialog] = useState({ open: false, lateCount: 0, lateDates: [] });
     const [avatarImageError, setAvatarImageError] = useState(false);
+    const breakActionInFlightRef = useRef(false);
+    const clockInActionInFlightRef = useRef(false);
+    const clockOutActionInFlightRef = useRef(false);
 
 
     const isClockedInSession = dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
 
-    useEffect(() => {
-        if (isClockedInSession) {
-            const timerId = setInterval(() => setNow(new Date()), 1000);
-            return () => clearInterval(timerId);
-        }
-    }, [isClockedInSession]);
-
-    const fetchAllData = useCallback(async (isInitialLoad = false) => {
-        if (isInitialLoad) setLoading(true);
+    const fetchAllDataRef = useRef(null);
+    
+    // Create stable fetch function
+    fetchAllDataRef.current = async (isInitialLoad = false) => {
         const localDate = getLocalDateString();
-        try {
-            const [statusRes, weeklyRes, requestsRes] = await Promise.all([
-                api.get(`/attendance/status?date=${localDate}`),
-                api.get('/attendance/my-weekly-log'),
-                api.get('/leaves/my-requests'),
-            ]);
-            setDailyData(statusRes.data);
-            setWeeklyLogs(Array.isArray(weeklyRes.data) ? weeklyRes.data : []);
-            setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
-        } catch (err) {
-            console.error("Dashboard fetch error:", err);
-            setError('Failed to load dashboard data. Please refresh the page.');
-        } finally {
-            if (isInitialLoad) setLoading(false);
+        
+        if (isInitialLoad) {
+            // For initial load, fetch critical data (status) first for instant UI
+            // Then load other data in background
+            setLoading(true);
+            try {
+                // Load status immediately - this is critical for UI
+                const statusRes = await api.get(`/attendance/status?date=${localDate}`);
+                setDailyData(statusRes.data);
+                setLoading(false); // Allow UI to render immediately after status loads
+                
+                // Load weekly logs and requests in background (non-blocking)
+                Promise.all([
+                    api.get('/attendance/my-weekly-log'),
+                    api.get('/leaves/my-requests'),
+                ]).then(([weeklyRes, requestsRes]) => {
+                    setWeeklyLogs(Array.isArray(weeklyRes.data) ? weeklyRes.data : []);
+                    setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
+                }).catch(err => {
+                    console.error("Background data fetch error:", err);
+                    // Don't show error for background data - it's not critical
+                });
+            } catch (err) {
+                console.error("Dashboard status fetch error:", err);
+                setError('Failed to load dashboard data. Please refresh the page.');
+                setLoading(false);
+            }
+        } else {
+            // For subsequent refreshes, fetch all data in parallel (non-blocking)
+            try {
+                const [statusRes, weeklyRes, requestsRes] = await Promise.all([
+                    api.get(`/attendance/status?date=${localDate}`),
+                    api.get('/attendance/my-weekly-log'),
+                    api.get('/leaves/my-requests'),
+                ]);
+                setDailyData(statusRes.data);
+                setWeeklyLogs(Array.isArray(weeklyRes.data) ? weeklyRes.data : []);
+                setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
+            } catch (err) {
+                console.error("Dashboard fetch error:", err);
+                // Don't show error for background refresh - silent fail
+            }
         }
+    };
+    
+    const fetchAllData = useCallback((isInitialLoad = false) => {
+        return fetchAllDataRef.current?.(isInitialLoad);
     }, []);
 
+    // Guard ref for React StrictMode duplicate execution prevention
+    const dataFetchedRef = useRef(false);
+    const { loading: authLoading } = useAuth();
+    
     useEffect(() => { 
-        fetchAllData(true);
-        const interval = setInterval(() => {
-            fetchAllData(false);
-        }, 30000);
-        return () => clearInterval(interval);
-     }, [fetchAllData]);
+        // CRITICAL FIX: Guard API calls - only execute if auth is ready and user is authenticated
+        // This prevents API calls during page refresh before auth state is restored
+        if (authLoading || !contextUser) {
+            console.log('[EmployeeDashboard] Waiting for auth to initialize...');
+            return;
+        }
+        
+        let mounted = true;
+        let intervalId = null;
+        
+        const loadData = async () => {
+            // Prevent duplicate execution in React StrictMode
+            if (dataFetchedRef.current) {
+                console.log('[EmployeeDashboard] Data fetch already in progress, skipping duplicate call');
+                return;
+            }
+            dataFetchedRef.current = true;
+            
+            if (fetchAllDataRef.current) {
+                await fetchAllDataRef.current(true);
+            }
+            if (mounted) {
+                // Only start polling if user is clocked in (reduces unnecessary API calls)
+                const checkSession = () => {
+                    // Check current status from state
+                    return dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
+                };
+                
+                // Start polling after initial load completes
+                const startPolling = () => {
+                    if (checkSession()) {
+                        intervalId = setInterval(() => {
+                            if (mounted && fetchAllDataRef.current) {
+                                fetchAllDataRef.current(false);
+                            }
+                        }, 30000);
+                    }
+                };
+                
+                // Delay polling start to check session status
+                setTimeout(startPolling, 1000);
+            }
+        };
+        
+        loadData();
+        
+        return () => {
+            mounted = false;
+            dataFetchedRef.current = false; // Reset on unmount
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+     }, [contextUser, authLoading]); // Depend on contextUser and authLoading to trigger when auth is ready
 
     useEffect(() => {
         if (location.state?.refresh) {
             console.log("Dashboard received refresh signal, refetching data...");
-            fetchAllData(false);
+            if (fetchAllDataRef.current) {
+                fetchAllDataRef.current(false);
+            }
             window.history.replaceState({}, document.title);
         }
-    }, [location.state, fetchAllData]);
+    }, [location.state]); // Remove fetchAllData from deps to prevent re-runs
 
     // Socket.IO listener for real-time attendance updates
     useEffect(() => {
@@ -162,8 +245,12 @@ const EmployeeDashboardPage = () => {
 
             if (isRelevantUpdate) {
                 console.log('🔄 Refreshing EmployeeDashboardPage data due to attendance log update');
-                // Refetch all data to get updated attendance status
-                fetchAllData(false);
+                // Refetch all data to get updated attendance status (non-blocking)
+                if (fetchAllDataRef.current) {
+                    fetchAllDataRef.current(false).catch(err => {
+                        console.error('Failed to refresh after socket update:', err);
+                    });
+                }
             }
         };
 
@@ -174,7 +261,7 @@ const EmployeeDashboardPage = () => {
         return () => {
             socket.off('attendance_log_updated', handleAttendanceLogUpdate);
         };
-    }, [contextUser, fetchAllData]);
+    }, [contextUser?.id, contextUser?._id]); // Only depend on user IDs, not fetchAllData
 
     // Reset avatar error state when profile image URL changes
     useEffect(() => {
@@ -183,10 +270,11 @@ const EmployeeDashboardPage = () => {
 
     const workedMinutes = useMemo(() => {
         if (!dailyData?.sessions?.[0]?.startTime) return 0;
+        const now = new Date();
         const grossTimeMs = dailyData.sessions.reduce((total, s) => total + ((s.endTime ? new Date(s.endTime) : now) - new Date(s.startTime)), 0);
         const breakTimeMs = (dailyData.breaks || []).reduce((total, b) => total + ((b.endTime ? new Date(b.endTime) : now) - new Date(b.startTime)), 0);
         return Math.floor(Math.max(0, grossTimeMs - breakTimeMs) / 60000);
-    }, [dailyData, now]);
+    }, [dailyData]);
     
     const serverCalculated = useMemo(() => ({
         penaltyMinutes: dailyData?.attendanceLog?.penaltyMinutes || 0,
@@ -201,9 +289,9 @@ const EmployeeDashboardPage = () => {
     const hasPendingExtraBreak = !!dailyData?.pendingExtraBreakRequest;
     const hasApprovedExtraBreak = !!dailyData?.approvedExtraBreak;
     
-    const paidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Paid'), [breakLimits, now]);
-    const unpaidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Unpaid'), [breakLimits, now]);
-    const extraBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Extra'), [breakLimits, now]);
+    const paidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Paid'), [breakLimits]);
+    const unpaidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Unpaid'), [breakLimits]);
+    const extraBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Extra'), [breakLimits]);
 
     const isAnyBreakPossible = useMemo(() => {
         if (!canAccess.breaks() || !canAccess.takeBreak()) return false;
@@ -230,12 +318,16 @@ const EmployeeDashboardPage = () => {
     };
 
     const handleClockIn = async () => {
+        if (clockInActionInFlightRef.current) return;
+        
         try {
             let location = getCachedLocationOnly();
             if (!location) location = await getCurrentLocation();
 
             // Immediate optimistic UI update for instant feedback
+            clockInActionInFlightRef.current = true;
             setActionLoading(true);
+            setError('');
             const previousDailyData = dailyData;
             setDailyData(prev => ({ ...prev, status: 'Clocked In', sessions: [{ startTime: new Date().toISOString(), endTime: null }] }));
             setSnackbar({ open: true, message: 'Checked in successfully!' });
@@ -249,8 +341,12 @@ const EmployeeDashboardPage = () => {
                     setWeeklyLateDialog({ open: true, lateCount: warning.lateCount || 0, lateDates: warning.lateDates || [] });
                 }
 
-                // Refresh data from server
-                await fetchAllData();
+                // Refresh data from server (non-blocking for UI)
+                if (fetchAllDataRef.current) {
+                    fetchAllDataRef.current(false).catch(err => {
+                        console.error('Failed to refresh data after clock-in:', err);
+                    });
+                }
             } catch (err) {
                 // Revert optimistic update on error and show message
                 setDailyData(previousDailyData);
@@ -258,12 +354,20 @@ const EmployeeDashboardPage = () => {
                 setSnackbar({ open: true, message: 'Check in failed. Please try again.' });
             } finally {
                 setActionLoading(false);
+                clockInActionInFlightRef.current = false;
             }
         } catch (locationError) {
+            clockInActionInFlightRef.current = false;
+            setActionLoading(false);
             setError('Location access is required to clock in. Please enable location permissions.');
         }
     };
     const handleClockOut = async () => {
+        if (clockOutActionInFlightRef.current) return;
+        
+        clockOutActionInFlightRef.current = true;
+        setActionLoading(true);
+        setError('');
         const previousDailyData = dailyData;
         // Immediate optimistic update
         setDailyData(prev => ({ ...prev, status: 'Clocked Out' }));
@@ -271,17 +375,28 @@ const EmployeeDashboardPage = () => {
         
         try {
             await api.post('/attendance/clock-out');
-            await fetchAllData();
+            // Refresh data from server (non-blocking for UI)
+            if (fetchAllDataRef.current) {
+                fetchAllDataRef.current(false).catch(err => {
+                    console.error('Failed to refresh data after clock-out:', err);
+                });
+            }
         } catch (err) {
             // Revert on error
             setDailyData(previousDailyData);
             setError(err.response?.data?.error || 'Failed to clock out. Please try again.');
             setSnackbar({ open: true, message: 'Check out failed. Please try again.' });
+        } finally {
+            setActionLoading(false);
+            clockOutActionInFlightRef.current = false;
         }
     };
 
     const handleStartBreak = async (breakType) => {
+        if (breakActionInFlightRef.current) return;
+        breakActionInFlightRef.current = true;
         setIsBreakModalOpen(false);
+        setError('');
         const previousDailyData = dailyData;
         // Immediate optimistic update
         setDailyData(prev => ({ ...prev, status: 'On Break', breaks: [...(prev.breaks || []), { breakType, startTime: new Date().toISOString(), endTime: null }] }));
@@ -289,30 +404,77 @@ const EmployeeDashboardPage = () => {
         
         try {
             await api.post('/breaks/start', { breakType });
-            await fetchAllData();
+            // Refresh data from server (non-blocking for UI)
+            if (fetchAllDataRef.current) {
+                fetchAllDataRef.current(false).catch(err => {
+                    console.error('Failed to refresh data after break start:', err);
+                });
+            }
         } catch (err) {
             // Revert on error
             setDailyData(previousDailyData);
             setError(err.response?.data?.error || 'Failed to start break. Please try again.');
             setSnackbar({ open: true, message: 'Failed to start break. Please try again.' });
+        } finally {
+            breakActionInFlightRef.current = false;
         }
     };
 
     const handleEndBreak = async () => {
+        if (breakActionInFlightRef.current) return;
+        breakActionInFlightRef.current = true;
+        setError('');
         const previousDailyData = dailyData;
-        // Immediate optimistic update
-        setDailyData(prev => ({ ...prev, status: 'Clocked In' }));
+        
+        // Find the active break and calculate final duration immediately
+        const activeBreak = dailyData?.breaks?.find(b => !b.endTime);
+        const breakEndTime = new Date().toISOString();
+        let finalDurationMinutes = 0;
+        
+        if (activeBreak && activeBreak.startTime) {
+            const startMs = new Date(activeBreak.startTime).getTime();
+            const endMs = new Date(breakEndTime).getTime();
+            finalDurationMinutes = Math.round((endMs - startMs) / (1000 * 60));
+        }
+        
+        // Immediate optimistic update - update status AND break endTime with final duration
+        setDailyData(prev => {
+            const updatedBreaks = (prev.breaks || []).map(b => {
+                // Match break by: same _id OR (no endTime and same startTime - for optimistic updates)
+                const isActiveBreak = !b.endTime && (
+                    (activeBreak?._id && b._id === activeBreak._id) ||
+                    (!activeBreak?._id && b.startTime === activeBreak?.startTime)
+                );
+                if (isActiveBreak) {
+                    return {
+                        ...b,
+                        endTime: breakEndTime,
+                        durationMinutes: finalDurationMinutes
+                    };
+                }
+                return b;
+            });
+            return { ...prev, status: 'Clocked In', breaks: updatedBreaks };
+        });
         setSnackbar({ open: true, message: 'Break ended successfully!' });
         
-        try {
-            await api.post('/breaks/end');
-            await fetchAllData();
-        } catch (err) {
+        // Backend sync happens in background - UI already updated
+        api.post('/breaks/end').catch(err => {
+            console.error('Failed to sync break end with backend:', err);
             // Revert on error
             setDailyData(previousDailyData);
-            setError(err.response?.data?.error || 'Failed to end break. Please try again.');
-            setSnackbar({ open: true, message: 'Failed to end break. Please try again.' });
+            setError(err.response?.data?.error || 'Failed to sync break end. Please refresh.');
+            setSnackbar({ open: true, message: 'Failed to sync break end. Please refresh.' });
+        });
+        
+        // Refresh data from server in background (non-blocking, for eventual consistency)
+        if (fetchAllDataRef.current) {
+            fetchAllDataRef.current(false).catch(err => {
+                console.error('Failed to refresh data after break end:', err);
+            });
         }
+        
+        breakActionInFlightRef.current = false;
     };
     
     const handleRequestExtraBreak = async () => {
@@ -322,7 +484,9 @@ const EmployeeDashboardPage = () => {
             await api.post('/breaks/request-extra', { reason: breakReason });
             setSnackbar({ open: true, message: 'Request sent for approval.' });
             handleCloseReasonModal();
-            await fetchAllData();
+            if (fetchAllDataRef.current) {
+                await fetchAllDataRef.current(false);
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to send request.');
         } finally {
@@ -337,8 +501,9 @@ const EmployeeDashboardPage = () => {
 
     // =================================================================
     // ### START OF FIX ###
-    // Guard against rendering if the main user object or the component's own data is still loading.
-    if (loading || !contextUser) {
+    // Only block on user context - allow dashboard to render with loading state
+    // Dashboard will show skeletons while data loads progressively
+    if (!contextUser) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" sx={{ height: '100vh' }}>
                 <CircularProgress size={60} />
@@ -348,7 +513,50 @@ const EmployeeDashboardPage = () => {
     // ### END OF FIX ###
     // =================================================================
     
-    if (!dailyData) return <Alert severity="warning" sx={{ m: 3 }}>Could not load critical attendance data. Please try again.</Alert>;
+    // Show skeleton/loading state if critical data not yet loaded, but don't block render
+    if (loading || !dailyData) {
+        // Render dashboard shell with skeletons - allows progressive loading
+        return (
+            <Box className="employee-dashboard-container">
+                <Grid container spacing={3}>
+                    <Grid item xs={12} lg={4}>
+                        <Stack spacing={3}>
+                            <Paper className="dashboard-card-base action-card">
+                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
+                                    <CircularProgress />
+                                </Box>
+                            </Paper>
+                            <Paper className="dashboard-card-base weekly-view-card">
+                                <WeeklyTimeCardsSkeleton />
+                            </Paper>
+                        </Stack>
+                    </Grid>
+                    <Grid item xs={12} lg={4}>
+                        <Stack spacing={3}>
+                            <Paper className="dashboard-card-base profile-card">
+                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
+                                    <CircularProgress />
+                                </Box>
+                            </Paper>
+                            <Paper className="dashboard-card-base shift-info-card">
+                                <ShiftInfoSkeleton />
+                            </Paper>
+                        </Stack>
+                    </Grid>
+                    <Grid item xs={12} lg={4}>
+                        <Stack spacing={3}>
+                            <Paper className="dashboard-card-base recent-activity-card">
+                                <RecentActivitySkeleton />
+                            </Paper>
+                            <Paper className="dashboard-card-base saturday-schedule-card">
+                                <SaturdayScheduleSkeleton />
+                            </Paper>
+                        </Stack>
+                    </Grid>
+                </Grid>
+            </Box>
+        );
+    }
 
     return (
         <Box className="employee-dashboard-container">

@@ -52,22 +52,64 @@ export default defineConfig({
     proxy: {
       // --- Development proxy configuration ---
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
+        timeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            // Only log if it's not a connection refused error (server might be starting)
+            if (err.code !== 'ECONNREFUSED') {
+              console.log('[Vite Proxy] Error:', err.message);
+            }
+            // Don't send response if already sent
+            if (!res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'Backend server is not available. Please ensure the backend server is running on port 3001.' 
+              }));
+            }
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Add timeout handling
+            proxyReq.setTimeout(10000, () => {
+              if (!res.headersSent) {
+                res.writeHead(504, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request timeout' }));
+              }
+            });
+          });
+        },
       },
       // --- WebSocket proxy for development ---
       '/api/socket.io': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         ws: true,
         changeOrigin: true,
         secure: false,
+        timeout: 10000,
       },
       // --- Avatar images proxy for development ---
       '/avatars': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
+        timeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            // Only log if it's not a connection refused error (server might be starting)
+            if (err.code !== 'ECONNREFUSED') {
+              console.log('[Vite Proxy] Avatar error:', err.message);
+            }
+            // Don't send response if already sent
+            if (!res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'Backend server is not available.' 
+              }));
+            }
+          });
+        },
       }
     }
   },

@@ -8,7 +8,11 @@ import api from '../api/axios';
 const NewNotificationContext = createContext();
 
 export const NewNotificationProvider = ({ children }) => {
-    const { user, token, loading: authLoading } = useAuth();
+    const auth = useAuth();
+    // Safely handle case where auth context might not be available yet
+    const user = auth?.user || null;
+    const token = auth?.token || null;
+    const authLoading = auth?.loading || false;
     const { showNotification, requestPermission } = useDesktopNotifications();
     
     const [notifications, setNotifications] = useState([]);

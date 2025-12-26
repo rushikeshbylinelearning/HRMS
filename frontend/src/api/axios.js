@@ -79,6 +79,12 @@ api.interceptors.request.use(
         method: config.method
       });
     }
+    
+    // Add timestamp to prevent browser caching of GET requests
+    if (config.method?.toUpperCase() === 'GET' && !config.params?._t) {
+      config.params = { ...config.params, _t: Date.now() };
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -111,6 +117,19 @@ api.interceptors.response.use(
 
     // Check if it's a 401 Unauthorized error and we are not already on the login page
     if (error.response && error.response.status === 401 && window.location.pathname !== '/login' && !isLoggingOut) {
+      // CRITICAL FIX: Don't logout during initial auth restoration
+      // The AuthContext is checking if the token is valid, a 401 here is expected if token is invalid
+      // But we shouldn't trigger logout during the initial /auth/me call
+      const isAuthRestoring = window.__AUTH_RESTORING__ === true;
+      const isAuthMeCall = originalRequest.url?.includes('/auth/me');
+      
+      // If this is the initial auth check and it fails, let AuthContext handle it
+      // Don't trigger logout here as it will cause a redirect loop
+      if (isAuthRestoring && isAuthMeCall) {
+        console.log('[Axios Interceptor] 401 during auth restoration - letting AuthContext handle it');
+        return Promise.reject(error);
+      }
+      
       // Check if this request has already been retried to prevent infinite loops
       if (originalRequest._retry || originalRequest._retryFailed) {
         // If we've already retried and still got 401, the session is invalid

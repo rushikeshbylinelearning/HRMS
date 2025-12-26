@@ -4,7 +4,8 @@ import { Typography, Box } from '@mui/material';
 import { getAttendanceStatus, formatLeaveRequestType } from '../utils/saturdayUtils';
 import '../styles/AttendanceCalendar.css';
 
-const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [], leaves = [], saturdayPolicy = 'All Saturdays Working' }) => {
+// Optimized: Calculate 'now' internally to prevent unnecessary re-renders
+const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], leaves = [], saturdayPolicy = 'All Saturdays Working' }) => {
     // Helper function to check if a date is a holiday
     const getHolidayForDate = (date) => {
         // Use local date formatting to avoid timezone issues
@@ -77,6 +78,7 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [],
             let status = 'blank';
             let hoursWorked = '';
             let isCurrentMonth = current.getMonth() === currentDate.getMonth();
+            const now = new Date(); // Calculate inline
             let isToday = current.toDateString() === now.toDateString();
             
             if (isCurrentMonth) {
@@ -90,6 +92,7 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [],
                     log.sessions.forEach(session => {
                         if (session.startTime) {
                             const start = new Date(session.startTime);
+                            const now = new Date(); // Calculate inline for ongoing sessions
                             const end = session.endTime ? new Date(session.endTime) : now;
                             totalWorkTime += (end - start) / (1000 * 60 * 60);
                         }
@@ -181,7 +184,7 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [],
         }
         
         return days;
-    }, [logs, currentDate, now, holidays, leaves]);
+    }, [logs, currentDate, holidays, leaves]);
 
     const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -208,6 +211,7 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, now, holidays = [],
                 <div className="calendar-days">
                     {calendarData.map((day, index) => {
                         // Check if this day should be clickable
+                        const now = new Date(); // Calculate inline
                         const today = new Date(now);
                         today.setHours(0, 0, 0, 0);
                         const clickedDate = new Date(day.date);

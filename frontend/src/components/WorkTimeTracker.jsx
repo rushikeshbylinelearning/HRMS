@@ -1,56 +1,94 @@
 // frontend/src/components/WorkTimeTracker.jsx
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Typography, Box, Stack } from '@mui/material';
 
 const formatTimeUnit = (value) => String(value).padStart(2, '0');
 
 const WorkTimeTracker = ({ sessions, breaks, status }) => {
     const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
+    const intervalRef = useRef(null);
+    const lastTimeRef = useRef({ hours: 0, minutes: 0, seconds: 0 });
+    const displayRef = useRef(null);
 
-    useEffect(() => {
-        const calculateWorkTime = () => {
-            if (!sessions || sessions.length === 0) {
-                setTime({ hours: 0, minutes: 0, seconds: 0 });
-                return;
+    const calculateWorkTime = useCallback(() => {
+        if (!sessions || sessions.length === 0) {
+            const zeroTime = { hours: 0, minutes: 0, seconds: 0 };
+            if (JSON.stringify(lastTimeRef.current) !== JSON.stringify(zeroTime)) {
+                lastTimeRef.current = zeroTime;
+                setTime(zeroTime);
             }
+            return;
+        }
 
-            const now = new Date();
-            // Calculate total time within all work sessions
-            const grossTimeMs = sessions.reduce((total, s) => {
-                const start = new Date(s.startTime);
-                // If session is finished, use its endTime. If active, use now.
-                const end = s.endTime ? new Date(s.endTime) : now;
-                return total + (end - start);
-            }, 0);
+        const now = new Date();
+        // Calculate total time within all work sessions
+        const grossTimeMs = sessions.reduce((total, s) => {
+            const start = new Date(s.startTime);
+            // If session is finished, use its endTime. If active, use now.
+            const end = s.endTime ? new Date(s.endTime) : now;
+            return total + (end - start);
+        }, 0);
 
-            // Calculate total duration of all breaks
-            const totalBreakMs = (breaks || []).reduce((total, b) => {
-                const start = new Date(b.startTime);
-                 // If break is finished, use its endTime. If active, use now.
-                const end = b.endTime ? new Date(b.endTime) : now;
-                return total + (end - start);
-            }, 0);
+        // Calculate total duration of all breaks
+        const totalBreakMs = (breaks || []).reduce((total, b) => {
+            const start = new Date(b.startTime);
+             // If break is finished, use its endTime. If active, use now.
+            const end = b.endTime ? new Date(b.endTime) : now;
+            return total + (end - start);
+        }, 0);
 
-            // Net work time is the difference
-            const netWorkMs = Math.max(0, grossTimeMs - totalBreakMs);
-            const totalSeconds = Math.floor(netWorkMs / 1000);
+        // Net work time is the difference
+        const netWorkMs = Math.max(0, grossTimeMs - totalBreakMs);
+        const totalSeconds = Math.floor(netWorkMs / 1000);
 
-            setTime({
-                hours: Math.floor(totalSeconds / 3600),
-                minutes: Math.floor((totalSeconds % 3600) / 60),
-                seconds: totalSeconds % 60,
-            });
+        const newTime = {
+            hours: Math.floor(totalSeconds / 3600),
+            minutes: Math.floor((totalSeconds % 3600) / 60),
+            seconds: totalSeconds % 60,
         };
 
-        calculateWorkTime(); // Run once on load/status change
+        // Only update state if time actually changed (prevents unnecessary re-renders)
+        if (JSON.stringify(lastTimeRef.current) !== JSON.stringify(newTime)) {
+            lastTimeRef.current = newTime;
+            setTime(newTime);
+        }
+    }, [sessions, breaks]);
+
+    useEffect(() => {
+        // Clear any existing interval
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+
+        // Calculate immediately
+        calculateWorkTime();
 
         // The interval should ONLY run if the status is 'Clocked In'.
         // When on break, the timer will "pause" because the interval is cleared.
         if (status === 'Clocked In') {
-            const interval = setInterval(calculateWorkTime, 1000);
-            return () => clearInterval(interval);
+            intervalRef.current = setInterval(() => {
+                // Use requestAnimationFrame for smooth updates
+                if (displayRef.current) {
+                    cancelAnimationFrame(displayRef.current);
+                }
+                displayRef.current = requestAnimationFrame(() => {
+                    calculateWorkTime();
+                });
+            }, 1000);
         }
-    }, [sessions, breaks, status]);
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            if (displayRef.current) {
+                cancelAnimationFrame(displayRef.current);
+                displayRef.current = null;
+            }
+        };
+    }, [status, calculateWorkTime]);
 
     const TimeBlock = ({ value, label }) => (
         <Box sx={{ textAlign: 'center' }}>

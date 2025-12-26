@@ -1,5 +1,5 @@
 // src/components/DailyTimelineRow.jsx
-import React, { Fragment } from 'react';
+import React, { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Typography, Box, Chip } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
@@ -165,11 +165,71 @@ const getDurationInfo = (log, now) => {
     };
 };
 
-const DailyTimelineRow = ({ dayData, onClick, now, shiftInfo }) => {
+// Optimized: Calculate 'now' internally using refs for real-time updates
+const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
     const { date, log, status, leave } = dayData;
+    const [now, setNow] = useState(new Date());
+    const intervalRef = useRef(null);
+    const rafRef = useRef(null);
+    const lastTimeStringRef = useRef('');
+    
+    // Only update timer if this is today and there's an active session
+    const isToday = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const rowDate = new Date(date);
+        rowDate.setHours(0, 0, 0, 0);
+        return today.getTime() === rowDate.getTime();
+    }, [date]);
+    
+    const hasActiveSession = useMemo(() => {
+        return log?.sessions?.some(s => !s.endTime);
+    }, [log]);
+    
+    // Only run timer if today and has active session
+    useEffect(() => {
+        if (!isToday || !hasActiveSession) {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            return;
+        }
+        
+        const updateTime = () => {
+            const currentNow = new Date();
+            const timeString = currentNow.toISOString();
+            
+            // Only update state if time actually changed (prevents unnecessary re-renders)
+            if (lastTimeStringRef.current !== timeString) {
+                lastTimeStringRef.current = timeString;
+                setNow(currentNow);
+            }
+        };
+        
+        updateTime();
+        
+        intervalRef.current = setInterval(() => {
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+            }
+            rafRef.current = requestAnimationFrame(updateTime);
+        }, 1000);
+        
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
+        };
+    }, [isToday, hasActiveSession]);
+    
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dayOfMonth = date.getDate();
-    const isToday = new Date(now).toDateString() === date.toDateString();
     
     // Calculate shift duration
     const shiftDurationHours = calculateShiftDuration(shiftInfo);
