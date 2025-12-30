@@ -219,13 +219,11 @@ const createIndexes = async () => {
     await createIndexIfNotExists(User.collection, { authMethod: 1 }, { name: "authMethod" });
 
     // AttendanceLog indexes - Critical for attendance queries
-    await createIndexIfNotExists(AttendanceLog.collection, { userId: 1, attendanceDate: 1 }, { name: "user_date" });
-    await createIndexIfNotExists(AttendanceLog.collection, { attendanceDate: 1, status: 1 }, { name: "date_status" });
-    await createIndexIfNotExists(AttendanceLog.collection, { userId: 1, attendanceDate: -1 }, { name: "user_date_desc" });
+    await createIndexIfNotExists(AttendanceLog.collection, { user: 1, attendanceDate: 1 }, { unique: true, name: "user_date_unique" });
+    await createIndexIfNotExists(AttendanceLog.collection, { attendanceDate: 1 }, { name: "attendanceDate" });
+    await createIndexIfNotExists(AttendanceLog.collection, { clockOutTime: 1 }, { name: "clockOutTime" }); // For auto-logout queries
+    await createIndexIfNotExists(AttendanceLog.collection, { user: 1, attendanceDate: -1 }, { name: "user_date_desc" });
     await createIndexIfNotExists(AttendanceLog.collection, { attendanceDate: -1 }, { name: "date_desc" });
-    await createIndexIfNotExists(AttendanceLog.collection, { status: 1, attendanceDate: 1 }, { name: "status_date" });
-    await createIndexIfNotExists(AttendanceLog.collection, { 'sessions.startTime': 1 }, { name: "session_start" });
-    await createIndexIfNotExists(AttendanceLog.collection, { 'sessions.endTime': 1 }, { name: "session_end" });
     await createIndexIfNotExists(AttendanceLog.collection, { createdAt: -1 }, { name: "created_desc" });
 
     // AttendanceSession indexes - For session tracking
@@ -234,6 +232,7 @@ const createIndexes = async () => {
     // For active sessions (where endTime is null), use: { endTime: { $exists: false } } or { endTime: null }
     // The endTime index will help with queries that check for existing endTime values
     await createIndexIfNotExists(AttendanceSession.collection, { endTime: 1 }, { name: "endTime_index" });
+    await createIndexIfNotExists(AttendanceSession.collection, { attendanceLog: 1, endTime: 1 }, { name: "attendanceLog_endTime" }); // For finding active sessions
     await createIndexIfNotExists(AttendanceSession.collection, { startTime: -1 }, { name: "startTime_desc" });
 
     // LeaveRequest indexes - For leave management

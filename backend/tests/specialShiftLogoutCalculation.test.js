@@ -239,16 +239,157 @@ describe('Special 10 AM - 7 PM Shift: Early Clock-In Logout Calculation', () => 
             const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, activeBreak);
             const logoutTime = extractTime(result);
             
-            // EarlyLoginMinutes = 10
-            // ActiveUnpaidBreak = 15 minutes
-            // TotalExtraBreak = 0 + 15 = 15
-            // Adjustment = max(15 - 10, 0) = 5
-            // Logout = 7:00 PM + 5 = 7:05 PM
+            // Base: 09:50 + 9 hours = 18:50
+            // Paid break: 30 min (≤30, no excess) = 0 min
+            // Active unpaid break: 15 min (normal case, paidBreakTaken > 0) = 15 min
+            // Result: 18:50 + 15 = 19:05
+            // Special shift minimum: max(19:05, 19:00) = 19:05
             
             expect(logoutTime).toBe('19:05');
             
             // Restore Date.now
             Date.now = originalNow;
+        });
+        
+        // New policy validation tests
+        describe('New Policy Validation Tests', () => {
+            it('Scenario: Paid break 20 min (within allowance)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 20,
+                    unpaidBreakMinutesTaken: 0,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 20 min (≤30, no excess) = 0 min
+                // Special shift minimum: max(18:00, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: Paid break 45 min (excess extends logout)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 45,
+                    unpaidBreakMinutesTaken: 0,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 45 min (>30, excess = 15 min) = 15 min
+                // Result: 18:00 + 15 = 18:15
+                // Special shift minimum: max(18:15, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: Unpaid break 20 min (normal case - extends logout)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 30,
+                    unpaidBreakMinutesTaken: 20,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 30 min (≤30, no excess) = 0 min
+                // Unpaid break: 20 min (normal case) = 20 min
+                // Result: 18:00 + 20 = 18:20
+                // Special shift minimum: max(18:20, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: No paid break, unpaid 25 min (rare exception - first 30 min free)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 0,
+                    unpaidBreakMinutesTaken: 25,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 0 min = 0 min
+                // Unpaid break: 25 min (rare exception: paidBreakTaken === 0)
+                //   Effective unpaid = max(0, 25 - 30) = 0 min
+                // Result: 18:00 + 0 = 18:00
+                // Special shift minimum: max(18:00, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: No paid break, unpaid 50 min (rare exception - excess extends logout)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 0,
+                    unpaidBreakMinutesTaken: 50,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 0 min = 0 min
+                // Unpaid break: 50 min (rare exception: paidBreakTaken === 0)
+                //   Effective unpaid = max(0, 50 - 30) = 20 min
+                // Result: 18:00 + 20 = 18:20
+                // Special shift minimum: max(18:20, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: Paid 30 + unpaid 15 (normal unpaid rule applies)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 9, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 30,
+                    unpaidBreakMinutesTaken: 15,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 09:00 + 9 hours = 18:00
+                // Paid break: 30 min (≤30, no excess) = 0 min
+                // Unpaid break: 15 min (normal case, paidBreakTaken > 0) = 15 min
+                // Result: 18:00 + 15 = 18:15
+                // Special shift minimum: max(18:15, 19:00) = 19:00
+                expect(logoutTime).toBe('19:00');
+            });
+            
+            it('Scenario: Paid 45 + unpaid 20 (both extend logout)', () => {
+                const clockInTime = createISTDate(2024, 1, 15, 10, 0);
+                const sessions = [{ startTime: clockInTime.toISOString() }];
+                const attendanceLog = {
+                    paidBreakMinutesTaken: 45,
+                    unpaidBreakMinutesTaken: 20,
+                    penaltyMinutes: 0
+                };
+                
+                const result = computeCalculatedLogoutTime(sessions, [], attendanceLog, specialShift, null);
+                const logoutTime = extractTime(result);
+                
+                // Base: 10:00 + 9 hours = 19:00
+                // Paid break: 45 min (>30, excess = 15 min) = 15 min
+                // Unpaid break: 20 min (normal case) = 20 min
+                // Result: 19:00 + 15 + 20 = 19:35
+                expect(logoutTime).toBe('19:35');
+            });
         });
     });
     

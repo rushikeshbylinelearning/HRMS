@@ -110,7 +110,16 @@ const EmployeeAttendanceTrendChart = ({ user, employeeData, startDate, endDate, 
   // Precompute lookups to speed up classification
   const holidaySet = useMemo(() => {
     if (!Array.isArray(holidays)) return new Set();
-    return new Set(holidays.map(h => dateKey(new Date(h.date))));
+    // Filter out tentative holidays before creating set
+    return new Set(
+      holidays
+        .filter(h => h.date && !h.isTentative)
+        .map(h => {
+          const d = new Date(h.date);
+          return isNaN(d.getTime()) ? null : dateKey(d);
+        })
+        .filter(key => key !== null)
+    );
   }, [holidays, dateKey]);
 
   const leaveMap = useMemo(() => {

@@ -30,7 +30,14 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
     const dateStr = `${year}-${month}-${day}`;
     
     return holidays.find(holiday => {
+      // Skip tentative holidays (no date or isTentative flag)
+      if (!holiday.date || holiday.isTentative) {
+        return false;
+      }
       const holidayDate = new Date(holiday.date);
+      if (isNaN(holidayDate.getTime())) {
+        return false;
+      }
       const holidayYear = holidayDate.getFullYear();
       const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
       const holidayDay = String(holidayDate.getDate()).padStart(2, '0');
@@ -90,7 +97,7 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
         leaveData: leave
       };
     } else {
-      const formattedRequestType = leave.requestType === 'Unpaid' ? 'Loss of pay' : leave.requestType;
+      const formattedRequestType = leave.requestType === 'Loss of Pay' ? 'Loss of pay' : leave.requestType;
       return { 
         status: `Leave - ${formattedRequestType}`, 
         color: '#e74c3c', 
@@ -209,13 +216,13 @@ export const isWorkingSaturday = (date, saturdayPolicy) => {
 
 /**
  * Format leave request type for display
- * Converts "Unpaid" to "Loss of pay" for better readability
+ * Converts "Loss of Pay" to "Loss of pay" for better readability
  * @param {string} requestType - The leave request type
  * @returns {string} Formatted leave request type for display
  */
 export const formatLeaveRequestType = (requestType) => {
   if (!requestType) return '';
-  if (requestType === 'Unpaid') return 'Loss of pay';
+  if (requestType === 'Loss of Pay') return 'Loss of pay';
   return requestType;
 };
 

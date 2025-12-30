@@ -460,7 +460,7 @@ const EmployeesPage = () => {
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Edit Profile">
-                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenProfileDialog(employee, 'edit'); }}>
+                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenForm(employee); }}>
                                             <EditOutlinedIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>

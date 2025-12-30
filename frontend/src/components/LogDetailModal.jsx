@@ -256,13 +256,15 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         end = end.add(1, 'day');
                     }
 
-                    // Validate duration (max 16 hours)
+                    // Validate duration (max 24 hours for admin edits - increased from 16 hours)
+                    // This allows for legitimate cases like night shifts, corrections, etc.
                     const durationHours = end.diff(start, 'hour', true);
                     if (durationHours <= 0) {
                         throw new Error(`Session #${index + 1} end time must be after start time.`);
                     }
-                    if (durationHours > 16) {
-                        throw new Error(`Session #${index + 1} duration cannot exceed 16 hours.`);
+                    // Increased limit to 24 hours for admin flexibility
+                    if (durationHours > 24) {
+                        throw new Error(`Session #${index + 1} duration cannot exceed 24 hours.`);
                     }
 
                     cleanSession.endTime = end.toISOString();
@@ -302,13 +304,15 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                     end = end.add(1, 'day');
                 }
 
-                // Validate duration (max 16 hours for breaks too)
+                // Validate duration (max 24 hours for admin edits - increased from 16 hours)
+                // This allows for legitimate cases like corrections, extended breaks, etc.
                 const durationHours = end.diff(start, 'hour', true);
                 if (durationHours <= 0) {
                     throw new Error(`Break #${index + 1} end time must be after start time.`);
                 }
-                if (durationHours > 16) {
-                    throw new Error(`Break #${index + 1} duration cannot exceed 16 hours.`);
+                // Increased limit to 24 hours for admin flexibility
+                if (durationHours > 24) {
+                    throw new Error(`Break #${index + 1} duration cannot exceed 24 hours.`);
                 }
 
                 // Normalize breakType (handle both type and breakType for backward compatibility)

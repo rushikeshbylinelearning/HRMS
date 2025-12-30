@@ -13,7 +13,33 @@ const LeaveValidationService = require('../services/leaveValidationService');
 const uploadMedicalCertificate = require('../middleware/uploadMedicalCertificate');
 
 const formatLeaveDateRangeForEmail = (leaveDates) => {
-    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    // CRITICAL FIX: Use IST timezone explicitly to avoid timezone conversion issues
+    const formatDate = (dateString) => {
+        let d;
+        if (dateString instanceof Date) {
+            d = dateString;
+        } else if (typeof dateString === 'string') {
+            // Handle ISO date strings (YYYY-MM-DD) - parse as IST date
+            if (dateString.includes('T')) {
+                // ISO datetime string - convert to IST
+                d = new Date(dateString);
+            } else {
+                // Date-only string (YYYY-MM-DD) - parse as IST date to avoid timezone shift
+                const [year, month, day] = dateString.split('-').map(Number);
+                // Create date in IST timezone (UTC+5:30)
+                d = new Date(Date.UTC(year, month - 1, day, 5, 30, 0)); // IST offset: UTC+5:30
+            }
+        } else {
+            d = new Date(dateString);
+        }
+        // Format using IST timezone explicitly
+        return d.toLocaleDateString('en-GB', { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric',
+            timeZone: 'Asia/Kolkata' // IST timezone
+        });
+    };
     if (!leaveDates || leaveDates.length === 0) return 'N/A';
     const startDate = formatDate(leaveDates[0]);
     if (leaveDates.length === 1) return startDate;
@@ -104,8 +130,25 @@ router.get('/my-leave-balances', authenticateToken, async (req, res) => {
 // GET /api/leaves/holidays
 router.get('/holidays', authenticateToken, async (req, res) => {
     try {
-        const holidays = await Holiday.find().sort({ date: 'asc' });
-        res.json(holidays);
+        // Get all holidays and sort: valid dates first (ASC), then tentative holidays at bottom (alphabetically)
+        const holidays = await Holiday.find();
+        // Manual sort to ensure tentative holidays are at bottom
+        const sortedHolidays = holidays.sort((a, b) => {
+            const aIsTentative = !a.date || a.isTentative;
+            const bIsTentative = !b.date || b.isTentative;
+            
+            // If both are tentative, sort alphabetically by name
+            if (aIsTentative && bIsTentative) {
+                return a.name.localeCompare(b.name);
+            }
+            // If only a is tentative, put it at bottom
+            if (aIsTentative) return 1;
+            // If only b is tentative, put it at bottom
+            if (bIsTentative) return -1;
+            // Both have dates, sort by date
+            return new Date(a.date) - new Date(b.date);
+        });
+        res.json(sortedHolidays);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch holidays.' });
     }
@@ -167,12 +210,12 @@ router.post('/request', authenticateToken, async (req, res) => {
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
         // Restrict certain leave types for employees on probation
-        // Probation employees may apply only for Unpaid or Compensatory leaves
+        // Probation employees may apply only for Loss of Pay or Compensatory leaves
         const isProbation = employee.employmentStatus === 'Probation';
         const restrictedForProbation = ['Planned', 'Sick', 'Casual'];
         if (isProbation && restrictedForProbation.includes(requestType)) {
             return res.status(403).json({ 
-                error: 'You are currently on probation. Only Unpaid or Compensatory leave is allowed.' 
+                error: 'You are currently on probation. Only Loss of Pay or Compensatory leave is allowed.' 
             });
         }
 
@@ -189,11 +232,20 @@ router.post('/request', authenticateToken, async (req, res) => {
         );
 
         if (!validation.valid) {
-            return res.status(400).json({ 
+            const errorResponse = {
                 error: validation.errors.join(' '),
                 errors: validation.errors,
-                warnings: validation.warnings
-            });
+                warnings: validation.warnings || []
+            };
+            
+            // Include validation blocking details if leave was blocked by anti-exploitation rules
+            if (validation.validationBlocked) {
+                errorResponse.validationBlocked = true;
+                errorResponse.blockedRules = validation.blockedRules || [];
+                errorResponse.validationDetails = validation.validationDetails || {};
+            }
+            
+            return res.status(400).json(errorResponse);
         }
 
         // Show warnings but allow submission
@@ -241,8 +293,34 @@ router.post('/request', authenticateToken, async (req, res) => {
         // Use the saved request's leaveDates to ensure consistency with database values
         // Format dates consistently using the same format as email notifications
         const formatDateForNotification = (date) => {
-            const d = new Date(date);
-            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            // CRITICAL FIX: Use IST timezone explicitly to avoid timezone conversion issues
+            // When date string is "2024-01-25", new Date() interprets as UTC midnight
+            // which then converts to previous day in timezones ahead of UTC (like IST)
+            // Solution: Use IST timezone explicitly for all date formatting
+            let d;
+            if (date instanceof Date) {
+                d = date;
+            } else if (typeof date === 'string') {
+                // Handle ISO date strings (YYYY-MM-DD) - parse as IST date
+                if (date.includes('T')) {
+                    // ISO datetime string - convert to IST
+                    d = new Date(date);
+                } else {
+                    // Date-only string (YYYY-MM-DD) - parse as IST date to avoid timezone shift
+                    const [year, month, day] = date.split('-').map(Number);
+                    // Create date in IST timezone (UTC+5:30)
+                    d = new Date(Date.UTC(year, month - 1, day, 5, 30, 0)); // IST offset: UTC+5:30
+                }
+            } else {
+                d = new Date(date);
+            }
+            // Format using IST timezone explicitly
+            return d.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: 'short', 
+                year: 'numeric',
+                timeZone: 'Asia/Kolkata' // IST timezone
+            });
         };
         
         // Use saved request's leaveDates (from database) to ensure consistency
@@ -391,6 +469,13 @@ router.post('/year-end-request', authenticateToken, async (req, res) => {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
+        // Check if employee is permanent - Year-End requests are only for permanent employees
+        if (employee.employmentStatus !== 'Permanent') {
+            return res.status(403).json({ 
+                error: 'Year-End leave requests are only available for permanent employees.' 
+            });
+        }
+
         // Check if Year-End feature is enabled
         const Setting = require('../models/Setting');
         const yearEndSetting = await Setting.findOne({ key: 'yearEndFeature' });
@@ -461,12 +546,32 @@ router.post('/year-end-request', authenticateToken, async (req, res) => {
 });
 
 // GET /api/leaves/year-end-feature-status
-// Check if Year-End feature is enabled
+// Check if Year-End feature is enabled and if user is permanent
 router.get('/year-end-feature-status', authenticateToken, async (req, res) => {
     try {
+        const { userId } = req.user;
+        const employee = await User.findById(userId);
+        if (!employee) {
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+
         const Setting = require('../models/Setting');
         const yearEndSetting = await Setting.findOne({ key: 'yearEndFeature' });
-        res.json({ enabled: yearEndSetting ? yearEndSetting.value : false });
+        const featureEnabled = yearEndSetting ? yearEndSetting.value : false;
+        
+        // Check if employee is permanent
+        const isPermanent = employee.employmentStatus === 'Permanent';
+        
+        // Year-end feature is available only if:
+        // 1. Feature is enabled by admin
+        // 2. Employee is permanent
+        const available = featureEnabled && isPermanent;
+        
+        res.json({ 
+            enabled: available,
+            featureEnabled: featureEnabled,
+            isPermanent: isPermanent
+        });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch Year-End feature status.' });
     }

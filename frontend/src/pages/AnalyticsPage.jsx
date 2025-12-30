@@ -1221,7 +1221,14 @@ const AnalyticsPage = () => {
     const d = String(dateObj.getDate()).padStart(2, '0');
     const key = `${y}-${m}-${d}`;
     return employeeHolidays.some(h => {
+      // Skip tentative holidays (no date or isTentative flag)
+      if (!h.date || h.isTentative) {
+        return false;
+      }
       const hd = new Date(h.date);
+      if (isNaN(hd.getTime())) {
+        return false;
+      }
       const hy = hd.getFullYear();
       const hm = String(hd.getMonth() + 1).padStart(2, '0');
       const hdStr = `${hy}-${hm}-${String(hd.getDate()).padStart(2, '0')}`;

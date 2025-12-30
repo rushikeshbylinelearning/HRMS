@@ -15,7 +15,14 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], leav
         const dateStr = `${year}-${month}-${day}`;
         
         const holiday = holidays.find(holiday => {
+            // Skip tentative holidays (no date or isTentative flag)
+            if (!holiday.date || holiday.isTentative) {
+                return false;
+            }
             const holidayDate = new Date(holiday.date);
+            if (isNaN(holidayDate.getTime())) {
+                return false;
+            }
             const holidayYear = holidayDate.getFullYear();
             const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
             const holidayDay = String(holidayDate.getDate()).padStart(2, '0');

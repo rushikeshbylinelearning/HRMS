@@ -93,11 +93,13 @@
   border: 1px solid #e0e0e0;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   overflow: hidden; /* Important for border-radius on children */
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
   margin-top: 24px; /* Space between manager cards and table */
 }
 
 .admin-leaves-page .table-container {
   max-height: calc(100vh - 450px); /* Adjust based on your layout */
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
 }
 
 .admin-leaves-page .requests-table-head .MuiTableCell-root {
@@ -152,4 +154,239 @@
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+/* --- Windows 11 Calendar Styling --- */
+.admin-leaves-page .MuiPickersPopper-paper {
+    border-radius: 8px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+    border: 1px solid #e0e0e0 !important;
+    overflow: hidden !important;
+    background-color: white !important;
+}
+
+.admin-leaves-page .MuiPickersCalendarHeader-root {
+    background-color: white !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    padding: 12px 16px !important;
+    min-height: 56px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.admin-leaves-page .MuiPickersCalendarHeader-labelContainer {
+    order: 2 !important;
+}
+
+.admin-leaves-page .MuiPickersCalendarHeader-label {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #323130 !important;
+    text-transform: none !important;
+    margin: 0 !important;
+}
+
+.admin-leaves-page .MuiPickersArrowSwitcher-root {
+    display: flex !important;
+    gap: 4px !important;
+}
+
+.admin-leaves-page .MuiPickersArrowSwitcher-root .MuiIconButton-root {
+    color: #605e5c !important;
+    padding: 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+}
+
+.admin-leaves-page .MuiPickersArrowSwitcher-root .MuiIconButton-root:hover {
+    background-color: #f3f2f1 !important;
+}
+
+.admin-leaves-page .MuiDayCalendar-header {
+    padding: 8px 0 !important;
+    background-color: white !important;
+}
+
+.admin-leaves-page .MuiDayCalendar-weekContainer {
+    margin: 0 !important;
+}
+
+.admin-leaves-page .MuiDayCalendar-weekDayLabel {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #605e5c !important;
+    width: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    color: #323130 !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root:hover {
+    background-color: #e1f5fe !important;
+    border-radius: 50% !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root.Mui-selected {
+    background-color: #0078d4 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root.Mui-selected:hover {
+    background-color: #106ebe !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root.MuiPickersDay-today {
+    border: none !important;
+    font-weight: 600 !important;
+    color: #323130 !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root.MuiPickersDay-today.Mui-selected {
+    color: white !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root.Mui-disabled {
+    color: #c8c6c4 !important;
+}
+
+.admin-leaves-page .MuiPickersDay-root:not(.Mui-selected):not(.Mui-disabled) {
+    color: #323130 !important;
+}
+
+/* Previous/Next month dates styling */
+.admin-leaves-page .MuiPickersDay-root.MuiPickersDay-dayOutsideMonth {
+    color: #c8c6c4 !important;
+}
+
+/* Global Windows 11 Calendar Styling (applies to all DatePickers) */
+.MuiPickersPopper-paper {
+    border-radius: 8px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+    border: 1px solid #e0e0e0 !important;
+    overflow: hidden !important;
+    background-color: white !important;
+}
+
+.MuiPickersCalendarHeader-root {
+    background-color: white !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    padding: 12px 16px !important;
+    min-height: 56px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.MuiPickersCalendarHeader-labelContainer {
+    order: 2 !important;
+}
+
+.MuiPickersCalendarHeader-label {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #323130 !important;
+    text-transform: none !important;
+    margin: 0 !important;
+}
+
+.MuiPickersArrowSwitcher-root {
+    display: flex !important;
+    gap: 4px !important;
+}
+
+.MuiPickersArrowSwitcher-root .MuiIconButton-root {
+    color: #605e5c !important;
+    padding: 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+}
+
+.MuiPickersArrowSwitcher-root .MuiIconButton-root:hover {
+    background-color: #f3f2f1 !important;
+}
+
+.MuiDayCalendar-header {
+    padding: 8px 0 !important;
+    background-color: white !important;
+}
+
+.MuiDayCalendar-weekContainer {
+    margin: 0 !important;
+}
+
+.MuiDayCalendar-weekDayLabel {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #605e5c !important;
+    width: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.MuiPickersDay-root {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    color: #323130 !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.MuiPickersDay-root:hover {
+    background-color: #e1f5fe !important;
+    border-radius: 50% !important;
+}
+
+.MuiPickersDay-root.Mui-selected {
+    background-color: #0078d4 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.MuiPickersDay-root.Mui-selected:hover {
+    background-color: #106ebe !important;
+}
+
+.MuiPickersDay-root.MuiPickersDay-today {
+    border: none !important;
+    font-weight: 600 !important;
+    color: #323130 !important;
+}
+
+.MuiPickersDay-root.MuiPickersDay-today.Mui-selected {
+    color: white !important;
+}
+
+.MuiPickersDay-root.Mui-disabled {
+    color: #c8c6c4 !important;
+}
+
+.MuiPickersDay-root:not(.Mui-selected):not(.Mui-disabled) {
+    color: #323130 !important;
+}
+
+.MuiPickersDay-root.MuiPickersDay-dayOutsideMonth {
+    color: #c8c6c4 !important;
 }

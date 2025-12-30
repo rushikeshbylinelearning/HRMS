@@ -12,6 +12,7 @@ import {
     Notes as NotesIcon,
     MoreTime as MoreTimeIcon,
     HistoryEdu as HistoryEduIcon,
+    Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import EmployeeListModal from '../components/EmployeeListModal';
 import LeaveRejectionModal from '../components/LeaveRejectionModal';
@@ -624,6 +625,30 @@ const AdminDashboardPage = () => {
                                 <a href="/admin/leaves" className="quick-link-item">
                                     <EventBusyIcon />
                                     <span>Leave Management</span>
+                                </a>
+                                <a 
+                                    href="/admin/leaves" 
+                                    className="quick-link-item"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        // Navigate to Employee Leave Count Summary tab
+                                        window.location.href = '/admin/leaves?tab=leave-count';
+                                    }}
+                                >
+                                    <AssessmentIcon />
+                                    <span>Employee Leave Count</span>
+                                </a>
+                                <a 
+                                    href="/admin/leaves" 
+                                    className="quick-link-item"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        // Navigate to Intern Leave Count Summary tab
+                                        window.location.href = '/admin/leaves?tab=intern-leave-count';
+                                    }}
+                                >
+                                    <AssessmentIcon />
+                                    <span>Intern Leave Count</span>
                                 </a>
                             </div>
                         </div>

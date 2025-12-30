@@ -2,13 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Box, Stack, Divider, 
-    Typography, Paper, Chip, OutlinedInput
+    Select, MenuItem, InputLabel, FormControl, CircularProgress, Box, Stack, 
+    Typography, Chip, OutlinedInput, IconButton
 } from '@mui/material';
-import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
-import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import EventIcon from '@mui/icons-material/Event';
+import CloseIcon from '@mui/icons-material/Close';
 
 const initialFormState = {
     employeeCode: '',
@@ -43,16 +40,35 @@ const employmentStatuses = ['Intern', 'Probation', 'Permanent'];
 const allWeekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-const formSectionStyles = {
-    p: 2.5,
+const cardSx = {
+    background: '#fff',
     borderRadius: '16px',
-    border: '1px solid',
-    borderColor: 'divider'
+    padding: '24px',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.08)'
+};
+
+const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+        borderRadius: '12px',
+        backgroundColor: '#fff'
+    },
+    '& .MuiInputLabel-root': {
+        color: '#666'
+    }
 };
 
 const formControlStyles = {
-    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-    '& .MuiInputBase-root': { borderRadius: '12px' }
+    '& .MuiOutlinedInput-root': { 
+        borderRadius: '12px',
+        backgroundColor: '#fff'
+    },
+    '& .MuiInputBase-root': { 
+        borderRadius: '12px',
+        backgroundColor: '#fff'
+    },
+    '& .MuiInputLabel-root': {
+        color: '#666'
+    }
 };
 
 const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => {
@@ -142,29 +158,95 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: '24px' } }}>
-            <DialogTitle sx={{ p: 3, pb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <PersonAddAlt1OutlinedIcon />
-                    <Typography variant="h6">{isEditing ? 'Edit Employee Details' : 'Add New Employee'}</Typography>
-                </Box>
+            <DialogTitle sx={{ px: 4, pt: 3, pb: 2 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Box>
+                        <Typography variant="overline" sx={{ color: '#E53935', letterSpacing: 1 }}>
+                            Advanced Editor
+                        </Typography>
+                        <Typography variant="h6" fontWeight={700}>
+                            {isEditing ? 'Edit Employee Details' : 'Add New Employee'}
+                        </Typography>
+                    </Box>
+                    <IconButton onClick={onClose} size="large">
+                        <CloseIcon />
+                    </IconButton>
+                </Stack>
             </DialogTitle>
-            <DialogContent sx={{ p: 3, backgroundColor: '#f9fafb' }}>
+            <DialogContent dividers sx={{ backgroundColor: '#f9fafb', px: 4, py: 4 }}>
                 <Stack spacing={3}>
-                    <Paper component={Stack} spacing={2} sx={formSectionStyles}>
-                        <Typography variant="subtitle1" fontWeight={600} display="flex" alignItems="center" gap={1}><BusinessCenterIcon fontSize="small"/> Job Details</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}><TextField name="fullName" label="Full Name" value={formData.fullName} onChange={handleChange} fullWidth required error={!!errors.fullName} helperText={errors.fullName} sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={6}><TextField name="employeeCode" label="Employee Code" value={formData.employeeCode} onChange={handleChange} fullWidth required error={!!errors.employeeCode} helperText={errors.employeeCode} sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={6}><TextField name="designation" label="Designation" value={formData.designation} onChange={handleChange} fullWidth sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={6}><TextField name="department" label="Department" value={formData.department} onChange={handleChange} fullWidth sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={6}><TextField name="joiningDate" label="Joining Date" type="date" value={formData.joiningDate} onChange={handleChange} fullWidth InputLabelProps={{ shrink: true }} sx={formControlStyles} /></Grid>
+                    <Box sx={cardSx}>
+                        <Typography variant="h6" fontWeight={700} gutterBottom>
+                            Section 1 — Job Details
+                        </Typography>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="fullName" 
+                                    label="Full Name" 
+                                    value={formData.fullName} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    required 
+                                    error={!!errors.fullName} 
+                                    helperText={errors.fullName} 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="employeeCode" 
+                                    label="Employee Code" 
+                                    value={formData.employeeCode} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    required 
+                                    error={!!errors.employeeCode} 
+                                    helperText={errors.employeeCode} 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="designation" 
+                                    label="Designation" 
+                                    value={formData.designation} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="department" 
+                                    label="Department" 
+                                    value={formData.department} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="joiningDate" 
+                                    label="Joining Date" 
+                                    type="date" 
+                                    value={formData.joiningDate} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    InputLabelProps={{ shrink: true }} 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
                         </Grid>
-                    </Paper>
+                    </Box>
 
-                    <Paper component={Stack} spacing={2} sx={formSectionStyles}>
-                         <Typography variant="subtitle1" fontWeight={600} display="flex" alignItems="center" gap={1}><VpnKeyIcon fontSize="small"/> System & Access</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
+                    <Box sx={cardSx}>
+                        <Typography variant="h6" fontWeight={700} gutterBottom>
+                            Section 2 — System & Access
+                        </Typography>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
                                 <TextField 
                                     name="email" 
                                     label="Email Address" 
@@ -175,22 +257,68 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                                     required 
                                     error={!!errors.email} 
                                     helperText={errors.email} 
-                                    sx={formControlStyles}
+                                    sx={textFieldSx}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6}><TextField name="password" label="Password" type="password" value={formData.password} onChange={handleChange} fullWidth required={!isEditing} helperText={isEditing ? "Leave blank to keep current password" : "Required for new employee"} error={!!errors.password} sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={6}><FormControl fullWidth sx={formControlStyles}><InputLabel>Role</InputLabel><Select name="role" label="Role" value={formData.role} onChange={handleChange}>{roles.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}</Select></FormControl></Grid>
-                            <Grid item xs={12} sm={6}><FormControl fullWidth sx={formControlStyles}><InputLabel>Domain</InputLabel><Select name="domain" label="Domain" value={formData.domain} onChange={handleChange}><MenuItem value=""><em>Select Domain</em></MenuItem>{domains.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</Select></FormControl></Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField 
+                                    name="password" 
+                                    label="Password" 
+                                    type="password" 
+                                    value={formData.password} 
+                                    onChange={handleChange} 
+                                    fullWidth 
+                                    required={!isEditing} 
+                                    helperText={isEditing ? "Leave blank to keep current password" : "Required for new employee"} 
+                                    error={!!errors.password} 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth sx={formControlStyles}>
+                                    <InputLabel>Role</InputLabel>
+                                    <Select name="role" label="Role" value={formData.role} onChange={handleChange}>
+                                        {roles.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth sx={formControlStyles}>
+                                    <InputLabel>Domain</InputLabel>
+                                    <Select name="domain" label="Domain" value={formData.domain} onChange={handleChange}>
+                                        <MenuItem value=""><em>Select Domain</em></MenuItem>
+                                        {domains.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
                         </Grid>
-                    </Paper>
+                    </Box>
                     
-                     <Paper component={Stack} spacing={2} sx={formSectionStyles}>
-                        <Typography variant="subtitle1" fontWeight={600} display="flex" alignItems="center" gap={1}><EventIcon fontSize="small"/> Work & Leave Policy</Typography>
-                        <Grid container spacing={2}>
-                             <Grid item xs={12} sm={6}><FormControl fullWidth sx={formControlStyles}><InputLabel>Shift Group</InputLabel><Select name="shiftGroup" label="Shift Group" value={formData.shiftGroup} onChange={handleChange}><MenuItem value=""><em>None</em></MenuItem>{shifts.map(s => <MenuItem key={s._id} value={s._id}>{s.shiftName}</MenuItem>)}</Select></FormControl></Grid>
-                             <Grid item xs={12} sm={6}><FormControl fullWidth sx={formControlStyles}><InputLabel>Employment Status</InputLabel><Select name="employmentStatus" label="Employment Status" value={formData.employmentStatus} onChange={handleChange}>{employmentStatuses.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}</Select></FormControl></Grid>
+                    <Box sx={cardSx}>
+                        <Typography variant="h6" fontWeight={700} gutterBottom>
+                            Section 3 — Work & Leave Policy
+                        </Typography>
+                        <Grid container spacing={3}>
+                            {/* Row 1: Policy Settings - 4 equal columns */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth sx={formControlStyles}>
+                                    <InputLabel>Shift Group</InputLabel>
+                                    <Select name="shiftGroup" label="Shift Group" value={formData.shiftGroup} onChange={handleChange}>
+                                        <MenuItem value=""><em>None</em></MenuItem>
+                                        {shifts?.map(s => <MenuItem key={s._id} value={s._id}>{s.shiftName}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth sx={formControlStyles}>
+                                    <InputLabel>Employment Status</InputLabel>
+                                    <Select name="employmentStatus" label="Employment Status" value={formData.employmentStatus} onChange={handleChange}>
+                                        {employmentStatuses.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
                             {formData.employmentStatus === 'Probation' && (
-                                <Grid item xs={12} sm={6}>
+                                <Grid item xs={12} sm={6} md={3}>
                                     <FormControl fullWidth sx={formControlStyles} error={!!errors.probationDurationMonths}>
                                         <InputLabel>Probation Period</InputLabel>
                                         <Select
@@ -207,14 +335,14 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                                         </Select>
                                     </FormControl>
                                     {errors.probationDurationMonths && (
-                                        <Typography variant="caption" color="error.main">
+                                        <Typography variant="caption" color="error.main" sx={{ mt: 0.5, display: 'block' }}>
                                             {errors.probationDurationMonths}
                                         </Typography>
                                     )}
                                 </Grid>
                             )}
-                             {formData.employmentStatus === 'Intern' && (
-                                <Grid item xs={12} sm={6}>
+                            {formData.employmentStatus === 'Intern' && (
+                                <Grid item xs={12} sm={6} md={3}>
                                     <FormControl fullWidth sx={formControlStyles}>
                                         <InputLabel>Internship Duration</InputLabel>
                                         <Select name="internshipDurationMonths" label="Internship Duration" value={formData.internshipDurationMonths} onChange={handleChange}>
@@ -222,13 +350,62 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                             )}
-                            <Grid item xs={12} sm={6}><FormControl fullWidth sx={formControlStyles}><InputLabel>Alternate Saturday Policy</InputLabel><Select name="alternateSaturdayPolicy" label="Alternate Saturday Policy" value={formData.alternateSaturdayPolicy} onChange={handleChange}>{satPolicies.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}</Select></FormControl></Grid>
-                            {/* --- START OF FIX --- */}
-                            <Grid item xs={12} sm={4}><TextField name="sick" label="Sick Leaves Balance" type="number" value={formData.leaveBalances.sick} onChange={handleBalanceChange} fullWidth sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={4}><TextField name="casual" label="Casual Leaves Balance" type="number" value={formData.leaveBalances.casual} onChange={handleBalanceChange} fullWidth sx={formControlStyles} /></Grid>
-                            <Grid item xs={12} sm={4}><TextField name="paid" label="Planned Leaves Balance" type="number" value={formData.leaveBalances.paid} onChange={handleBalanceChange} fullWidth sx={formControlStyles} /></Grid>
-                            {/* --- END OF FIX --- */}
+                            )}
+                            {formData.employmentStatus === 'Permanent' && (
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <FormControl fullWidth sx={formControlStyles}>
+                                        <InputLabel>Duration</InputLabel>
+                                        <Select disabled>
+                                            <MenuItem value="">Permanent</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            )}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth sx={formControlStyles}>
+                                    <InputLabel>Alternate Saturday Policy</InputLabel>
+                                    <Select name="alternateSaturdayPolicy" label="Alternate Saturday Policy" value={formData.alternateSaturdayPolicy} onChange={handleChange}>
+                                        {satPolicies.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            
+                            {/* Row 2: Leave Balances - 3 equal columns */}
+                            <Grid item xs={12} sm={4} md={4}>
+                                <TextField 
+                                    name="sick" 
+                                    label="Sick Leaves Balance" 
+                                    type="number" 
+                                    value={formData.leaveBalances.sick} 
+                                    onChange={handleBalanceChange} 
+                                    fullWidth 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4} md={4}>
+                                <TextField 
+                                    name="casual" 
+                                    label="Casual Leaves Balance" 
+                                    type="number" 
+                                    value={formData.leaveBalances.casual} 
+                                    onChange={handleBalanceChange} 
+                                    fullWidth 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4} md={4}>
+                                <TextField 
+                                    name="paid" 
+                                    label="Planned Leaves Balance" 
+                                    type="number" 
+                                    value={formData.leaveBalances.paid} 
+                                    onChange={handleBalanceChange} 
+                                    fullWidth 
+                                    sx={textFieldSx} 
+                                />
+                            </Grid>
+                            
+                            {/* Row 3: Working Days - Full width */}
                             <Grid item xs={12}>
                                 <FormControl fullWidth sx={formControlStyles}>
                                     <InputLabel>Working Days</InputLabel>
@@ -249,14 +426,29 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                                 </FormControl>
                             </Grid>
                         </Grid>
-                    </Paper>
+                    </Box>
                 </Stack>
             </DialogContent>
-            <Divider />
-            <DialogActions sx={{ p: '16px 24px' }}>
-                <Button onClick={onClose} color="inherit">Cancel</Button>
-                <Button onClick={handleSubmit} variant="contained" disabled={isSaving} sx={{ borderRadius: '12px', minWidth: '90px' }}>
-                    {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Save'}
+            <DialogActions sx={{ px: 4, py: 3, gap: 1.5 }}>
+                <Button 
+                    onClick={onClose} 
+                    variant="outlined"
+                    sx={{ borderRadius: '12px' }}
+                >
+                    Cancel
+                </Button>
+                <Button 
+                    onClick={handleSubmit} 
+                    variant="contained" 
+                    disabled={isSaving} 
+                    sx={{
+                        backgroundColor: '#E53935',
+                        borderRadius: '12px',
+                        minWidth: 140,
+                        '&:hover': { backgroundColor: '#d32f2f' }
+                    }}
+                >
+                    {isSaving ? <CircularProgress size={22} color="inherit" /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

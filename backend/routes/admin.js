@@ -20,10 +20,46 @@ const NewNotificationService = require('../services/NewNotificationService');
 const { getUserDailyStatus, recalculateLateStatus } = require('../services/dailyStatusService');
 
 // Middleware to check for Admin/HR role
-const isAdminOrHr = (req, res, next) => {
-    if (!['Admin', 'HR'].includes(req.user.role)) {
-        return res.status(403).json({ error: 'Access forbidden: Requires Admin or HR role.' });
+const isAdminOrHr = async (req, res, next) => {
+    // CRITICAL FIX: Check if req.user exists before accessing role
+    // This prevents 403 errors when authentication fails or user object is missing
+    if (!req.user) {
+        console.error('[isAdminOrHr] req.user is missing - authentication may have failed');
+        return res.status(401).json({ error: 'Authentication required. Please log in again.' });
     }
+    
+    // Check role with better error logging
+    let userRole = req.user.role;
+    
+    // If role is missing from token, fetch from database as fallback
+    if (!userRole && req.user.userId) {
+        try {
+            const dbUser = await User.findById(req.user.userId).select('role').lean();
+            if (dbUser && dbUser.role) {
+                userRole = dbUser.role;
+                // Update req.user.role for consistency
+                req.user.role = userRole;
+                console.log('[isAdminOrHr] Fetched role from database:', userRole);
+            }
+        } catch (error) {
+            console.error('[isAdminOrHr] Error fetching user role from database:', error);
+        }
+    }
+    
+    if (!userRole) {
+        console.error('[isAdminOrHr] req.user.role is missing for user:', req.user.userId || req.user.email);
+        return res.status(403).json({ error: 'User role not found. Please contact administrator.' });
+    }
+    
+    // Normalize role (trim whitespace, handle case sensitivity)
+    const normalizedRole = String(userRole).trim();
+    if (!['Admin', 'HR'].includes(normalizedRole)) {
+        console.warn('[isAdminOrHr] Access denied - User role:', normalizedRole, 'User ID:', req.user.userId || req.user.email);
+        return res.status(403).json({ 
+            error: 'Access forbidden: Requires Admin or HR role.'
+        });
+    }
+    
     next();
 };
 
@@ -149,7 +185,7 @@ router.get('/leaves/employee/:id', [authenticateToken, isAdminOrHr], async (req,
 // PATCH /leaves/:id/status
 router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { id } = req.params;
-    const { status: newStatus, rejectionNotes } = req.body;
+    const { status: newStatus, rejectionNotes, overrideReason } = req.body;
 
     if (!['Approved', 'Rejected'].includes(newStatus)) {
         return res.status(400).json({ error: 'Invalid status provided.' });
@@ -194,7 +230,7 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                 case 'Casual':
                     leaveField = 'casual'; // Casual leaves use casual leave balance
                     break;
-                case 'Unpaid':
+                case 'Loss of Pay':
                 case 'Compensatory':
                 case 'Backdated Leave':
                     // These don't affect leave balances
@@ -223,6 +259,28 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
             request.rejectionNotes = rejectionNotes;
         } else if (newStatus === 'Approved') {
             request.rejectionNotes = undefined;
+            
+            // Handle admin override for blocked leaves
+            if (request.validationBlocked && overrideReason) {
+                request.adminOverride = true;
+                request.overrideReason = overrideReason;
+                request.overriddenBy = req.user.userId;
+                request.overriddenAt = new Date();
+                
+                // Log the override action
+                const { logAction } = require('../services/auditLogger');
+                await logAction({
+                    action: 'LEAVE_OVERRIDE_ANTI_EXPLOITATION',
+                    userId: req.user.userId.toString(),
+                    details: {
+                        leaveRequestId: id,
+                        employeeId: request.employee.toString(),
+                        blockedRules: request.blockedRules || [],
+                        overrideReason: overrideReason,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
         }
         
         await employee.save({ session });
@@ -455,8 +513,20 @@ router.patch('/breaks/extra/:requestId/status', [authenticateToken, isAdminOrHr]
 
 router.get('/holidays', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
-        const holidays = await Holiday.find().sort({ date: 1 });
-        res.json(holidays);
+        const holidays = await Holiday.find();
+        // Sort: valid dates first (ASC), then tentative holidays at bottom (alphabetically)
+        const sortedHolidays = holidays.sort((a, b) => {
+            const aIsTentative = !a.date || a.isTentative;
+            const bIsTentative = !b.date || b.isTentative;
+            
+            if (aIsTentative && bIsTentative) {
+                return a.name.localeCompare(b.name);
+            }
+            if (aIsTentative) return 1;
+            if (bIsTentative) return -1;
+            return new Date(a.date) - new Date(b.date);
+        });
+        res.json(sortedHolidays);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch holidays.' });
     }
@@ -486,6 +556,268 @@ router.delete('/holidays/:id', [authenticateToken, isAdminOrHr], async (req, res
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete holiday.' });
+    }
+});
+
+// POST /api/admin/holidays/bulk-upload
+// Bulk upload holidays from Excel file
+router.post('/holidays/bulk-upload', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { holidays } = req.body;
+
+    if (!holidays || !Array.isArray(holidays) || holidays.length === 0) {
+        return res.status(400).json({ error: 'Holidays array is required and must not be empty.' });
+    }
+
+    const session = await require('mongoose').startSession();
+    session.startTransaction();
+
+    try {
+        const results = {
+            successCount: 0,
+            failureCount: 0,
+            errors: []
+        };
+
+        // Helper function to parse flexible date (same logic as frontend)
+        const parseFlexibleDate = (dateStr, currentYear = new Date().getFullYear()) => {
+            if (!dateStr) return null;
+            
+            const normalized = String(dateStr).trim();
+            
+            // Check for "Not Yet decided" (case-insensitive)
+            if (/not\s+yet\s+decided/i.test(normalized)) {
+                return { date: null, isTentative: true };
+            }
+            
+            // Try Excel serial date first
+            if (!isNaN(normalized) && parseFloat(normalized) > 25569) {
+                const excelEpoch = new Date(1900, 0, 1);
+                const days = parseFloat(normalized) - 2;
+                const parsedDate = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
+                if (!isNaN(parsedDate.getTime())) {
+                    return { date: parsedDate, isTentative: false };
+                }
+            }
+            
+            // Try parsing as full date
+            let parsedDate = new Date(normalized);
+            if (!isNaN(parsedDate.getTime())) {
+                return { date: parsedDate, isTentative: false };
+            }
+            
+            // Try parsing as "DD-MMM" format (e.g., "26-Jan", "3-Mar")
+            const dayMonthMatch = normalized.match(/^(\d{1,2})[-/](\w{3,})$/i);
+            if (dayMonthMatch) {
+                const day = parseInt(dayMonthMatch[1]);
+                const monthStr = dayMonthMatch[2].toLowerCase();
+                const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                const monthIndex = monthNames.findIndex(m => monthStr.startsWith(m));
+                
+                if (monthIndex !== -1 && day >= 1 && day <= 31) {
+                    const date = new Date(currentYear, monthIndex, day);
+                    if (date.getDate() === day && date.getMonth() === monthIndex) {
+                        return { date: date, isTentative: false };
+                    }
+                }
+            }
+            
+            return null; // Invalid format
+        };
+
+        // Get existing holidays to check for duplicates
+        const existingHolidays = await Holiday.find({}, 'date name isTentative').session(session);
+        const existingDates = new Set(
+            existingHolidays
+                .filter(h => h.date && !h.isTentative)
+                .map(h => {
+                    const d = new Date(h.date);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                })
+        );
+        const existingTentativeHolidays = new Set(
+            existingHolidays
+                .filter(h => h.isTentative)
+                .map(h => h.name.toLowerCase().trim())
+        );
+
+        // Validate and process each holiday
+        const holidaysToInsert = [];
+        const seenDatesInBatch = new Set();
+        const seenTentativeInBatch = new Set();
+        const currentYear = new Date().getFullYear();
+
+        for (let i = 0; i < holidays.length; i++) {
+            const holiday = holidays[i];
+            const rowNum = i + 1;
+            const errors = [];
+
+            // Validate holiday name
+            const holidayName = String(holiday.name || '').trim();
+            if (holidayName.length === 0) {
+                errors.push('Holiday name is required');
+            } else if (holidayName.length > 100) {
+                errors.push('Holiday name exceeds 100 characters');
+            }
+
+            // Parse date (can be null for tentative)
+            const isTentative = holiday.isTentative || false;
+            let dateResult = null;
+            let formattedDate = null;
+            let parsedDate = null;
+
+            if (holiday.date) {
+                dateResult = parseFlexibleDate(holiday.date, currentYear);
+                if (!dateResult) {
+                    errors.push('Invalid date format');
+                } else if (dateResult.isTentative) {
+                    // "Not Yet decided" - date is null
+                    formattedDate = null;
+                    parsedDate = null;
+                } else {
+                    parsedDate = dateResult.date;
+                    const year = parsedDate.getFullYear();
+                    const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(parsedDate.getDate()).padStart(2, '0');
+                    formattedDate = `${year}-${month}-${day}`;
+                }
+            } else if (!isTentative) {
+                errors.push('Date is required for non-tentative holidays');
+            }
+
+            if (errors.length > 0) {
+                results.failureCount++;
+                results.errors.push({
+                    row: rowNum,
+                    errors: errors
+                });
+                continue;
+            }
+
+            // Handle tentative holidays
+            if (isTentative || !formattedDate) {
+                const nameKey = holidayName.toLowerCase();
+                
+                // Check for duplicate tentative in batch
+                if (seenTentativeInBatch.has(nameKey)) {
+                    results.failureCount++;
+                    results.errors.push({
+                        row: rowNum,
+                        errors: [`Duplicate tentative holiday in upload: ${holidayName}`]
+                    });
+                    continue;
+                }
+
+                // Check for duplicate tentative in database
+                if (existingTentativeHolidays.has(nameKey)) {
+                    results.failureCount++;
+                    results.errors.push({
+                        row: rowNum,
+                        errors: [`Tentative holiday already exists: ${holidayName}`]
+                    });
+                    continue;
+                }
+
+                seenTentativeInBatch.add(nameKey);
+                holidaysToInsert.push({
+                    name: holidayName,
+                    date: null,
+                    isTentative: true,
+                    day: holiday.day ? String(holiday.day).trim() : null
+                });
+                continue;
+            }
+
+            // Handle regular holidays with dates
+            // Check for duplicates in batch
+            if (seenDatesInBatch.has(formattedDate)) {
+                results.failureCount++;
+                results.errors.push({
+                    row: rowNum,
+                    errors: [`Duplicate date in upload: ${formattedDate}`]
+                });
+                continue;
+            }
+
+            // Check for duplicates in database
+            if (existingDates.has(formattedDate)) {
+                results.failureCount++;
+                results.errors.push({
+                    row: rowNum,
+                    errors: [`Holiday already exists for date: ${formattedDate}`]
+                });
+                continue;
+            }
+
+            // Day validation (optional, allow multiple days)
+            // Don't strictly validate day for flexibility
+
+            // Add to insert batch
+            seenDatesInBatch.add(formattedDate);
+            holidaysToInsert.push({
+                name: holidayName,
+                date: parsedDate,
+                isTentative: false,
+                day: holiday.day ? String(holiday.day).trim() : null
+            });
+        }
+
+        // If there are any errors, reject the entire batch
+        if (results.errors.length > 0) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+                error: 'Validation failed. Please fix all errors before uploading.',
+                successCount: 0,
+                failureCount: results.failureCount,
+                errors: results.errors
+            });
+        }
+
+        // Insert all holidays in a transaction
+        if (holidaysToInsert.length > 0) {
+            try {
+                await Holiday.insertMany(holidaysToInsert, { session });
+                results.successCount = holidaysToInsert.length;
+            } catch (insertError) {
+                // Handle unique constraint violations
+                if (insertError.code === 11000) {
+                    const duplicateField = Object.keys(insertError.keyPattern || {})[0];
+                    throw new Error(`Duplicate holiday detected: ${duplicateField}`);
+                }
+                throw insertError;
+            }
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.status(200).json({
+            message: `Successfully uploaded ${results.successCount} holiday(s).`,
+            successCount: results.successCount,
+            failureCount: results.failureCount,
+            errors: results.errors
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error('Error in bulk upload holidays:', error);
+        
+        if (error.code === 11000) {
+            return res.status(409).json({ 
+                error: 'One or more holidays already exist in the database.',
+                successCount: 0,
+                failureCount: holidays.length,
+                errors: []
+            });
+        }
+
+        res.status(500).json({ 
+            error: 'Failed to upload holidays.',
+            successCount: 0,
+            failureCount: holidays.length,
+            errors: []
+        });
     }
 });
 
@@ -1164,7 +1496,7 @@ router.get('/attendance/user/:userId', [authenticateToken, isAdminOrHr], async (
             { $match: { user: new mongoose.Types.ObjectId(userId), attendanceDate: { $gte: startDate, $lte: endDate } } },
             { $lookup: { from: 'attendancesessions', localField: '_id', foreignField: 'attendanceLog', as: 'sessions' } },
             { $lookup: { from: 'breaklogs', localField: '_id', foreignField: 'attendanceLog', as: 'breaks' } },
-            { $project: { _id: 1, attendanceDate: 1, status: 1, clockInTime: 1, clockOutTime: 1, notes: 1, sessions: { $map: { input: "$sessions", as: "s", in: { startTime: "$$s.startTime", endTime: "$$s.endTime" } } }, breaks: { $map: { input: "$breaks", as: "b", in: { startTime: "$$b.startTime", endTime: "$$b.endTime", durationMinutes: "$$b.durationMinutes", breakType: "$$b.breakType" } } } } },
+            { $project: { _id: 1, attendanceDate: 1, status: 1, clockInTime: 1, clockOutTime: 1, notes: 1, logoutType: 1, autoLogoutReason: 1, sessions: { $map: { input: "$sessions", as: "s", in: { startTime: "$$s.startTime", endTime: "$$s.endTime", logoutType: "$$s.logoutType", autoLogoutReason: "$$s.autoLogoutReason" } } }, breaks: { $map: { input: "$breaks", as: "b", in: { startTime: "$$b.startTime", endTime: "$$b.endTime", durationMinutes: "$$b.durationMinutes", breakType: "$$b.breakType" } } } } },
             { $sort: { attendanceDate: 1 } }
         ]);
 
@@ -1197,9 +1529,10 @@ router.get('/attendance/user/:userId', [authenticateToken, isAdminOrHr], async (
  * Validation rules:
  * - All time values must be valid ISO 8601 date strings
  * - endTime must be after startTime for both sessions and breaks
- * - Session duration cannot exceed 16 hours
- * - Break duration cannot exceed 16 hours
+ * - Session duration cannot exceed 24 hours (increased from 16 hours for admin flexibility)
+ * - Break duration cannot exceed 24 hours (increased from 16 hours for admin flexibility)
  * - breakType must be one of: 'Paid', 'Unpaid', 'Extra'
+ * - Admins can edit auto-logged-out attendance logs (restriction removed)
  */
 router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { logId } = req.params;
@@ -1235,34 +1568,26 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         });
     }
 
-    // Prevent editing critical fields for auto-logged-out sessions
-    // Allow notes to be updated, but not sessions, breaks, or clockOutTime
+    // CRITICAL FIX: Allow admins to edit auto-logged-out sessions
+    // Admins should be able to override auto-logout restrictions for corrections
+    // Only show warning, but allow the edit to proceed
     if (log.logoutType === 'AUTO' && log.autoLogoutReason) {
-        // Only allow updating notes for auto-logged-out sessions
-        if (sessions !== undefined || breaks !== undefined) {
-            return res.status(403).json({ 
-                success: false,
-                message: 'Cannot edit sessions or breaks for auto-logged-out attendance. Only notes can be updated.',
-                error: 'This attendance was automatically logged out and cannot be edited to prevent policy abuse. Only notes can be updated.',
-                logoutType: 'AUTO',
-                autoLogoutReason: log.autoLogoutReason
-            });
-        }
-        // Allow notes update only
-        if (notes !== undefined) {
-            log.notes = notes;
-            await log.save();
-            return res.json({ 
-                success: true,
-                message: 'Notes updated successfully (attendance was auto-logged-out, only notes can be edited).',
-                attendanceLog: log
-            });
-        }
-        return res.json({ 
-            success: true,
-            message: 'No changes requested (attendance was auto-logged-out, only notes can be edited).',
-            attendanceLog: log
+        // Log warning but allow admin to proceed with edit
+        console.warn('[Admin Edit] Editing auto-logged-out attendance log:', {
+            logId: log._id,
+            userId: log.user,
+            autoLogoutReason: log.autoLogoutReason,
+            adminUserId: req.user.userId,
+            adminRole: req.user.role
         });
+        
+        // Clear auto-logout status when admin edits (mark as manually corrected)
+        if (sessions !== undefined || breaks !== undefined) {
+            log.logoutType = 'MANUAL';
+            log.autoLogoutReason = null;
+            console.log('[Admin Edit] Auto-logout status cleared by admin edit');
+        }
+        // Continue with normal edit flow below
     }
 
     // Validate and default required fields
@@ -1332,13 +1657,14 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
                     error: `Session #${i + 1} end time must be after start time.`
                 });
             }
-            // Validate reasonable duration (max 16 hours)
+            // Validate reasonable duration (max 24 hours for admin edits - increased from 16 hours)
+            // This allows for legitimate cases like night shifts, corrections, etc.
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
-            if (durationHours > 16) {
+            if (durationHours > 24) {
                 return res.status(400).json({ 
                     success: false,
-                    message: `Session #${i + 1} duration cannot exceed 16 hours.`,
-                    error: `Session #${i + 1} duration cannot exceed 16 hours.`
+                    message: `Session #${i + 1} duration cannot exceed 24 hours.`,
+                    error: `Session #${i + 1} duration cannot exceed 24 hours.`
                 });
             }
         }
@@ -1392,13 +1718,14 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
                 error: `Break #${i + 1} end time must be after start time.`
             });
         }
-        // Validate reasonable duration (max 16 hours)
+        // Validate reasonable duration (max 24 hours for admin edits - increased from 16 hours)
+        // This allows for legitimate cases like corrections, extended breaks, etc.
         const durationHours = (endTime - startTime) / (1000 * 60 * 60);
-        if (durationHours > 16) {
+        if (durationHours > 24) {
             return res.status(400).json({ 
                 success: false,
-                message: `Break #${i + 1} duration cannot exceed 16 hours.`,
-                error: `Break #${i + 1} duration cannot exceed 16 hours.`
+                message: `Break #${i + 1} duration cannot exceed 24 hours.`,
+                error: `Break #${i + 1} duration cannot exceed 24 hours.`
             });
         }
         // Handle both breakType and type for backward compatibility
@@ -1436,14 +1763,20 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         
         // Ensure logoutType check still applies (double-check within transaction)
         if (logInTransaction.logoutType === 'AUTO' && logInTransaction.autoLogoutReason) {
-            await dbSession.abortTransaction();
-            return res.status(403).json({ 
-                success: false,
-                message: 'Cannot edit sessions or breaks for auto-logged-out attendance. Only notes can be updated.',
-                error: 'This attendance was automatically logged out and cannot be edited to prevent policy abuse. Only notes can be updated.',
-                logoutType: 'AUTO',
-                autoLogoutReason: logInTransaction.autoLogoutReason
+            // CRITICAL FIX: Allow admins to edit auto-logged-out sessions
+            // Clear auto-logout status when admin edits (mark as manually corrected)
+            console.warn('[Admin Edit] Editing auto-logged-out attendance log in transaction:', {
+                logId: logInTransaction._id,
+                userId: logInTransaction.user,
+                autoLogoutReason: logInTransaction.autoLogoutReason,
+                adminUserId: req.user.userId,
+                adminRole: req.user.role
             });
+            
+            // Clear auto-logout status
+            logInTransaction.logoutType = 'MANUAL';
+            logInTransaction.autoLogoutReason = null;
+            console.log('[Admin Edit] Auto-logout status cleared by admin edit in transaction');
         }
         
         const log = logInTransaction;

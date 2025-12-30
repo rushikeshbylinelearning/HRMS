@@ -214,7 +214,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                 >
                                     <MenuItem value="Planned">Planned Leave</MenuItem>
                                     <MenuItem value="Sick">Sick Leave</MenuItem>
-                                    <MenuItem value="Unpaid">LOP Loss of Pay</MenuItem>
+                                    <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
                                     <MenuItem value="Compensatory">Compensatory</MenuItem>
                                     <MenuItem value="Backdated Leave">Backdated Leave</MenuItem>
                                 </Select>

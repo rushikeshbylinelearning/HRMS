@@ -114,6 +114,8 @@ const mapAttendanceLog = (attendanceLog) => ({
     penaltyMinutes: attendanceLog?.penaltyMinutes || 0,
     paidBreakMinutesTaken: attendanceLog?.paidBreakMinutesTaken || 0,
     unpaidBreakMinutesTaken: attendanceLog?.unpaidBreakMinutesTaken || 0,
+    logoutType: attendanceLog?.logoutType || 'MANUAL',
+    autoLogoutReason: attendanceLog?.autoLogoutReason || null,
     // CRITICAL: Do NOT include isLate, isHalfDay, lateMinutes, attendanceStatus here
     // These must be recalculated from clockInTime on every request
 });
@@ -132,6 +134,16 @@ const mapActiveBreak = (breakDoc) => breakDoc ? ({
     durationMinutes: Math.floor((Date.now() - new Date(breakDoc.startTime)) / (1000 * 60)),
 }) : null;
 
+/**
+ * Calculate required logout time based on POLICY RULES:
+ * 
+ * 1. Base Rule: loginTime + 9 hours (always applies)
+ * 2. Paid Break Rule: If paid break > 30 minutes, add excess to logout time
+ * 3. Unpaid Break Rule: Add full unpaid break duration to logout time
+ * 4. Rare Exception: If no paid break taken AND unpaid break taken, treat unpaid like paid (first 30 min free)
+ * 
+ * All break calculations must preserve existing early logout restrictions.
+ */
 const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift, activeBreak = null) => {
     if (!sessions?.length || !userShift || !attendanceLog) {
         return null;
@@ -140,46 +152,6 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     const firstClockInSession = sessions[0];
     const clockInTime = new Date(firstClockInSession.startTime);
     
-    // Constants for shift calculation
-    // Use the shift's paidBreakMinutes if available, otherwise default to 30 minutes
-    const EXPECTED_BREAK_MINUTES = userShift.paidBreakMinutes || 30;
-    const SHIFT_TOTAL_MINUTES = 9 * 60; // 540 minutes (9 hours total shift duration)
-    
-    // EARLY CHECK: For 10 AM - 7 PM shift with early login and no breaks, return 7:00 PM immediately
-    // This ensures the special case is handled before any other calculations
-    const isSpecialShiftEarly = userShift.shiftType === 'Fixed' && 
-                                userShift.startTime && 
-                                (userShift.startTime === '10:00' || userShift.startTime.startsWith('10:00')) &&
-                                userShift.endTime && 
-                                (userShift.endTime === '19:00' || userShift.endTime === '7:00 PM' || 
-                                 userShift.endTime.startsWith('19:') || userShift.endTime.startsWith('7:'));
-    
-    if (isSpecialShiftEarly) {
-        // Get clock-in hour in IST
-        const istFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-        const clockInParts = istFormatter.formatToParts(clockInTime);
-        const clockInHour = parseInt(clockInParts.find(p => p.type === 'hour').value);
-        
-        // If clock-in is before 10 AM and no breaks, return 7:00 PM directly
-        if (clockInHour < 10) {
-            const sevenPM = getShiftDateTimeIST(clockInTime, '19:00');
-            // Check if there are any breaks
-            const hasPaidBreaks = (attendanceLog.paidBreakMinutesTaken || 0) > 0;
-            const hasUnpaidBreaks = (attendanceLog.unpaidBreakMinutesTaken || 0) > 0;
-            const hasActiveBreak = activeBreak && (activeBreak.breakType === 'Unpaid' || activeBreak.breakType === 'Extra');
-            const hasAnyBreaks = hasPaidBreaks || hasUnpaidBreaks || hasActiveBreak || (breaks && breaks.length > 0);
-            
-            if (!hasAnyBreaks) {
-                return sevenPM.toISOString();
-            }
-        }
-    }
-
     // Helper function to set time on a date (in IST)
     const setTime = (date, timeString) => {
         const [hours, minutes] = timeString.split(':').map(Number);
@@ -192,240 +164,87 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         newDate.setMinutes(newDate.getMinutes() + minutes);
         return newDate;
     };
-
-    // Helper function to calculate minutes between two dates
-    const minutesBetween = (start, end) => {
-        return Math.floor((end.getTime() - start.getTime()) / (1000 * 60));
-    };
-
-    // Get total paid break minutes taken (from stored value, which includes all paid breaks)
-    // This is more accurate than calculating from individual break objects because:
-    // 1. It accounts for multiple paid breaks correctly
-    // 2. It matches what's actually stored in the database
-    // 3. It handles the case where break allowance is exceeded correctly
-    const totalPaidBreakMinutes = attendanceLog.paidBreakMinutesTaken || 0;
-    const hasTakenPaidBreak = totalPaidBreakMinutes > 0;
-
-    // CRITICAL FIX: Calculate actual paid break time taken from break logs
-    // This includes extra paid break time beyond the allowance
-    // The stored paidBreakMinutesTaken is capped at the allowance, so we need to check actual break durations
-    let actualPaidBreakMinutes = 0;
-    if (breaks && breaks.length > 0) {
-        const paidBreaks = breaks.filter(b => 
-            (b.breakType === 'Paid' || b.type === 'Paid') && b.endTime && b.durationMinutes
-        );
-        actualPaidBreakMinutes = paidBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
-    }
     
-    // Also include active paid break if present
-    let activePaidBreakMinutes = 0;
-    if (activeBreak && (activeBreak.breakType === 'Paid' || activeBreak.type === 'Paid') && activeBreak.startTime) {
+    // ============================================
+    // RULE 1: Base Rule - Always start with loginTime + 9 hours
+    // ============================================
+    const SHIFT_TOTAL_MINUTES = 9 * 60; // 540 minutes (9 hours)
+    let requiredLogoutTime = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
+    
+    // ============================================
+    // Calculate total break minutes (including active break if present)
+    // ============================================
+    let paidBreakMinutesTaken = attendanceLog.paidBreakMinutesTaken || 0;
+    let unpaidBreakMinutesTaken = attendanceLog.unpaidBreakMinutesTaken || 0;
+    
+    // Include active break duration if present
+    if (activeBreak && activeBreak.startTime) {
         const now = new Date();
-        const activeBreakDurationMs = now.getTime() - new Date(activeBreak.startTime).getTime();
-        activePaidBreakMinutes = Math.floor(activeBreakDurationMs / (1000 * 60));
+        const activeBreakStart = new Date(activeBreak.startTime);
+        const activeBreakDurationMinutes = Math.floor((now - activeBreakStart) / (1000 * 60));
+        const activeBreakType = (activeBreak.breakType || activeBreak.type || '').toString().trim();
+        
+        if (activeBreakType === 'Paid') {
+            paidBreakMinutesTaken += activeBreakDurationMinutes;
+        } else if (activeBreakType === 'Unpaid' || activeBreakType === 'Extra') {
+            unpaidBreakMinutesTaken += activeBreakDurationMinutes;
+        }
     }
     
-    const totalActualPaidBreakMinutes = actualPaidBreakMinutes + activePaidBreakMinutes;
-    
-    // Calculate extra paid break minutes (paid break beyond allowance)
-    // These extra minutes should extend the shift, just like unpaid breaks
-    const extraPaidBreakMinutes = Math.max(0, totalActualPaidBreakMinutes - EXPECTED_BREAK_MINUTES);
-
-    // Calculate unpaid break minutes (Unpaid and Extra breaks extend the shift)
-    // Active unpaid breaks ARE included in backend calculation for correct adjustment
-    // Frontend will add incremental time for real-time UI updates
-    const unpaidBreakMinutes = attendanceLog.unpaidBreakMinutesTaken || 0;
-    let activeUnpaidBreakMinutes = 0;
-    if (activeBreak && (activeBreak.breakType === 'Unpaid' || activeBreak.breakType === 'Extra') && activeBreak.startTime) {
-        const now = new Date();
-        const activeBreakDurationMs = now.getTime() - new Date(activeBreak.startTime).getTime();
-        activeUnpaidBreakMinutes = Math.floor(activeBreakDurationMs / (1000 * 60));
+    // ============================================
+    // RULE 2: Paid Break Rule
+    // If paid break > 30 minutes, add excess to logout time
+    // ============================================
+    const PAID_BREAK_ALLOWANCE_MINUTES = 30;
+    if (paidBreakMinutesTaken > PAID_BREAK_ALLOWANCE_MINUTES) {
+        const extraPaidBreak = paidBreakMinutesTaken - PAID_BREAK_ALLOWANCE_MINUTES;
+        requiredLogoutTime = addMinutes(requiredLogoutTime, extraPaidBreak);
     }
     
-    // Add extra paid break minutes to unpaid break calculation
-    // Extra paid break time (beyond allowance) should extend the shift just like unpaid breaks
-    // Note: For special case (10 AM - 7 PM), we calculate this separately to avoid double-counting
-    const totalUnpaidBreakMinutes = unpaidBreakMinutes + activeUnpaidBreakMinutes + extraPaidBreakMinutes;
-
-    // SPECIAL CASE: 10 AM - 7 PM shift
-    // Check for both '19:00' and '7:00 PM' formats to handle different storage formats
-    // Also check for variations like '10:00 AM' or just numeric comparisons
-    const startTimeMatch = userShift.startTime === '10:00' || 
-                          userShift.startTime === '10:00 AM' ||
-                          (typeof userShift.startTime === 'string' && userShift.startTime.startsWith('10:00'));
-    const endTimeMatch = userShift.endTime === '19:00' || 
-                        userShift.endTime === '7:00 PM' ||
-                        userShift.endTime === '19:00:00' ||
-                        (typeof userShift.endTime === 'string' && (userShift.endTime.startsWith('19:') || userShift.endTime.startsWith('7:')));
+    // ============================================
+    // RULE 3 & 4: Unpaid Break Rule OR Rare Exception
+    // ============================================
+    if (unpaidBreakMinutesTaken > 0) {
+        // RULE 4: Rare Exception - Apply ONLY if:
+        // - paidBreakMinutesTaken === 0 (no paid break taken)
+        // - unpaidBreakMinutesTaken > 0 (unpaid break was taken)
+        // In this case, treat unpaid break like paid break (first 30 min free)
+        if (paidBreakMinutesTaken === 0) {
+            // Rare exception: treat unpaid like paid
+            const effectiveUnpaid = Math.max(0, unpaidBreakMinutesTaken - PAID_BREAK_ALLOWANCE_MINUTES);
+            if (effectiveUnpaid > 0) {
+                requiredLogoutTime = addMinutes(requiredLogoutTime, effectiveUnpaid);
+            }
+        } else {
+            // RULE 3: Normal case - add full unpaid break duration
+            requiredLogoutTime = addMinutes(requiredLogoutTime, unpaidBreakMinutesTaken);
+        }
+    }
     
-    const isSpecialShift = userShift.shiftType === 'Fixed' && startTimeMatch && endTimeMatch;
+    // ============================================
+    // PRESERVE EXISTING RULE: Early logout restriction
+    // For 10 AM - 7 PM shift, ensure logout never goes below 7:00 PM
+    // ============================================
+    const isSpecialShift = userShift.shiftType === 'Fixed' && 
+                          userShift.startTime && 
+                          (userShift.startTime === '10:00' || 
+                           userShift.startTime === '10:00 AM' ||
+                           (typeof userShift.startTime === 'string' && userShift.startTime.startsWith('10:00'))) &&
+                          userShift.endTime && 
+                          (userShift.endTime === '19:00' || 
+                           userShift.endTime === '7:00 PM' ||
+                           userShift.endTime === '19:00:00' ||
+                           (typeof userShift.endTime === 'string' && (userShift.endTime.startsWith('19:') || userShift.endTime.startsWith('7:'))));
     
     if (isSpecialShift) {
-        const tenAM = setTime(clockInTime, '10:00');
         const sevenPM = setTime(clockInTime, '19:00');
-        
-        // Get clock-in time in IST for comparison
-        // Use the IST formatter to get the actual time in IST timezone
-        const istFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-        const clockInParts = istFormatter.formatToParts(clockInTime);
-        const clockInHour = parseInt(clockInParts.find(p => p.type === 'hour').value);
-        const clockInMinute = parseInt(clockInParts.find(p => p.type === 'minute').value);
-        const isBeforeTenAM = clockInHour < 10 || (clockInHour === 10 && clockInMinute === 0 && clockInTime < tenAM);
-        
-        // If clock-in is before 10:00 AM, apply special case logic
-        // Use both time comparison and hour-based comparison for robustness
-        if (clockInTime < tenAM || isBeforeTenAM || clockInHour < 10) {
-            // Constants for special case
-            const PAID_BREAK_LIMIT = 30; // minutes
-            const SHIFT_START = '10:00';
-            
-            // CRITICAL: If no breaks are taken at all, logout is always 7:00 PM
-            // Early login doesn't reduce logout time when there are no breaks
-            // Check both stored values and calculated values to be safe
-            const hasNoBreaks = (totalActualPaidBreakMinutes === 0 || totalPaidBreakMinutes === 0) && 
-                               unpaidBreakMinutes === 0 && 
-                               activeUnpaidBreakMinutes === 0 &&
-                               (!breaks || breaks.length === 0);
-            
-            if (hasNoBreaks) {
-                return sevenPM.toISOString();
-            }
-            
-            // Calculate early login buffer (minutes before 10 AM)
-            const earlyLoginMinutes = Math.max(0, Math.floor((tenAM.getTime() - clockInTime.getTime()) / (1000 * 60)));
-            
-            // Break classification - use ACTUAL paid break minutes (includes extra beyond allowance)
-            // PaidBreakUsed = min(totalActualPaidBreakTaken, 30)
-            const paidBreakUsed = Math.min(totalActualPaidBreakMinutes, PAID_BREAK_LIMIT);
-            
-            // ExtraPaidBreak = max(totalActualPaidBreakTaken - 30, 0)
-            const extraPaidBreak = Math.max(totalActualPaidBreakMinutes - PAID_BREAK_LIMIT, 0);
-            
-            // UnpaidBreak = unpaidBreakTaken (NOT including extraPaidBreakMinutes to avoid double-counting)
-            const unpaidBreak = unpaidBreakMinutes + activeUnpaidBreakMinutes;
-            
-            // TotalExtraBreak = ExtraPaidBreak + UnpaidBreak
-            const totalExtraBreak = extraPaidBreak + unpaidBreak;
-            
-            // Adjustment calculation: net excess break after early login buffer
-            // The early login buffer can offset extra breaks, but should never reduce logout below 7 PM
-            // AdjustmentMinutes = max(TotalExtraBreak - EarlyLoginMinutes, 0)
-            const adjustmentMinutes = Math.max(totalExtraBreak - earlyLoginMinutes, 0);
-            
-            // CRITICAL: For 10 AM - 7 PM shift with early login, logout should NEVER go below 7 PM
-            // The early login buffer only offsets extra breaks, it doesn't reduce the base logout time
-            // Final logout time: 7:00 PM + adjustment (never earlier than 7 PM)
-            const finalLogout = addMinutes(sevenPM, adjustmentMinutes);
-            
-            // Double-check: ensure logout is never before 7 PM (safety check)
-            if (finalLogout < sevenPM) {
-                return sevenPM.toISOString();
-            }
-            
-            return finalLogout.toISOString();
+        // Enforce minimum logout time: never before 7:00 PM
+        if (requiredLogoutTime < sevenPM) {
+            requiredLogoutTime = sevenPM;
         }
-        
-        // If clock-in is at or after 10:00 AM, ensure logout never goes below 7 PM
-        // Calculate base logout time using normal 9-hour logic
-        let baseLogout;
-        if (!hasTakenPaidBreak && totalActualPaidBreakMinutes === 0) {
-            // No break taken yet → clockIn + 9 hours
-            baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
-        } else {
-            // Break taken → adjust logout based on actual total paid break minutes taken (up to allowance)
-            // Use the minimum of actual paid break and allowance for the base calculation
-            const paidBreakUsed = Math.min(totalActualPaidBreakMinutes, EXPECTED_BREAK_MINUTES);
-            const savedBreak = EXPECTED_BREAK_MINUTES - paidBreakUsed; // positive = saved, negative = extra
-            baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES - savedBreak);
-        }
-        
-        // CRITICAL: For 10 AM - 7 PM shift, logout time should NEVER go below 7 PM
-        // If calculated logout is before 7 PM, set it to 7 PM
-        if (baseLogout < sevenPM) {
-            baseLogout = sevenPM;
-        }
-        
-        // Add unpaid break extension (this includes extra paid break minutes beyond allowance)
-        // This will extend beyond 7 PM if more break is taken
-        if (totalUnpaidBreakMinutes > 0) {
-            return addMinutes(baseLogout, totalUnpaidBreakMinutes).toISOString();
-        }
-        return baseLogout.toISOString();
     }
-
-    // GENERAL RULE for all other shifts
-    // For Fixed shifts
-    if (userShift.shiftType === 'Fixed' && userShift.startTime && userShift.endTime) {
-        const shiftStartTime = getShiftDateTimeIST(clockInTime, userShift.startTime);
-        const shiftEndTime = getShiftDateTimeIST(clockInTime, userShift.endTime);
-        if (shiftEndTime < shiftStartTime) {
-            shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        }
-        
-        // Before break: requiredLogout = clockIn + 9 hours
-        // After break: requiredLogout = clockIn + 9 hours - (expectedBreak - actualBreak)
-        // Note: Lateness is already accounted for by calculating from actual clock-in time,
-        // so we don't add a lateness penalty. Employee works the standard 9 hours from when they clock in.
-        let baseLogoutTime;
-        
-        if (!hasTakenPaidBreak && totalActualPaidBreakMinutes === 0) {
-            // No paid break taken yet
-            baseLogoutTime = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
-        } else {
-            // Paid break taken → adjust logout based on actual total paid break minutes taken (up to allowance)
-            // Use the minimum of actual paid break and allowance for the base calculation
-            const paidBreakUsed = Math.min(totalActualPaidBreakMinutes, EXPECTED_BREAK_MINUTES);
-            const savedBreak = EXPECTED_BREAK_MINUTES - paidBreakUsed;
-            baseLogoutTime = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES - savedBreak);
-        }
-        
-        // CRITICAL: For 10 AM - 7 PM shift, ensure logout never goes below 7 PM
-        // This check applies even if the special case above didn't match (e.g., due to format differences)
-        if (userShift.startTime === '10:00' && (userShift.endTime === '19:00' || userShift.endTime === '7:00 PM')) {
-            const sevenPM = setTime(clockInTime, '19:00');
-            if (baseLogoutTime < sevenPM) {
-                baseLogoutTime = sevenPM;
-            }
-        }
-        
-        // Add unpaid break extension (includes extra paid break minutes beyond allowance)
-        if (totalUnpaidBreakMinutes > 0) {
-            baseLogoutTime = addMinutes(baseLogoutTime, totalUnpaidBreakMinutes);
-        }
-        
-        return baseLogoutTime.toISOString();
-    } 
-    // For Flexible shifts, use 9-hour logic with break adjustment
-    else if (userShift.shiftType === 'Flexible' && userShift.durationHours) {
-        // If break not taken yet → no break deduction
-        if (!hasTakenPaidBreak && totalActualPaidBreakMinutes === 0) {
-            const baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES);
-            // Add unpaid break extension
-            if (totalUnpaidBreakMinutes > 0) {
-                return addMinutes(baseLogout, totalUnpaidBreakMinutes).toISOString();
-            }
-            return baseLogout.toISOString();
-        }
-        
-        // Break taken → adjust logout based on actual total paid break minutes taken (up to allowance)
-        // Use the minimum of actual paid break and allowance for the base calculation
-        const paidBreakUsed = Math.min(totalActualPaidBreakMinutes, EXPECTED_BREAK_MINUTES);
-        const savedBreak = EXPECTED_BREAK_MINUTES - paidBreakUsed; // positive = saved, negative = extra
-        
-        const baseLogout = addMinutes(clockInTime, SHIFT_TOTAL_MINUTES - savedBreak);
-        // Add unpaid break extension (includes extra paid break minutes beyond allowance)
-        if (totalUnpaidBreakMinutes > 0) {
-            return addMinutes(baseLogout, totalUnpaidBreakMinutes).toISOString();
-        }
-        return baseLogout.toISOString();
-    }
-
-    return null;
+    
+    return requiredLogoutTime.toISOString();
 };
 
 const getUserDailyStatus = async (userId, targetDate, options = {}) => {

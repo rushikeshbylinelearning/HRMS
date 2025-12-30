@@ -762,7 +762,7 @@ const LeavesTrackerPage = () => {
             const days = leave.leaveDates.length * (leave.leaveType.startsWith('Half Day') ? 0.5 : 1);
             if (leave.requestType === 'Sick') used.sick += days;
             else if (leave.requestType === 'Planned') used.casual += days; // Mapping "Planned" request type to "Casual" leave
-            else if (leave.requestType === 'Unpaid') used.unpaid += days;
+            else if (leave.requestType === 'Loss of Pay') used.unpaid += days;
         }
     });
 
@@ -946,7 +946,7 @@ const LeavesTrackerPage = () => {
           const days = leave.leaveDates.length * (leave.leaveType?.startsWith('Half Day') ? 0.5 : 1);
           if (leave.requestType === 'Sick') utilized.sick += days;
           else if (leave.requestType === 'Planned' || leave.requestType === 'Casual') utilized.casual += days;
-          else if (leave.requestType === 'Unpaid') utilized.paid += days; // Adjust based on your system
+          else if (leave.requestType === 'Loss of Pay') utilized.paid += days; // Adjust based on your system
         }
       });
       
@@ -1701,7 +1701,7 @@ const LeavesTrackerPage = () => {
                                                     if (leave.requestType === 'Sick') leaveTypesUsed.sick += daysValue;
                                                     else if (leave.requestType === 'Planned') leaveTypesUsed.planned += daysValue;
                                                     else if (leave.requestType === 'Casual') leaveTypesUsed.casual += daysValue;
-                                                    else if (leave.requestType === 'Unpaid') leaveTypesUsed.unpaid += daysValue;
+                                                    else if (leave.requestType === 'Loss of Pay') leaveTypesUsed.unpaid += daysValue;
                                                 });
                                                 
                                                 // Find most used leave type
@@ -1915,7 +1915,7 @@ const LeavesTrackerPage = () => {
                                                                             )}
                                                                             {leaveTypesUsed.unpaid > 0 && (
                                                                                 <Typography variant="body2" sx={{ color: '#000000', fontSize: '0.75rem' }}>
-                                                                                    <strong>Unpaid:</strong> {leaveTypesUsed.unpaid.toFixed(1)}
+                                                                                    <strong>Loss of Pay:</strong> {leaveTypesUsed.unpaid.toFixed(1)}
                                                                                 </Typography>
                                                                             )}
                                                                             {totalDaysTaken === 0 && (
@@ -2069,7 +2069,7 @@ const LeavesTrackerPage = () => {
                                                                                     const requestTypeName = leave.requestType === 'Sick' ? 'Sick' 
                                                                                         : leave.requestType === 'Planned' ? 'Planned'
                                                                                         : leave.requestType === 'Casual' ? 'Casual'
-                                                                                        : leave.requestType === 'Unpaid' ? 'Unpaid'
+                                                                                        : leave.requestType === 'Loss of Pay' ? 'Loss of Pay'
                                                                                         : leave.requestType || 'N/A';
                                                                                     
                                                                                     return (

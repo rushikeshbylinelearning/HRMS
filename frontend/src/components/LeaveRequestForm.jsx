@@ -67,7 +67,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
         if (open) {
             // If user is on probation, default to an allowed type
             const isProbation = user?.employmentStatus === 'Probation';
-            const defaultRequestType = isProbation ? 'Unpaid' : initialState.requestType;
+            const defaultRequestType = isProbation ? 'Loss of Pay' : initialState.requestType;
             setFormData({ ...initialState, requestType: defaultRequestType });
             setError('');
             setUploadingCertificate(false);
@@ -392,7 +392,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                 }
                             })()}
                             <MenuItem value="Sick" disabled={user?.employmentStatus === 'Probation'}>Sick Leave</MenuItem>
-                            <MenuItem value="Unpaid">LOP Loss of Pay</MenuItem>
+                            <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
                             <MenuItem value="Compensatory">Compensatory Leave</MenuItem>
                             <Divider />
                             <MenuItem value="Backdated Leave">Backdate Leave</MenuItem>

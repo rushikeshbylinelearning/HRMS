@@ -34,10 +34,11 @@ const attendanceLogSchema = new mongoose.Schema({
   // Auto-logout tracking fields
   logoutType: { 
     type: String, 
-    enum: ['MANUAL', 'AUTO'], 
+    enum: ['MANUAL', 'AUTO', 'SYSTEM'], 
     default: 'MANUAL' 
-  }, // Track if clock-out was manual or automatic
+  }, // Track if clock-out was manual, automatic, or system cleanup
   autoLogoutReason: { type: String }, // Reason for auto-logout
+  isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
 }, { timestamps: true });
 
 // Ensure a user can only have one log per day

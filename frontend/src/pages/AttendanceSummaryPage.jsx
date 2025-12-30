@@ -1,5 +1,5 @@
 // src/pages/AttendanceSummaryPage.jsx - Redesigned to match Admin layout
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     Typography, CircularProgress, Alert, 
     IconButton, Tooltip, Snackbar, Dialog, 
@@ -220,7 +220,14 @@ const AttendanceSummaryPage = () => {
         const dateStr = `${year}-${month}-${day}`;
         
         return holidays.find(holiday => {
+            // Skip tentative holidays (no date or isTentative flag)
+            if (!holiday.date || holiday.isTentative) {
+                return false;
+            }
             const holidayDate = new Date(holiday.date);
+            if (isNaN(holidayDate.getTime())) {
+                return false;
+            }
             const holidayYear = holidayDate.getFullYear();
             const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
             const holidayDay = String(holidayDate.getDate()).padStart(2, '0');

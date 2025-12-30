@@ -160,11 +160,26 @@ const checkProbationCompletions = async () => {
  * This checks for employees who should be auto-logged out and performs the logout
  */
 const startAutoLogoutJob = () => {
-    // Run immediately on startup, then every 5 minutes
-    checkAndAutoLogout();
+    // Run immediately on startup (with a small delay to ensure DB is ready), then every 5 minutes
+    // Use setTimeout to give the database a moment to be fully ready
+    setTimeout(() => {
+        checkAndAutoLogout().catch(err => {
+            console.error('[cronService] Error in initial auto-logout check:', err);
+        });
+    }, 2000); // 2 second delay
+    
     const AUTO_LOGOUT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-    setInterval(checkAndAutoLogout, AUTO_LOGOUT_INTERVAL_MS);
+    const intervalId = setInterval(() => {
+        checkAndAutoLogout().catch(err => {
+            console.error('[cronService] Error in scheduled auto-logout check:', err);
+        });
+    }, AUTO_LOGOUT_INTERVAL_MS);
+    
     console.log('✅ Auto-logout job started (runs every 5 minutes)');
+    console.log(`   First check will run in 2 seconds, then every ${AUTO_LOGOUT_INTERVAL_MS / 1000 / 60} minutes`);
+    
+    // Store interval ID for potential cleanup (if needed in future)
+    return intervalId;
 };
 
 /**

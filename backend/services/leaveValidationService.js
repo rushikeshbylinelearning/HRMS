@@ -1,6 +1,8 @@
 // backend/services/leaveValidationService.js
 const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
+const Holiday = require('../models/Holiday');
+const AntiExploitationLeaveService = require('./antiExploitationLeaveService');
 
 /**
  * Leave Validation Service
@@ -228,23 +230,83 @@ class LeaveValidationService {
 
     /**
      * Main validation function that routes to appropriate validator
+     * Also applies anti-exploitation validation rules
      */
     static async validateLeaveRequest(employee, requestType, leaveDates, leaveType, medicalCertificate = null) {
+        // First, run type-specific validation
+        let validationResult;
         switch (requestType) {
             case 'Planned':
-                return await this.validatePlannedLeave(employee, leaveDates, leaveType);
+                validationResult = await this.validatePlannedLeave(employee, leaveDates, leaveType);
+                break;
             case 'Casual':
-                return await this.validateCasualLeave(employee, leaveDates, leaveType);
+                validationResult = await this.validateCasualLeave(employee, leaveDates, leaveType);
+                break;
             case 'Sick':
-                return await this.validateSickLeave(employee, leaveDates, leaveType, medicalCertificate);
-            case 'Unpaid':
+                validationResult = await this.validateSickLeave(employee, leaveDates, leaveType, medicalCertificate);
+                break;
+            case 'Loss of Pay':
             case 'Compensatory':
             case 'Backdated Leave':
                 // These don't have special validation rules
-                return { valid: true, errors: [], warnings: [] };
+                validationResult = { valid: true, errors: [], warnings: [] };
+                break;
             default:
                 return { valid: false, errors: ['Invalid leave request type.'], warnings: [] };
         }
+
+        // If type-specific validation failed, return early
+        if (!validationResult.valid) {
+            return validationResult;
+        }
+
+        // Apply anti-exploitation validation rules
+        // These rules apply to ALL leave types (Planned, Casual, Sick, Loss of Pay, LOP)
+        try {
+            // Fetch holidays for the month
+            const firstLeaveDate = new Date(leaveDates[0]);
+            const month = firstLeaveDate.getMonth();
+            const year = firstLeaveDate.getFullYear();
+            const monthStart = new Date(year, month, 1);
+            const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+            
+            const holidays = await Holiday.find({
+                date: {
+                    $gte: monthStart,
+                    $lte: monthEnd
+                }
+            });
+
+            const antiExploitationResult = await AntiExploitationLeaveService.validateAntiExploitation(
+                employee,
+                leaveDates,
+                holidays,
+                requestType
+            );
+
+            // Merge warnings from anti-exploitation validation
+            if (antiExploitationResult.warnings && antiExploitationResult.warnings.length > 0) {
+                validationResult.warnings = validationResult.warnings || [];
+                validationResult.warnings.push(...antiExploitationResult.warnings);
+            }
+
+            // If anti-exploitation rules blocked the leave, add errors
+            if (antiExploitationResult.blocked) {
+                validationResult.valid = false;
+                validationResult.errors = validationResult.errors || [];
+                validationResult.errors.push(...antiExploitationResult.errors);
+                // Store validation details for audit and admin override
+                validationResult.validationBlocked = true;
+                validationResult.blockedRules = antiExploitationResult.blockedRules;
+                validationResult.validationDetails = antiExploitationResult.validationDetails;
+            }
+        } catch (error) {
+            console.error('Error in anti-exploitation validation:', error);
+            // Don't block leave if anti-exploitation validation fails
+            // Log error but allow the request to proceed
+        }
+
+        return validationResult;
     }
 
     /**

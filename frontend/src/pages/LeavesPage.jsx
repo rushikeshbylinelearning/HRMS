@@ -122,8 +122,26 @@ const LeavesPage = () => {
             }
             
             setLeaveBalances(balancesRes.data);
-            setHolidays(Array.isArray(holidaysRes.data) ? holidaysRes.data : []);
+            // Sort holidays: valid dates first (ASC), then tentative at bottom (alphabetically)
+            const holidaysData = Array.isArray(holidaysRes.data) ? holidaysRes.data : [];
+            const sortedHolidays = holidaysData.sort((a, b) => {
+                const aIsTentative = !a.date || a.isTentative;
+                const bIsTentative = !b.date || b.isTentative;
+                
+                // If both are tentative, sort alphabetically by name
+                if (aIsTentative && bIsTentative) {
+                    return a.name.localeCompare(b.name);
+                }
+                // If only a is tentative, put it at bottom
+                if (aIsTentative) return 1;
+                // If only b is tentative, put it at bottom
+                if (bIsTentative) return -1;
+                // Both have dates, sort by date
+                return new Date(a.date) - new Date(b.date);
+            });
+            setHolidays(sortedHolidays);
             setCarryforwardStatus(carryforwardRes.data);
+            // Year-end feature is enabled only if feature is enabled AND user is permanent
             setYearEndFeatureEnabled(featureStatusRes.data?.enabled || false);
         } catch (err) {
             setError('Failed to load leave management data.');
@@ -356,8 +374,14 @@ const LeavesPage = () => {
 
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-CA') : 'N/A';
 
-    const formatPrettyDate = (dateString) => {
+    const formatPrettyDate = (dateString, isTentative = false) => {
+        if (!dateString || isTentative) {
+            return 'Tentative (Date not decided)';
+        }
         const d = new Date(dateString);
+        if (isNaN(d.getTime())) {
+            return 'Tentative (Date not decided)';
+        }
         return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     };
 
@@ -486,7 +510,7 @@ const LeavesPage = () => {
                     <Button className="apply-leave-button" onClick={handleOpenModal} startIcon={<AddCircleOutlineIcon />}>
                         Apply Leave
                     </Button>
-                    {yearEndFeatureEnabled && (
+                    {yearEndFeatureEnabled && user?.employmentStatus === 'Permanent' && (
                         <IconButton
                             onClick={(e) => {
                                 setYearEndMenuAnchor(e.currentTarget);
@@ -686,17 +710,32 @@ const LeavesPage = () => {
                 <ContentCard title="Company Holidays">
                     <ul className="vector-list">
                         {holidays && holidays.length > 0 ? (
-                            holidays.map((holiday, idx) => (
-                                <li key={holiday._id || idx} className="vector-item">
-                                    <span className="vector-icon" aria-hidden="true">
-                                        {holidayIconFor(holiday)}
-                                    </span>
-                                    <span className="vector-text">
-                                        <span className="vector-title">{holiday.name}</span>
-                                        <span className="vector-subtitle">{formatPrettyDate(holiday.date)}</span>
-                                    </span>
-                                </li>
-                            ))
+                            holidays.map((holiday, idx) => {
+                                const isTentative = !holiday.date || holiday.isTentative;
+                                return (
+                                    <li key={holiday._id || idx} className="vector-item">
+                                        <span className="vector-icon" aria-hidden="true">
+                                            {holidayIconFor(holiday)}
+                                        </span>
+                                        <span className="vector-text">
+                                            <span className="vector-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {holiday.name}
+                                                {isTentative && (
+                                                    <Chip 
+                                                        label="Tentative" 
+                                                        size="small" 
+                                                        color="warning"
+                                                        sx={{ height: '20px', fontSize: '0.7rem' }}
+                                                    />
+                                                )}
+                                            </span>
+                                            <span className="vector-subtitle">
+                                                {formatPrettyDate(holiday.date, isTentative)}
+                                            </span>
+                                        </span>
+                                    </li>
+                                );
+                            })
                         ) : (
                             <li className="vector-item" style={{ justifyContent: 'center' }}>
                                 <span className="vector-text">
@@ -1231,10 +1270,12 @@ const LeavesPage = () => {
                             }}
                         >
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Year-End Leave Actions Disabled
+                                Year-End Leave Actions Unavailable
                             </Typography>
                             <Typography variant="body2">
-                                Year-End Leave actions are currently disabled by Admin.
+                                {user?.employmentStatus !== 'Permanent' 
+                                    ? 'Year-End Leave requests are only available for permanent employees.'
+                                    : 'Year-End Leave actions are currently disabled by Admin.'}
                             </Typography>
                         </Alert>
                     ) : (

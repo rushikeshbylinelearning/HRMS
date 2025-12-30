@@ -6,7 +6,7 @@ const leaveRequestSchema = new mongoose.Schema({
     requestType: {
         type: String,
         // --- START OF FIX: Added 'Casual' to the enum ---
-        enum: ['Planned', 'Sick', 'Unpaid', 'Compensatory', 'Backdated Leave', 'Casual', 'YEAR_END'],
+        enum: ['Planned', 'Sick', 'Loss of Pay', 'Compensatory', 'Backdated Leave', 'Casual', 'YEAR_END'],
         // --- END OF FIX ---
         required: true,
     },
@@ -57,6 +57,39 @@ const leaveRequestSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
         // Prevents double processing of Year-End approvals
+    },
+    // Anti-exploitation validation fields
+    validationBlocked: {
+        type: Boolean,
+        default: false,
+        // Indicates if leave was blocked by anti-exploitation rules
+    },
+    blockedReason: {
+        type: String,
+        // Reason why leave was blocked (e.g., "FRIDAY_SATURDAY_CLUBBING", "MONTHLY_FREQUENCY_CAP", "WORKING_DAYS_DILUTION")
+    },
+    blockedRules: [{
+        type: String,
+        // Array of rules that blocked the leave
+    }],
+    // Admin override fields
+    adminOverride: {
+        type: Boolean,
+        default: false,
+        // Indicates if admin overrode the validation block
+    },
+    overrideReason: {
+        type: String,
+        // Reason provided by admin for overriding the block
+    },
+    overriddenBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        // Admin who overrode the validation
+    },
+    overriddenAt: {
+        type: Date,
+        // Timestamp when override was applied
     },
 }, { timestamps: true });
 

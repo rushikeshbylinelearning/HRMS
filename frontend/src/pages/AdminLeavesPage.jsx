@@ -1,12 +1,13 @@
 // src/pages/AdminLeavesPage.jsx
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import {
     Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Dialog, DialogTitle,
     DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination,
-    Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton
+    Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton,
+    Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -24,9 +25,2163 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AdminLeaveForm from '../components/AdminLeaveForm';
 import EnhancedLeaveRequestModal from '../components/EnhancedLeaveRequestModal';
 import PageHeroHeader from '../components/PageHeroHeader';
+import HolidayBulkUploadModal from '../components/HolidayBulkUploadModal';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import '../styles/AdminLeavesPage.css'; // Import the new stylesheet
 import { TableSkeleton } from '../components/SkeletonLoaders';
+import PeopleIcon from '@mui/icons-material/People';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import WorkIcon from '@mui/icons-material/Work';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+
+// --- Shared DatePicker SlotProps for Microsoft Calendar Style ---
+const datePickerSlotProps = {
+    textField: {
+        fullWidth: true,
+        size: 'medium',
+        sx: {
+            '& .MuiOutlinedInput-root': {
+                borderRadius: '8px',
+                bgcolor: '#fafafa',
+                border: '1px solid #e0e0e0',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                    bgcolor: '#f5f5f5',
+                    borderColor: '#0078d4'
+                },
+                '&.Mui-focused': {
+                    bgcolor: 'white',
+                    borderColor: '#0078d4',
+                    boxShadow: '0 0 0 2px rgba(0, 120, 212, 0.1)'
+                }
+            },
+            '& .MuiInputLabel-root': {
+                color: '#605e5c',
+                '&.Mui-focused': {
+                    color: '#0078d4'
+                }
+            }
+        }
+    },
+    paper: {
+        sx: {
+            borderRadius: '8px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: '1px solid #e0e0e0',
+            overflow: 'hidden',
+            bgcolor: 'white',
+            zIndex: 1300,
+            '& .MuiPickersCalendarHeader-root': {
+                bgcolor: '#fafafa',
+                borderBottom: '1px solid #e0e0e0',
+                padding: '12px 16px',
+                minHeight: '56px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+            },
+            '& .MuiPickersCalendarHeader-labelContainer': {
+                order: 2,
+                '& .MuiPickersCalendarHeader-label': {
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#323130',
+                    textTransform: 'none',
+                    margin: 0,
+                    cursor: 'pointer',
+                    '&:hover': {
+                        color: '#0078d4'
+                    }
+                }
+            },
+            '& .MuiPickersArrowSwitcher-root': {
+                display: 'flex',
+                gap: '4px',
+                '& .MuiIconButton-root': {
+                    color: '#605e5c',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                        bgcolor: '#f3f2f1'
+                    }
+                }
+            },
+            '& .MuiDayCalendar-header': {
+                padding: '8px 0',
+                bgcolor: 'white'
+            },
+            '& .MuiDayCalendar-weekContainer': {
+                margin: 0
+            },
+            '& .MuiDayCalendar-weekDayLabel': {
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#605e5c',
+                width: '40px',
+                height: '40px',
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            },
+            '& .MuiPickersDay-root': {
+                width: '40px',
+                height: '40px',
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#323130',
+                margin: 0,
+                borderRadius: '50%',
+                transition: 'all 0.2s ease',
+                '&.Mui-selected': {
+                    bgcolor: '#0078d4',
+                    color: 'white',
+                    fontWeight: 600,
+                    border: 'none',
+                    '&:hover': {
+                        bgcolor: '#106ebe'
+                    },
+                    '&:focus': {
+                        bgcolor: '#0078d4',
+                        outline: 'none'
+                    }
+                },
+                '&:hover': {
+                    bgcolor: '#e1f5fe',
+                    borderRadius: '50%'
+                },
+                '&.MuiPickersDay-today': {
+                    border: 'none',
+                    fontWeight: 600,
+                    color: '#323130',
+                    '&.Mui-selected': {
+                        color: 'white',
+                        bgcolor: '#0078d4'
+                    },
+                    '&:not(.Mui-selected)': {
+                        color: '#0078d4'
+                    }
+                },
+                '&.Mui-disabled': {
+                    color: '#c8c6c4',
+                    cursor: 'not-allowed'
+                },
+                '&.MuiPickersDay-dayOutsideMonth': {
+                    color: '#c8c6c4'
+                }
+            },
+            '& .MuiPickersMonth-root, & .MuiPickersYear-root': {
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#323130',
+                borderRadius: '4px',
+                '&.Mui-selected': {
+                    bgcolor: '#0078d4',
+                    color: 'white',
+                    fontWeight: 600,
+                    '&:hover': {
+                        bgcolor: '#106ebe'
+                    }
+                },
+                '&:hover': {
+                    bgcolor: '#e1f5fe'
+                }
+            }
+        }
+    },
+    popper: {
+        sx: {
+            zIndex: 1300,
+            '& .MuiPaper-root': {
+                borderRadius: '8px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                border: '1px solid #e0e0e0'
+            }
+        },
+        placement: 'bottom-start',
+        modifiers: [
+            {
+                name: 'offset',
+                options: {
+                    offset: [0, 8]
+                }
+            }
+        ]
+    }
+};
+
+// --- Leave Count Summary Tab Component ---
+const LeaveCountSummaryTab = memo(() => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [employees, setEmployees] = useState([]);
+    const [allLeaveRequests, setAllLeaveRequests] = useState([]);
+    const [analyticsData, setAnalyticsData] = useState({}); // Store analytics per employee
+    const [totalWorkingDays, setTotalWorkingDays] = useState(null); // Total working days from monthly context settings
+    const [monthlyContextDays, setMonthlyContextDays] = useState(30); // Monthly context days from settings
+    const [filteredData, setFilteredData] = useState([]);
+    
+    // Filter states
+    const today = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+    const [dateRange, setDateRange] = useState({ start: null, end: null });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedLeaveType, setSelectedLeaveType] = useState('');
+    const [filtersExpanded, setFiltersExpanded] = useState(true);
+    
+    // Pagination
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    
+    // Clear all filters
+    const handleClearFilters = () => {
+        setSearchTerm('');
+        setSelectedLeaveType('');
+        setDateRange({ start: null, end: null });
+        setSelectedMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    };
+    
+    // Check if any filters are active
+    const hasActiveFilters = searchTerm || selectedLeaveType || dateRange.start || dateRange.end;
+    
+    // Fetch all data
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            // Fetch all employees
+            const empRes = await api.get('/admin/employees?all=true');
+            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
+            // Filter for employees only (exclude interns)
+            const employeesOnly = allEmps.filter(emp => emp.role !== 'Intern');
+            setEmployees(employeesOnly);
+            
+            // Fetch all leave requests - try to get all in one call, but handle pagination if needed
+            let allLeaves = [];
+            let page = 1;
+            const limit = 1000; // Reasonable page size
+            let hasMore = true;
+            
+            while (hasMore) {
+                try {
+                    const leavesRes = await api.get(`/admin/leaves/all?page=${page}&limit=${limit}`);
+                    let pageLeaves = [];
+                    if (leavesRes.data.requests) {
+                        pageLeaves = Array.isArray(leavesRes.data.requests) ? leavesRes.data.requests : [];
+                    } else {
+                        pageLeaves = Array.isArray(leavesRes.data) ? leavesRes.data : [];
+                    }
+                    
+                    allLeaves = [...allLeaves, ...pageLeaves];
+                    
+                    // Check if there are more pages
+                    const totalCount = leavesRes.data.totalCount || 0;
+                    const totalPages = leavesRes.data.totalPages || Math.ceil(totalCount / limit);
+                    hasMore = page < totalPages && pageLeaves.length === limit;
+                    page++;
+                    
+                    // Safety limit to prevent infinite loops
+                    if (page > 100) {
+                        console.warn('Reached safety limit for leave requests pagination');
+                        break;
+                    }
+                } catch (pageErr) {
+                    console.error('Error fetching leave requests page:', pageErr);
+                    hasMore = false;
+                }
+            }
+            
+            setAllLeaveRequests(allLeaves);
+        } catch (err) {
+            console.error('Failed to fetch leave count data:', err);
+            setError('Unable to load data');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    
+    // Fetch analytics data for working days calculation
+    const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
+        try {
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
+            
+            const analyticsRes = await api.get('/analytics/all', {
+                params: {
+                    startDate: startStr,
+                    endDate: endStr
+                }
+            });
+            
+            // Extract analytics data per employee (for actual worked days only)
+            const analyticsMap = {};
+            
+            if (analyticsRes.data?.employees && Array.isArray(analyticsRes.data.employees)) {
+                analyticsRes.data.employees.forEach(emp => {
+                    // Use id or _id for compatibility, only include employees (exclude interns)
+                    const employeeId = emp.employee?._id || emp.employee?.id;
+                    if (employeeId && emp.employee?.role !== 'Intern' && emp.metrics) {
+                        analyticsMap[employeeId] = {
+                            actualWorkedDays: emp.metrics.totalDays || 0 // Actual worked days from attendance
+                        };
+                    }
+                });
+            }
+            
+            setAnalyticsData(analyticsMap);
+            // Total working days comes from monthly context settings, not analytics
+        } catch (err) {
+            console.error('Failed to fetch analytics data:', err);
+            // Don't set error - just log silently, show "unavailable" in UI
+            setAnalyticsData({});
+        }
+    }, []);
+    
+    // Fetch monthly context settings (single source of truth for working days)
+    const fetchMonthlyContextSettings = useCallback(async () => {
+        try {
+            const response = await api.get('/analytics/monthly-context-settings');
+            const days = response.data?.days || 30;
+            setMonthlyContextDays(days);
+            setTotalWorkingDays(days); // Use monthly context as total working days
+        } catch (err) {
+            console.error('Failed to fetch monthly context settings:', err);
+            // Use default value
+            setMonthlyContextDays(30);
+            setTotalWorkingDays(30);
+        }
+    }, []);
+    
+    useEffect(() => {
+        fetchData();
+        fetchMonthlyContextSettings();
+    }, [fetchData, fetchMonthlyContextSettings]);
+    
+    // Fetch analytics when date range changes
+    useEffect(() => {
+        if (loading || !employees.length) return;
+        
+        // Determine date range
+        let startDate, endDate;
+        if (dateRange.start && dateRange.end) {
+            startDate = new Date(dateRange.start);
+            endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            // Use selected month
+            const year = selectedMonth.getFullYear();
+            const month = selectedMonth.getMonth();
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        }
+        
+        // Fetch analytics data for working days
+        fetchAnalyticsData(startDate, endDate);
+    }, [selectedMonth, dateRange, employees.length, loading, fetchAnalyticsData]);
+    
+    // Aggregate and filter data
+    useEffect(() => {
+        if (loading || !employees.length) return;
+        
+        // Determine date range
+        let startDate, endDate;
+        if (dateRange.start && dateRange.end) {
+            startDate = new Date(dateRange.start);
+            endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            // Use selected month
+            const year = selectedMonth.getFullYear();
+            const month = selectedMonth.getMonth();
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        }
+        
+        // Aggregate leave data per employee
+        const aggregated = employees.map(emp => {
+            // Filter leaves for this employee within date range
+            const empLeaves = allLeaveRequests.filter(leave => {
+                if (leave.employee?._id?.toString() !== emp._id?.toString()) return false;
+                
+                // Check if any leave date falls within range
+                if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
+                
+                const hasDateInRange = leave.leaveDates.some(date => {
+                    const leaveDate = new Date(date);
+                    return leaveDate >= startDate && leaveDate <= endDate;
+                });
+                
+                if (!hasDateInRange) return false;
+                
+                // Filter by leave type if selected
+                if (selectedLeaveType && leave.requestType !== selectedLeaveType) return false;
+                
+                return true;
+            });
+            
+            // Calculate metrics
+            const appliedCount = empLeaves.length;
+            const approvedCount = empLeaves.filter(l => l.status === 'Approved').length;
+            
+            // Calculate total leave days (only approved)
+            let totalLeaveDays = 0;
+            const leaveTypeBreakdown = {};
+            
+            empLeaves.forEach(leave => {
+                if (leave.status === 'Approved' && leave.leaveDates) {
+                    // Count days within the date range
+                    const daysInRange = leave.leaveDates.filter(date => {
+                        const leaveDate = new Date(date);
+                        return leaveDate >= startDate && leaveDate <= endDate;
+                    }).length;
+                    
+                    // Adjust for half days
+                    const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
+                    const adjustedDays = daysInRange * multiplier;
+                    totalLeaveDays += adjustedDays;
+                    
+                    // Track by request type
+                    const reqType = leave.requestType || 'Unknown';
+                    leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
+                }
+            });
+            
+            // Get working days from analytics API (not calculated on frontend)
+            const empAnalytics = analyticsData[emp._id] || {};
+            const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays; // From monthly context settings
+            const actualWorkedDays = empAnalytics.actualWorkedDays || 0;
+            
+            // Format period display
+            let periodDisplay;
+            if (dateRange.start && dateRange.end) {
+                const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                periodDisplay = `${startStr} - ${endStr}`;
+            } else {
+                periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
+            }
+            
+            return {
+                employee: emp,
+                leaveApplied: appliedCount,
+                leaveApproved: approvedCount,
+                totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
+                leaveTypeBreakdown,
+                totalWorkingDays: totalWorkingDaysForPeriod, // From backend calendar API
+                actualWorkedDays: actualWorkedDays, // From backend attendance API
+                month: periodDisplay
+            };
+        });
+        
+        // Apply search filter
+        let filtered = aggregated;
+        if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            filtered = aggregated.filter(item => {
+                const name = item.employee?.fullName?.toLowerCase() || '';
+                const code = item.employee?.employeeCode?.toLowerCase() || '';
+                return name.includes(searchLower) || code.includes(searchLower);
+            });
+        }
+        
+        setFilteredData(filtered);
+    }, [employees, allLeaveRequests, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    
+    // Calculate KPIs
+    const kpis = useMemo(() => {
+        if (!filteredData.length) {
+            return {
+                totalEmployees: 0,
+                leavesApplied: 0,
+                leavesApproved: 0,
+                totalLeaveDays: 0,
+                avgWorkingDays: 0
+            };
+        }
+        
+        const totalEmployees = filteredData.length;
+        const leavesApplied = filteredData.reduce((sum, item) => sum + item.leaveApplied, 0);
+        const leavesApproved = filteredData.reduce((sum, item) => sum + item.leaveApproved, 0);
+        const totalLeaveDays = filteredData.reduce((sum, item) => sum + item.totalLeaveDays, 0);
+        const totalWorkedDays = filteredData.reduce((sum, item) => sum + item.actualWorkedDays, 0);
+        const avgWorkingDays = totalWorkingDays || monthlyContextDays; // Use monthly context settings value
+        
+            return {
+                totalEmployees,
+                leavesApplied,
+                leavesApproved,
+                totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
+                avgWorkingDays,
+                totalWorkedDays
+            };
+    }, [filteredData]);
+    
+    // Paginated data
+    const paginatedData = useMemo(() => {
+        const start = page * rowsPerPage;
+        return filteredData.slice(start, start + rowsPerPage);
+    }, [filteredData, page, rowsPerPage]);
+    
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+    
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+    
+    if (loading) {
+        return (
+            <Box>
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <Grid item xs={12} sm={6} md={2.4} key={i}>
+                            <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 2 }} />
+                        </Grid>
+                    ))}
+                </Grid>
+                <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 2 }} />
+            </Box>
+        );
+    }
+    
+    return (
+        <Box>
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
+            
+            {/* Filter Controls with KPI Cards */}
+            <Paper 
+                elevation={0} 
+                sx={{ 
+                    mb: 3, 
+                    borderRadius: 3, 
+                    border: '1px solid #e0e0e0',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}
+            >
+                <Box 
+                    sx={{
+                        bgcolor: '#f8f9fa',
+                        p: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #e0e0e0',
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => setFiltersExpanded(!filtersExpanded)}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <FilterListIcon sx={{ color: '#dc3545' }} />
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                            Filters & Search
+                        </Typography>
+                        {hasActiveFilters && (
+                            <Chip
+                                label="Active"
+                                size="small"
+                                color="primary"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                        )}
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {hasActiveFilters && (
+                            <Button
+                                size="small"
+                                startIcon={<ClearIcon />}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearFilters();
+                                }}
+                                sx={{
+                                    textTransform: 'none',
+                                    color: '#dc3545',
+                                    '&:hover': { bgcolor: 'rgba(220, 53, 69, 0.1)' }
+                                }}
+                            >
+                                Clear All
+                            </Button>
+                        )}
+                        <IconButton size="small">
+                            {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                    </Box>
+                </Box>
+                <Collapse in={filtersExpanded}>
+                    <Box sx={{ p: 3, bgcolor: 'white' }}>
+                        {/* KPI Cards Section */}
+                        <Box sx={{ mb: 4 }}>
+                            <Grid container spacing={2.5}>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(102, 126, 234, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(102, 126, 234, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <PeopleIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.totalEmployees}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Employees
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(240, 147, 251, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(240, 147, 251, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <EventBusyIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.leavesApplied}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Leaves Applied
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(79, 172, 254, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(79, 172, 254, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <CheckCircleIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.leavesApproved}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Leaves Approved
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(255, 152, 0, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #ff9800 0%, #ffeb3b 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(255, 152, 0, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <CalendarTodayIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.totalLeaveDays}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Leave Days
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(255, 106, 136, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #ff6a88 0%, #ff8c94 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(255, 106, 136, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <WorkIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.avgWorkingDays || 'N/A'}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Working Days
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                        
+                        <Divider sx={{ my: 3, borderColor: '#e0e0e0', borderWidth: 1 }} />
+                        
+                        <Grid container spacing={3}>
+                            {/* Date Range Section */}
+                            <Grid item xs={12}>
+                                <Grid container spacing={2.5}>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Select Month"
+                                                views={['year', 'month']}
+                                                value={selectedMonth}
+                                                onChange={(newValue) => {
+                                                    if (newValue) {
+                                                        setSelectedMonth(new Date(newValue.getFullYear(), newValue.getMonth(), 1));
+                                                        setDateRange({ start: null, end: null });
+                                                    }
+                                                }}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Custom Start Date"
+                                                value={dateRange.start}
+                                                onChange={(newValue) => setDateRange(prev => ({ ...prev, start: newValue }))}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Custom End Date"
+                                                value={dateRange.end}
+                                                onChange={(newValue) => setDateRange(prev => ({ ...prev, end: newValue }))}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                            
+                            <Divider sx={{ my: 3, borderColor: '#e0e0e0', borderWidth: 1 }} />
+                            
+                            {/* Search & Filter Section */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" sx={{ mb: 2.5, fontWeight: 600, color: '#2c3e50', fontSize: '1.1rem' }}>
+                                    🔍 Search & Filter
+                                </Typography>
+                                <Grid container spacing={2.5}>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <TextField
+                                            fullWidth
+                                            size="medium"
+                                            label="Search Employee"
+                                            placeholder="Name or Employee ID"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: <SearchIcon sx={{ mr: 1, color: '#dc3545' }} />
+                                            }}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: '8px',
+                                                    bgcolor: '#fafafa',
+                                                    border: '1px solid #e0e0e0',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': {
+                                                        bgcolor: '#f5f5f5',
+                                                        borderColor: '#0078d4'
+                                                    },
+                                                    '&.Mui-focused': {
+                                                        bgcolor: 'white',
+                                                        borderColor: '#0078d4',
+                                                        boxShadow: '0 0 0 2px rgba(0, 120, 212, 0.1)'
+                                                    }
+                                                },
+                                                '& .MuiInputLabel-root': {
+                                                    color: '#605e5c',
+                                                    '&.Mui-focused': {
+                                                        color: '#0078d4'
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <FormControl fullWidth size="medium">
+                                            <InputLabel sx={{ 
+                                                color: '#605e5c',
+                                                '&.Mui-focused': {
+                                                    color: '#0078d4'
+                                                }
+                                            }}>
+                                                Leave Type
+                                            </InputLabel>
+                                            <Select
+                                                value={selectedLeaveType}
+                                                onChange={(e) => setSelectedLeaveType(e.target.value)}
+                                                label="Leave Type"
+                                                sx={{
+                                                    borderRadius: '8px',
+                                                    bgcolor: '#fafafa',
+                                                    border: '1px solid #e0e0e0',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': {
+                                                        bgcolor: '#f5f5f5',
+                                                        borderColor: '#0078d4'
+                                                    },
+                                                    '&.Mui-focused': {
+                                                        bgcolor: 'white',
+                                                        borderColor: '#0078d4',
+                                                        boxShadow: '0 0 0 2px rgba(0, 120, 212, 0.1)'
+                                                    },
+                                                    '& .MuiOutlinedInput-notchedOutline': {
+                                                        border: 'none'
+                                                    }
+                                                }}
+                                            >
+                                                <MenuItem value="">All Types</MenuItem>
+                                                <MenuItem value="Planned">Planned</MenuItem>
+                                                <MenuItem value="Sick">Sick</MenuItem>
+                                                <MenuItem value="Loss of Pay">Loss of Pay</MenuItem>
+                                                <MenuItem value="Compensatory">Compensatory</MenuItem>
+                                                <MenuItem value="Backdated Leave">Backdated Leave</MenuItem>
+                                                <MenuItem value="Casual">Casual</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                </Collapse>
+            </Paper>
+            
+            {/* Employee Leave List */}
+            <div className="requests-card">
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        borderRadius: 0, 
+                        overflow: 'hidden',
+                        border: 'none',
+                        boxShadow: 'none'
+                    }}
+                >
+                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                            Employee Leave Summary
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {filteredData.length} employee{filteredData.length !== 1 ? 's' : ''} found
+                        </Typography>
+                    </Box>
+                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflowX: 'hidden' }}>
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Employee Name
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Employee ID
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Applied
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Approved
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Total Leave Days
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Type Breakdown
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Total Working Days
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Actual Worked Days
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Month
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No data available for the selected period.
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedData.map((item, index) => (
+                                    <TableRow 
+                                        key={item.employee._id || index} 
+                                        hover
+                                        sx={{
+                                            '&:hover': {
+                                                bgcolor: '#f8f9fa',
+                                                transform: 'scale(1.001)',
+                                                transition: 'all 0.2s ease'
+                                            },
+                                            '&:nth-of-type(even)': {
+                                                bgcolor: '#fafafa'
+                                            }
+                                        }}
+                                    >
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Avatar 
+                                                    src={item.employee.profileImageUrl} 
+                                                    sx={{ 
+                                                        width: 40, 
+                                                        height: 40,
+                                                        bgcolor: '#dc3545',
+                                                        fontWeight: 600,
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                                    }}
+                                                >
+                                                    {item.employee.fullName?.charAt(0) || 'E'}
+                                                </Avatar>
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                                                        {item.employee.fullName || 'N/A'}
+                                                    </Typography>
+                                                    {item.employee.department && (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {item.employee.department}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#666' }}>
+                                                {item.employee.employeeCode || 'N/A'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip 
+                                                label={item.leaveApplied} 
+                                                size="small" 
+                                                sx={{ 
+                                                    bgcolor: '#fff3cd',
+                                                    color: '#856404',
+                                                    fontWeight: 600,
+                                                    minWidth: 40
+                                                }} 
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip 
+                                                label={item.leaveApproved} 
+                                                size="small" 
+                                                sx={{ 
+                                                    bgcolor: '#d4edda',
+                                                    color: '#155724',
+                                                    fontWeight: 600,
+                                                    minWidth: 40
+                                                }} 
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc3545', fontSize: '1rem' }}>
+                                                {item.totalLeaveDays}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                {Object.entries(item.leaveTypeBreakdown).map(([type, days]) => (
+                                                    <Chip
+                                                        key={type}
+                                                        label={`${type}: ${days}`}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ 
+                                                            fontSize: '0.7rem',
+                                                            borderColor: '#dc3545',
+                                                            color: '#dc3545',
+                                                            '&:hover': {
+                                                                bgcolor: '#dc3545',
+                                                                color: 'white'
+                                                            }
+                                                        }}
+                                                    />
+                                                ))}
+                                                {Object.keys(item.leaveTypeBreakdown).length === 0 && (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                        None
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                                                {item.totalWorkingDays !== null && item.totalWorkingDays !== undefined 
+                                                    ? item.totalWorkingDays 
+                                                    : 'N/A'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#2e7d32' }}>
+                                                {item.actualWorkedDays || 0}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                                {item.month}
+                                            </Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                    <TablePagination
+                        rowsPerPageOptions={[10, 25, 50, 100]}
+                        component="div"
+                        count={filteredData.length}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handlePageChange}
+                        onRowsPerPageChange={handleRowsPerPageChange}
+                    />
+                </Paper>
+            </div>
+        </Box>
+    );
+});
+
+LeaveCountSummaryTab.displayName = 'LeaveCountSummaryTab';
+
+// --- Intern Leave Count Summary Tab Component ---
+const InternLeaveCountSummaryTab = memo(() => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [employees, setEmployees] = useState([]);
+    const [allLeaveRequests, setAllLeaveRequests] = useState([]);
+    const [analyticsData, setAnalyticsData] = useState({});
+    const [totalWorkingDays, setTotalWorkingDays] = useState(null);
+    const [monthlyContextDays, setMonthlyContextDays] = useState(30); // Monthly context days from settings
+    const [filteredData, setFilteredData] = useState([]);
+    
+    // Filter states
+    const today = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+    const [dateRange, setDateRange] = useState({ start: null, end: null });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedLeaveType, setSelectedLeaveType] = useState('');
+    const [filtersExpanded, setFiltersExpanded] = useState(true);
+    
+    // Pagination
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    
+    // Clear all filters
+    const handleClearFilters = () => {
+        setSearchTerm('');
+        setSelectedLeaveType('');
+        setDateRange({ start: null, end: null });
+        setSelectedMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    };
+    
+    // Check if any filters are active
+    const hasActiveFilters = searchTerm || selectedLeaveType || dateRange.start || dateRange.end;
+    
+    // Fetch monthly context settings (single source of truth for working days)
+    const fetchMonthlyContextSettings = useCallback(async () => {
+        try {
+            const response = await api.get('/analytics/monthly-context-settings');
+            const days = response.data?.days || 30;
+            setMonthlyContextDays(days);
+            setTotalWorkingDays(days); // Use monthly context as total working days
+        } catch (err) {
+            console.error('Failed to fetch monthly context settings:', err);
+            // Use default value
+            setMonthlyContextDays(30);
+            setTotalWorkingDays(30);
+        }
+    }, []);
+    
+    // Fetch all data
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            // Fetch all employees
+            const empRes = await api.get('/admin/employees?all=true');
+            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
+            // Filter for interns only
+            const interns = allEmps.filter(emp => emp.role === 'Intern');
+            setEmployees(interns);
+            
+            // Fetch all leave requests
+            let allLeaves = [];
+            let page = 1;
+            const limit = 1000;
+            let hasMore = true;
+            
+            while (hasMore) {
+                try {
+                    const leavesRes = await api.get(`/admin/leaves/all?page=${page}&limit=${limit}`);
+                    let pageLeaves = [];
+                    if (leavesRes.data.requests) {
+                        pageLeaves = Array.isArray(leavesRes.data.requests) ? leavesRes.data.requests : [];
+                    } else {
+                        pageLeaves = Array.isArray(leavesRes.data) ? leavesRes.data : [];
+                    }
+                    
+                    allLeaves = [...allLeaves, ...pageLeaves];
+                    
+                    const totalCount = leavesRes.data.totalCount || 0;
+                    const totalPages = leavesRes.data.totalPages || Math.ceil(totalCount / limit);
+                    hasMore = page < totalPages && pageLeaves.length === limit;
+                    page++;
+                    
+                    if (page > 100) {
+                        console.warn('Reached safety limit for leave requests pagination');
+                        break;
+                    }
+                } catch (pageErr) {
+                    console.error('Error fetching leave requests page:', pageErr);
+                    hasMore = false;
+                }
+            }
+            
+            setAllLeaveRequests(allLeaves);
+        } catch (err) {
+            console.error('Failed to fetch intern leave count data:', err);
+            setError('Unable to load data');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    
+    // Fetch analytics data for working days calculation
+    const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
+        try {
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
+            
+            const analyticsRes = await api.get('/analytics/all', {
+                params: {
+                    startDate: startStr,
+                    endDate: endStr
+                }
+            });
+            
+            // Extract analytics data per employee (for actual worked days only)
+            const analyticsMap = {};
+            
+            if (analyticsRes.data?.employees && Array.isArray(analyticsRes.data.employees)) {
+                analyticsRes.data.employees.forEach(emp => {
+                    // Use id or _id for compatibility, only include interns
+                    const employeeId = emp.employee?._id || emp.employee?.id;
+                    if (employeeId && emp.employee?.role === 'Intern' && emp.metrics) {
+                        analyticsMap[employeeId] = {
+                            actualWorkedDays: emp.metrics.totalDays || 0 // Actual worked days from attendance
+                        };
+                    }
+                });
+            }
+            
+            setAnalyticsData(analyticsMap);
+            // Total working days comes from monthly context settings, not analytics
+        } catch (err) {
+            console.error('Failed to fetch analytics data:', err);
+            setAnalyticsData({});
+        }
+    }, []);
+    
+    useEffect(() => {
+        fetchData();
+        fetchMonthlyContextSettings();
+    }, [fetchData, fetchMonthlyContextSettings]);
+    
+    // Fetch analytics when date range changes (for actual worked days per employee)
+    useEffect(() => {
+        if (loading || !employees.length) return;
+        
+        let startDate, endDate;
+        if (dateRange.start && dateRange.end) {
+            startDate = new Date(dateRange.start);
+            endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            const year = selectedMonth.getFullYear();
+            const month = selectedMonth.getMonth();
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        }
+        
+        fetchAnalyticsData(startDate, endDate);
+    }, [selectedMonth, dateRange, employees.length, loading, fetchAnalyticsData]);
+    
+    // Aggregate and filter data
+    useEffect(() => {
+        if (loading || !employees.length) return;
+        
+        let startDate, endDate;
+        if (dateRange.start && dateRange.end) {
+            startDate = new Date(dateRange.start);
+            endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            const year = selectedMonth.getFullYear();
+            const month = selectedMonth.getMonth();
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        }
+        
+        const aggregated = employees.map(emp => {
+            const empLeaves = allLeaveRequests.filter(leave => {
+                if (leave.employee?._id?.toString() !== emp._id?.toString()) return false;
+                if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
+                
+                const hasDateInRange = leave.leaveDates.some(date => {
+                    const leaveDate = new Date(date);
+                    return leaveDate >= startDate && leaveDate <= endDate;
+                });
+                
+                if (!hasDateInRange) return false;
+                if (selectedLeaveType && leave.requestType !== selectedLeaveType) return false;
+                
+                return true;
+            });
+            
+            const appliedCount = empLeaves.length;
+            const approvedCount = empLeaves.filter(l => l.status === 'Approved').length;
+            
+            let totalLeaveDays = 0;
+            const leaveTypeBreakdown = {};
+            
+            empLeaves.forEach(leave => {
+                if (leave.status === 'Approved' && leave.leaveDates) {
+                    const daysInRange = leave.leaveDates.filter(date => {
+                        const leaveDate = new Date(date);
+                        return leaveDate >= startDate && leaveDate <= endDate;
+                    }).length;
+                    
+                    const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
+                    const adjustedDays = daysInRange * multiplier;
+                    totalLeaveDays += adjustedDays;
+                    
+                    const reqType = leave.requestType || 'Unknown';
+                    leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
+                }
+            });
+            
+            const empAnalytics = analyticsData[emp._id] || {};
+            const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays; // From monthly context settings
+            const actualWorkedDays = empAnalytics.actualWorkedDays || 0;
+            
+            let periodDisplay;
+            if (dateRange.start && dateRange.end) {
+                const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                periodDisplay = `${startStr} - ${endStr}`;
+            } else {
+                periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
+            }
+            
+            return {
+                employee: emp,
+                leaveApplied: appliedCount,
+                leaveApproved: approvedCount,
+                totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
+                leaveTypeBreakdown,
+                totalWorkingDays: totalWorkingDaysForPeriod,
+                actualWorkedDays: actualWorkedDays,
+                month: periodDisplay
+            };
+        });
+        
+        let filtered = aggregated;
+        if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            filtered = aggregated.filter(item => {
+                const name = item.employee?.fullName?.toLowerCase() || '';
+                const code = item.employee?.employeeCode?.toLowerCase() || '';
+                return name.includes(searchLower) || code.includes(searchLower);
+            });
+        }
+        
+        setFilteredData(filtered);
+    }, [employees, allLeaveRequests, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    
+    // Calculate KPIs
+    const kpis = useMemo(() => {
+        if (!filteredData.length) {
+            return {
+                totalEmployees: 0,
+                leavesApplied: 0,
+                leavesApproved: 0,
+                totalLeaveDays: 0,
+                avgWorkingDays: 0,
+                totalWorkedDays: 0
+            };
+        }
+        
+        const totalEmployees = filteredData.length;
+        const leavesApplied = filteredData.reduce((sum, item) => sum + item.leaveApplied, 0);
+        const leavesApproved = filteredData.reduce((sum, item) => sum + item.leaveApproved, 0);
+        const totalLeaveDays = filteredData.reduce((sum, item) => sum + item.totalLeaveDays, 0);
+        const totalWorkedDays = filteredData.reduce((sum, item) => sum + item.actualWorkedDays, 0);
+        const avgWorkingDays = totalWorkingDays || monthlyContextDays; // Use monthly context settings value
+        
+        return {
+            totalEmployees,
+            leavesApplied,
+            leavesApproved,
+            totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
+            avgWorkingDays,
+            totalWorkedDays
+        };
+    }, [filteredData, totalWorkingDays]);
+    
+    const paginatedData = useMemo(() => {
+        const start = page * rowsPerPage;
+        return filteredData.slice(start, start + rowsPerPage);
+    }, [filteredData, page, rowsPerPage]);
+    
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+    
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+    
+    if (loading) {
+        return (
+            <Box>
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <Grid item xs={12} sm={6} md={2.4} key={i}>
+                            <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 2 }} />
+                        </Grid>
+                    ))}
+                </Grid>
+                <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 2 }} />
+            </Box>
+        );
+    }
+    
+    return (
+        <Box>
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
+            
+            {/* Filter Controls with KPI Cards */}
+            <Paper 
+                elevation={0} 
+                sx={{ 
+                    mb: 3, 
+                    borderRadius: 3, 
+                    border: '1px solid #e0e0e0',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}
+            >
+                <Box 
+                    sx={{
+                        bgcolor: '#f8f9fa',
+                        p: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #e0e0e0',
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => setFiltersExpanded(!filtersExpanded)}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <FilterListIcon sx={{ color: '#dc3545' }} />
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                            Filters & Search
+                        </Typography>
+                        {hasActiveFilters && (
+                            <Chip
+                                label="Active"
+                                size="small"
+                                color="primary"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                        )}
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {hasActiveFilters && (
+                            <Button
+                                size="small"
+                                startIcon={<ClearIcon />}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearFilters();
+                                }}
+                                sx={{
+                                    textTransform: 'none',
+                                    color: '#dc3545',
+                                    '&:hover': { bgcolor: 'rgba(220, 53, 69, 0.1)' }
+                                }}
+                            >
+                                Clear All
+                            </Button>
+                        )}
+                        <IconButton size="small">
+                            {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                    </Box>
+                </Box>
+                <Collapse in={filtersExpanded}>
+                    <Box sx={{ p: 3, bgcolor: 'white' }}>
+                        {/* KPI Cards Section */}
+                        <Box sx={{ mb: 4 }}>
+                            <Grid container spacing={2.5}>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(102, 126, 234, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(102, 126, 234, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <PeopleIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.totalEmployees}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Interns
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(240, 147, 251, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(240, 147, 251, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <EventBusyIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.leavesApplied}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Leaves Applied
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(79, 172, 254, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(79, 172, 254, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <CheckCircleIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.leavesApproved}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Leaves Approved
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(255, 152, 0, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #ff9800 0%, #ffeb3b 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(255, 152, 0, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <CalendarTodayIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.totalLeaveDays}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Leave Days
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Card 
+                                        sx={{ 
+                                            borderRadius: 3, 
+                                            boxShadow: '0 4px 20px rgba(255, 106, 136, 0.15)', 
+                                            height: '100%',
+                                            background: 'linear-gradient(135deg, #ff6a88 0%, #ff8c94 100%)',
+                                            color: 'white',
+                                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                                boxShadow: '0 8px 30px rgba(255, 106, 136, 0.25)'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                <Box sx={{ 
+                                                    bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                                                    borderRadius: 2, 
+                                                    p: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <WorkIcon sx={{ color: 'white', fontSize: 28 }} />
+                                                </Box>
+                                            </Box>
+                                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
+                                                {kpis.avgWorkingDays || 'N/A'}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                                                Total Working Days
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                        
+                        <Divider sx={{ my: 3, borderColor: '#e0e0e0', borderWidth: 1 }} />
+                        
+                        <Grid container spacing={3}>
+                            {/* Date Range Section */}
+                            <Grid item xs={12}>
+                                <Grid container spacing={2.5}>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Select Month"
+                                                views={['year', 'month']}
+                                                value={selectedMonth}
+                                                onChange={(newValue) => {
+                                                    if (newValue) {
+                                                        setSelectedMonth(new Date(newValue.getFullYear(), newValue.getMonth(), 1));
+                                                        setDateRange({ start: null, end: null });
+                                                    }
+                                                }}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Custom Start Date"
+                                                value={dateRange.start}
+                                                onChange={(newValue) => setDateRange(prev => ({ ...prev, start: newValue }))}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                            <DatePicker
+                                                label="Custom End Date"
+                                                value={dateRange.end}
+                                                onChange={(newValue) => setDateRange(prev => ({ ...prev, end: newValue }))}
+                                                slotProps={datePickerSlotProps}
+                                            />
+                                        </LocalizationProvider>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                            
+                            <Divider sx={{ my: 3, borderColor: '#e0e0e0', borderWidth: 1 }} />
+                            
+                            {/* Search & Filter Section */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" sx={{ mb: 2.5, fontWeight: 600, color: '#2c3e50', fontSize: '1.1rem' }}>
+                                    🔍 Search & Filter
+                                </Typography>
+                                <Grid container spacing={2.5}>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <TextField
+                                            fullWidth
+                                            size="medium"
+                                            label="Search Intern"
+                                            placeholder="Name or Intern ID"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: <SearchIcon sx={{ mr: 1, color: '#dc3545' }} />
+                                            }}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: '8px',
+                                                    bgcolor: '#fafafa',
+                                                    border: '1px solid #e0e0e0',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': {
+                                                        bgcolor: '#f5f5f5',
+                                                        borderColor: '#0078d4'
+                                                    },
+                                                    '&.Mui-focused': {
+                                                        bgcolor: 'white',
+                                                        borderColor: '#0078d4',
+                                                        boxShadow: '0 0 0 2px rgba(0, 120, 212, 0.1)'
+                                                    }
+                                                },
+                                                '& .MuiInputLabel-root': {
+                                                    color: '#605e5c',
+                                                    '&.Mui-focused': {
+                                                        color: '#0078d4'
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <FormControl fullWidth size="medium">
+                                            <InputLabel sx={{ 
+                                                color: '#605e5c',
+                                                '&.Mui-focused': {
+                                                    color: '#0078d4'
+                                                }
+                                            }}>
+                                                Leave Type
+                                            </InputLabel>
+                                            <Select
+                                                value={selectedLeaveType}
+                                                onChange={(e) => setSelectedLeaveType(e.target.value)}
+                                                label="Leave Type"
+                                                sx={{
+                                                    borderRadius: '8px',
+                                                    bgcolor: '#fafafa',
+                                                    border: '1px solid #e0e0e0',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': {
+                                                        bgcolor: '#f5f5f5',
+                                                        borderColor: '#0078d4'
+                                                    },
+                                                    '&.Mui-focused': {
+                                                        bgcolor: 'white',
+                                                        borderColor: '#0078d4',
+                                                        boxShadow: '0 0 0 2px rgba(0, 120, 212, 0.1)'
+                                                    },
+                                                    '& .MuiOutlinedInput-notchedOutline': {
+                                                        border: 'none'
+                                                    }
+                                                }}
+                                            >
+                                                <MenuItem value="">All Types</MenuItem>
+                                                <MenuItem value="Planned">Planned</MenuItem>
+                                                <MenuItem value="Sick">Sick</MenuItem>
+                                                <MenuItem value="Loss of Pay">Loss of Pay</MenuItem>
+                                                <MenuItem value="Compensatory">Compensatory</MenuItem>
+                                                <MenuItem value="Backdated Leave">Backdated Leave</MenuItem>
+                                                <MenuItem value="Casual">Casual</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                </Collapse>
+            </Paper>
+            
+            {/* Intern Leave List */}
+            <div className="requests-card">
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        borderRadius: 0, 
+                        overflow: 'hidden',
+                        border: 'none',
+                        boxShadow: 'none'
+                    }}
+                >
+                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                            Intern Leave Summary
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {filteredData.length} intern{filteredData.length !== 1 ? 's' : ''} found
+                        </Typography>
+                    </Box>
+                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflowX: 'hidden' }}>
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Intern Name
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Intern ID
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Applied
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Approved
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Total Leave Days
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Leave Type Breakdown
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Total Working Days
+                                </TableCell>
+                                <TableCell align="center" sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Actual Worked Days
+                                </TableCell>
+                                <TableCell sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f8f9fa',
+                                    color: '#2c3e50',
+                                    fontSize: '0.875rem',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}>
+                                    Month
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No intern data available for the selected period.
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedData.map((item, index) => (
+                                    <TableRow 
+                                        key={item.employee._id || index} 
+                                        hover
+                                        sx={{
+                                            '&:hover': {
+                                                bgcolor: '#f8f9fa',
+                                                transform: 'scale(1.001)',
+                                                transition: 'all 0.2s ease'
+                                            },
+                                            '&:nth-of-type(even)': {
+                                                bgcolor: '#fafafa'
+                                            }
+                                        }}
+                                    >
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Avatar 
+                                                    src={item.employee.profileImageUrl} 
+                                                    sx={{ 
+                                                        width: 40, 
+                                                        height: 40,
+                                                        bgcolor: '#dc3545',
+                                                        fontWeight: 600,
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                                    }}
+                                                >
+                                                    {item.employee.fullName?.charAt(0) || 'I'}
+                                                </Avatar>
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                                                        {item.employee.fullName || 'N/A'}
+                                                    </Typography>
+                                                    {item.employee.department && (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {item.employee.department}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#666' }}>
+                                                {item.employee.employeeCode || 'N/A'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip 
+                                                label={item.leaveApplied} 
+                                                size="small" 
+                                                sx={{ 
+                                                    bgcolor: '#fff3cd',
+                                                    color: '#856404',
+                                                    fontWeight: 600,
+                                                    minWidth: 40
+                                                }} 
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip 
+                                                label={item.leaveApproved} 
+                                                size="small" 
+                                                sx={{ 
+                                                    bgcolor: '#d4edda',
+                                                    color: '#155724',
+                                                    fontWeight: 600,
+                                                    minWidth: 40
+                                                }} 
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc3545', fontSize: '1rem' }}>
+                                                {item.totalLeaveDays}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                {Object.entries(item.leaveTypeBreakdown).map(([type, days]) => (
+                                                    <Chip
+                                                        key={type}
+                                                        label={`${type}: ${days}`}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ 
+                                                            fontSize: '0.7rem',
+                                                            borderColor: '#dc3545',
+                                                            color: '#dc3545',
+                                                            '&:hover': {
+                                                                bgcolor: '#dc3545',
+                                                                color: 'white'
+                                                            }
+                                                        }}
+                                                    />
+                                                ))}
+                                                {Object.keys(item.leaveTypeBreakdown).length === 0 && (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                        None
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                                                {item.totalWorkingDays !== null && item.totalWorkingDays !== undefined 
+                                                    ? item.totalWorkingDays 
+                                                    : 'N/A'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#2e7d32' }}>
+                                                {item.actualWorkedDays || 0}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                                {item.month}
+                                            </Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                    </TableContainer>
+                    <TablePagination
+                        rowsPerPageOptions={[10, 25, 50, 100]}
+                        component="div"
+                        count={filteredData.length}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handlePageChange}
+                        onRowsPerPageChange={handleRowsPerPageChange}
+                    />
+                </Paper>
+            </div>
+        </Box>
+    );
+});
+
+InternLeaveCountSummaryTab.displayName = 'InternLeaveCountSummaryTab';
 
 // --- HrEmailManager Modal ---
 const HrEmailManagerModal = memo(({ open, onClose }) => {
@@ -123,6 +2278,7 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
     const [newHoliday, setNewHoliday] = useState({ name: '', date: null });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
     const fetchHolidays = useCallback(async () => {
         if (!open) return;
@@ -169,6 +2325,19 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
             <DialogContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Add or remove company-wide holidays.</Typography>
                 {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+                
+                {/* Bulk Upload Button */}
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<UploadFileIcon />}
+                        onClick={() => setBulkUploadOpen(true)}
+                        sx={{ mr: 1 }}
+                    >
+                        Upload Holidays (Excel)
+                    </Button>
+                </Box>
+                
                 <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
                     <Grid item xs={12} sm={6}><TextField label="Holiday Name" size="small" fullWidth value={newHoliday.name} onChange={(e) => setNewHoliday(p => ({ ...p, name: e.target.value }))} /></Grid>
                     <Grid item xs={12} sm={4}>
@@ -181,7 +2350,18 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
                 <Divider sx={{ my: 3 }} />
                 <div className="recipients-box">
                     {loading ? <CircularProgress size={20} /> : holidays.length > 0 ? (
-                        holidays.map(h => (<Chip key={h._id} label={`${h.name} (${new Date(h.date).toLocaleDateString()})`} onDelete={() => handleDeleteHoliday(h._id)} />))
+                        holidays.map(h => {
+                            const isTentative = !h.date || h.isTentative;
+                            const dateDisplay = isTentative ? 'Tentative' : new Date(h.date).toLocaleDateString();
+                            return (
+                                <Chip 
+                                    key={h._id} 
+                                    label={`${h.name} (${dateDisplay})`}
+                                    onDelete={() => handleDeleteHoliday(h._id)}
+                                    color={isTentative ? 'warning' : 'default'}
+                                />
+                            );
+                        })
                     ) : (
                         <div className="no-recipients-box"><InfoOutlinedIcon fontSize="small" /><Typography variant="body2">No holidays configured.</Typography></div>
                     )}
@@ -190,6 +2370,16 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
             <DialogActions sx={{ p: 2 }}>
                 <Button onClick={onClose}>Close</Button>
             </DialogActions>
+            
+            {/* Bulk Upload Modal */}
+            <HolidayBulkUploadModal 
+                open={bulkUploadOpen} 
+                onClose={() => setBulkUploadOpen(false)}
+                onSuccess={() => {
+                    setBulkUploadOpen(false);
+                    fetchHolidays();
+                }}
+            />
         </Dialog>
     );
 });
@@ -485,6 +2675,10 @@ const AdminLeavesPage = () => {
                     }
                 }, 500);
             }
+        } else if (tab === 'leave-count') {
+            setCurrentTab(2);
+        } else if (tab === 'intern-leave-count') {
+            setCurrentTab(3);
         }
     }, [searchParams, setSearchParams, fetchYearEndActions, yearEndActions.length]);
 
@@ -811,6 +3005,8 @@ const AdminLeavesPage = () => {
                 >
                     <Tab label="Leave Requests" />
                     <Tab label="Year-End Requests" />
+                    <Tab label="Employee Leave Count" />
+                    <Tab label="Intern Leave Count" />
                 </Tabs>
             </Paper>
             
@@ -1095,6 +3291,44 @@ const AdminLeavesPage = () => {
                         </TableContainer>
                     )}
                     </div>
+                </Box>
+                
+                {/* Leave Count Summary Tab - Always mounted, visibility toggled */}
+                <Box
+                    sx={{
+                        position: currentTab === 2 ? 'relative' : 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        opacity: currentTab === 2 ? 1 : 0,
+                        transform: currentTab === 2 ? 'translateY(0)' : 'translateY(8px)',
+                        pointerEvents: currentTab === 2 ? 'auto' : 'none',
+                        transition: 'opacity 220ms ease-in-out, transform 220ms ease-in-out',
+                        willChange: currentTab === 2 ? 'auto' : 'opacity, transform',
+                        zIndex: currentTab === 2 ? 1 : 0,
+                        visibility: currentTab === 2 ? 'visible' : 'hidden',
+                    }}
+                >
+                    <LeaveCountSummaryTab />
+                </Box>
+                
+                {/* Intern Leave Count Summary Tab - Always mounted, visibility toggled */}
+                <Box
+                    sx={{
+                        position: currentTab === 3 ? 'relative' : 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        opacity: currentTab === 3 ? 1 : 0,
+                        transform: currentTab === 3 ? 'translateY(0)' : 'translateY(8px)',
+                        pointerEvents: currentTab === 3 ? 'auto' : 'none',
+                        transition: 'opacity 220ms ease-in-out, transform 220ms ease-in-out',
+                        willChange: currentTab === 3 ? 'auto' : 'opacity, transform',
+                        zIndex: currentTab === 3 ? 1 : 0,
+                        visibility: currentTab === 3 ? 'visible' : 'hidden',
+                    }}
+                >
+                    <InternLeaveCountSummaryTab />
                 </Box>
             </Box>
 

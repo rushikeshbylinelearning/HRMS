@@ -8,9 +8,11 @@ const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const Setting = require('../models/Setting');
+const Holiday = require('../models/Holiday');
 const NewNotificationService = require('../services/NewNotificationService');
 const logAction = require('../services/logAction');
 const { getUserDailyStatus } = require('../services/dailyStatusService');
+const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 
 const router = express.Router();
 
@@ -601,6 +603,224 @@ router.put('/end-break', authenticateToken, async (req, res) => {
         res.status(500).json({ 
             error: 'Failed to end break.',
             success: false,
+            details: error.message
+        });
+    }
+});
+
+/**
+ * Helper function to get working dates for a month
+ * Excludes: Sundays, Alternate Saturdays (based on employee policy), Holidays
+ * @param {number} month - Month (0-11)
+ * @param {number} year - Year
+ * @param {Object} employee - Employee object with alternateSaturdayPolicy
+ * @returns {Promise<Array<string>>} Array of working dates in YYYY-MM-DD format
+ */
+const getWorkingDatesForMonth = async (month, year, employee) => {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    
+    // Get all holidays in this month (exclude tentative holidays)
+    const holidays = await Holiday.find({
+        date: {
+            $gte: monthStart,
+            $lte: monthEnd,
+            $ne: null
+        },
+        isTentative: { $ne: true }
+    }).lean();
+    
+    const holidayDates = new Set(
+        holidays
+            .filter(h => h.date && !h.isTentative)
+            .map(h => {
+                const d = new Date(h.date);
+                if (isNaN(d.getTime())) return null;
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })
+            .filter(dateStr => dateStr !== null)
+    );
+    
+    const saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
+    const workingDates = [];
+    
+    for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        const dayOfWeek = d.getDay();
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        
+        // Skip Sundays
+        if (dayOfWeek === 0) continue;
+        
+        // Skip alternate Saturdays based on policy
+        if (dayOfWeek === 6) {
+            if (AntiExploitationLeaveService.isOffSaturday(d, saturdayPolicy)) {
+                continue;
+            }
+        }
+        
+        // Skip holidays
+        if (holidayDates.has(dateStr)) continue;
+        
+        workingDates.push(dateStr);
+    }
+    
+    return workingDates;
+};
+
+/**
+ * GET /api/attendance/actual-work-days
+ * Calculate Actual Worked Days (Present Days) for employee(s) in a given month
+ * 
+ * Query Params:
+ * - employeeId (optional): Specific employee ID. If not provided, returns data for all employees (Admin/HR only)
+ * - month (required): Month (1-12)
+ * - year (required): Year
+ * 
+ * Response:
+ * Single employee: {
+ *   employeeId: string,
+ *   month: number,
+ *   year: number,
+ *   totalWorkingDays: number,
+ *   actualWorkedDays: number,
+ *   absentDays: number
+ * }
+ * 
+ * Multiple employees: Array of above objects
+ */
+router.get('/actual-work-days', authenticateToken, async (req, res) => {
+    try {
+        const { employeeId, month, year } = req.query;
+        const { userId, role } = req.user;
+        
+        // Validate required params
+        if (!month || !year) {
+            return res.status(400).json({ 
+                error: 'Month and year are required query parameters.' 
+            });
+        }
+        
+        const monthNum = parseInt(month, 10);
+        const yearNum = parseInt(year, 10);
+        
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+            return res.status(400).json({ 
+                error: 'Month must be a number between 1 and 12.' 
+            });
+        }
+        
+        if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+            return res.status(400).json({ 
+                error: 'Year must be a valid year.' 
+            });
+        }
+        
+        // Access control: Employee can only see their own data
+        if (employeeId) {
+            if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+                return res.status(400).json({ error: 'Invalid employee ID format.' });
+            }
+            
+            // If employee is requesting, ensure they can only see their own data
+            if (role !== 'Admin' && role !== 'HR' && employeeId !== userId) {
+                return res.status(403).json({ 
+                    error: 'You do not have permission to view this employee\'s data.' 
+                });
+            }
+        } else {
+            // Bulk request (no employeeId) - only Admin/HR allowed
+            if (role !== 'Admin' && role !== 'HR') {
+                return res.status(403).json({ 
+                    error: 'Only Admin and HR can view all employees\' data.' 
+                });
+            }
+        }
+        
+        // Convert month to 0-indexed for Date constructor
+        const monthIndex = monthNum - 1;
+        
+        // Determine which employees to process
+        let employeesToProcess = [];
+        
+        if (employeeId) {
+            // Single employee
+            const employee = await User.findById(employeeId).select('_id fullName employeeCode alternateSaturdayPolicy role');
+            if (!employee) {
+                return res.status(404).json({ error: 'Employee not found.' });
+            }
+            employeesToProcess = [employee];
+        } else {
+            // All employees (Admin/HR only)
+            employeesToProcess = await User.find({ 
+                isActive: true 
+            }).select('_id fullName employeeCode alternateSaturdayPolicy role').lean();
+        }
+        
+        // Process each employee
+        const results = await Promise.all(
+            employeesToProcess.map(async (employee) => {
+                try {
+                    // Get working dates for this employee's month
+                    const workingDates = await getWorkingDatesForMonth(
+                        monthIndex, 
+                        yearNum, 
+                        employee
+                    );
+                    
+                    const totalWorkingDays = workingDates.length;
+                    
+                    // Fetch attendance records for working dates only
+                    // Count unique dates where employee has check-in
+                    const attendanceLogs = await AttendanceLog.find({
+                        user: employee._id,
+                        attendanceDate: { $in: workingDates },
+                        clockInTime: { $exists: true, $ne: null }
+                    }).select('attendanceDate').lean();
+                    
+                    // Deduplicate by date (in case of multiple records per date)
+                    const presentDateSet = new Set(
+                        attendanceLogs.map(log => log.attendanceDate)
+                    );
+                    
+                    const actualWorkedDays = presentDateSet.size;
+                    const absentDays = totalWorkingDays - actualWorkedDays;
+                    
+                    return {
+                        employeeId: employee._id.toString(),
+                        employeeName: employee.fullName,
+                        employeeCode: employee.employeeCode,
+                        month: monthNum,
+                        year: yearNum,
+                        totalWorkingDays,
+                        actualWorkedDays,
+                        absentDays
+                    };
+                } catch (error) {
+                    console.error(`Error processing employee ${employee._id}:`, error);
+                    // Return error data for this employee
+                    return {
+                        employeeId: employee._id.toString(),
+                        employeeName: employee.fullName,
+                        employeeCode: employee.employeeCode,
+                        month: monthNum,
+                        year: yearNum,
+                        error: 'Failed to calculate work days'
+                    };
+                }
+            })
+        );
+        
+        // Return single object if single employee requested, array if bulk
+        if (employeeId) {
+            res.json(results[0]);
+        } else {
+            res.json(results);
+        }
+        
+    } catch (error) {
+        console.error('Error calculating actual work days:', error);
+        res.status(500).json({ 
+            error: 'Internal server error while calculating actual work days.',
             details: error.message
         });
     }

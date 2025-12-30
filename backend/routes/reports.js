@@ -160,11 +160,21 @@ router.post('/attendance', [authenticateToken, isAdminOrHr], async (req, res) =>
 
         const shiftMap = new Map(shifts.map(shift => [shift._id.toString(), shift.shiftName || 'N/A']));
 
-        // Get all holidays in date range
+        // Get all holidays in date range (exclude tentative holidays)
         const holidays = await Holiday.find({
-            date: { $gte: rangeStart, $lte: rangeEnd }
+            date: { 
+                $gte: rangeStart, 
+                $lte: rangeEnd,
+                $ne: null
+            },
+            isTentative: { $ne: true }
         }).lean();
-        const holidayDates = new Set(holidays.map(h => formatDate(h.date)));
+        const holidayDates = new Set(
+            holidays
+                .filter(h => h.date && !h.isTentative)
+                .map(h => formatDate(h.date))
+                .filter(dateStr => dateStr && dateStr !== 'Invalid Date')
+        );
 
         // Get approved leave requests for selected employees
         const leaveRequests = await LeaveRequest.find({

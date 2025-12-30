@@ -351,7 +351,14 @@ const EmployeeMusterRollPage = () => {
     
     // Check for holidays
     const holiday = holidays.find(h => {
+      // Skip tentative holidays (no date or isTentative flag)
+      if (!h.date || h.isTentative) {
+        return false;
+      }
       const holidayDate = new Date(h.date);
+      if (isNaN(holidayDate.getTime())) {
+        return false;
+      }
       return holidayDate.toLocaleDateString('en-CA') === date.toLocaleDateString('en-CA');
     });
     

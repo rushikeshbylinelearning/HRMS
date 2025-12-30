@@ -9,9 +9,73 @@ const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const LeaveRequest = require('../models/LeaveRequest');
 const Setting = require('../models/Setting'); // <-- IMPORT SETTING MODEL
+const Holiday = require('../models/Holiday');
+const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const { sendEmail } = require('../services/mailService');
 
 const router = express.Router();
+
+/**
+ * Helper function to get working dates for a date range
+ * Excludes: Sundays, Alternate Saturdays (based on employee policy), Holidays
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @param {Object} employee - Employee object with alternateSaturdayPolicy
+ * @returns {Promise<Set<string>>} Set of working dates in YYYY-MM-DD format
+ */
+const getWorkingDatesForRange = async (startDate, endDate, employee) => {
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  endDateObj.setHours(23, 59, 59, 999);
+  
+  // Get all holidays in this date range (exclude tentative holidays)
+  const holidays = await Holiday.find({
+    date: {
+      $gte: startDateObj,
+      $lte: endDateObj,
+      $ne: null
+    },
+    isTentative: { $ne: true }
+  }).lean();
+  
+  const holidayDates = new Set(
+    holidays
+      .filter(h => h.date && !h.isTentative)
+      .map(h => {
+        const d = new Date(h.date);
+        if (isNaN(d.getTime())) return null;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      })
+      .filter(dateStr => dateStr !== null)
+  );
+  
+  const saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
+  const workingDates = new Set();
+  
+  // Iterate through each day in the range
+  for (let d = new Date(startDateObj); d <= endDateObj; d.setDate(d.getDate() + 1)) {
+    const dayOfWeek = d.getDay();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
+    // Skip Sundays
+    if (dayOfWeek === 0) continue;
+    
+    // Skip alternate Saturdays based on policy
+    if (dayOfWeek === 6) {
+      if (AntiExploitationLeaveService.isOffSaturday(d, saturdayPolicy)) {
+        continue;
+      }
+    }
+    
+    // Skip holidays
+    if (holidayDates.has(dateStr)) continue;
+    
+    // It's a working day
+    workingDates.add(dateStr);
+  }
+  
+  return workingDates;
+};
 
 // Helper function to calculate analytics metrics
 const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyContextDays) => { // <-- ADDED PARAM
@@ -19,13 +83,33 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   const normalizedStartDate = typeof startDate === 'string' ? startDate : new Date(startDate).toISOString().slice(0, 10);
   const normalizedEndDate = typeof endDate === 'string' ? endDate : new Date(endDate).toISOString().slice(0, 10);
   
+  // Fetch employee to get alternateSaturdayPolicy for working days calculation
+  // This is required to determine which Saturdays are working days for this employee
+  let employee = null;
+  try {
+    employee = await User.findById(userId).select('alternateSaturdayPolicy').lean();
+  } catch (userError) {
+    console.error('Error fetching employee for working days calculation:', userError);
+    // Continue with default policy if employee fetch fails
+    employee = { alternateSaturdayPolicy: 'All Saturdays Working' };
+  }
+  
+  // Get working dates for the period (excludes Sundays, holidays, alternate off-Saturdays)
+  // This ensures we only count attendance on valid working days
+  const workingDatesSet = await getWorkingDatesForRange(normalizedStartDate, normalizedEndDate, employee);
+  
+  // Fetch all attendance logs in the date range
   const logs = await AttendanceLog.find({
     user: userId,
     attendanceDate: { $gte: normalizedStartDate, $lte: normalizedEndDate }
   }).sort({ attendanceDate: 1 });
 
+  // Filter logs to only include working days
+  // This ensures totalDays represents ACTUAL WORKED DAYS, not all attendance records
+  const workingDayLogs = logs.filter(log => workingDatesSet.has(log.attendanceDate));
+
   const metrics = {
-    totalDays: logs.length,
+    totalDays: workingDayLogs.length, // ← FIXED: Now counts only working days, not all attendance logs
     onTimeDays: 0,
     lateDays: 0,
     halfDays: 0,
@@ -46,7 +130,9 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
     console.error('Failed to fetch late grace setting for analytics derivation, using default 30 minutes', err);
   }
 
-  logs.forEach(log => {
+  // Process only working day logs for status calculations
+  // This ensures all metrics (onTimeDays, lateDays, etc.) are based on working days only
+  workingDayLogs.forEach(log => {
     // Some logs may not have attendanceStatus set (legacy or not yet processed).
     // Derive status from available fields to ensure accurate counts per employee.
     let status = log.attendanceStatus;
@@ -84,8 +170,8 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
     metrics.lateMinutes += log.lateMinutes || 0;
   });
 
-  // Calculate average working hours only for completed days
-  const completedDays = logs.filter(log => log.clockOutTime && log.totalWorkingHours).length;
+  // Calculate average working hours only for completed days (from working day logs)
+  const completedDays = workingDayLogs.filter(log => log.clockOutTime && log.totalWorkingHours).length;
   metrics.averageWorkingHours = completedDays > 0 ? (metrics.totalWorkingHours / completedDays) : 0;
   
   // Add additional metrics for better debugging
@@ -908,10 +994,12 @@ router.get('/all', authenticateToken, async (req, res) => {
       return {
         employee: {
           id: user._id,
+          _id: user._id, // Include both id and _id for compatibility
           name: user.fullName,
           email: user.email,
           department: user.department,
-          designation: user.designation
+          designation: user.designation,
+          role: user.role // Include role for frontend filtering (Intern vs Employee)
         },
         metrics,
         recentLogs
