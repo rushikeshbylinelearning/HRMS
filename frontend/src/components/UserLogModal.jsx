@@ -306,48 +306,56 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                         <CircularProgress />
                     </Box>
-                ) : !log && !holiday && !leave ? (
-                    <Alert severity="info">No attendance data available for this date.</Alert>
-                ) : !log && (holiday || leave) ? (
-                    <Box className="audit-timeline-container">
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            {holiday ? (
-                                <Box>
-                                    <Typography variant="h6" gutterBottom>
-                                        Holiday: {holiday.name}
-                                    </Typography>
-                                    {holiday.description && (
-                                        <Typography variant="body2" color="text.secondary">
-                                            {holiday.description}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            ) : leave ? (
-                                <Box>
-                                    <Typography variant="h6" gutterBottom>
-                                        Leave: {formatLeaveRequestType(leave.requestType)}
-                                    </Typography>
-                                    {leave.leaveType && (
-                                        <Box sx={{ mt: 1, mb: 1 }}>
-                                            <Chip 
-                                                label={leave.leaveType === 'Full Day' ? 'Full Day Leave' : leave.leaveType}
-                                                color={leave.leaveType === 'Full Day' ? 'primary' : 'secondary'}
-                                                variant="outlined"
-                                                sx={{ fontWeight: 600 }}
-                                            />
+                ) : (() => {
+                    // Check if there's actual attendance data (sessions exist)
+                    const hasAttendanceData = log && log.sessions && log.sessions.length > 0;
+                    
+                    if (!hasAttendanceData && (holiday || leave)) {
+                        return (
+                            <Box className="audit-timeline-container">
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    {holiday ? (
+                                        <Box>
+                                            <Typography variant="h6" gutterBottom>
+                                                Holiday: {holiday.name}
+                                            </Typography>
+                                            {holiday.description && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {holiday.description}
+                                                </Typography>
+                                            )}
                                         </Box>
-                                    )}
-                                    {leave.reason && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Reason: {leave.reason}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            ) : null}
-                        </Alert>
-                    </Box>
-                ) : (
-                    <Box className="audit-timeline-container">
+                                    ) : leave ? (
+                                        <Box>
+                                            <Typography variant="h6" gutterBottom>
+                                                Leave: {formatLeaveRequestType(leave.requestType)}
+                                            </Typography>
+                                            {leave.leaveType && (
+                                                <Box sx={{ mt: 1, mb: 1 }}>
+                                                    <Chip 
+                                                        label={leave.leaveType === 'Full Day' ? 'Full Day Leave' : leave.leaveType}
+                                                        color={leave.leaveType === 'Full Day' ? 'primary' : 'secondary'}
+                                                        variant="outlined"
+                                                        sx={{ fontWeight: 600 }}
+                                                    />
+                                                </Box>
+                                            )}
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                <strong>Reason:</strong> {leave.reason || 'No reason provided'}
+                                            </Typography>
+                                        </Box>
+                                    ) : null}
+                                </Alert>
+                            </Box>
+                        );
+                    }
+                    
+                    if (!hasAttendanceData && !holiday && !leave) {
+                        return <Alert severity="info">No attendance data available for this date.</Alert>;
+                    }
+                    
+                    return (
+                        <Box className="audit-timeline-container">
                         {/* Summary Cards */}
                         <Grid container spacing={2} className="summary-cards-container">
                             <Grid item xs={12} sm={6} md={2.4}>
@@ -527,7 +535,8 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                             </Box>
                         </Box>
                     </Box>
-                )}
+                    );
+                })()}
             </DialogContent>
         </Dialog>
     );

@@ -3,6 +3,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
 const Holiday = require('../models/Holiday');
 const AntiExploitationLeaveService = require('./antiExploitationLeaveService');
+const { parseISTDate, getTodayIST, formatDateIST, getDatePartsIST, daysDifferenceIST } = require('../utils/dateUtils');
 
 /**
  * Leave Validation Service
@@ -15,11 +16,15 @@ const AntiExploitationLeaveService = require('./antiExploitationLeaveService');
 
 class LeaveValidationService {
     /**
-     * Get half-year period for a date (First Half: Jan-Jun, Second Half: Jul-Dec)
+     * Get half-year period for a date in IST (First Half: Jan-Jun, Second Half: Jul-Dec)
      */
     static getHalfYearPeriod(date) {
-        const month = date.getMonth(); // 0-11
-        return month < 6 ? 'First Half' : 'Second Half';
+        // Get month in IST
+        const parts = getDatePartsIST(date);
+        if (!parts) return null;
+        
+        // parts.month is 1-12, so subtract 1 for comparison
+        return parts.month <= 6 ? 'First Half' : 'Second Half';
     }
 
     /**
@@ -70,17 +75,26 @@ class LeaveValidationService {
             errors.push(`Planned leaves must be applied at least ${requiredMonthsPrior} months prior to the leave start date.`);
         }
 
-        // Check half-year allocation (5 days per half)
+        // Check half-year allocation (5 days per half) - use IST dates
         const halfYearPeriod = this.getHalfYearPeriod(firstLeaveDate);
         
         // Get all approved planned leaves for the same half-year period
-        const year = firstLeaveDate.getFullYear();
+        const year = leaveParts.year;
         const halfYearStart = halfYearPeriod === 'First Half' 
-            ? new Date(year, 0, 1)  // Jan 1
-            : new Date(year, 6, 1);  // Jul 1
+            ? parseISTDate(`${year}-01-01`)  // Jan 1 in IST
+            : parseISTDate(`${year}-07-01`);  // Jul 1 in IST
         const halfYearEnd = halfYearPeriod === 'First Half'
-            ? new Date(year, 5, 30, 23, 59, 59, 999)  // Jun 30 end of day
-            : new Date(year, 11, 31, 23, 59, 59, 999); // Dec 31 end of day
+            ? parseISTDate(`${year}-06-30`)  // Jun 30 in IST
+            : parseISTDate(`${year}-12-31`); // Dec 31 in IST
+        
+        if (halfYearEnd) {
+            halfYearEnd.setHours(23, 59, 59, 999);
+        }
+        
+        if (!halfYearStart || !halfYearEnd) {
+            errors.push('Unable to calculate half-year period boundaries.');
+            return { valid: false, errors, warnings };
+        }
 
         // Find all approved planned leaves that have at least one date in this half-year
         const existingPlannedLeaves = await LeaveRequest.find({
@@ -148,13 +162,20 @@ class LeaveValidationService {
             return { valid: false, errors, warnings };
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const firstLeaveDate = new Date(leaveDates[0]);
-        firstLeaveDate.setHours(0, 0, 0, 0);
+        // Use IST for date comparisons
+        const today = getTodayIST();
+        const firstLeaveDate = parseISTDate(leaveDates[0]);
+        if (!firstLeaveDate) {
+            errors.push('Invalid leave date provided.');
+            return { valid: false, errors, warnings };
+        }
 
-        // Calculate days difference
-        const daysDiff = Math.floor((firstLeaveDate - today) / (1000 * 60 * 60 * 24));
+        // Calculate days difference using IST dates
+        const daysDiff = daysDifferenceIST(today, firstLeaveDate);
+        if (daysDiff === null) {
+            errors.push('Unable to calculate date difference.');
+            return { valid: false, errors, warnings };
+        }
 
         // Check 5 days prior rule
         if (daysDiff < 5) {
@@ -196,13 +217,19 @@ class LeaveValidationService {
             errors.push('Medical certificate is mandatory for sick leave applications.');
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const lastLeaveDate = new Date(leaveDates[leaveDates.length - 1]);
-        lastLeaveDate.setHours(0, 0, 0, 0);
+        // Use IST for date comparisons
+        const today = getTodayIST();
+        const lastLeaveDate = parseISTDate(leaveDates[leaveDates.length - 1]);
+        if (!lastLeaveDate) {
+            errors.push('Invalid leave date provided.');
+            return { valid: false, errors, warnings };
+        }
 
         // Check if applied after return (leave end date should be in the past or today)
-        const daysSinceLeaveEnd = Math.floor((today - lastLeaveDate) / (1000 * 60 * 60 * 24));
+        const daysSinceLeaveEnd = daysDifferenceIST(lastLeaveDate, today);
+        if (daysSinceLeaveEnd === null) {
+            warnings.push('Unable to verify if leave is applied after return. Please ensure you have a valid medical certificate.');
+        }
         
         if (daysSinceLeaveEnd < 0) {
             warnings.push('Sick leave is typically applied after returning to office. Please ensure you have a valid medical certificate.');
@@ -260,16 +287,41 @@ class LeaveValidationService {
             return validationResult;
         }
 
-        // Apply anti-exploitation validation rules
+        // Apply anti-exploitation validation rules (IST-ONLY)
         // These rules apply to ALL leave types (Planned, Casual, Sick, Loss of Pay, LOP)
         try {
-            // Fetch holidays for the month
-            const firstLeaveDate = new Date(leaveDates[0]);
-            const month = firstLeaveDate.getMonth();
-            const year = firstLeaveDate.getFullYear();
-            const monthStart = new Date(year, month, 1);
-            const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+            // Parse first leave date as IST
+            const firstLeaveDate = parseISTDate(leaveDates[0]);
+            if (!firstLeaveDate) {
+                validationResult.valid = false;
+                validationResult.errors = validationResult.errors || [];
+                validationResult.errors.push('Invalid leave date provided.');
+                return validationResult;
+            }
             
+            // Get month and year in IST
+            const parts = getDatePartsIST(firstLeaveDate);
+            if (!parts) {
+                validationResult.valid = false;
+                validationResult.errors = validationResult.errors || [];
+                validationResult.errors.push('Unable to determine month for leave date.');
+                return validationResult;
+            }
+            
+            const year = parts.year;
+            const month = parts.month; // 1-12
+            
+            // Calculate month boundaries in IST
+            const monthStartStr = `${year}-${String(month).padStart(2, '0')}-01`;
+            const monthStart = parseISTDate(monthStartStr);
+            const lastDay = new Date(year, month, 0).getDate();
+            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            const monthEnd = parseISTDate(monthEndStr);
+            if (monthEnd) {
+                monthEnd.setHours(23, 59, 59, 999);
+            }
+            
+            // Fetch holidays for the month (IST-aware query)
             const holidays = await Holiday.find({
                 date: {
                     $gte: monthStart,
@@ -277,9 +329,11 @@ class LeaveValidationService {
                 }
             });
 
+            // Pass leaveType to anti-exploitation service for accurate working days calculation
             const antiExploitationResult = await AntiExploitationLeaveService.validateAntiExploitation(
                 employee,
                 leaveDates,
+                leaveType, // Pass leaveType for accurate day counting
                 holidays,
                 requestType
             );

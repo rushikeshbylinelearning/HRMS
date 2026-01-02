@@ -1,6 +1,6 @@
 // src/pages/LeavesPage.jsx
 import React, { useState, useEffect, useCallback, memo, useMemo } from 'react';
-import { Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
+import { Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import CelebrationIcon from '@mui/icons-material/Celebration';
@@ -15,6 +15,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SickIcon from '@mui/icons-material/Sick';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 import BeachAccessIcon from '@mui/icons-material/BeachAccess';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import InfoIcon from '@mui/icons-material/Info';
 import DateRangeIcon from '@mui/icons-material/DateRange';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -27,16 +28,19 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import LeaveRequestForm from '../components/LeaveRequestForm';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
+import { normalizeDate, formatDateIST } from '../utils/dateUtils';
 import '../styles/LeavesPage.css';
 import { CardSkeleton, TableSkeleton } from '../components/SkeletonLoaders';
 
 // Reusable component for the small rounded balance boxes
-const BalanceBox = ({ title, balance, icon }) => (
+const BalanceBox = ({ title, balance, icon, iconBgColor, numberColor }) => (
     <Paper elevation={3} className="balance-box">
-        <Box className="balance-icon-wrapper">
-            {icon}
+        <Box className="balance-box-content">
+            <Box className="balance-icon-wrapper" sx={{ bgcolor: iconBgColor }}>
+                {icon}
+            </Box>
+            <Typography className="balance-value" sx={{ color: numberColor }}>{balance}</Typography>
         </Box>
-        <Typography className="balance-value">{balance}</Typography>
         <Typography className="balance-title">{title}</Typography>
     </Paper>
 );
@@ -61,10 +65,7 @@ const LeavesPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     
-    // Pagination state
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [totalCount, setTotalCount] = useState(0);
+    // Removed pagination state - showing all requests with scrollbar
     
     // Modal state for leave details
     const [viewDialog, setViewDialog] = useState({ open: false, request: null });
@@ -106,7 +107,7 @@ const LeavesPage = () => {
         setLoading(true);
         try {
             const [requestsRes, balancesRes, holidaysRes, carryforwardRes, featureStatusRes] = await Promise.all([
-                api.get(`/leaves/my-requests?page=${page + 1}&limit=${rowsPerPage}`),
+                api.get('/leaves/my-requests?page=1&limit=1000'), // Fetch all requests
                 api.get('/leaves/my-leave-balances'),
                 api.get('/leaves/holidays'),
                 api.get('/leaves/carryforward-status').catch(() => ({ data: { hasPendingDecision: false } })),
@@ -116,7 +117,6 @@ const LeavesPage = () => {
             // Handle paginated response for requests
             if (requestsRes.data.requests) {
                 setMyRequests(Array.isArray(requestsRes.data.requests) ? requestsRes.data.requests : []);
-                setTotalCount(requestsRes.data.totalCount || 0);
             } else {
                 setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
             }
@@ -148,7 +148,7 @@ const LeavesPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, rowsPerPage]);
+    }, []);
     
     // Get existing Year-End requests for current year
     const getExistingYearEndRequest = useCallback((leaveType) => {
@@ -225,15 +225,6 @@ const LeavesPage = () => {
         setSnackbar({ open: true, message: 'Your request has been submitted successfully!' });
         fetchPageData();
     }, [fetchPageData]);
-    
-    const handlePageChange = (event, newPage) => {
-        setPage(newPage);
-    };
-    
-    const handleRowsPerPageChange = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
-    };
     
     const handleViewDetails = (request) => {
         setViewDialog({ open: true, request });
@@ -372,7 +363,8 @@ const LeavesPage = () => {
         }
     };
 
-    const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-CA') : 'N/A';
+    // Use centralized date utility to avoid timezone issues
+    const formatDate = (dateString) => dateString ? normalizeDate(dateString) : 'N/A';
 
     const formatPrettyDate = (dateString, isTentative = false) => {
         if (!dateString || isTentative) {
@@ -421,11 +413,8 @@ const LeavesPage = () => {
         if (myRequests) {
             myRequests.forEach(req => {
                 if (req.status === 'Approved' && req.leaveDates && req.leaveDates[0]) {
-                    // Fix: Use the date directly if it's already in YYYY-MM-DD format
-                    // to avoid timezone conversion issues
-                    const dateKey = typeof req.leaveDates[0] === 'string' && req.leaveDates[0].includes('-') 
-                        ? req.leaveDates[0] 
-                        : new Date(req.leaveDates[0]).toISOString().split('T')[0];
+                    // Use centralized date utility to normalize dates consistently
+                    const dateKey = normalizeDate(req.leaveDates[0]);
                     approvedRequestsMap.set(dateKey, req);
                 }
             });
@@ -501,33 +490,35 @@ const LeavesPage = () => {
             {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
 
             {/* Header Bar */}
-            <Box className="leaves-header-bar">
-                <Box className="header-title-wrapper">
-                    <CalendarTodayIcon className="header-icon" />
-                    <Typography variant="h6" className="page-title">Leave Management</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Button className="apply-leave-button" onClick={handleOpenModal} startIcon={<AddCircleOutlineIcon />}>
-                        Apply Leave
-                    </Button>
-                    {yearEndFeatureEnabled && user?.employmentStatus === 'Permanent' && (
-                        <IconButton
-                            onClick={(e) => {
-                                setYearEndMenuAnchor(e.currentTarget);
-                            }}
-                            sx={{
-                                color: 'white',
-                                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
-                                cursor: 'pointer'
-                            }}
-                            title="Year-End Leave Options"
-                        >
-                            <MoreVertIcon />
-                        </IconButton>
-                    )}
-                </Box>
-            </Box>
+            <header className="summary-header">
+                <div className="header-left">
+                    <Typography variant="h4" component="h1" className="summary-title">
+                        Leave Management
+                    </Typography>
+                </div>
+                
+                <div className="header-center">
+                    {/* Center section can be used for future features */}
+                </div>
+                
+                <div className="header-right">
+                    <div className="action-icons">
+                        <Button className="apply-leave-button" onClick={handleOpenModal} startIcon={<AddCircleOutlineIcon />}>
+                            Apply Leave
+                        </Button>
+                        {yearEndFeatureEnabled && user?.employmentStatus === 'Permanent' && (
+                            <IconButton
+                                onClick={(e) => {
+                                    setYearEndMenuAnchor(e.currentTarget);
+                                }}
+                                title="Year-End Leave Options"
+                            >
+                                <MoreVertIcon />
+                            </IconButton>
+                        )}
+                    </div>
+                </div>
+            </header>
             
             {/* Year-End Menu */}
             <Menu
@@ -557,17 +548,23 @@ const LeavesPage = () => {
                 <BalanceBox 
                     title="Sick Leave" 
                     balance={leaveBalances.sick} 
-                    icon={<SickIcon className="balance-icon" />}
+                    icon={<FavoriteIcon className="balance-icon" />}
+                    iconBgColor="#00897b"
+                    numberColor="#00695c"
                 />
                 <BalanceBox 
                     title="Casual Leave" 
                     balance={leaveBalances.casual} 
-                    icon={<WorkOutlineIcon className="balance-icon" />}
+                    icon={<CalendarTodayIcon className="balance-icon" />}
+                    iconBgColor="#ff9800"
+                    numberColor="#ff9800"
                 />
                 <BalanceBox 
                     title="Planned Leave" 
                     balance={leaveBalances.paid} 
                     icon={<BeachAccessIcon className="balance-icon" />}
+                    iconBgColor="#d32f2f"
+                    numberColor="#d32f2f"
                 />
             </Box>
 
@@ -651,59 +648,46 @@ const LeavesPage = () => {
                             </Typography>
                         </Box>
                     ) : (
-                        <>
-                            <TableContainer className="table-container">
-                                <Table stickyHeader aria-label="leave requests table">
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>S.No</TableCell>
-                                            <TableCell>Status</TableCell>
-                                            <TableCell>Request Type</TableCell>
-                                            <TableCell>Leave Type</TableCell>
-                                            <TableCell>Date(s)</TableCell>
+                        <TableContainer className="table-container">
+                            <Table stickyHeader aria-label="leave requests table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>S.No</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Request Type</TableCell>
+                                        <TableCell>Leave Type</TableCell>
+                                        <TableCell>Date(s)</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {myRequests.map((row, index) => (
+                                        <TableRow 
+                                            key={row._id} 
+                                            hover 
+                                            onClick={() => handleViewDetails(row)}
+                                            className="table-row-clickable"
+                                        >
+                                            <TableCell>{index + 1}</TableCell>
+                                            <TableCell>
+                                                <Chip label={row.status} className={`status-chip ${statusStyles[row.status] || ''}`} />
+                                            </TableCell>
+                                            <TableCell>{formatLeaveRequestType(row.requestType)}</TableCell>
+                                            <TableCell>{row.leaveType}</TableCell>
+                                            <TableCell>
+                                                {row.requestType === 'Compensatory' && row.alternateDate ? (
+                                                    <Box>
+                                                        <Typography variant="body2" component="div"><strong>Leave:</strong> {formatDate(row.leaveDates[0])}</Typography>
+                                                        <Typography variant="caption" color="textSecondary"><strong>Work:</strong> {formatDate(row.alternateDate)}</Typography>
+                                                    </Box>
+                                                ) : (
+                                                    row.leaveDates.map(formatDate).join(', ')
+                                                )}
+                                            </TableCell>
                                         </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {myRequests.map((row, index) => (
-                                            <TableRow 
-                                                key={row._id} 
-                                                hover 
-                                                onClick={() => handleViewDetails(row)}
-                                                className="table-row-clickable"
-                                            >
-                                                <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                                                <TableCell>
-                                                    <Chip label={row.status} className={`status-chip ${statusStyles[row.status] || ''}`} />
-                                                </TableCell>
-                                                <TableCell>{formatLeaveRequestType(row.requestType)}</TableCell>
-                                                <TableCell>{row.leaveType}</TableCell>
-                                                <TableCell>
-                                                    {row.requestType === 'Compensatory' && row.alternateDate ? (
-                                                        <Box>
-                                                            <Typography variant="body2" component="div"><strong>Leave:</strong> {formatDate(row.leaveDates[0])}</Typography>
-                                                            <Typography variant="caption" color="textSecondary"><strong>Work:</strong> {formatDate(row.alternateDate)}</Typography>
-                                                        </Box>
-                                                    ) : (
-                                                        row.leaveDates.map(formatDate).join(', ')
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                            
-                            <TablePagination
-                                rowsPerPageOptions={[5, 10, 25, 50]}
-                                component="div"
-                                count={totalCount}
-                                rowsPerPage={rowsPerPage}
-                                page={page}
-                                onPageChange={handlePageChange}
-                                onRowsPerPageChange={handleRowsPerPageChange}
-                                className="table-pagination"
-                            />
-                        </>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                     )}
                 </ContentCard>
 

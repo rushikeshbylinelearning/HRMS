@@ -2,13 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Stack, Divider, Box, Typography,
+    Select, MenuItem, InputLabel, FormControl, CircularProgress, Stack, Box, Typography,
     Autocomplete
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 const initialFormState = {
@@ -33,8 +32,12 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     employee: request.employee?._id || '',
                     requestType: request.requestType || 'Planned',
                     leaveType: request.leaveType || 'Full Day',
-                    leaveDates: request.leaveDates?.map(d => new Date(d)) || [null],
-                    alternateDate: request.alternateDate ? new Date(request.alternateDate) : null,
+                    leaveDates: request.leaveDates?.map(d => {
+                        // Parse date - backend sends as Date object or ISO string
+                        // Frontend DatePicker expects Date object
+                        return d instanceof Date ? d : (d ? new Date(d) : null);
+                    }).filter(d => d !== null) || [null],
+                    alternateDate: request.alternateDate ? (request.alternateDate instanceof Date ? request.alternateDate : new Date(request.alternateDate)) : null,
                     reason: request.reason || '',
                     status: request.status || 'Pending',
                 });
@@ -76,57 +79,32 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
             maxWidth="sm" 
             PaperProps={{ 
                 sx: { 
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
+                    borderRadius: '12px',
+                    backgroundColor: '#ffffff',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
                 } 
             }}
         >
-            {/* Header */}
+            {/* Header with Red Accent */}
             <DialogTitle sx={{ 
-                background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
-                color: '#ffffff', 
-                fontWeight: 'bold',
-                fontSize: '1.375rem',
+                backgroundColor: '#ffffff',
+                color: '#212121', 
+                fontWeight: 600,
+                fontSize: '1.25rem',
                 py: 2.5,
                 px: 3,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                position: 'relative',
-                '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '3px',
-                    background: 'rgba(255,255,255,0.2)'
-                }
+                borderBottom: '2px solid #dc3545',
+                position: 'relative'
             }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <EditCalendarOutlinedIcon sx={{ color: '#ffffff', fontSize: '1.5rem' }} />
-                    <Typography 
-                        variant="h6" 
-                        sx={{ 
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            fontSize: '1.375rem',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                    >
-                        {isEditing ? 'Edit Leave Request' : 'Log New Leave Request'}
-                    </Typography>
-                </Box>
+                {isEditing ? 'Edit Leave Request' : 'New Leave Request'}
             </DialogTitle>
 
             <DialogContent sx={{ 
                 backgroundColor: '#ffffff',
-                p: '20px',
-                '&.MuiDialogContent-root': {
-                    paddingTop: '20px'
-                }
+                p: 3
             }}>
-                <Stack spacing={2}>
-                    {/* Employee Dropdown with Search */}
+                <Stack spacing={3}>
+                    {/* Employee Selection */}
                     <Autocomplete
                         options={employees}
                         getOptionLabel={(option) => `${option.fullName} (${option.employeeCode})`}
@@ -136,19 +114,17 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         }}
                         disabled={!employees.length}
                         loading={!employees.length}
-                        aria-label="Select employee"
                         renderInput={(params) => (
                             <TextField
                                 {...params}
                                 label="Employee"
                                 required
-                                aria-required="true"
+                                variant="outlined"
                                 sx={{
                                     '& .MuiOutlinedInput-root': {
-                                        borderRadius: '8px',
+                                        backgroundColor: '#ffffff',
                                         '& fieldset': {
-                                            borderColor: selectedEmployee ? '#dc3545' : '#d0d0d0',
-                                            borderWidth: selectedEmployee ? '2px' : '1px'
+                                            borderColor: '#d0d0d0'
                                         },
                                         '&:hover fieldset': {
                                             borderColor: '#dc3545'
@@ -164,56 +140,36 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                 }}
                             />
                         )}
-                        sx={{
-                            '& .MuiAutocomplete-inputRoot': {
-                                paddingTop: '8px !important',
-                                paddingBottom: '8px !important'
-                            }
-                        }}
                     />
-                    {/* Request Type & Leave Type - Side by Side */}
+
+                    {/* Request Type & Leave Type */}
                     <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth required>
-                                <InputLabel 
-                                    id="request-type-label"
-                                    sx={{ 
-                                        color: '#6c757d', 
-                                        '&.Mui-focused': { color: '#dc3545' } 
-                                    }}
-                                >
-                                    Request Type *
-                                </InputLabel>
+                                <InputLabel id="request-type-label" sx={{ '&.Mui-focused': { color: '#dc3545' } }}>Request Type</InputLabel>
                                 <Select 
                                     name="requestType" 
                                     labelId="request-type-label"
-                                    label="Request Type *" 
+                                    label="Request Type" 
                                     value={formData.requestType} 
                                     onChange={handleChange}
-                                    aria-label="Request type"
-                                    aria-required="true"
                                     sx={{
-                                        borderRadius: '8px',
+                                        backgroundColor: '#ffffff',
                                         '& .MuiOutlinedInput-notchedOutline': {
                                             borderColor: '#d0d0d0'
                                         },
                                         '&:hover .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
+                                            borderColor: '#dc3545'
                                         },
                                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                                             borderColor: '#dc3545',
                                             borderWidth: '2px'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
                                         }
                                     }}
                                 >
                                     <MenuItem value="Planned">Planned Leave</MenuItem>
                                     <MenuItem value="Sick">Sick Leave</MenuItem>
+                                    <MenuItem value="Casual">Casual Leave</MenuItem>
                                     <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
                                     <MenuItem value="Compensatory">Compensatory</MenuItem>
                                     <MenuItem value="Backdated Leave">Backdated Leave</MenuItem>
@@ -222,40 +178,24 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth required>
-                                <InputLabel 
-                                    id="leave-type-label"
-                                    sx={{ 
-                                        color: '#6c757d', 
-                                        '&.Mui-focused': { color: '#dc3545' } 
-                                    }}
-                                >
-                                    Leave Type *
-                                </InputLabel>
+                                <InputLabel id="leave-type-label" sx={{ '&.Mui-focused': { color: '#dc3545' } }}>Leave Type</InputLabel>
                                 <Select 
                                     name="leaveType" 
                                     labelId="leave-type-label"
-                                    label="Leave Type *" 
+                                    label="Leave Type" 
                                     value={formData.leaveType} 
                                     onChange={handleChange}
-                                    aria-label="Leave type"
-                                    aria-required="true"
                                     sx={{
-                                        borderRadius: '8px',
+                                        backgroundColor: '#ffffff',
                                         '& .MuiOutlinedInput-notchedOutline': {
                                             borderColor: '#d0d0d0'
                                         },
                                         '&:hover .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
+                                            borderColor: '#dc3545'
                                         },
                                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                                             borderColor: '#dc3545',
                                             borderWidth: '2px'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
                                         }
                                     }}
                                 >
@@ -266,40 +206,36 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             </FormControl>
                         </Grid>
                     </Grid>
-                    {/* Leave Date with Calendar Icon */}
+
+                    {/* Leave Date */}
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                         <DatePicker 
-                            label="Leave Date *" 
+                            label="Leave Date" 
                             value={formData.leaveDates[0]} 
                             onChange={handleDateChange}
                             slotProps={{
                                 textField: {
                                     fullWidth: true,
                                     required: true,
-                                    placeholder: 'Select Date',
-                                    'aria-label': 'Leave date',
-                                    'aria-required': 'true',
+                                    variant: "outlined",
                                     InputProps: {
                                         endAdornment: (
                                             <CalendarTodayIcon 
                                                 sx={{ 
                                                     color: '#dc3545',
-                                                    mr: 1,
-                                                    pointerEvents: 'none'
+                                                    mr: 1
                                                 }} 
                                             />
                                         )
                                     },
                                     sx: {
-                                        borderRadius: '8px',
+                                        backgroundColor: '#ffffff',
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: '8px',
                                             '& fieldset': {
                                                 borderColor: '#d0d0d0'
                                             },
                                             '&:hover fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
+                                                borderColor: '#dc3545'
                                             },
                                             '&.Mui-focused fieldset': {
                                                 borderColor: '#dc3545',
@@ -314,46 +250,41 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             }}
                         />
                     </LocalizationProvider>
+
+                    {/* Alternate Date for Compensatory */}
                     {formData.requestType === 'Compensatory' && (
                         <LocalizationProvider dateAdapter={AdapterDateFns}>
                             <DatePicker 
-                                label="Alternate Date *" 
+                                label="Alternate Date" 
                                 value={formData.alternateDate} 
                                 onChange={handleAlternateDateChange}
                                 slotProps={{
                                     textField: {
                                         fullWidth: true,
                                         required: true,
-                                        placeholder: 'Select Date',
+                                        variant: "outlined",
                                         InputProps: {
                                             endAdornment: (
                                                 <CalendarTodayIcon 
                                                     sx={{ 
-                                                        color: '#dc3545',
-                                                        mr: 1,
-                                                        pointerEvents: 'none'
+                                                        color: '#757575',
+                                                        mr: 1
                                                     }} 
                                                 />
                                             )
                                         },
                                         sx: {
-                                            borderRadius: '8px',
+                                            backgroundColor: '#ffffff',
                                             '& .MuiOutlinedInput-root': {
-                                                borderRadius: '8px',
                                                 '& fieldset': {
                                                     borderColor: '#d0d0d0'
                                                 },
                                                 '&:hover fieldset': {
-                                                    borderColor: '#dc3545',
-                                                    borderWidth: '2px'
+                                                    borderColor: '#9e9e9e'
                                                 },
                                                 '&.Mui-focused fieldset': {
-                                                    borderColor: '#dc3545',
-                                                    borderWidth: '2px'
+                                                    borderColor: '#616161'
                                                 }
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
                                             }
                                         }
                                     }
@@ -361,10 +292,11 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             />
                         </LocalizationProvider>
                     )}
-                    {/* Reason Textarea */}
+
+                    {/* Reason */}
                     <TextField 
                         name="reason" 
-                        label="Reason *" 
+                        label="Reason" 
                         multiline 
                         rows={3} 
                         value={formData.reason} 
@@ -372,18 +304,15 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         fullWidth 
                         required
                         placeholder="Enter reason for leave"
-                        aria-label="Reason for leave"
-                        aria-required="true"
+                        variant="outlined"
                         sx={{
-                            borderRadius: '8px',
+                            backgroundColor: '#ffffff',
                             '& .MuiOutlinedInput-root': {
-                                borderRadius: '8px',
                                 '& fieldset': {
                                     borderColor: '#d0d0d0'
                                 },
                                 '&:hover fieldset': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
+                                    borderColor: '#dc3545'
                                 },
                                 '&.Mui-focused fieldset': {
                                     borderColor: '#dc3545',
@@ -395,33 +324,23 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             }
                         }}
                     />
-                    {/* Status Dropdown with Color Coding */}
+
+                    {/* Status */}
                     <FormControl fullWidth required>
-                        <InputLabel 
-                            id="status-label"
-                            sx={{ 
-                                color: '#6c757d', 
-                                '&.Mui-focused': { color: '#dc3545' } 
-                            }}
-                        >
-                            Status *
-                        </InputLabel>
+                        <InputLabel id="status-label" sx={{ '&.Mui-focused': { color: '#dc3545' } }}>Status</InputLabel>
                         <Select 
                             name="status" 
                             labelId="status-label"
-                            label="Status *" 
+                            label="Status" 
                             value={formData.status} 
                             onChange={handleChange}
-                            aria-label="Leave request status"
-                            aria-required="true"
                             sx={{
-                                borderRadius: '8px',
+                                backgroundColor: '#ffffff',
                                 '& .MuiOutlinedInput-notchedOutline': {
                                     borderColor: '#d0d0d0'
                                 },
                                 '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
+                                    borderColor: '#dc3545'
                                 },
                                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                                     borderColor: '#dc3545',
@@ -429,119 +348,35 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                 }
                             }}
                         >
-                            <MenuItem 
-                                value="Pending"
-                                sx={{
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 193, 7, 0.1)'
-                                    },
-                                    '&.Mui-selected': {
-                                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                                        '&:hover': {
-                                            backgroundColor: 'rgba(255, 193, 7, 0.3)'
-                                        }
-                                    }
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box 
-                                        sx={{ 
-                                            width: 12, 
-                                            height: 12, 
-                                            borderRadius: '50%', 
-                                            backgroundColor: '#ffc107' 
-                                        }} 
-                                    />
-                                    Pending
-                                </Box>
-                            </MenuItem>
-                            <MenuItem 
-                                value="Approved"
-                                sx={{
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(40, 167, 69, 0.1)'
-                                    },
-                                    '&.Mui-selected': {
-                                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                                        '&:hover': {
-                                            backgroundColor: 'rgba(40, 167, 69, 0.3)'
-                                        }
-                                    }
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box 
-                                        sx={{ 
-                                            width: 12, 
-                                            height: 12, 
-                                            borderRadius: '50%', 
-                                            backgroundColor: '#28a745' 
-                                        }} 
-                                    />
-                                    Approved
-                                </Box>
-                            </MenuItem>
-                            <MenuItem 
-                                value="Rejected"
-                                sx={{
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(220, 53, 69, 0.1)'
-                                    },
-                                    '&.Mui-selected': {
-                                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
-                                        '&:hover': {
-                                            backgroundColor: 'rgba(220, 53, 69, 0.3)'
-                                        }
-                                    }
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box 
-                                        sx={{ 
-                                            width: 12, 
-                                            height: 12, 
-                                            borderRadius: '50%', 
-                                            backgroundColor: '#dc3545' 
-                                        }} 
-                                    />
-                                    Rejected
-                                </Box>
-                            </MenuItem>
+                            <MenuItem value="Pending">Pending</MenuItem>
+                            <MenuItem value="Approved">Approved</MenuItem>
+                            <MenuItem value="Rejected">Rejected</MenuItem>
                         </Select>
                     </FormControl>
                 </Stack>
             </DialogContent>
 
-            {/* Footer Actions */}
+            {/* Simple Footer Actions */}
             <DialogActions sx={{ 
-                p: '20px',
+                p: 3,
                 backgroundColor: '#ffffff',
                 borderTop: '1px solid #e0e0e0',
-                justifyContent: 'flex-end',
-                gap: 2,
-                flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                gap: 2
             }}>
                 <Button 
                     onClick={onClose}
                     variant="outlined"
                     sx={{
-                        color: '#dc3545',
-                        borderColor: '#dc3545',
-                        borderWidth: '1.5px',
+                        color: '#424242',
+                        borderColor: '#d0d0d0',
                         px: 3,
-                        py: 1.25,
-                        minWidth: { xs: '100%', sm: '100px' },
-                        borderRadius: '8px',
-                        fontWeight: 500,
+                        py: 1,
                         textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        transition: 'all 0.2s ease-in-out',
+                        fontWeight: 500,
                         '&:hover': {
-                            backgroundColor: '#fff5f5',
                             borderColor: '#dc3545',
-                            borderWidth: '1.5px',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.15)'
+                            color: '#dc3545',
+                            backgroundColor: '#fff5f5'
                         }
                     }}
                 >
@@ -552,35 +387,22 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     variant="contained" 
                     disabled={isSaving} 
                     sx={{ 
-                        minWidth: { xs: '100%', sm: '120px' },
                         backgroundColor: '#dc3545',
                         color: '#ffffff',
-                        fontWeight: 600,
-                        px: 4,
-                        py: 1.25,
-                        borderRadius: '8px',
+                        px: 3,
+                        py: 1,
                         textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        boxShadow: '0 2px 8px rgba(220, 53, 69, 0.3)',
-                        transition: 'all 0.2s ease-in-out',
+                        fontWeight: 500,
                         '&:hover': {
-                            backgroundColor: '#c82333',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.4)'
-                        },
-                        '&:active': {
-                            transform: 'translateY(0)',
-                            boxShadow: '0 2px 6px rgba(220, 53, 69, 0.3)'
+                            backgroundColor: '#c82333'
                         },
                         '&.Mui-disabled': {
-                            backgroundColor: '#cccccc',
-                            color: '#666666',
-                            boxShadow: 'none',
-                            transform: 'none'
+                            backgroundColor: '#e0e0e0',
+                            color: '#9e9e9e'
                         }
                     }}
                 >
-                    {isSaving ? <CircularProgress size={24} sx={{ color: '#ffffff' }} /> : 'Save'}
+                    {isSaving ? <CircularProgress size={20} sx={{ color: '#ffffff' }} /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

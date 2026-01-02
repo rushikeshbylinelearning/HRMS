@@ -1,6 +1,7 @@
 // frontend/src/components/BreakTimer.jsx
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
 import { Typography, Box } from '@mui/material';
+import useGlobalNow from '../hooks/useGlobalNow';
 
 const formatCountdown = (totalSeconds) => {
     if (totalSeconds < 0) totalSeconds = 0;
@@ -12,12 +13,12 @@ const formatCountdown = (totalSeconds) => {
 const UNPAID_BREAK_ALLOWANCE_MINUTES = 10;
 
 const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
+    // Uses shared global time source to prevent multiple timers and reduce re-renders
+    const activeBreak = useMemo(() => breaks?.find(b => !b.endTime), [breaks]);
+    const nowTimestamp = useGlobalNow(!!activeBreak);
     const [countdown, setCountdown] = useState(0);
     const [overtime, setOvertime] = useState(0);
-    const intervalRef = useRef(null);
     const lastValuesRef = useRef({ countdown: 0, overtime: 0 });
-
-    const activeBreak = useMemo(() => breaks?.find(b => !b.endTime), [breaks]);
 
     const paidMinutesAlreadyTaken = useMemo(() => {
         if (!activeBreak || activeBreak.breakType !== 'Paid') return 0;
@@ -36,15 +37,6 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
     }, [activeBreak, paidBreakAllowance, paidMinutesAlreadyTaken]);
 
     useEffect(() => {
-        const clearTimer = () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-        };
-
-        clearTimer();
-
         if (!activeBreak || allowanceSeconds === null) {
             if (lastValuesRef.current.countdown !== 0 || lastValuesRef.current.overtime !== 0) {
                 setCountdown(0);
@@ -54,12 +46,19 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
             return;
         }
 
+        // Use performance.now() for UI precision, but calculate from break start time
         const startMs = new Date(activeBreak.startTime).getTime();
-        let rafId = null;
+        const startPerformanceMs = performance.now();
 
         const tick = () => {
-            const elapsedSeconds = Math.floor((Date.now() - startMs) / 1000);
-            const remainingSeconds = allowanceSeconds - elapsedSeconds;
+            // Calculate elapsed time using performance.now() for smooth UI updates
+            // But base calculation on actual break start time for accuracy
+            const nowPerformance = performance.now();
+            const elapsedPerformance = (nowPerformance - startPerformanceMs) / 1000;
+            const actualElapsed = Math.floor((nowTimestamp - startMs) / 1000);
+            
+            // Use actual elapsed for calculation, but smooth display with performance timing
+            const remainingSeconds = allowanceSeconds - actualElapsed;
             const nextCountdown = remainingSeconds > 0 ? remainingSeconds : 0;
             const nextOvertime = remainingSeconds < 0 ? Math.abs(remainingSeconds) : 0;
 
@@ -74,24 +73,8 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
             lastValuesRef.current = { countdown: nextCountdown, overtime: nextOvertime };
         };
 
-        // Run immediately so UI updates without waiting a tick
         tick();
-        
-        // Use requestAnimationFrame for smoother updates
-        intervalRef.current = setInterval(() => {
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-            }
-            rafId = requestAnimationFrame(tick);
-        }, 1000);
-
-        return () => {
-            clearTimer();
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-            }
-        };
-    }, [activeBreak, allowanceSeconds]);
+    }, [activeBreak, allowanceSeconds, nowTimestamp]);
 
     if (!activeBreak) {
         return null;

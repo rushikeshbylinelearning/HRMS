@@ -1,14 +1,15 @@
 // frontend/src/components/WorkTimeTracker.jsx
 import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Typography, Box, Stack } from '@mui/material';
+import useGlobalNow from '../hooks/useGlobalNow';
 
 const formatTimeUnit = (value) => String(value).padStart(2, '0');
 
 const WorkTimeTracker = ({ sessions, breaks, status }) => {
+    // Uses shared global time source to prevent multiple timers and reduce re-renders
+    const nowTimestamp = useGlobalNow(status === 'Clocked In');
     const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
-    const intervalRef = useRef(null);
     const lastTimeRef = useRef({ hours: 0, minutes: 0, seconds: 0 });
-    const displayRef = useRef(null);
 
     const calculateWorkTime = useCallback(() => {
         if (!sessions || sessions.length === 0) {
@@ -20,7 +21,7 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
             return;
         }
 
-        const now = new Date();
+        const now = new Date(nowTimestamp);
         // Calculate total time within all work sessions
         const grossTimeMs = sessions.reduce((total, s) => {
             const start = new Date(s.startTime);
@@ -52,43 +53,11 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
             lastTimeRef.current = newTime;
             setTime(newTime);
         }
-    }, [sessions, breaks]);
+    }, [sessions, breaks, nowTimestamp]);
 
     useEffect(() => {
-        // Clear any existing interval
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-
-        // Calculate immediately
         calculateWorkTime();
-
-        // The interval should ONLY run if the status is 'Clocked In'.
-        // When on break, the timer will "pause" because the interval is cleared.
-        if (status === 'Clocked In') {
-            intervalRef.current = setInterval(() => {
-                // Use requestAnimationFrame for smooth updates
-                if (displayRef.current) {
-                    cancelAnimationFrame(displayRef.current);
-                }
-                displayRef.current = requestAnimationFrame(() => {
-                    calculateWorkTime();
-                });
-            }, 1000);
-        }
-
-        return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-            if (displayRef.current) {
-                cancelAnimationFrame(displayRef.current);
-                displayRef.current = null;
-            }
-        };
-    }, [status, calculateWorkTime]);
+    }, [calculateWorkTime]);
 
     const TimeBlock = ({ value, label }) => (
         <Box sx={{ textAlign: 'center' }}>

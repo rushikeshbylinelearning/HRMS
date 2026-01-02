@@ -100,6 +100,32 @@
 .admin-leaves-page .table-container {
   max-height: calc(100vh - 450px); /* Adjust based on your layout */
   overflow-x: hidden; /* Prevent horizontal scrollbar */
+  overflow-y: auto; /* Enable vertical scrollbar */
+}
+
+/* Custom scrollbar styling for the table container */
+.admin-leaves-page .table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-leaves-page .table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.admin-leaves-page .table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.admin-leaves-page .table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Firefox scrollbar styling */
+.admin-leaves-page .table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
 }
 
 .admin-leaves-page .requests-table-head .MuiTableCell-root {

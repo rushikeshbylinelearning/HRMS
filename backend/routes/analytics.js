@@ -12,6 +12,8 @@ const Setting = require('../models/Setting'); // <-- IMPORT SETTING MODEL
 const Holiday = require('../models/Holiday');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const { sendEmail } = require('../services/mailService');
+const { determineHalfDayStatus } = require('../services/halfDayService');
+const { formatDateIST, getTodayIST, parseISTDate, addMonthsIST } = require('../utils/dateUtils');
 
 const router = express.Router();
 
@@ -80,8 +82,8 @@ const getWorkingDatesForRange = async (startDate, endDate, employee) => {
 // Helper function to calculate analytics metrics
 const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyContextDays) => { // <-- ADDED PARAM
   // Ensure dates are in YYYY-MM-DD format (string comparison for MongoDB)
-  const normalizedStartDate = typeof startDate === 'string' ? startDate : new Date(startDate).toISOString().slice(0, 10);
-  const normalizedEndDate = typeof endDate === 'string' ? endDate : new Date(endDate).toISOString().slice(0, 10);
+  const normalizedStartDate = typeof startDate === 'string' ? startDate : formatDateIST(parseISTDate(startDate));
+  const normalizedEndDate = typeof endDate === 'string' ? endDate : formatDateIST(parseISTDate(endDate));
   
   // Fetch employee to get alternateSaturdayPolicy for working days calculation
   // This is required to determine which Saturdays are working days for this employee
@@ -201,11 +203,12 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   }
 
   // Calculate total leave days for the requested period
+  // Use string comparison (YYYY-MM-DD) to avoid timezone issues
   let totalLeaveDays = 0;
   leaveRequests.forEach(leave => {
     const leaveDaysInPeriod = leave.leaveDates.filter(date => {
-      const leaveDate = new Date(date);
-      return leaveDate >= startDateObj && leaveDate <= endDateObj;
+      const leaveDateStr = formatDateIST(date);
+      return leaveDateStr && leaveDateStr >= normalizedStartDate && leaveDateStr <= normalizedEndDate;
     }).length;
     totalLeaveDays += leaveDaysInPeriod;
   });
@@ -228,10 +231,12 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   }
 
   let totalLeaveDaysYTD = 0;
+  const ytdStartStr = formatDateIST(ytdStart);
+  const todayDateStr = formatDateIST(todayDate);
   leaveRequestsYTD.forEach(leave => {
     totalLeaveDaysYTD += leave.leaveDates.filter(d => {
-      const ld = new Date(d);
-      return ld >= ytdStart && ld <= todayDate;
+      const leaveDateStr = formatDateIST(d);
+      return leaveDateStr && leaveDateStr >= ytdStartStr && leaveDateStr <= todayDateStr;
     }).length;
   });
 
@@ -279,54 +284,26 @@ const getShiftDateTimeIST = (onDate, shiftTime) => {
 const checkAndUpdateLateStatus = async (attendanceLog, user) => {
   if (!user.shiftGroup || !user.shiftGroup.startTime) return;
 
-  const clockInTime = new Date(attendanceLog.clockInTime);
-  
-  // Use the proper timezone-aware function to get shift start time
-  const shiftStartTime = getShiftDateTimeIST(clockInTime, user.shiftGroup.startTime);
-  
-  const lateMinutes = Math.max(0, Math.floor((clockInTime - shiftStartTime) / (1000 * 60)));
-  
-  let isLate = false;
-  let isHalfDay = false;
-  let attendanceStatus = 'On-time';
-  // Grace period: configurable via settings (default 30 minutes)
-  let GRACE_PERIOD_MINUTES = 30;
-  try {
-    const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-    if (graceSetting && !isNaN(Number(graceSetting.value))) {
-      GRACE_PERIOD_MINUTES = Number(graceSetting.value);
-    }
-  } catch (err) {
-    console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
-  }
+  // Reload attendance log as document for unified service
+  const logDoc = await AttendanceLog.findById(attendanceLog._id);
+  if (!logDoc) return;
 
-  // Consistent rules:
-  // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
-  // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day
-  // - Employee is always present if they clocked in (never absent)
-  // Grace period allows employees to arrive late without penalty
-  if (lateMinutes <= GRACE_PERIOD_MINUTES) {
-    isLate = false;
-    isHalfDay = false;
-    attendanceStatus = 'On-time';
-  } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
-    isHalfDay = true;
-    isLate = false;
-    attendanceStatus = 'Half-day';
-  }
-
-  // Update the attendance log
-  await AttendanceLog.findByIdAndUpdate(attendanceLog._id, {
-    isLate,
-    isHalfDay,
-    lateMinutes,
-    attendanceStatus
+  // Use unified half-day detection service
+  const halfDayResult = await determineHalfDayStatus(logDoc, {
+    user: user,
+    shift: user.shiftGroup,
+    skipNotifications: false, // Send notifications
+    source: 'analytics'
   });
+
+  // Update isLate flag based on lateMinutes (for backward compatibility)
+  const isLate = halfDayResult.lateMinutes > 0 && !halfDayResult.isHalfDay;
 
   // Send email notification if late and not already sent
   if (isLate && !attendanceLog.lateNotificationSent) {
     try {
       // Convert minutes to hours and minutes for better readability
+      const lateMinutes = halfDayResult.lateMinutes;
       const lateHours = Math.floor(lateMinutes / 60);
       const remainingMinutes = lateMinutes % 60;
       const lateTimeText = lateHours > 0 
@@ -359,7 +336,7 @@ const checkAndUpdateLateStatus = async (attendanceLog, user) => {
             </div>
 
             <!-- Policy Notification -->
-            ${isHalfDay ? `
+            ${halfDayResult.isHalfDay && halfDayResult.source === 'late' ? `
             <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
               <div style="display: flex; align-items: center;">
                 <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-right: 10px;">
@@ -392,7 +369,11 @@ const checkAndUpdateLateStatus = async (attendanceLog, user) => {
       
       // Mark that notification has been sent
       await AttendanceLog.findByIdAndUpdate(attendanceLog._id, {
-        lateNotificationSent: true
+        lateNotificationSent: true,
+        isLate,
+        isHalfDay: halfDayResult.isHalfDay,
+        lateMinutes: halfDayResult.lateMinutes,
+        attendanceStatus: halfDayResult.attendanceStatus
       });
       
       console.log(`Late login notification sent to ${user.email} for ${attendanceLog.attendanceDate}`);
@@ -431,8 +412,8 @@ router.get('/monthly-overview', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: { $in: userIds },
         attendanceDate: { 
-          $gte: monthStart.toISOString().slice(0, 10),
-          $lte: monthEnd.toISOString().slice(0, 10)
+          $gte: formatDateIST(monthStart),
+          $lte: formatDateIST(monthEnd)
         }
       }).populate('user', 'fullName email department').lean();
       
@@ -466,7 +447,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const targetDate = date || formatDateIST(getTodayIST());
     
     // Get all active users
     const users = await User.find({ isActive: true }).lean();
@@ -593,10 +574,11 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
 
     // Default to last 3 months if no dates provided to get more data
     // Use IST timezone for consistent date calculations
-    const now = new Date();
-    const nowIST = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-    const defaultStartDate = new Date(nowIST.getFullYear(), nowIST.getMonth() - 3, 1).toISOString().slice(0, 10);
-    const defaultEndDate = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const nowIST = getTodayIST();
+    const firstDayOfThreeMonthsAgo = new Date(nowIST.getFullYear(), nowIST.getMonth() - 3, 1);
+    const lastDayOfCurrentMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
+    const defaultStartDate = formatDateIST(firstDayOfThreeMonthsAgo);
+    const defaultEndDate = formatDateIST(lastDayOfCurrentMonth);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -828,8 +810,8 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const weekLogs = await AttendanceLog.find({
         user: id,
         attendanceDate: { 
-          $gte: weekStart.toISOString().slice(0, 10),
-          $lte: weekEnd.toISOString().slice(0, 10)
+          $gte: formatDateIST(weekStart),
+          $lte: formatDateIST(weekEnd)
         }
       });
       
@@ -858,8 +840,8 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: id,
         attendanceDate: { 
-          $gte: monthStart.toISOString().slice(0, 10),
-          $lte: monthEnd.toISOString().slice(0, 10)
+          $gte: formatDateIST(monthStart),
+          $lte: formatDateIST(monthEnd)
         }
       });
       
@@ -919,9 +901,11 @@ router.get('/all', authenticateToken, async (req, res) => {
     }
 
     // Default to current month if no dates provided
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const nowIST = getTodayIST();
+    const firstDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
+    const lastDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
+    const defaultStartDate = formatDateIST(firstDayOfMonth);
+    const defaultEndDate = formatDateIST(lastDayOfMonth);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -1353,9 +1337,11 @@ router.get('/export', authenticateToken, async (req, res) => {
     }
 
     // Default to current month if no dates provided
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const nowIST = getTodayIST();
+    const firstDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
+    const lastDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
+    const defaultStartDate = formatDateIST(firstDayOfMonth);
+    const defaultEndDate = formatDateIST(lastDayOfMonth);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;

@@ -14,4 +14,16 @@ const attendanceSessionSchema = new mongoose.Schema({
   isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
 }, { timestamps: true });
 
+// CRITICAL: Unique partial index to prevent duplicate active sessions per AttendanceLog
+// This ensures at database level that only ONE session with endTime = null exists per attendanceLog
+// This prevents race conditions where multiple clock-in requests create duplicate sessions
+attendanceSessionSchema.index(
+  { attendanceLog: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { endTime: null },
+    name: 'unique_active_session_per_log'
+  }
+);
+
 module.exports = mongoose.model('AttendanceSession', attendanceSessionSchema);

@@ -81,6 +81,9 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
             newEditableLog.sessions = (newEditableLog.sessions || []).map(s => ({ ...s, _id: s._id || uuidv4() }));
             newEditableLog.breaks = (newEditableLog.breaks || []).map(b => ({ ...b, _id: b._id || uuidv4() }));
             setEditableLog(newEditableLog);
+        } else {
+            // Reset editableLog when log is null (e.g., when showing leave/holiday only)
+            setEditableLog(null);
         }
         if (open) {
             if (isAdmin) setAdminView('view');
@@ -97,8 +100,13 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     
     // Allow modal to open even without log if there's holiday or leave info
     if (!date) return null;
-    if (!log && !holiday && !leave) return null;
-    if (log && !editableLog) return null;
+    
+    // Check if there's actual attendance data (sessions exist)
+    const hasAttendanceData = log && log.sessions && log.sessions.length > 0;
+    
+    if (!hasAttendanceData && !holiday && !leave) return null;
+    // Only wait for editableLog if we actually have attendance data to edit
+    if (hasAttendanceData && !editableLog) return null;
 
     const fullDateStr = date.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     const dateForApi = log ? date.toLocaleDateString('en-CA') : null;
@@ -395,8 +403,11 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     };
 
     const ReadOnlyView = () => {
-        // If no log but there's holiday or leave, show that information
-        if (!log && (holiday || leave)) {
+        // Check if there's actual attendance data (sessions exist)
+        const hasAttendanceData = log && log.sessions && log.sessions.length > 0;
+        
+        // If no attendance data but there's holiday or leave, show that information
+        if (!hasAttendanceData && (holiday || leave)) {
             return (
                 <DialogContent className="dialog-content audit-dialog-content">
                     <Box className="audit-timeline-container">
@@ -427,11 +438,9 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                                             />
                                         </Box>
                                     )}
-                                    {leave.reason && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Reason: {leave.reason}
-                                        </Typography>
-                                    )}
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        <strong>Reason:</strong> {leave.reason || 'No reason provided'}
+                                    </Typography>
                                 </Box>
                             ) : null}
                         </Alert>

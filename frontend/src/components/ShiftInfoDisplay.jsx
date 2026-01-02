@@ -5,6 +5,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import UpdateIcon from '@mui/icons-material/Update';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TimerOffIcon from '@mui/icons-material/TimerOff';
+import useGlobalNow from '../hooks/useGlobalNow';
 import '../styles/ShiftInfoDisplay.css';
 
 const formatTimeIST = (time) => {
@@ -63,27 +64,17 @@ const getShiftStartDateTimeIST = (onDate, shiftStartTime) => {
 
 
 const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
-    const [liveLogoutTime, setLiveLogoutTime] = useState(null);
+    // Uses shared global time source to prevent multiple timers and reduce re-renders
     const { shift, sessions, breaks, status } = dailyData || {};
     const clockInTime = sessions?.[0]?.startTime;
-    const intervalRef = useRef(null);
-    const rafRef = useRef(null);
+    const nowTimestamp = useGlobalNow(status === 'Clocked In');
+    const [liveLogoutTime, setLiveLogoutTime] = useState(null);
     const lastTimeStringRef = useRef('');
     
     // Use shift from dailyData, or fallback to the user's assigned shift
     const effectiveShift = shift || fallbackShift;
 
     useEffect(() => {
-        // Clear any existing timers
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-        }
-
         // Check if log exists - if not, reset all state
         const hasLog = dailyData?.hasLog === true && dailyData?.attendanceLog !== null;
         if (!hasLog) {
@@ -118,7 +109,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
         }
 
         const calculateLiveLogoutTime = () => {
-            const now = new Date();
+            const now = new Date(nowTimestamp);
             
             // Check if this is the special 10 AM - 7 PM shift with early clock-in
             const isSpecialShift = effectiveShift?.shiftType === 'Fixed' && 
@@ -147,56 +138,24 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
                 }
             }
             
-            // For all other cases, use the standard calculation
-            // The active break is the only "live" component we need to account for.
-            const activeBreak = (breaks || []).find(b => !b.endTime);
-            let activeBreakDurationMs = 0;
-
-            if (activeBreak) {
-                const breakType = (activeBreak.breakType || activeBreak.type || '').toLowerCase();
-                // Only unpaid breaks (including Extra breaks) extend the shift duration
-                // Paid breaks don't extend the shift, so we don't add them to logout time
-                if (breakType === 'unpaid' || breakType === 'extra') {
-                    activeBreakDurationMs = now.getTime() - new Date(activeBreak.startTime).getTime();
-                }
-            }
-
-            // The base logout time is what the server calculated initially (includes completed unpaid breaks).
-            const baseLogoutTime = new Date(dailyData.calculatedLogoutTime);
-
-            // The live logout time is the server's calculation plus the duration of any currently active unpaid break.
-            const newLiveLogoutTime = new Date(baseLogoutTime.getTime() + activeBreakDurationMs);
-            const timeString = newLiveLogoutTime.toISOString();
+            // Backend is authoritative: Use calculatedLogoutTime from server ONLY
+            // Server already includes active break in calculation (see dailyStatusService.js)
+            // No frontend math allowed - backend handles all break logic
             
-            // Only update state if time actually changed (prevents unnecessary re-renders)
-            if (lastTimeStringRef.current !== timeString) {
-                lastTimeStringRef.current = timeString;
-                setLiveLogoutTime(newLiveLogoutTime);
+            if (dailyData.calculatedLogoutTime) {
+                const serverLogoutTime = new Date(dailyData.calculatedLogoutTime);
+                const timeString = serverLogoutTime.toISOString();
+                
+                // Only update state if time actually changed (prevents unnecessary re-renders)
+                if (lastTimeStringRef.current !== timeString) {
+                    lastTimeStringRef.current = timeString;
+                    setLiveLogoutTime(serverLogoutTime);
+                }
             }
         };
         
-        calculateLiveLogoutTime(); // Run once immediately
-
-        // Use requestAnimationFrame for smoother updates
-        intervalRef.current = setInterval(() => {
-            if (rafRef.current) {
-                cancelAnimationFrame(rafRef.current);
-            }
-            rafRef.current = requestAnimationFrame(calculateLiveLogoutTime);
-        }, 1000);
-        
-        return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-            if (rafRef.current) {
-                cancelAnimationFrame(rafRef.current);
-                rafRef.current = null;
-            }
-        }; 
-
-    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog]);
+        calculateLiveLogoutTime();
+    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog, nowTimestamp, liveLogoutTime]);
 
     if (!effectiveShift) {
         return <div className="shift-info-display-container no-shift">No shift assigned for today.</div>;

@@ -60,6 +60,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
+import { formatDateYYYYMMDD } from '../utils/dateUtils';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -78,8 +79,8 @@ const EmployeeAnalyticsModalFull = ({ open, onClose, employeeId, employeeName })
     setLoading(true);
     setError(null);
     try {
-      const start = startDate.toISOString().slice(0, 10);
-      const end = endDate.toISOString().slice(0, 10);
+      const start = formatDateYYYYMMDD(startDate);
+      const end = formatDateYYYYMMDD(endDate);
       
       console.log(`Fetching analytics for employee ${employeeId} from ${start} to ${end}`);
       
@@ -163,7 +164,7 @@ const EmployeeAnalyticsModalFull = ({ open, onClose, employeeId, employeeName })
       const date = new Date(log.attendanceDate);
       const weekStart = new Date(date);
       weekStart.setDate(date.getDate() - date.getDay());
-      const weekKey = weekStart.toISOString().slice(0, 10);
+      const weekKey = formatDateYYYYMMDD(weekStart);
       
       if (!weeklyStats[weekKey]) {
         weeklyStats[weekKey] = {

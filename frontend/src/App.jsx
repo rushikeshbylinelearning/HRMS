@@ -42,6 +42,7 @@ const SSOCallbackPage = lazy(() => import('./pages/SSOCallbackPage'));
 const EmployeeMusterRollPage = lazy(() => import('./pages/EmployeeMusterRollPage'));
 const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
 const PayrollManagementPage = lazy(() => import('./pages/PayrollManagementPage'));
+const ProbationTrackerPage = lazy(() => import('./pages/ProbationTrackerPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Import skeleton loaders
@@ -262,6 +263,13 @@ function App() {
                                         <Suspense fallback={<PageLoader />}>
                                             <PermissionProtectedRoute requiredPermission="viewAnalytics">
                                                 <PayrollManagementPage />
+                                            </PermissionProtectedRoute>
+                                        </Suspense>
+                                    } />
+                                    <Route path="/admin/analytics/probation-tracker" element={
+                                        <Suspense fallback={<PageLoader />}>
+                                            <PermissionProtectedRoute requiredPermission="viewAnalytics">
+                                                <ProbationTrackerPage />
                                             </PermissionProtectedRoute>
                                         </Suspense>
                                     } />

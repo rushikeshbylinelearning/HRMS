@@ -511,98 +511,142 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
     return (
         <Box>
             {/* Statistics Overview */}
-            <Card sx={{ 
-                mb: 3, 
-                borderRadius: '8px', 
-                background: 'white',
-                border: '2px solid #000',
-                boxShadow: 'none'
-            }}>
-                <CardContent>
-                    <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#000' }}>
+            <Paper 
+                elevation={0} 
+                sx={{ 
+                    mb: 3, 
+                    borderRadius: 3, 
+                    border: '1px solid #e0e0e0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    overflow: 'hidden'
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <Typography 
+                        variant="h5" 
+                        sx={{ 
+                            mb: 3, 
+                            color: '#dc3545',
+                            fontWeight: 600,
+                            fontSize: '1.5rem'
+                        }}
+                    >
                         Saturday Schedule Overview
                     </Typography>
-                    <Grid container spacing={3}>
+                    <Grid container spacing={2.5}>
                         <Grid item xs={6} sm={3}>
                             <Box sx={{ 
                                 textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
+                                p: 2.5,
+                                borderRadius: 2,
+                                border: '1px solid #e0e0e0',
                                 background: 'white',
                                 transition: 'all 0.3s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 '&:hover': {
                                     background: '#f8f9fa',
                                     transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                    borderColor: '#dc3545'
                                 }
                             }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.firstAndThirdOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>1st & 3rd Off</Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 700, color: '#2c3e50', mb: 0.5, fontSize: '2.5rem' }}>
+                                    {categorizedSchedules.firstAndThirdOff.length}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    1st & 3rd Off
+                                </Typography>
                             </Box>
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <Box sx={{ 
                                 textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
+                                p: 2.5,
+                                borderRadius: 2,
+                                border: '1px solid #e0e0e0',
                                 background: 'white',
                                 transition: 'all 0.3s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 '&:hover': {
                                     background: '#f8f9fa',
                                     transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                    borderColor: '#dc3545'
                                 }
                             }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.secondAndFourthOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>2nd & 4th Off</Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 700, color: '#2c3e50', mb: 0.5, fontSize: '2.5rem' }}>
+                                    {categorizedSchedules.secondAndFourthOff.length}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    2nd & 4th Off
+                                </Typography>
                             </Box>
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <Box sx={{ 
                                 textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
+                                p: 2.5,
+                                borderRadius: 2,
+                                border: '1px solid #e0e0e0',
                                 background: 'white',
                                 transition: 'all 0.3s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 '&:hover': {
                                     background: '#f8f9fa',
                                     transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                    borderColor: '#dc3545'
                                 }
                             }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.allWorking.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>All Working</Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 700, color: '#2c3e50', mb: 0.5, fontSize: '2.5rem' }}>
+                                    {categorizedSchedules.allWorking.length}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    All Working
+                                </Typography>
                             </Box>
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <Box sx={{ 
                                 textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
+                                p: 2.5,
+                                borderRadius: 2,
+                                border: '1px solid #e0e0e0',
                                 background: 'white',
                                 transition: 'all 0.3s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 '&:hover': {
                                     background: '#f8f9fa',
                                     transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                    borderColor: '#dc3545'
                                 }
                             }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.allOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>All Off</Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 700, color: '#2c3e50', mb: 0.5, fontSize: '2.5rem' }}>
+                                    {categorizedSchedules.allOff.length}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    All Off
+                                </Typography>
                             </Box>
                         </Grid>
                     </Grid>
                 </CardContent>
-            </Card>
+            </Paper>
 
             {/* Filters and View Toggle */}
-            <Card sx={{ mb: 3, borderRadius: '8px', boxShadow: 'none', border: '2px solid #e0e0e0', bgcolor: 'white' }}>
-                <CardContent>
-                    <Grid container spacing={2} alignItems="center">
+            <Paper 
+                elevation={0} 
+                sx={{ 
+                    mb: 3, 
+                    borderRadius: 3, 
+                    border: '1px solid #e0e0e0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    overflow: 'hidden'
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <Grid container spacing={2.5} alignItems="center">
                         <Grid item xs={12} sm={6} md={4}>
                             <TextField
                                 fullWidth
@@ -611,7 +655,19 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
                                 value={searchFilter}
                                 onChange={(e) => setSearchFilter(e.target.value)}
                                 InputProps={{
-                                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+                                    startAdornment: <Search sx={{ mr: 1, color: '#6c757d' }} />
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: '8px',
+                                        bgcolor: '#fafafa',
+                                        '&:hover': {
+                                            bgcolor: '#f5f5f5'
+                                        },
+                                        '&.Mui-focused': {
+                                            bgcolor: 'white'
+                                        }
+                                    }
                                 }}
                             />
                         </Grid>
@@ -622,6 +678,16 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
                                     value={selectedDepartmentFilter}
                                     label="Department"
                                     onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        bgcolor: '#fafafa',
+                                        '&:hover': {
+                                            bgcolor: '#f5f5f5'
+                                        },
+                                        '&.Mui-focused': {
+                                            bgcolor: 'white'
+                                        }
+                                    }}
                                 >
                                     <MenuItem value="">All Departments</MenuItem>
                                     {departments.map(dept => (
@@ -650,7 +716,7 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
                         </Grid>
                     </Grid>
                 </CardContent>
-            </Card>
+            </Paper>
 
             {/* View Content */}
             {viewMode === 'grid' ? <GridView /> : <DepartmentView />}
@@ -1046,41 +1112,277 @@ const LeavesTrackerPage = () => {
             <Typography variant="h4" component="h1" sx={{ color: '#FFFFFF', fontWeight: 'bold' }}>Employee Leaves Tracker</Typography>
           </Box>
           <Box display="flex" gap={2}>
-            <Button variant="contained" startIcon={<Add />} onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }} sx={{ backgroundColor: '#28a745', '&:hover': { backgroundColor: '#218838' } }}>Assign Leave</Button>
-            <Button variant="contained" startIcon={<Assignment />} onClick={() => setShowAllocateDialog(true)} sx={{ backgroundColor: '#17a2b8', '&:hover': { backgroundColor: '#138496' } }}>Allocate Leaves</Button>
-            <Button variant="contained" startIcon={<Group />} onClick={() => setShowBulkAllocateDialog(true)} sx={{ backgroundColor: '#6f42c1', '&:hover': { backgroundColor: '#5a32a3' } }}>Bulk Allocate</Button>
+            <Button 
+                variant="contained" 
+                startIcon={<Add />} 
+                onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }} 
+                sx={{ 
+                    backgroundColor: '#28a745', 
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 2.5,
+                    py: 1,
+                    boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
+                    '&:hover': { 
+                        backgroundColor: '#218838',
+                        boxShadow: '0 4px 12px rgba(40, 167, 69, 0.4)'
+                    } 
+                }}
+            >
+                Assign Leave
+            </Button>
+            <Button 
+                variant="contained" 
+                startIcon={<Assignment />} 
+                onClick={() => setShowAllocateDialog(true)} 
+                sx={{ 
+                    backgroundColor: '#17a2b8', 
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 2.5,
+                    py: 1,
+                    boxShadow: '0 2px 8px rgba(23, 162, 184, 0.3)',
+                    '&:hover': { 
+                        backgroundColor: '#138496',
+                        boxShadow: '0 4px 12px rgba(23, 162, 184, 0.4)'
+                    } 
+                }}
+            >
+                Allocate Leaves
+            </Button>
+            <Button 
+                variant="contained" 
+                startIcon={<Group />} 
+                onClick={() => setShowBulkAllocateDialog(true)} 
+                sx={{ 
+                    backgroundColor: '#6f42c1', 
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 2.5,
+                    py: 1,
+                    boxShadow: '0 2px 8px rgba(111, 66, 193, 0.3)',
+                    '&:hover': { 
+                        backgroundColor: '#5a32a3',
+                        boxShadow: '0 4px 12px rgba(111, 66, 193, 0.4)'
+                    } 
+                }}
+            >
+                Bulk Allocate
+            </Button>
           </Box>
         </Box>
         
-        <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-            <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tab label="Leave Balances" />
-                <Tab label="Leave Requests" />
-                <Tab label="Saturday Schedule" />
-            </Tabs>
-        </Card>
+         <Paper 
+             elevation={0} 
+             sx={{ 
+                 mb: 3, 
+                 borderRadius: 3, 
+                 border: '1px solid #e0e0e0',
+                 boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                 overflow: 'hidden'
+             }}
+         >
+             <Tabs 
+                 value={activeTab} 
+                 onChange={(e, newValue) => setActiveTab(newValue)} 
+                 sx={{ 
+                     borderBottom: 1, 
+                     borderColor: '#e0e0e0',
+                     '& .MuiTabs-indicator': {
+                         backgroundColor: '#dc3545',
+                         height: 3,
+                         transition: 'all 0.3s ease-in-out'
+                     },
+                     '& .MuiTab-root': {
+                         textTransform: 'none',
+                         fontWeight: 500,
+                         fontSize: '0.9375rem',
+                         color: '#6c757d',
+                         transition: 'color 0.2s ease-in-out',
+                         '&.Mui-selected': {
+                             color: '#dc3545',
+                             fontWeight: 600
+                         }
+                     }
+                 }}
+             >
+                 <Tab label="Leave Balances" />
+                 <Tab label="Leave Requests" />
+                 <Tab label="Saturday Schedule" />
+             </Tabs>
+         </Paper>
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-        <Card sx={{ borderRadius: '16px', mb: 3 }}>
-            <CardContent>
-                <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={6} md={3}><TextField fullWidth label="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }} size="small" /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Department</InputLabel><Select value={selectedDepartment} label="Department" onChange={(e) => setSelectedDepartment(e.target.value)}><MenuItem value="">All Departments</MenuItem>{departments.map((dept) => (<MenuItem key={dept} value={dept}>{dept}</MenuItem>))}</Select></FormControl></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Employee</InputLabel><Select value={selectedEmployee} label="Employee" onChange={(e) => setSelectedEmployee(e.target.value)}><MenuItem value="">All Employees</MenuItem>{employees.map((emp) => (<MenuItem key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</MenuItem>))}</Select></FormControl></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Year</InputLabel><Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value)}>{[2023, 2024, 2025, 2026].map((year) => (<MenuItem key={year} value={year}>{year}</MenuItem>))}</Select></FormControl></Grid>
-                </Grid>
-            </CardContent>
-        </Card>
+         <Paper 
+             elevation={0} 
+             sx={{ 
+                 mb: 3, 
+                 borderRadius: 3, 
+                 border: '1px solid #e0e0e0',
+                 overflow: 'hidden',
+                 boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+             }}
+         >
+             <CardContent sx={{ p: 3, bgcolor: 'white' }}>
+                 <Grid container spacing={2.5} alignItems="center">
+                     <Grid item xs={12} sm={6} md={3}>
+                         <TextField 
+                             fullWidth 
+                             label="Search employees..." 
+                             value={searchTerm} 
+                             onChange={(e) => setSearchTerm(e.target.value)} 
+                             InputProps={{ 
+                                 startAdornment: <Search sx={{ mr: 1, color: '#6c757d' }} /> 
+                             }} 
+                             size="small"
+                             sx={{
+                                 '& .MuiOutlinedInput-root': {
+                                     borderRadius: '8px',
+                                     bgcolor: '#fafafa',
+                                     '&:hover': {
+                                         bgcolor: '#f5f5f5'
+                                     },
+                                     '&.Mui-focused': {
+                                         bgcolor: 'white'
+                                     }
+                                 }
+                             }}
+                         />
+                     </Grid>
+                     <Grid item xs={12} sm={6} md={3}>
+                         <FormControl fullWidth size="small">
+                             <InputLabel>Department</InputLabel>
+                             <Select 
+                                 value={selectedDepartment} 
+                                 label="Department" 
+                                 onChange={(e) => setSelectedDepartment(e.target.value)}
+                                 sx={{
+                                     borderRadius: '8px',
+                                     bgcolor: '#fafafa',
+                                     '&:hover': {
+                                         bgcolor: '#f5f5f5'
+                                     },
+                                     '&.Mui-focused': {
+                                         bgcolor: 'white'
+                                     }
+                                 }}
+                             >
+                                 <MenuItem value="">All Departments</MenuItem>
+                                 {departments.map((dept) => (
+                                     <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                                 ))}
+                             </Select>
+                         </FormControl>
+                     </Grid>
+                     <Grid item xs={12} sm={6} md={3}>
+                         <FormControl fullWidth size="small">
+                             <InputLabel>Employee</InputLabel>
+                             <Select 
+                                 value={selectedEmployee} 
+                                 label="Employee" 
+                                 onChange={(e) => setSelectedEmployee(e.target.value)}
+                                 sx={{
+                                     borderRadius: '8px',
+                                     bgcolor: '#fafafa',
+                                     '&:hover': {
+                                         bgcolor: '#f5f5f5'
+                                     },
+                                     '&.Mui-focused': {
+                                         bgcolor: 'white'
+                                     }
+                                 }}
+                             >
+                                 <MenuItem value="">All Employees</MenuItem>
+                                 {employees.map((emp) => (
+                                     <MenuItem key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</MenuItem>
+                                 ))}
+                             </Select>
+                         </FormControl>
+                     </Grid>
+                     <Grid item xs={12} sm={6} md={3}>
+                         <FormControl fullWidth size="small">
+                             <InputLabel>Year</InputLabel>
+                             <Select 
+                                 value={selectedYear} 
+                                 label="Year" 
+                                 onChange={(e) => setSelectedYear(e.target.value)}
+                                 sx={{
+                                     borderRadius: '8px',
+                                     bgcolor: '#fafafa',
+                                     '&:hover': {
+                                         bgcolor: '#f5f5f5'
+                                     },
+                                     '&.Mui-focused': {
+                                         bgcolor: 'white'
+                                     }
+                                 }}
+                             >
+                                 {[2023, 2024, 2025, 2026].map((year) => (
+                                     <MenuItem key={year} value={year}>{year}</MenuItem>
+                                 ))}
+                             </Select>
+                         </FormControl>
+                     </Grid>
+                 </Grid>
+             </CardContent>
+         </Paper>
         
     {/* --- START OF FIX: Dynamic Table Rendering --- */}
         {activeTab === 0 && (
-            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, color: '#dc3545' }}>Leave Balances Overview</Typography>
-                    {filteredLeaveData.length === 0 ? (<Box textAlign="center" py={4}><Typography variant="h6" color="textSecondary">No leave data found for the selected filters.</Typography></Box>) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table><TableHead><TableRow sx={{ backgroundColor: '#f8f9fa' }}><TableCell sx={{ fontWeight: 'bold' }}>Employee</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Total Leave (Used/Total)</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Sick Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Casual Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Planned Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>LOP Loss of Pay</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell></TableRow></TableHead>
+             <Paper 
+                 elevation={0} 
+                 sx={{ 
+                     borderRadius: 3, 
+                     border: '1px solid #e0e0e0',
+                     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                     overflow: 'hidden'
+                 }}
+             >
+                 <CardContent sx={{ p: 3 }}>
+                     <Typography 
+                         variant="h6" 
+                         sx={{ 
+                             mb: 3, 
+                             color: '#dc3545',
+                             fontWeight: 600,
+                             fontSize: '1.25rem'
+                         }}
+                     >
+                         Leave Balances Overview
+                     </Typography>
+                     {filteredLeaveData.length === 0 ? (
+                         <Box 
+                             textAlign="center" 
+                             py={6}
+                             sx={{
+                                 bgcolor: '#f8f9fa',
+                                 borderRadius: 2,
+                                 border: '1px dashed #dee2e6'
+                             }}
+                         >
+                             <Typography variant="h6" sx={{ color: '#6c757d', fontWeight: 500 }}>
+                                 No leave data found for the selected filters.
+                             </Typography>
+                         </Box>
+                     ) : (
+                     <Box sx={{ overflowX: 'auto' }}>
+                         <Table sx={{ minWidth: 1200 }}>
+                             <TableHead>
+                                 <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Employee</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Department</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Total Leave (Used/Total)</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Sick Leave</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Casual Leave</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Planned Leave</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>LOP Loss of Pay</TableCell>
+                                     <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Actions</TableCell>
+                                 </TableRow>
+                             </TableHead>
                             <TableBody>
                                 {filteredLeaveData.map((data) => {
                                     const { employee, balances } = data;
@@ -1088,88 +1390,198 @@ const LeavesTrackerPage = () => {
                                     const { used, entitlements } = balances;
 
                                     return (
-                                        <TableRow 
-                                            key={employee._id} 
-                                            hover 
-                                            sx={{ cursor: 'pointer' }}
-                                            onClick={() => {
-                                                setDialogEmployee(employee);
-                                                setSelectedRequest(null);
-                                                setShowEmployeeDialog(true);
-                                            }}
-                                        >
-                                            <TableCell><Box display="flex" alignItems="center" gap={1}><Avatar src={employee.profileImageUrl} sx={{ width: 30, height: 30 }}>{employee.fullName.charAt(0)}</Avatar><Box><Typography variant="body2" fontWeight="bold">{employee.fullName}</Typography><Typography variant="caption" color="textSecondary">{employee.employeeCode}</Typography></Box></Box></TableCell>
-                                            <TableCell>{employee.department || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight="bold">{totalUsed} / {totalEntitlement} days</Typography>
-                                                <LinearProgress variant="determinate" value={(totalUsed / totalEntitlement) * 100 || 0} color={getProgressColor(totalUsed, totalEntitlement)} sx={{ height: 8, borderRadius: 5, backgroundColor: '#e0e0e0' }} />
-                                                <Typography variant="caption" color="textSecondary">{((totalUsed / totalEntitlement) * 100 || 0).toFixed(1)}% used</Typography>
-                                            </TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.sick}</Typography><Typography variant="body2">Balance: {balances.balances.sick}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.sick}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.casual}</Typography><Typography variant="body2">Balance: {balances.balances.casual}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.casual}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.paid}</Typography><Typography variant="body2">Balance: {balances.balances.paid}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.paid}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.unpaid}</Typography></TableCell>
-                                            <TableCell onClick={(e) => e.stopPropagation()}>
-                                                <Box display="flex" gap={1}>
-                                                    <Tooltip title="Assign Leave">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => { 
-                                                                setAssignLeaveRequest({ employee: { _id: employee._id } }); 
-                                                                setShowAssignDialog(true); 
-                                                            }} 
-                                                            sx={{ color: '#28a745' }}
-                                                        >
-                                                            <Add />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="View Leave History">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => {
-                                                                setDialogEmployee(employee);
-                                                                setSelectedRequest(null);
-                                                                setShowEmployeeDialog(true);
-                                                            }}
-                                                            sx={{ color: '#17a2b8' }}
-                                                        >
-                                                            <History />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Allocate Leaves">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => { 
-                                                                setAllocateForm({ ...allocateForm, employeeId: employee._id }); 
-                                                                setShowAllocateDialog(true); 
-                                                            }} 
-                                                            sx={{ color: '#17a2b8' }}
-                                                        >
-                                                            <Assignment />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Box>
-                                            </TableCell>
+                                         <TableRow 
+                                             key={employee._id} 
+                                             hover 
+                                             sx={{ 
+                                                 cursor: 'pointer',
+                                                 transition: 'background-color 0.2s ease',
+                                                 '&:hover': {
+                                                     bgcolor: '#f8f9fa'
+                                                 }
+                                             }}
+                                             onClick={() => {
+                                                 setDialogEmployee(employee);
+                                                 setSelectedRequest(null);
+                                                 setShowEmployeeDialog(true);
+                                             }}
+                                         >
+                                             <TableCell>
+                                                 <Box display="flex" alignItems="center" gap={1.5}>
+                                                     <Avatar 
+                                                         src={employee.profileImageUrl} 
+                                                         sx={{ 
+                                                             width: 36, 
+                                                             height: 36,
+                                                             bgcolor: '#dc3545',
+                                                             fontSize: '0.875rem',
+                                                             fontWeight: 600
+                                                         }}
+                                                     >
+                                                         {employee.fullName.charAt(0)}
+                                                     </Avatar>
+                                                     <Box>
+                                                         <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                             {employee.fullName}
+                                                         </Typography>
+                                                         <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>
+                                                             {employee.employeeCode}
+                                                         </Typography>
+                                                     </Box>
+                                                 </Box>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                     {employee.department || 'N/A'}
+                                                 </Typography>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50', mb: 0.5, fontSize: '0.875rem' }}>
+                                                     {totalUsed} / {totalEntitlement} days
+                                                 </Typography>
+                                                 <LinearProgress 
+                                                     variant="determinate" 
+                                                     value={(totalUsed / totalEntitlement) * 100 || 0} 
+                                                     color={getProgressColor(totalUsed, totalEntitlement)} 
+                                                     sx={{ 
+                                                         height: 8, 
+                                                         borderRadius: 4, 
+                                                         backgroundColor: '#e9ecef',
+                                                         mb: 0.5
+                                                     }} 
+                                                 />
+                                                 <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>
+                                                     {((totalUsed / totalEntitlement) * 100 || 0).toFixed(1)}% used
+                                                 </Typography>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Used: {used.sick}</Typography>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Balance: {balances.balances.sick}</Typography>
+                                                 <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>Total: {entitlements.sick}</Typography>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Used: {used.casual}</Typography>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Balance: {balances.balances.casual}</Typography>
+                                                 <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>Total: {entitlements.casual}</Typography>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Used: {used.paid}</Typography>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem', mb: 0.25 }}>Balance: {balances.balances.paid}</Typography>
+                                                 <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>Total: {entitlements.paid}</Typography>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>Used: {used.unpaid}</Typography>
+                                             </TableCell>
+                                             <TableCell onClick={(e) => e.stopPropagation()}>
+                                                 <Box display="flex" gap={0.5}>
+                                                     <Tooltip title="Assign Leave" arrow>
+                                                         <IconButton 
+                                                             size="small" 
+                                                             onClick={() => { 
+                                                                 setAssignLeaveRequest({ employee: { _id: employee._id } }); 
+                                                                 setShowAssignDialog(true); 
+                                                             }} 
+                                                             sx={{ 
+                                                                 color: '#28a745',
+                                                                 '&:hover': {
+                                                                     bgcolor: 'rgba(40, 167, 69, 0.1)'
+                                                                 }
+                                                             }}
+                                                         >
+                                                             <Add fontSize="small" />
+                                                         </IconButton>
+                                                     </Tooltip>
+                                                     <Tooltip title="View Leave History" arrow>
+                                                         <IconButton 
+                                                             size="small" 
+                                                             onClick={() => {
+                                                                 setDialogEmployee(employee);
+                                                                 setSelectedRequest(null);
+                                                                 setShowEmployeeDialog(true);
+                                                             }}
+                                                             sx={{ 
+                                                                 color: '#17a2b8',
+                                                                 '&:hover': {
+                                                                     bgcolor: 'rgba(23, 162, 184, 0.1)'
+                                                                 }
+                                                             }}
+                                                         >
+                                                             <History fontSize="small" />
+                                                         </IconButton>
+                                                     </Tooltip>
+                                                     <Tooltip title="Allocate Leaves" arrow>
+                                                         <IconButton 
+                                                             size="small" 
+                                                             onClick={() => { 
+                                                                 setAllocateForm({ ...allocateForm, employeeId: employee._id }); 
+                                                                 setShowAllocateDialog(true); 
+                                                             }} 
+                                                             sx={{ 
+                                                                 color: '#17a2b8',
+                                                                 '&:hover': {
+                                                                     bgcolor: 'rgba(23, 162, 184, 0.1)'
+                                                                 }
+                                                             }}
+                                                         >
+                                                             <Assignment fontSize="small" />
+                                                         </IconButton>
+                                                     </Tooltip>
+                                                 </Box>
+                                             </TableCell>
                                         </TableRow>
                                     );
                                 })}
                             </TableBody>
-                        </Table>
-                    </Box>
-                )}
-                </CardContent>
-            </Card>
+                         </Table>
+                     </Box>
+                     )}
+                 </CardContent>
+             </Paper>
         )}
         {/* Leave Requests Tab */}
         {activeTab === 1 && (
-            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', mb: 3 }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, color: '#dc3545' }}>Leave Requests</Typography>
-                    <Grid container spacing={2} sx={{ mb: 2 }} alignItems="center">
-                        <Grid item xs={12} sm={4} md={3}>
+            <Paper 
+                elevation={0} 
+                sx={{ 
+                    borderRadius: 3, 
+                    border: '1px solid #e0e0e0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    overflow: 'hidden',
+                    mb: 3
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <Typography 
+                        variant="h6" 
+                        sx={{ 
+                            mb: 3, 
+                            color: '#dc3545',
+                            fontWeight: 600,
+                            fontSize: '1.25rem'
+                        }}
+                    >
+                        Leave Requests
+                    </Typography>
+                    
+                    <Grid container spacing={2.5} sx={{ mb: 3 }} alignItems="center">
+                        <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Month</InputLabel>
-                                <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value)}>
+                                <Select 
+                                    value={selectedMonth} 
+                                    label="Month" 
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        bgcolor: '#fafafa',
+                                        '&:hover': {
+                                            bgcolor: '#f5f5f5'
+                                        },
+                                        '&.Mui-focused': {
+                                            bgcolor: 'white'
+                                        }
+                                    }}
+                                >
                                     <MenuItem value="">All Months</MenuItem>
                                     {[...Array(12)].map((_, i) => (
                                         <MenuItem key={i} value={i}>{new Date(0, i).toLocaleString(undefined, { month: 'long' })}</MenuItem>
@@ -1177,32 +1589,55 @@ const LeavesTrackerPage = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={4} md={3}>
+                        <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Week</InputLabel>
-                                <Select value={selectedWeek} label="Week" onChange={(e) => setSelectedWeek(e.target.value)}>
+                                <Select 
+                                    value={selectedWeek} 
+                                    label="Week" 
+                                    onChange={(e) => setSelectedWeek(e.target.value)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        bgcolor: '#fafafa',
+                                        '&:hover': {
+                                            bgcolor: '#f5f5f5'
+                                        },
+                                        '&.Mui-focused': {
+                                            bgcolor: 'white'
+                                        }
+                                    }}
+                                >
                                     <MenuItem value="">All Weeks</MenuItem>
                                     {[1,2,3,4,5].map(w => (<MenuItem key={w} value={w}>{`Week ${w}`}</MenuItem>))}
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={4} md={6}>
-                            <Typography variant="body2" color="text.secondary">Filters apply to the first date of the leave request. Use Search / Department / Employee selectors above for additional filtering.</Typography>
+                        <Grid item xs={12} md={6}>
+                            <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                    color: '#6c757d',
+                                    fontSize: '0.8125rem',
+                                    fontStyle: 'italic'
+                                }}
+                            >
+                                Filters apply to the first date of the leave request. Use Search / Department / Employee selectors above for additional filtering.
+                            </Typography>
                         </Grid>
                     </Grid>
 
                     <Box sx={{ overflowX: 'auto' }}>
-                        <Table>
+                        <Table sx={{ minWidth: 1000 }}>
                             <TableHead>
                                 <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Employee</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Leave Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Dates</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Days</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Applied On</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Employee</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Department</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Type</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Leave Type</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Dates</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Days</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>Applied On</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -1243,7 +1678,27 @@ const LeavesTrackerPage = () => {
                                     });
 
                                     if (filteredRequests.length === 0) {
-                                        return (<TableRow><TableCell colSpan={8}><Box textAlign="center" py={4}><Typography variant="h6" color="textSecondary">No leave requests found for the selected filters.</Typography></Box></TableCell></TableRow>);
+                                        return (
+                                            <TableRow>
+                                                <TableCell colSpan={8}>
+                                                    <Box 
+                                                        textAlign="center" 
+                                                        py={6}
+                                                        sx={{
+                                                            bgcolor: '#f8f9fa',
+                                                            borderRadius: 2,
+                                                            border: '1px dashed #dee2e6',
+                                                            mx: 2,
+                                                            my: 2
+                                                        }}
+                                                    >
+                                                        <Typography variant="h6" sx={{ color: '#6c757d', fontWeight: 500 }}>
+                                                            No leave requests found for the selected filters.
+                                                        </Typography>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
                                     }
 
                                     return filteredRequests.map(req => {
@@ -1252,15 +1707,83 @@ const LeavesTrackerPage = () => {
                                         const days = dates.length * (req.leaveType && req.leaveType.startsWith('Half Day') ? 0.5 : 1);
                                         const appliedOn = req.createdAt ? new Date(req.createdAt).toLocaleDateString() : (dates[0] ? new Date(dates[0]).toLocaleDateString() : 'N/A');
                                         return (
-                                            <TableRow key={req._id} hover sx={{ cursor: 'pointer' }} onClick={() => { setDialogEmployee(emp); setSelectedRequest(req); setShowEmployeeDialog(true); }}>
-                                                <TableCell><Box display="flex" alignItems="center" gap={1}><Avatar sx={{ width: 30, height: 30 }}>{(emp.fullName || '').charAt(0)}</Avatar><Box><Typography variant="body2" fontWeight="bold">{emp.fullName || 'Unknown'}</Typography><Typography variant="caption" color="textSecondary">{emp.employeeCode || ''}</Typography></Box></Box></TableCell>
-                                                <TableCell>{emp.department || 'N/A'}</TableCell>
-                                                <TableCell>{formatLeaveRequestType(req.requestType) || 'N/A'}</TableCell>
-                                                <TableCell>{req.leaveType || 'N/A'}</TableCell>
-                                                <TableCell>{dates.map(d => (new Date(d)).toLocaleDateString()).join(', ')}</TableCell>
-                                                <TableCell>{days}</TableCell>
-                                                <TableCell><Chip label={req.status || 'Pending'} color={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'} size="small" /></TableCell>
-                                                <TableCell>{appliedOn}</TableCell>
+                                            <TableRow 
+                                                key={req._id} 
+                                                hover 
+                                                sx={{ 
+                                                    cursor: 'pointer',
+                                                    transition: 'background-color 0.2s ease',
+                                                    '&:hover': {
+                                                        bgcolor: '#f8f9fa'
+                                                    }
+                                                }} 
+                                                onClick={() => { setDialogEmployee(emp); setSelectedRequest(req); setShowEmployeeDialog(true); }}
+                                            >
+                                                <TableCell>
+                                                    <Box display="flex" alignItems="center" gap={1.5}>
+                                                        <Avatar 
+                                                            sx={{ 
+                                                                width: 36, 
+                                                                height: 36,
+                                                                bgcolor: '#dc3545',
+                                                                fontSize: '0.875rem',
+                                                                fontWeight: 600
+                                                            }}
+                                                        >
+                                                            {(emp.fullName || '').charAt(0)}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                                {emp.fullName || 'Unknown'}
+                                                            </Typography>
+                                                            <Typography variant="caption" sx={{ color: '#6c757d', fontSize: '0.75rem' }}>
+                                                                {emp.employeeCode || ''}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {emp.department || 'N/A'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {formatLeaveRequestType(req.requestType) || 'N/A'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {req.leaveType || 'N/A'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {dates.map(d => (new Date(d)).toLocaleDateString()).join(', ')}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {days}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip 
+                                                        label={req.status || 'Pending'} 
+                                                        color={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'} 
+                                                        size="small"
+                                                        sx={{
+                                                            fontWeight: 500,
+                                                            fontSize: '0.75rem',
+                                                            height: 24
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: '#2c3e50', fontSize: '0.875rem' }}>
+                                                        {appliedOn}
+                                                    </Typography>
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     });
@@ -1269,7 +1792,7 @@ const LeavesTrackerPage = () => {
                         </Table>
                     </Box>
                 </CardContent>
-            </Card>
+            </Paper>
         )}
 
         {activeTab === 2 && (
@@ -1295,11 +1818,33 @@ const LeavesTrackerPage = () => {
                 }
             }}
         >
-            <DialogTitle sx={{ color: '#000000', fontWeight: 700, px: 3, pt: 3, pb: 2, borderBottom: '2px solid #D32F2F', bgcolor: '#FFFFFF' }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h5" component="span" sx={{ color: '#000000' }}>Employee Leave History</Typography>
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                        <InputLabel sx={{ color: '#000000' }}>Select Year</InputLabel>
+            {/* Compact Header Section */}
+            <DialogTitle sx={{ 
+                px: 3, 
+                pt: 2.5, 
+                pb: 2, 
+                borderBottom: '1px solid #E0E0E0', 
+                bgcolor: '#FFFFFF',
+                position: 'sticky',
+                top: 0,
+                zIndex: 1
+            }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
+                    <Box display="flex" alignItems="center" gap={2} flex={1}>
+                        <Avatar sx={{ width: 40, height: 40, bgcolor: '#D32F2F', color: '#FFFFFF', fontSize: '1rem' }}>
+                            {(dialogEmployee?.fullName || 'U').charAt(0)}
+                        </Avatar>
+                        <Box>
+                            <Typography variant="h6" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '1.125rem', lineHeight: 1.2 }}>
+                                {dialogEmployee?.fullName || 'Unknown Employee'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem', mt: 0.25 }}>
+                                {dialogEmployee?.employeeCode || 'N/A'} {dialogEmployee?.department ? `• ${dialogEmployee.department}` : ''}
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                        <InputLabel sx={{ color: '#6B7280' }}>Select Year</InputLabel>
                         <Select
                             value={dialogSelectedYear}
                             label="Select Year"
@@ -1311,42 +1856,29 @@ const LeavesTrackerPage = () => {
                                 }
                             }}
                             sx={{
-                                color: '#000000',
+                                color: '#1F2937',
+                                bgcolor: '#FFFFFF',
                                 '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#000000'
+                                    borderColor: '#D1D5DB'
                                 },
                                 '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#000000'
+                                    borderColor: '#9CA3AF'
                                 },
                                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#D32F2F'
+                                    borderColor: '#6366F1'
                                 }
                             }}
                         >
                             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <MenuItem key={year} value={year} sx={{ color: '#000000' }}>{year}</MenuItem>
+                                <MenuItem key={year} value={year} sx={{ color: '#1F2937' }}>{year}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
                 </Box>
             </DialogTitle>
-            <DialogContent sx={{ px: 3, pb: 2, maxHeight: '80vh', overflowY: 'auto' }}>
+            <DialogContent sx={{ px: 3, pb: 2, maxHeight: '80vh', overflowY: 'auto', bgcolor: '#F9FAFB' }}>
                 {dialogEmployee ? (
-                    <Box sx={{ color: '#000000' }}>
-                        {/* Employee Basic Info */}
-                        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 3 }}>
-                            <Avatar sx={{ width: 56, height: 56, bgcolor: '#D32F2F', color: '#FFFFFF' }}>
-                                {(dialogEmployee.fullName || '').charAt(0)}
-                            </Avatar>
-                            <Box flex={1}>
-                                <Typography variant="h6" sx={{ color: '#000000', fontWeight: 700 }}>
-                                    {dialogEmployee.fullName || 'Unknown'}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#000000' }}>
-                                    {dialogEmployee.employeeCode || 'N/A'} • {dialogEmployee.department || 'N/A'}
-                                </Typography>
-                            </Box>
-                        </Box>
+                    <Box sx={{ color: '#1F2937', pt: 3 }}>
 
                         {loadingLeaveUsage || loadingYearEndHistory ? (
                             <Box display="flex" justifyContent="center" py={4}>
@@ -1376,225 +1908,310 @@ const LeavesTrackerPage = () => {
                                     
                                     return (
                                         <>
-                                            {/* TOP SUMMARY BANNER - BIG, BOLD, NON-NEGOTIABLE */}
+                                            {/* Leave Summary Card - Top Priority */}
                                             <Paper 
-                                                elevation={3} 
+                                                elevation={0} 
                                                 sx={{ 
                                                     p: 3, 
                                                     mb: 3, 
                                                     bgcolor: '#FFFFFF', 
                                                     borderRadius: 2,
-                                                    border: '2px solid #D32F2F'
+                                                    border: '1px solid #E5E7EB',
+                                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                                                 }}
                                             >
                                                 <Typography 
                                                     variant="h6" 
                                                     sx={{ 
-                                                        mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
-                                                        fontSize: '1.1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        borderBottom: '2px solid #D32F2F',
-                                                        pb: 1
+                                                        mb: 3, 
+                                                        color: '#1F2937', 
+                                                        fontWeight: 600,
+                                                        fontSize: '1rem',
+                                                        letterSpacing: '0.025em'
                                                     }}
                                                 >
-                                                    LEAVE SUMMARY ({leaveUsageData.previousYear} → {leaveUsageData.year})
+                                                    Leave Summary — FY {leaveUsageData.previousYear}–{leaveUsageData.year}
                                                 </Typography>
                                                 
-                                                <Grid container spacing={3}>
+                                                <Grid container spacing={4}>
                                                     <Grid item xs={12} sm={4}>
                                                         <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
-                                                                Previous Year Opening Balance
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    mb: 1.5, 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    fontWeight: 500
+                                                                }}
+                                                            >
+                                                                Opening Balance
                                                             </Typography>
                                                             <Typography 
                                                                 variant="h3" 
                                                                 sx={{ 
                                                                     fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    color: '#111827',
+                                                                    fontSize: '2.25rem',
+                                                                    lineHeight: 1.2
                                                                 }}
                                                             >
-                                                                {totalOpening.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalOpening.toFixed(1)}
+                                                            </Typography>
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    mt: 0.5
+                                                                }}
+                                                            >
+                                                                Days
                                                             </Typography>
                                                         </Box>
                                                     </Grid>
                                                     <Grid item xs={12} sm={4}>
                                                         <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
-                                                                Leaves Used During Year
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    mb: 1.5, 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    fontWeight: 500
+                                                                }}
+                                                            >
+                                                                Leaves Used
                                                             </Typography>
                                                             <Typography 
                                                                 variant="h3" 
                                                                 sx={{ 
                                                                     fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    color: '#111827',
+                                                                    fontSize: '2.25rem',
+                                                                    lineHeight: 1.2
                                                                 }}
                                                             >
-                                                                {totalUtilized.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalUtilized.toFixed(1)}
+                                                            </Typography>
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    mt: 0.5
+                                                                }}
+                                                            >
+                                                                Days
                                                             </Typography>
                                                         </Box>
                                                     </Grid>
                                                     <Grid item xs={12} sm={4}>
                                                         <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
-                                                                Remaining at Year End
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    mb: 1.5, 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    fontWeight: 500
+                                                                }}
+                                                            >
+                                                                Closing Balance
                                                             </Typography>
                                                             <Typography 
                                                                 variant="h3" 
                                                                 sx={{ 
                                                                     fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    color: '#111827',
+                                                                    fontSize: '2.25rem',
+                                                                    lineHeight: 1.2
                                                                 }}
                                                             >
-                                                                {totalRemaining.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalRemaining.toFixed(1)}
+                                                            </Typography>
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    color: '#6B7280',
+                                                                    fontSize: '0.875rem',
+                                                                    mt: 0.5
+                                                                }}
+                                                            >
+                                                                Days
                                                             </Typography>
                                                         </Box>
                                                     </Grid>
                                                 </Grid>
                                             </Paper>
 
-                                            {/* YEAR-END DECISION - CENTER STAGE */}
-                                            <Paper 
-                                                elevation={2} 
-                                                sx={{ 
-                                                    p: 3, 
-                                                    mb: 3, 
-                                                    bgcolor: '#FFFFFF',
-                                                    borderRadius: 2,
-                                                    border: '1px solid #E0E0E0'
-                                                }}
-                                            >
-                                                <Typography 
-                                                    variant="h6" 
+                                            {/* Year-End Action Section - Conditional Display */}
+                                            {primaryYearEndAction || totalRemaining <= 0 ? (
+                                                <Paper 
+                                                    elevation={0} 
                                                     sx={{ 
-                                                        mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
-                                                        fontSize: '1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        borderLeft: '4px solid #D32F2F',
-                                                        pl: 1.5
+                                                        p: 3, 
+                                                        mb: 3, 
+                                                        bgcolor: '#FFFFFF',
+                                                        borderRadius: 2,
+                                                        border: '1px solid #E5E7EB',
+                                                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                                                     }}
                                                 >
-                                                    YEAR-END ACTION TAKEN
-                                                </Typography>
-                                                
-                                                {primaryYearEndAction ? (
-                                                    <Box>
-                                                        <Box sx={{ mb: 2 }}>
-                                                            {primaryYearEndAction.yearEndSubType === 'CARRY_FORWARD' ? (
-                                                                <Typography 
-                                                                    variant="h4" 
-                                                                    sx={{ 
-                                                                        fontWeight: 700, 
-                                                                        color: '#000000',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 1,
-                                                                        flexWrap: 'wrap'
-                                                                    }}
-                                                                >
-                                                                    <ArrowUpward sx={{ fontSize: 32, color: '#D32F2F' }} />
-                                                                    Carry Forward: <span style={{ fontSize: '2rem' }}>{primaryYearEndAction.yearEndDays || 0} DAYS</span>
-                                                                    {primaryYearEndAction.yearEndLeaveType && (
-                                                                        <Chip 
-                                                                            label={primaryYearEndAction.yearEndLeaveType} 
-                                                                            size="small" 
+                                                    <Typography 
+                                                        variant="h6" 
+                                                        sx={{ 
+                                                            mb: 2.5, 
+                                                            color: '#1F2937', 
+                                                            fontWeight: 600,
+                                                            fontSize: '1rem',
+                                                            letterSpacing: '0.025em'
+                                                        }}
+                                                    >
+                                                        Year-End Processing
+                                                    </Typography>
+                                                    
+                                                    {primaryYearEndAction ? (
+                                                        <Box>
+                                                            <Box sx={{ mb: 2.5 }}>
+                                                                {primaryYearEndAction.yearEndSubType === 'CARRY_FORWARD' ? (
+                                                                    <Box>
+                                                                        <Typography 
+                                                                            variant="body1" 
                                                                             sx={{ 
-                                                                                ml: 1, 
+                                                                                color: '#6B7280',
                                                                                 fontSize: '0.875rem',
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #000000'
+                                                                                mb: 1
                                                                             }}
-                                                                        />
-                                                                    )}
-                                                                </Typography>
-                                                            ) : (
-                                                                <Typography 
-                                                                    variant="h4" 
-                                                                    sx={{ 
-                                                                        fontWeight: 700, 
-                                                                        color: '#000000',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 1,
-                                                                        flexWrap: 'wrap'
-                                                                    }}
-                                                                >
-                                                                    <AttachMoney sx={{ fontSize: 32, color: '#D32F2F' }} />
-                                                                    Encashed: <span style={{ fontSize: '2rem' }}>{primaryYearEndAction.yearEndDays || 0} DAYS</span>
-                                                                    {primaryYearEndAction.yearEndLeaveType && (
-                                                                        <Chip 
-                                                                            label={primaryYearEndAction.yearEndLeaveType} 
-                                                                            size="small" 
+                                                                        >
+                                                                            Carry Forward Action
+                                                                        </Typography>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+                                                                            <Typography 
+                                                                                variant="h4" 
+                                                                                sx={{ 
+                                                                                    fontWeight: 700, 
+                                                                                    color: '#111827',
+                                                                                    fontSize: '2rem'
+                                                                                }}
+                                                                            >
+                                                                                {primaryYearEndAction.yearEndDays || 0} Days
+                                                                            </Typography>
+                                                                            {primaryYearEndAction.yearEndLeaveType && (
+                                                                                <Chip 
+                                                                                    label={primaryYearEndAction.yearEndLeaveType} 
+                                                                                    size="small" 
+                                                                                    sx={{ 
+                                                                                        fontSize: '0.8125rem',
+                                                                                        bgcolor: '#F3F4F6',
+                                                                                        color: '#374151',
+                                                                                        border: '1px solid #D1D5DB',
+                                                                                        height: 24
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box>
+                                                                        <Typography 
+                                                                            variant="body1" 
                                                                             sx={{ 
-                                                                                ml: 1, 
+                                                                                color: '#6B7280',
                                                                                 fontSize: '0.875rem',
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #000000'
+                                                                                mb: 1
                                                                             }}
-                                                                        />
-                                                                    )}
-                                                                </Typography>
-                                                            )}
-                                                        </Box>
-                                                        
-                                                        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #E0E0E0' }}>
+                                                                        >
+                                                                            Encashment Action
+                                                                        </Typography>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+                                                                            <Typography 
+                                                                                variant="h4" 
+                                                                                sx={{ 
+                                                                                    fontWeight: 700, 
+                                                                                    color: '#111827',
+                                                                                    fontSize: '2rem'
+                                                                                }}
+                                                                            >
+                                                                                {primaryYearEndAction.yearEndDays || 0} Days
+                                                                            </Typography>
+                                                                            {primaryYearEndAction.yearEndLeaveType && (
+                                                                                <Chip 
+                                                                                    label={primaryYearEndAction.yearEndLeaveType} 
+                                                                                    size="small" 
+                                                                                    sx={{ 
+                                                                                        fontSize: '0.8125rem',
+                                                                                        bgcolor: '#F3F4F6',
+                                                                                        color: '#374151',
+                                                                                        border: '1px solid #D1D5DB',
+                                                                                        height: 24
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
+                                                                )}
+                                                            </Box>
+                                                            
+                                                            <Divider sx={{ my: 2.5 }} />
+                                                            
                                                             <Grid container spacing={2}>
                                                                 <Grid item xs={12} sm={6}>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                        {primaryYearEndAction.status === 'Approved' && <CheckCircle sx={{ color: '#000000', fontSize: 20 }} />}
-                                                                        {primaryYearEndAction.status === 'Rejected' && <Cancel sx={{ color: '#D32F2F', fontSize: 20 }} />}
-                                                                        {primaryYearEndAction.status === 'Pending' && <Pending sx={{ color: '#000000', fontSize: 20 }} />}
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Status:</strong>{' '}
-                                                                            <Chip
-                                                                                label={primaryYearEndAction.status}
-                                                                                size="small"
-                                                                                sx={{ 
-                                                                                    ml: 1,
-                                                                                    bgcolor: '#FFFFFF',
-                                                                                    color: '#000000',
-                                                                                    border: primaryYearEndAction.status === 'Approved' 
-                                                                                        ? '1px solid #D32F2F' 
-                                                                                        : primaryYearEndAction.status === 'Rejected'
-                                                                                        ? '1px solid #D32F2F'
-                                                                                        : '1px dashed #000000'
-                                                                                }}
-                                                                            />
-                                                                        </Typography>
-                                                                    </Box>
+                                                                    <Typography variant="body2" sx={{ color: '#6B7280', mb: 0.5, fontSize: '0.875rem' }}>
+                                                                        Status
+                                                                    </Typography>
+                                                                    <Chip
+                                                                        label={primaryYearEndAction.status}
+                                                                        size="small"
+                                                                        sx={{ 
+                                                                            bgcolor: primaryYearEndAction.status === 'Approved' 
+                                                                                ? '#D1FAE5' 
+                                                                                : primaryYearEndAction.status === 'Rejected'
+                                                                                ? '#FEE2E2'
+                                                                                : '#FEF3C7',
+                                                                            color: primaryYearEndAction.status === 'Approved' 
+                                                                                ? '#065F46' 
+                                                                                : primaryYearEndAction.status === 'Rejected'
+                                                                                ? '#991B1B'
+                                                                                : '#92400E',
+                                                                            border: 'none',
+                                                                            fontWeight: 500,
+                                                                            height: 24
+                                                                        }}
+                                                                    />
                                                                 </Grid>
                                                                 {primaryYearEndAction.approvedBy && (
                                                                     <Grid item xs={12} sm={6}>
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Approved By:</strong> {primaryYearEndAction.approvedBy?.fullName || 'N/A'}
+                                                                        <Typography variant="body2" sx={{ color: '#6B7280', mb: 0.5, fontSize: '0.875rem' }}>
+                                                                            Approved By
+                                                                        </Typography>
+                                                                        <Typography variant="body2" sx={{ color: '#1F2937', fontWeight: 500 }}>
+                                                                            {primaryYearEndAction.approvedBy?.fullName || 'N/A'}
                                                                         </Typography>
                                                                     </Grid>
                                                                 )}
                                                                 {primaryYearEndAction.approvedAt && (
                                                                     <Grid item xs={12} sm={6}>
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Approval Date:</strong> {new Date(primaryYearEndAction.approvedAt).toLocaleDateString()}
+                                                                        <Typography variant="body2" sx={{ color: '#6B7280', mb: 0.5, fontSize: '0.875rem' }}>
+                                                                            Approval Date
+                                                                        </Typography>
+                                                                        <Typography variant="body2" sx={{ color: '#1F2937', fontWeight: 500 }}>
+                                                                            {new Date(primaryYearEndAction.approvedAt).toLocaleDateString()}
                                                                         </Typography>
                                                                     </Grid>
                                                                 )}
                                                                 {primaryYearEndAction.status === 'Rejected' && (
                                                                     <Grid item xs={12}>
                                                                         <Alert 
+                                                                            severity="info"
                                                                             sx={{ 
                                                                                 mt: 1,
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #D32F2F'
+                                                                                bgcolor: '#EFF6FF',
+                                                                                color: '#1E40AF',
+                                                                                border: '1px solid #BFDBFE',
+                                                                                '& .MuiAlert-icon': {
+                                                                                    color: '#3B82F6'
+                                                                                }
                                                                             }}
                                                                         >
                                                                             Year-End request rejected — no change in balance
@@ -1603,65 +2220,81 @@ const LeavesTrackerPage = () => {
                                                                 )}
                                                             </Grid>
                                                         </Box>
-                                                    </Box>
-                                                ) : totalRemaining <= 0 ? (
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#000000' }}>
-                                                        No leaves available to carry forward or encash
-                                                    </Typography>
-                                                ) : (
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#000000' }}>
-                                                        No Year-End Action Taken
-                                                    </Typography>
-                                                )}
-                                            </Paper>
+                                                    ) : (
+                                                        <Alert 
+                                                            severity="info"
+                                                            sx={{ 
+                                                                bgcolor: '#F9FAFB',
+                                                                        color: '#4B5563',
+                                                                        border: '1px solid #E5E7EB',
+                                                                        '& .MuiAlert-icon': {
+                                                                            color: '#6B7280'
+                                                                        }
+                                                            }}
+                                                        >
+                                                            No leaves available to carry forward or encash
+                                                        </Alert>
+                                                    )}
+                                                </Paper>
+                                            ) : null}
 
-                                            {/* CURRENT YEAR REALITY - MOST IMPORTANT */}
+                                            {/* Current Year Opening Balance - Highlight Card */}
                                             <Paper 
-                                                elevation={4} 
+                                                elevation={0} 
                                                 sx={{ 
                                                     p: 3, 
                                                     mb: 3, 
-                                                    bgcolor: '#FFFFFF',
+                                                    bgcolor: '#F0FDF4',
                                                     borderRadius: 2,
-                                                    border: '2px solid #D32F2F'
+                                                    border: '1px solid #BBF7D0',
+                                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                                                 }}
                                             >
                                                 <Typography 
                                                     variant="h6" 
                                                     sx={{ 
                                                         mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
+                                                        color: '#1F2937', 
+                                                        fontWeight: 600,
                                                         fontSize: '1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 1,
-                                                        borderLeft: '4px solid #D32F2F',
-                                                        pl: 1.5
+                                                        letterSpacing: '0.025em'
                                                     }}
                                                 >
-                                                    <CalendarToday sx={{ fontSize: 24, color: '#D32F2F' }} />
-                                                    LEAVES AVAILABLE FROM 1st JANUARY {leaveUsageData.year}
+                                                    Opening Balance — {leaveUsageData.year}
                                                 </Typography>
                                                 
-                                                <Box sx={{ textAlign: 'center', py: 2 }}>
+                                                <Box sx={{ textAlign: 'center', py: 1 }}>
                                                     <Typography 
                                                         variant="h2" 
                                                         sx={{ 
                                                             fontWeight: 700, 
-                                                            color: '#000000',
-                                                            mb: 1
+                                                            color: '#065F46',
+                                                            mb: 1.5,
+                                                            fontSize: '3rem',
+                                                            lineHeight: 1
                                                         }}
                                                     >
-                                                        {totalCurrentBalance.toFixed(1)} <span style={{ fontSize: '1.5rem', fontWeight: 400 }}>DAYS</span>
+                                                        {totalCurrentBalance.toFixed(1)}
                                                     </Typography>
-                                                    <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                        Opening Balance (after carry forward / encash)
+                                                    <Typography 
+                                                        variant="body1" 
+                                                        sx={{ 
+                                                            color: '#047857',
+                                                            mb: 1,
+                                                            fontSize: '0.9375rem',
+                                                            fontWeight: 500
+                                                        }}
+                                                    >
+                                                        Days Available
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{ mt: 1, color: '#000000' }}>
-                                                        Effective From: <strong>01 January {leaveUsageData.year}</strong>
+                                                    <Typography 
+                                                        variant="body2" 
+                                                        sx={{ 
+                                                            color: '#6B7280',
+                                                            fontSize: '0.8125rem'
+                                                        }}
+                                                    >
+                                                        Effective from 01 January {leaveUsageData.year}
                                                     </Typography>
                                                 </Box>
                                             </Paper>
@@ -1721,36 +2354,56 @@ const LeavesTrackerPage = () => {
                                                 
                                                 return (
                                                     <>
-                                                        <Paper elevation={2} sx={{ p: 2, mb: 3, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E0E0E0' }}>
-                                                            <Typography variant="h6" sx={{ mb: 2, color: '#000000', fontWeight: 600, borderLeft: '4px solid #D32F2F', pl: 1.5 }}>
+                                                        <Paper 
+                                                            elevation={0} 
+                                                            sx={{ 
+                                                                p: 3, 
+                                                                mb: 3, 
+                                                                bgcolor: '#FFFFFF', 
+                                                                borderRadius: 2, 
+                                                                border: '1px solid #E5E7EB',
+                                                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                                                            }}
+                                                        >
+                                                            <Typography 
+                                                                variant="h6" 
+                                                                sx={{ 
+                                                                    mb: 3, 
+                                                                    color: '#1F2937', 
+                                                                    fontWeight: 600,
+                                                                    fontSize: '1rem',
+                                                                    letterSpacing: '0.025em'
+                                                                }}
+                                                            >
                                                                 Leave Usage KPIs ({leaveUsageData.year})
                                                             </Typography>
-                                                            <Grid container spacing={2}>
+                                                            <Grid container spacing={2.5}>
                                                                 {/* KPI 1: Total Leaves Taken */}
                                                                 <Grid item xs={12} sm={6} md={3}>
                                                                     <Paper 
-                                                                        elevation={1} 
+                                                                        elevation={0} 
                                                                         sx={{ 
-                                                                            p: 2, 
+                                                                            p: 2.5, 
                                                                             textAlign: 'center', 
-                                                                            bgcolor: '#FFFFFF', 
-                                                                            borderRadius: 1, 
-                                                                            border: '1px solid #000000',
-                                                                            minHeight: '120px',
-                                                                            maxHeight: '120px',
-                                                                            height: '120px',
+                                                                            bgcolor: totalDaysTaken > 0 ? '#FFFFFF' : '#F9FAFB', 
+                                                                            borderRadius: 2, 
+                                                                            border: '1px solid #E5E7EB',
+                                                                            minHeight: '130px',
                                                                             display: 'flex',
                                                                             flexDirection: 'column',
                                                                             justifyContent: 'space-between',
-                                                                            width: '100%'
+                                                                            width: '100%',
+                                                                            boxShadow: totalDaysTaken > 0 ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'
                                                                         }}
                                                                     >
                                                                         <Typography 
-                                                                            variant="caption" 
+                                                                            variant="body2" 
                                                                             display="block" 
                                                                             sx={{ 
-                                                                                mb: 1, 
-                                                                                color: '#000000',
+                                                                                mb: 1.5, 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.875rem',
+                                                                                fontWeight: 500,
                                                                                 overflow: 'hidden',
                                                                                 textOverflow: 'ellipsis',
                                                                                 whiteSpace: 'nowrap'
@@ -1758,10 +2411,28 @@ const LeavesTrackerPage = () => {
                                                                         >
                                                                             Total Leaves Taken
                                                                         </Typography>
-                                                                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#000000', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        <Typography 
+                                                                            variant="h4" 
+                                                                            sx={{ 
+                                                                                fontWeight: 700, 
+                                                                                color: totalDaysTaken > 0 ? '#111827' : '#9CA3AF', 
+                                                                                flex: 1, 
+                                                                                display: 'flex', 
+                                                                                alignItems: 'center', 
+                                                                                justifyContent: 'center',
+                                                                                fontSize: '2rem'
+                                                                            }}
+                                                                        >
                                                                             {totalDaysTaken.toFixed(1)}
                                                                         </Typography>
-                                                                        <Typography variant="caption" sx={{ color: '#000000', mt: 'auto' }}>
+                                                                        <Typography 
+                                                                            variant="caption" 
+                                                                            sx={{ 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.8125rem',
+                                                                                mt: 'auto'
+                                                                            }}
+                                                                        >
                                                                             Days
                                                                         </Typography>
                                                                     </Paper>
@@ -1770,28 +2441,29 @@ const LeavesTrackerPage = () => {
                                                                 {/* KPI 2: Full-Day Leaves */}
                                                                 <Grid item xs={12} sm={6} md={3}>
                                                                     <Paper 
-                                                                        elevation={1} 
+                                                                        elevation={0} 
                                                                         sx={{ 
-                                                                            p: 2, 
+                                                                            p: 2.5, 
                                                                             textAlign: 'center', 
-                                                                            bgcolor: '#FFFFFF', 
-                                                                            borderRadius: 1, 
-                                                                            border: '1px solid #000000',
-                                                                            minHeight: '120px',
-                                                                            maxHeight: '120px',
-                                                                            height: '120px',
+                                                                            bgcolor: fullDayCount > 0 ? '#FFFFFF' : '#F9FAFB', 
+                                                                            borderRadius: 2, 
+                                                                            border: '1px solid #E5E7EB',
+                                                                            minHeight: '130px',
                                                                             display: 'flex',
                                                                             flexDirection: 'column',
                                                                             justifyContent: 'space-between',
-                                                                            width: '100%'
+                                                                            width: '100%',
+                                                                            boxShadow: fullDayCount > 0 ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'
                                                                         }}
                                                                     >
                                                                         <Typography 
-                                                                            variant="caption" 
+                                                                            variant="body2" 
                                                                             display="block" 
                                                                             sx={{ 
-                                                                                mb: 1, 
-                                                                                color: '#000000',
+                                                                                mb: 1.5, 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.875rem',
+                                                                                fontWeight: 500,
                                                                                 overflow: 'hidden',
                                                                                 textOverflow: 'ellipsis',
                                                                                 whiteSpace: 'nowrap'
@@ -1799,10 +2471,28 @@ const LeavesTrackerPage = () => {
                                                                         >
                                                                             Full-Day Leaves
                                                                         </Typography>
-                                                                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#000000', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        <Typography 
+                                                                            variant="h4" 
+                                                                            sx={{ 
+                                                                                fontWeight: 700, 
+                                                                                color: fullDayCount > 0 ? '#111827' : '#9CA3AF', 
+                                                                                flex: 1, 
+                                                                                display: 'flex', 
+                                                                                alignItems: 'center', 
+                                                                                justifyContent: 'center',
+                                                                                fontSize: '2rem'
+                                                                            }}
+                                                                        >
                                                                             {fullDayCount}
                                                                         </Typography>
-                                                                        <Typography variant="caption" sx={{ color: '#000000', mt: 'auto' }}>
+                                                                        <Typography 
+                                                                            variant="caption" 
+                                                                            sx={{ 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.8125rem',
+                                                                                mt: 'auto'
+                                                                            }}
+                                                                        >
                                                                             Days
                                                                         </Typography>
                                                                     </Paper>
@@ -1811,28 +2501,29 @@ const LeavesTrackerPage = () => {
                                                                 {/* KPI 3: Half-Day Leaves */}
                                                                 <Grid item xs={12} sm={6} md={3}>
                                                                     <Paper 
-                                                                        elevation={1} 
+                                                                        elevation={0} 
                                                                         sx={{ 
-                                                                            p: 2, 
+                                                                            p: 2.5, 
                                                                             textAlign: 'center', 
-                                                                            bgcolor: '#FFFFFF', 
-                                                                            borderRadius: 1, 
-                                                                            border: '1px solid #000000',
-                                                                            minHeight: '120px',
-                                                                            maxHeight: '120px',
-                                                                            height: '120px',
+                                                                            bgcolor: halfDayCount > 0 ? '#FFFFFF' : '#F9FAFB', 
+                                                                            borderRadius: 2, 
+                                                                            border: '1px solid #E5E7EB',
+                                                                            minHeight: '130px',
                                                                             display: 'flex',
                                                                             flexDirection: 'column',
                                                                             justifyContent: 'space-between',
-                                                                            width: '100%'
+                                                                            width: '100%',
+                                                                            boxShadow: halfDayCount > 0 ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'
                                                                         }}
                                                                     >
                                                                         <Typography 
-                                                                            variant="caption" 
+                                                                            variant="body2" 
                                                                             display="block" 
                                                                             sx={{ 
-                                                                                mb: 1, 
-                                                                                color: '#000000',
+                                                                                mb: 1.5, 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.875rem',
+                                                                                fontWeight: 500,
                                                                                 overflow: 'hidden',
                                                                                 textOverflow: 'ellipsis',
                                                                                 whiteSpace: 'nowrap'
@@ -1840,15 +2531,42 @@ const LeavesTrackerPage = () => {
                                                                         >
                                                                             Half-Day Leaves
                                                                         </Typography>
-                                                                        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                                                                            <Typography variant="h4" sx={{ fontWeight: 700, color: '#000000' }}>
+                                                                        <Box sx={{ 
+                                                                            flex: 1, 
+                                                                            display: 'flex', 
+                                                                            flexDirection: 'column', 
+                                                                            justifyContent: 'center', 
+                                                                            alignItems: 'center' 
+                                                                        }}>
+                                                                            <Typography 
+                                                                                variant="h4" 
+                                                                                sx={{ 
+                                                                                    fontWeight: 700, 
+                                                                                    color: halfDayCount > 0 ? '#111827' : '#9CA3AF',
+                                                                                    fontSize: '2rem'
+                                                                                }}
+                                                                            >
                                                                                 {halfDayCount}
                                                                             </Typography>
-                                                                            <Typography variant="caption" sx={{ color: '#000000', mt: 0.5 }}>
+                                                                            <Typography 
+                                                                                variant="caption" 
+                                                                                sx={{ 
+                                                                                    color: '#6B7280',
+                                                                                    mt: 0.5,
+                                                                                    fontSize: '0.8125rem'
+                                                                                }}
+                                                                            >
                                                                                 Half-Days
                                                                             </Typography>
                                                                             {halfDayCount > 0 && (
-                                                                                <Typography variant="caption" sx={{ mt: 0.25, color: '#000000', fontSize: '0.65rem' }}>
+                                                                                <Typography 
+                                                                                    variant="caption" 
+                                                                                    sx={{ 
+                                                                                        mt: 0.25, 
+                                                                                        color: '#9CA3AF', 
+                                                                                        fontSize: '0.6875rem'
+                                                                                    }}
+                                                                                >
                                                                                     ({halfDayCount * 0.5} Full Days)
                                                                                 </Typography>
                                                                             )}
@@ -1859,28 +2577,29 @@ const LeavesTrackerPage = () => {
                                                                 {/* KPI 4: Leave Types Used */}
                                                                 <Grid item xs={12} sm={6} md={3}>
                                                                     <Paper 
-                                                                        elevation={1} 
+                                                                        elevation={0} 
                                                                         sx={{ 
-                                                                            p: 2, 
+                                                                            p: 2.5, 
                                                                             textAlign: 'center', 
-                                                                            bgcolor: '#FFFFFF', 
-                                                                            borderRadius: 1, 
-                                                                            border: '1px solid #000000',
-                                                                            minHeight: '120px',
-                                                                            maxHeight: '120px',
-                                                                            height: '120px',
+                                                                            bgcolor: mostUsedType && mostUsedType[1] > 0 ? '#FFFFFF' : '#F9FAFB', 
+                                                                            borderRadius: 2, 
+                                                                            border: '1px solid #E5E7EB',
+                                                                            minHeight: '130px',
                                                                             display: 'flex',
                                                                             flexDirection: 'column',
                                                                             justifyContent: 'space-between',
-                                                                            width: '100%'
+                                                                            width: '100%',
+                                                                            boxShadow: mostUsedType && mostUsedType[1] > 0 ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'
                                                                         }}
                                                                     >
                                                                         <Typography 
-                                                                            variant="caption" 
+                                                                            variant="body2" 
                                                                             display="block" 
                                                                             sx={{ 
-                                                                                mb: 1, 
-                                                                                color: '#000000',
+                                                                                mb: 1.5, 
+                                                                                color: '#6B7280',
+                                                                                fontSize: '0.875rem',
+                                                                                fontWeight: 500,
                                                                                 overflow: 'hidden',
                                                                                 textOverflow: 'ellipsis',
                                                                                 whiteSpace: 'nowrap'
@@ -1893,33 +2612,34 @@ const LeavesTrackerPage = () => {
                                                                             display: 'flex', 
                                                                             flexDirection: 'column', 
                                                                             justifyContent: 'center',
-                                                                            alignItems: 'center',
+                                                                            alignItems: 'flex-start',
                                                                             textAlign: 'left',
                                                                             width: '100%',
-                                                                            overflow: 'hidden'
+                                                                            overflow: 'hidden',
+                                                                            px: 1
                                                                         }}>
                                                                             {leaveTypesUsed.sick > 0 && (
-                                                                                <Typography variant="body2" sx={{ mb: 0.25, color: '#000000', fontSize: '0.75rem' }}>
-                                                                                    <strong>Sick:</strong> {leaveTypesUsed.sick.toFixed(1)}
+                                                                                <Typography variant="body2" sx={{ mb: 0.5, color: '#374151', fontSize: '0.8125rem' }}>
+                                                                                    <strong style={{ color: '#111827' }}>Sick:</strong> {leaveTypesUsed.sick.toFixed(1)}
                                                                                 </Typography>
                                                                             )}
                                                                             {leaveTypesUsed.casual > 0 && (
-                                                                                <Typography variant="body2" sx={{ mb: 0.25, color: '#000000', fontSize: '0.75rem' }}>
-                                                                                    <strong>Casual:</strong> {leaveTypesUsed.casual.toFixed(1)}
+                                                                                <Typography variant="body2" sx={{ mb: 0.5, color: '#374151', fontSize: '0.8125rem' }}>
+                                                                                    <strong style={{ color: '#111827' }}>Casual:</strong> {leaveTypesUsed.casual.toFixed(1)}
                                                                                 </Typography>
                                                                             )}
                                                                             {leaveTypesUsed.planned > 0 && (
-                                                                                <Typography variant="body2" sx={{ mb: 0.25, color: '#000000', fontSize: '0.75rem' }}>
-                                                                                    <strong>Planned:</strong> {leaveTypesUsed.planned.toFixed(1)}
+                                                                                <Typography variant="body2" sx={{ mb: 0.5, color: '#374151', fontSize: '0.8125rem' }}>
+                                                                                    <strong style={{ color: '#111827' }}>Planned:</strong> {leaveTypesUsed.planned.toFixed(1)}
                                                                                 </Typography>
                                                                             )}
                                                                             {leaveTypesUsed.unpaid > 0 && (
-                                                                                <Typography variant="body2" sx={{ color: '#000000', fontSize: '0.75rem' }}>
-                                                                                    <strong>Loss of Pay:</strong> {leaveTypesUsed.unpaid.toFixed(1)}
+                                                                                <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.8125rem' }}>
+                                                                                    <strong style={{ color: '#111827' }}>Loss of Pay:</strong> {leaveTypesUsed.unpaid.toFixed(1)}
                                                                                 </Typography>
                                                                             )}
                                                                             {totalDaysTaken === 0 && (
-                                                                                <Typography variant="body2" sx={{ color: '#000000', fontSize: '0.75rem' }}>
+                                                                                <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: '0.8125rem', width: '100%', textAlign: 'center' }}>
                                                                                     No leaves taken
                                                                                 </Typography>
                                                                             )}
@@ -1931,9 +2651,9 @@ const LeavesTrackerPage = () => {
 
                                                         {/* LEAVE USAGE SUMMARY - PLAIN LANGUAGE */}
                                                         {totalDaysTaken > 0 && (
-                                                            <Paper elevation={2} sx={{ p: 3, mb: 3, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E0E0E0' }}>
-                                                                <Typography variant="h6" sx={{ mb: 2, color: '#000000', fontWeight: 600, borderLeft: '4px solid #D32F2F', pl: 1.5 }}>
-                                                                    LEAVE USAGE SUMMARY
+                                                            <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
+                                                                <Typography variant="h6" sx={{ mb: 2, color: '#1F2937', fontWeight: 600, fontSize: '1rem', letterSpacing: '0.025em' }}>
+                                                                    Leave Usage Summary
                                                                 </Typography>
                                                                 <Box sx={{ pl: 1 }}>
                                                                     <Typography variant="body1" sx={{ mb: 1.5, color: '#000000' }}>
@@ -1962,15 +2682,37 @@ const LeavesTrackerPage = () => {
                                             })()}
 
                                             {/* DETAILED BREAKDOWN - COLLAPSIBLE */}
-                                            <Accordion sx={{ mb: 2, border: '1px solid #E0E0E0' }}>
-                                                <AccordionSummary expandIcon={<ExpandMore sx={{ color: '#000000' }} />}>
-                                                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#000000' }}>
-                                                        View Detailed Breakdown by Leave Type
-                                                    </Typography>
-                                                </AccordionSummary>
-                                                <AccordionDetails>
+                                            <Accordion 
+                                                defaultExpanded
+                                                sx={{ 
+                                                    mb: 3, 
+                                                    border: '1px solid #E5E7EB',
+                                                    borderRadius: 2,
+                                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                                    '&:before': { display: 'none' }
+                                                }}
+                                            >
+                                                <AccordionSummary 
+                                                    expandIcon={<ExpandMore sx={{ color: '#6B7280' }} />}
+                                                    sx={{
+                                                        px: 3,
+                                                        py: 2,
+                                                        borderBottom: '1px solid #E5E7EB',
+                                                        '&:hover': { bgcolor: '#F9FAFB' }
+                                                    }}
+                                                >
                                                     <Box>
-                                                        {/* Summary by Leave Type */}
+                                                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', fontSize: '1rem', mb: 0.5 }}>
+                                                            Leave Type Breakdown
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.8125rem' }}>
+                                                            Allocation, usage, and balance by leave category
+                                                        </Typography>
+                                                    </Box>
+                                                </AccordionSummary>
+                                                <AccordionDetails sx={{ px: 3, py: 3 }}>
+                                                    <Box>
+                                                        {/* Summary by Leave Type - Metric Cards */}
                                                         {['Sick', 'Casual', 'Paid'].map((leaveType) => {
                                                             const typeKey = leaveType.toLowerCase();
                                                             const opening = leaveUsageData.previousYearOpening[typeKey] || 0;
@@ -1984,54 +2726,200 @@ const LeavesTrackerPage = () => {
                                                             const rejectedYearEnd = yearEndRequests.find(r => r.status === 'Rejected');
                                                             const yearEndAction = approvedYearEnd || pendingYearEnd || rejectedYearEnd || null;
                                                             
+                                                            // Determine status badge
+                                                            let statusBadge = { label: 'Active', color: '#10B981', bgColor: '#D1FAE5' };
+                                                            if (currentBalance === 0 && utilized === 0) {
+                                                                statusBadge = { label: 'Not Used', color: '#6B7280', bgColor: '#F3F4F6' };
+                                                            } else if (currentBalance === 0 && utilized > 0) {
+                                                                statusBadge = { label: 'Exhausted', color: '#EF4444', bgColor: '#FEE2E2' };
+                                                            }
+                                                            
                                                             return (
-                                                                <Box key={leaveType} sx={{ mb: 3, p: 2, bgcolor: '#FFFFFF', borderRadius: 1, border: '1px solid #E0E0E0' }}>
-                                                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#000000' }}>
-                                                                        {leaveType} Leave
-                                                                    </Typography>
-                                                                    <Grid container spacing={2}>
-                                                                        <Grid item xs={12} sm={6} md={3}>
-                                                                            <Typography variant="body2" sx={{ color: '#000000' }}>Allocated Last Year</Typography>
-                                                                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#000000' }}>{opening}</Typography>
+                                                                <Paper 
+                                                                    key={leaveType} 
+                                                                    elevation={0}
+                                                                    sx={{ 
+                                                                        mb: 2, 
+                                                                        p: 3, 
+                                                                        bgcolor: '#FFFFFF', 
+                                                                        borderRadius: 2, 
+                                                                        border: '1px solid #E5E7EB',
+                                                                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                                                                    }}
+                                                                >
+                                                                    {/* Leave Type Header */}
+                                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                                                        <Typography 
+                                                                            variant="h6" 
+                                                                            sx={{ 
+                                                                                fontWeight: 600, 
+                                                                                color: '#1F2937',
+                                                                                fontSize: '1.125rem'
+                                                                            }}
+                                                                        >
+                                                                            {leaveType} Leave
+                                                                        </Typography>
+                                                                        <Chip
+                                                                            label={statusBadge.label}
+                                                                            size="small"
+                                                                            sx={{
+                                                                                bgcolor: statusBadge.bgColor,
+                                                                                color: statusBadge.color,
+                                                                                fontWeight: 500,
+                                                                                fontSize: '0.75rem',
+                                                                                height: 24,
+                                                                                border: 'none'
+                                                                            }}
+                                                                        />
+                                                                    </Box>
+                                                                    
+                                                                    {/* Metric Grid */}
+                                                                    <Grid container spacing={3}>
+                                                                        <Grid item xs={6} sm={3}>
+                                                                            <Box sx={{ textAlign: 'center' }}>
+                                                                                <Typography 
+                                                                                    variant="body2" 
+                                                                                    sx={{ 
+                                                                                        color: '#6B7280',
+                                                                                        fontSize: '0.8125rem',
+                                                                                        mb: 1,
+                                                                                        fontWeight: 500
+                                                                                    }}
+                                                                                >
+                                                                                    Allocated
+                                                                                </Typography>
+                                                                                <Typography 
+                                                                                    variant="h5" 
+                                                                                    sx={{ 
+                                                                                        fontWeight: 700, 
+                                                                                        color: '#111827',
+                                                                                        fontSize: '1.5rem'
+                                                                                    }}
+                                                                                >
+                                                                                    {opening}
+                                                                                </Typography>
+                                                                            </Box>
                                                                         </Grid>
-                                                                        <Grid item xs={12} sm={6} md={3}>
-                                                                            <Typography variant="body2" sx={{ color: '#000000' }}>Used</Typography>
-                                                                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#000000' }}>{utilized.toFixed(1)}</Typography>
+                                                                        <Grid item xs={6} sm={3}>
+                                                                            <Box sx={{ textAlign: 'center' }}>
+                                                                                <Typography 
+                                                                                    variant="body2" 
+                                                                                    sx={{ 
+                                                                                        color: '#6B7280',
+                                                                                        fontSize: '0.8125rem',
+                                                                                        mb: 1,
+                                                                                        fontWeight: 500
+                                                                                    }}
+                                                                                >
+                                                                                    Used
+                                                                                </Typography>
+                                                                                <Typography 
+                                                                                    variant="h5" 
+                                                                                    sx={{ 
+                                                                                        fontWeight: 700, 
+                                                                                        color: '#111827',
+                                                                                        fontSize: '1.5rem'
+                                                                                    }}
+                                                                                >
+                                                                                    {utilized.toFixed(1)}
+                                                                                </Typography>
+                                                                            </Box>
                                                                         </Grid>
-                                                                        <Grid item xs={12} sm={6} md={3}>
-                                                                            <Typography variant="body2" sx={{ color: '#000000' }}>Remaining</Typography>
-                                                                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#000000' }}>{remaining.toFixed(1)}</Typography>
+                                                                        <Grid item xs={6} sm={3}>
+                                                                            <Box sx={{ textAlign: 'center' }}>
+                                                                                <Typography 
+                                                                                    variant="body2" 
+                                                                                    sx={{ 
+                                                                                        color: '#6B7280',
+                                                                                        fontSize: '0.8125rem',
+                                                                                        mb: 1,
+                                                                                        fontWeight: 500
+                                                                                    }}
+                                                                                >
+                                                                                    Remaining
+                                                                                </Typography>
+                                                                                <Typography 
+                                                                                    variant="h5" 
+                                                                                    sx={{ 
+                                                                                        fontWeight: 700, 
+                                                                                        color: '#111827',
+                                                                                        fontSize: '1.5rem'
+                                                                                    }}
+                                                                                >
+                                                                                    {remaining.toFixed(1)}
+                                                                                </Typography>
+                                                                            </Box>
                                                                         </Grid>
-                                                                        <Grid item xs={12} sm={6} md={3}>
-                                                                            <Typography variant="body2" sx={{ color: '#000000' }}>Current Balance</Typography>
-                                                                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#000000' }}>{currentBalance.toFixed(1)}</Typography>
+                                                                        <Grid item xs={6} sm={3}>
+                                                                            <Box sx={{ textAlign: 'center' }}>
+                                                                                <Typography 
+                                                                                    variant="body2" 
+                                                                                    sx={{ 
+                                                                                        color: '#6B7280',
+                                                                                        fontSize: '0.8125rem',
+                                                                                        mb: 1,
+                                                                                        fontWeight: 500
+                                                                                    }}
+                                                                                >
+                                                                                    Balance
+                                                                                </Typography>
+                                                                                <Typography 
+                                                                                    variant="h5" 
+                                                                                    sx={{ 
+                                                                                        fontWeight: 700, 
+                                                                                        color: '#111827',
+                                                                                        fontSize: '1.5rem'
+                                                                                    }}
+                                                                                >
+                                                                                    {currentBalance.toFixed(1)}
+                                                                                </Typography>
+                                                                            </Box>
                                                                         </Grid>
-                                                                        {yearEndAction && (
-                                                                            <>
-                                                                                {yearEndAction.yearEndSubType === 'CARRY_FORWARD' && (
-                                                                                    <Grid item xs={12} sm={6}>
-                                                                                        <Typography variant="body2" sx={{ color: '#000000' }}>Carried Forward</Typography>
-                                                                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#000000' }}>{yearEndAction.yearEndDays || 0} days</Typography>
-                                                                                    </Grid>
-                                                                                )}
-                                                                                {yearEndAction.yearEndSubType === 'ENCASH' && (
-                                                                                    <Grid item xs={12} sm={6}>
-                                                                                        <Typography variant="body2" sx={{ color: '#000000' }}>Encashed</Typography>
-                                                                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#000000' }}>{yearEndAction.yearEndDays || 0} days</Typography>
-                                                                                    </Grid>
-                                                                                )}
-                                                                            </>
-                                                                        )}
                                                                     </Grid>
-                                                                </Box>
+                                                                    
+                                                                    {/* Year-End Action Info */}
+                                                                    {yearEndAction && (
+                                                                        <Box sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid #E5E7EB' }}>
+                                                                            {yearEndAction.yearEndSubType === 'CARRY_FORWARD' && (
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                    <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
+                                                                                        Carried Forward:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>
+                                                                                        {yearEndAction.yearEndDays || 0} days
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                            )}
+                                                                            {yearEndAction.yearEndSubType === 'ENCASH' && (
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                    <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
+                                                                                        Encashed:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>
+                                                                                        {yearEndAction.yearEndDays || 0} days
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                            )}
+                                                                        </Box>
+                                                                    )}
+                                                                </Paper>
                                                             );
                                                         })}
                                                         
-                                                        <Divider sx={{ my: 3, borderColor: '#E0E0E0' }} />
+                                                        <Divider sx={{ my: 3, borderColor: '#E5E7EB' }} />
                                                         
                                                         {/* Detailed Leave Records with Half-Day Intelligence */}
                                                         <Box>
-                                                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#000000' }}>
+                                                            <Typography 
+                                                                variant="h6" 
+                                                                sx={{ 
+                                                                    mb: 2.5, 
+                                                                    fontWeight: 600, 
+                                                                    color: '#1F2937',
+                                                                    fontSize: '1rem',
+                                                                    letterSpacing: '0.025em'
+                                                                }}
+                                                            >
                                                                 Detailed Leave Records ({leaveUsageData.year})
                                                             </Typography>
                                                             {(() => {
@@ -2039,22 +2927,44 @@ const LeavesTrackerPage = () => {
                                                                 
                                                                 if (approvedLeaves.length === 0) {
                                                                     return (
-                                                                        <Alert sx={{ bgcolor: '#FFFFFF', color: '#000000', border: '1px solid #E0E0E0' }}>
-                                                                            No approved leave records found for {leaveUsageData.year}.
-                                                                        </Alert>
+                                                                        <Paper
+                                                                            elevation={0}
+                                                                            sx={{
+                                                                                p: 3,
+                                                                                bgcolor: '#F9FAFB',
+                                                                                borderRadius: 2,
+                                                                                border: '1px solid #E5E7EB',
+                                                                                textAlign: 'center'
+                                                                            }}
+                                                                        >
+                                                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                                                                <CheckCircle sx={{ fontSize: 40, color: '#9CA3AF' }} />
+                                                                                <Typography variant="body1" sx={{ color: '#4B5563', fontWeight: 500 }}>
+                                                                                    This employee has not used any approved leaves in {leaveUsageData.year}.
+                                                                                </Typography>
+                                                                            </Box>
+                                                                        </Paper>
                                                                     );
                                                                 }
                                                                 
                                                                 return (
-                                                                    <TableContainer component={Paper} elevation={1} sx={{ border: '1px solid #E0E0E0' }}>
+                                                                    <TableContainer 
+                                                                        component={Paper} 
+                                                                        elevation={0}
+                                                                        sx={{ 
+                                                                            border: '1px solid #E5E7EB',
+                                                                            borderRadius: 2,
+                                                                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                                                                        }}
+                                                                    >
                                                                         <Table size="small">
                                                                             <TableHead>
-                                                                                <TableRow sx={{ bgcolor: '#FFFFFF', borderBottom: '2px solid #000000' }}>
-                                                                                    <TableCell sx={{ fontWeight: 'bold', color: '#000000' }}>Leave Type</TableCell>
-                                                                                    <TableCell sx={{ fontWeight: 'bold', color: '#000000' }}>Day Type</TableCell>
-                                                                                    <TableCell sx={{ fontWeight: 'bold', color: '#000000' }}>Half Type</TableCell>
-                                                                                    <TableCell sx={{ fontWeight: 'bold', color: '#000000' }}>Date(s)</TableCell>
-                                                                                    <TableCell sx={{ fontWeight: 'bold', color: '#000000' }} align="right">Days</TableCell>
+                                                                                <TableRow sx={{ bgcolor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                                                                                    <TableCell sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Leave Type</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Day Type</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Half Type</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Date(s)</TableCell>
+                                                                                    <TableCell sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }} align="right">Days</TableCell>
                                                                                 </TableRow>
                                                                             </TableHead>
                                                                             <TableBody>
@@ -2077,18 +2987,22 @@ const LeavesTrackerPage = () => {
                                                                                             key={leave._id || idx} 
                                                                                             sx={{ 
                                                                                                 bgcolor: '#FFFFFF',
-                                                                                                '&:hover': { bgcolor: 'rgba(211, 47, 47, 0.05)' }
+                                                                                                borderBottom: '1px solid #F3F4F6',
+                                                                                                '&:hover': { bgcolor: '#F9FAFB' },
+                                                                                                '&:last-child td': { borderBottom: 'none' }
                                                                                             }}
                                                                                         >
-                                                                                            <TableCell sx={{ color: '#000000' }}>{requestTypeName}</TableCell>
+                                                                                            <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem' }}>{requestTypeName}</TableCell>
                                                                                             <TableCell>
                                                                                                 <Chip 
                                                                                                     label={dayType} 
                                                                                                     size="small" 
                                                                                                     sx={{
-                                                                                                        bgcolor: '#FFFFFF',
-                                                                                                        color: '#000000',
-                                                                                                        border: '1px solid #000000'
+                                                                                                        bgcolor: '#F3F4F6',
+                                                                                                        color: '#374151',
+                                                                                                        border: '1px solid #D1D5DB',
+                                                                                                        fontSize: '0.75rem',
+                                                                                                        height: 24
                                                                                                     }}
                                                                                                 />
                                                                                             </TableCell>
@@ -2100,28 +3014,30 @@ const LeavesTrackerPage = () => {
                                                                                                         variant="outlined"
                                                                                                         sx={{
                                                                                                             bgcolor: '#FFFFFF',
-                                                                                                            color: '#000000',
-                                                                                                            border: '1px solid #E0E0E0'
+                                                                                                            color: '#6B7280',
+                                                                                                            border: '1px solid #D1D5DB',
+                                                                                                            fontSize: '0.75rem',
+                                                                                                            height: 24
                                                                                                         }}
                                                                                                     />
                                                                                                 ) : (
-                                                                                                    <Typography variant="body2" sx={{ color: '#000000' }}>-</Typography>
+                                                                                                    <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: '0.875rem' }}>-</Typography>
                                                                                                 )}
                                                                                             </TableCell>
-                                                                                            <TableCell sx={{ color: '#000000' }}>
+                                                                                            <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem' }}>
                                                                                                 {leave.leaveDates && leave.leaveDates.length > 0 ? (
                                                                                                     leave.leaveDates.map((date, i) => (
-                                                                                                        <Typography key={i} variant="body2" component="span" sx={{ color: '#000000' }}>
+                                                                                                        <Typography key={i} variant="body2" component="span" sx={{ color: '#1F2937', fontSize: '0.875rem' }}>
                                                                                                             {new Date(date).toLocaleDateString()}
                                                                                                             {i < leave.leaveDates.length - 1 && ', '}
                                                                                                         </Typography>
                                                                                                     ))
                                                                                                 ) : (
-                                                                                                    <Typography variant="body2" sx={{ color: '#000000' }}>N/A</Typography>
+                                                                                                    <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: '0.875rem' }}>N/A</Typography>
                                                                                                 )}
                                                                                             </TableCell>
                                                                                             <TableCell align="right">
-                                                                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#000000' }}>
+                                                                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937', fontSize: '0.875rem' }}>
                                                                                                     {daysValue.toFixed(1)}
                                                                                                 </Typography>
                                                                                             </TableCell>
@@ -2155,12 +3071,14 @@ const LeavesTrackerPage = () => {
                         setLeaveUsageData(null);
                         setDialogSelectedYear(new Date().getFullYear());
                     }}
-                    variant="contained"
+                    variant="outlined"
                     sx={{ 
-                        backgroundColor: '#D32F2F', 
-                        '&:hover': { backgroundColor: '#B71C1C' }, 
-                        color: '#FFFFFF',
-                        border: 'none'
+                        borderColor: '#D1D5DB',
+                        color: '#374151',
+                        '&:hover': { 
+                            borderColor: '#9CA3AF',
+                            backgroundColor: '#F9FAFB'
+                        }
                     }}
                 >
                     Close

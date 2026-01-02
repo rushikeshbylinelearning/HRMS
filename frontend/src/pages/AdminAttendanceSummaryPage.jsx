@@ -19,7 +19,7 @@ import api from '../api/axios';
 import AttendanceTimeline from '../components/AttendanceTimeline';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import LogDetailModal from '../components/LogDetailModal';
-import { getAttendanceStatus } from '../utils/saturdayUtils';
+import { normalizeDate, findLeaveForDate, findHolidayForDate } from '../utils/dateUtils';
 import '../styles/AdminAttendanceSummaryPage.css';
 
 const AdminAttendanceSummaryPage = () => {
@@ -73,6 +73,8 @@ const AdminAttendanceSummaryPage = () => {
     }, []);
 
     // Continuous timer to update the 'now' state
+    // TODO: Replace this local timer with useGlobalNow hook to reduce multiple timers
+    // Example: const nowTimestamp = useGlobalNow(true); const now = new Date(nowTimestamp);
     useEffect(() => {
         const timerId = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(timerId);
@@ -137,9 +139,13 @@ const AdminAttendanceSummaryPage = () => {
             const allLeaves = Array.isArray(leavesRes.data.requests) ? leavesRes.data.requests : [];
             
             // Filter leaves for the selected employee and approved status
-            const fetchedLeaves = allLeaves.filter(leave => 
-                leave.employee._id === employeeId && leave.status === 'Approved'
-            );
+            const fetchedLeaves = allLeaves.filter(leave => {
+                if (leave.status !== 'Approved') return false;
+                // Handle both cases: employee as object with _id, or employee as string ID
+                const employeeIdStr = String(employeeId);
+                const leaveEmployeeId = leave.employee?._id ? String(leave.employee._id) : String(leave.employee);
+                return leaveEmployeeId === employeeIdStr;
+            });
             
             setHolidays(fetchedHolidays);
             setLeaves(fetchedLeaves);
@@ -314,44 +320,9 @@ const AdminAttendanceSummaryPage = () => {
         }
     };
 
-    // Helper function to check if a date is a holiday
-    const getHolidayForDate = (date) => {
-        // Use local date formatting to avoid timezone issues
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        
-        return holidays.find(holiday => {
-            const holidayDate = new Date(holiday.date);
-            const holidayYear = holidayDate.getFullYear();
-            const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
-            const holidayDay = String(holidayDate.getDate()).padStart(2, '0');
-            const holidayDateStr = `${holidayYear}-${holidayMonth}-${holidayDay}`;
-            return holidayDateStr === dateStr;
-        });
-    };
-
-    // Helper function to check if a date is a leave
-    const getLeaveForDate = (date) => {
-        // Use local date formatting to avoid timezone issues
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        
-        return leaves.find(leave => {
-            if (leave.status !== 'Approved') return false;
-            return leave.leaveDates.some(leaveDateItem => {
-                const leaveDate = new Date(leaveDateItem);
-                const leaveYear = leaveDate.getFullYear();
-                const leaveMonth = String(leaveDate.getMonth() + 1).padStart(2, '0');
-                const leaveDay = String(leaveDate.getDate()).padStart(2, '0');
-                const leaveDateStr = `${leaveYear}-${leaveMonth}-${leaveDay}`;
-                return leaveDateStr === dateStr;
-            });
-        });
-    };
+    // Use centralized date utilities (same as Employee view)
+    const getHolidayForDate = (date) => findHolidayForDate(date, holidays);
+    const getLeaveForDate = (date) => findLeaveForDate(date, leaves);
 
 
     // Format attendance data for admin list view
@@ -390,6 +361,58 @@ const AdminAttendanceSummaryPage = () => {
             let statusColor = '#ff6b6b';
             let shift = selectedEmployeeObject?.shiftGroup?.shiftName || 'Morning';
             
+            // UNIFIED RESOLUTION: Trust backend's resolved status first (from attendanceStatusResolver)
+            // The backend now returns fully resolved status that considers holidays, leaves, weekends, etc.
+            if (log && log.attendanceStatus) {
+                // Backend has already resolved the status - use it directly
+                const resolvedStatus = log.attendanceStatus;
+                
+                // Map resolved status to display format
+                if (resolvedStatus.startsWith('Holiday -')) {
+                    status = resolvedStatus;
+                    statusColor = '#9c27b0';
+                    payableHours = '09:00';
+                } else if (resolvedStatus === 'Comp Off') {
+                    status = 'Comp Off';
+                    statusColor = '#1976d2';
+                    payableHours = '00:00';
+                } else if (resolvedStatus === 'Swap Leave') {
+                    status = 'Swap Leave';
+                    statusColor = '#f57c00';
+                    payableHours = '00:00';
+                } else if (resolvedStatus.startsWith('Leave -')) {
+                    status = resolvedStatus;
+                    statusColor = '#74c0fc';
+                    // Check leave type for payable hours
+                    const leave = log.leave || getLeaveForDate(date);
+                    payableHours = leave && leave.leaveType && leave.leaveType.startsWith('Half Day') ? '04:30' : '00:00';
+                } else if (resolvedStatus === 'Weekend' || resolvedStatus === 'Week Off') {
+                    status = resolvedStatus;
+                    statusColor = '#9e9e9e';
+                    payableHours = '09:00';
+                } else if (resolvedStatus === 'Present' || resolvedStatus === 'On-time') {
+                    status = 'Present';
+                    statusColor = '#51cf66';
+                    payableHours = '09:00';
+                } else if (resolvedStatus === 'Late') {
+                    status = 'Late';
+                    statusColor = '#ff9800';
+                    payableHours = '09:00';
+                } else if (resolvedStatus === 'Half Day' || resolvedStatus === 'Half-day') {
+                    status = 'Half Day';
+                    statusColor = '#ff9800';
+                    payableHours = '04:30';
+                } else if (resolvedStatus === 'Absent') {
+                    status = 'Absent';
+                    statusColor = '#ff6b6b';
+                    payableHours = '00:00';
+                } else {
+                    // Fallback: use resolved status as-is
+                    status = resolvedStatus;
+                }
+            }
+            
+            // If log has sessions, calculate work hours (but status is already resolved by backend)
             if (log && log.sessions && log.sessions.length > 0) {
                 // Sort sessions by start time
                 const sortedSessions = log.sessions.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
@@ -461,23 +484,44 @@ const AdminAttendanceSummaryPage = () => {
                 const minutes = Math.round((netHours - hours) * 60);
                 totalHours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                 
-                payableHours = '09:00';
-                
-                // Determine status - if there are work sessions, they are present
-                if (log.status === 'On Leave') {
-                    status = 'On Leave';
-                    statusColor = '#74c0fc';
-                } else {
-                    // If there are work sessions, they are present regardless of log.status
-                    status = 'Present';
-                    statusColor = '#51cf66';
+                // Status is already resolved by backend, but ensure payable hours are set for present days
+                if (!payableHours || payableHours === '-') {
+                    payableHours = '09:00';
                 }
-            } else {
-                // Use centralized attendance status function
-                const statusInfo = getAttendanceStatus(date, log, selectedEmployeeObject?.alternateSaturdayPolicy || 'All Saturdays Working', holidays, leaves);
-                status = statusInfo.status;
-                statusColor = statusInfo.statusColor;
-                payableHours = statusInfo.payableHours;
+            } else if (!log || !log.attendanceStatus) {
+                // No log or no resolved status - this should be rare with new backend
+                // For dates without logs, determine status based on day of week
+                const dayOfWeek = date.getDay();
+                if (dayOfWeek === 0) {
+                    status = 'Weekend';
+                    statusColor = '#9e9e9e';
+                    payableHours = '09:00';
+                } else if (dayOfWeek === 6) {
+                    // Check Saturday policy
+                    const weekNum = Math.ceil(date.getDate() / 7);
+                    const satPolicy = selectedEmployeeObject?.alternateSaturdayPolicy || 'All Saturdays Working';
+                    let isWorkingSaturday = true;
+                    if (satPolicy === 'All Saturdays Off') {
+                        isWorkingSaturday = false;
+                    } else if (satPolicy === 'Week 1 & 3 Off' && (weekNum === 1 || weekNum === 3)) {
+                        isWorkingSaturday = false;
+                    } else if (satPolicy === 'Week 2 & 4 Off' && (weekNum === 2 || weekNum === 4)) {
+                        isWorkingSaturday = false;
+                    }
+                    if (!isWorkingSaturday) {
+                        status = 'Week Off';
+                        statusColor = '#9e9e9e';
+                        payableHours = '09:00';
+                    } else {
+                        status = 'Absent';
+                        statusColor = '#ff6b6b';
+                        payableHours = '00:00';
+                    }
+                } else {
+                    status = 'Absent';
+                    statusColor = '#ff6b6b';
+                    payableHours = '00:00';
+                }
             }
             
             return {

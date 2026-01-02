@@ -12,6 +12,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../api/axios';
+import { formatDateYYYYMMDD } from '../utils/dateUtils';
 
 const formSectionStyles = {
     p: 2.5,
@@ -55,7 +56,7 @@ const ProbationSettingsModal = ({ open, onClose, employee, onSave }) => {
                 employeeType: data.employee.employeeType || 'On-Role',
                 probationStatus: data.employee.probationStatus || 'None',
                 conversionDate: data.employee.conversionDate 
-                    ? new Date(data.employee.conversionDate).toISOString().slice(0, 10) 
+                    ? formatDateYYYYMMDD(new Date(data.employee.conversionDate)) 
                     : '',
                 probationDurationMonths: data.employee.probationDurationMonths || 3
             });

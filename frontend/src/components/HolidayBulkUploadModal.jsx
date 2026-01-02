@@ -340,35 +340,50 @@ const HolidayBulkUploadModal = memo(({ open, onClose, onSuccess }) => {
 
     return (
         <>
-            <Dialog open={open} onClose={handleClose} fullWidth maxWidth="lg">
-                <DialogTitle>
+            <Dialog 
+                open={open} 
+                onClose={handleClose} 
+                fullWidth 
+                maxWidth="sm"
+                PaperProps={{ 
+                    sx: { 
+                        borderRadius: '12px',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                    } 
+                }}
+            >
+                <DialogTitle sx={{ 
+                    backgroundColor: '#ffffff',
+                    color: '#212121', 
+                    fontWeight: 600,
+                    fontSize: '1.25rem',
+                    py: 2.5,
+                    px: 3,
+                    borderBottom: '2px solid #dc3545'
+                }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <UploadFileIcon />
+                        <UploadFileIcon sx={{ color: '#dc3545' }} />
                         Upload Holidays from Excel
                     </Box>
                 </DialogTitle>
-                <DialogContent>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                            Excel Format Requirements:
-                        </Typography>
-                        <Typography variant="body2" component="div">
-                            • Headers: <strong>S.No, Date, Day, Holiday</strong> (case-insensitive, order doesn't matter)
-                            <br />
-                            • Date formats: <strong>26-Jan</strong>, <strong>3-Mar</strong>, <strong>2025-01-26</strong>, or <strong>Not Yet decided</strong>
-                            <br />
-                            • Day: Single day (e.g., Monday) or multiple days (e.g., Saturday & Monday)
-                            <br />
-                            • Holiday name: Required, max 100 characters
-                        </Typography>
-                    </Alert>
-
+                <DialogContent sx={{ backgroundColor: '#ffffff', p: 3 }}>
                     <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
                         <Button
                             variant="outlined"
                             startIcon={<DownloadIcon />}
                             onClick={handleDownloadSample}
-                            size="small"
+                            sx={{
+                                borderColor: '#d0d0d0',
+                                color: '#424242',
+                                textTransform: 'none',
+                                fontWeight: 500,
+                                '&:hover': {
+                                    borderColor: '#dc3545',
+                                    color: '#dc3545',
+                                    backgroundColor: '#fff5f5'
+                                }
+                            }}
                         >
                             Download Sample Template
                         </Button>
@@ -388,6 +403,18 @@ const HolidayBulkUploadModal = memo(({ open, onClose, onSuccess }) => {
                                 component="span"
                                 startIcon={<UploadFileIcon />}
                                 fullWidth
+                                sx={{
+                                    borderColor: '#d0d0d0',
+                                    color: '#424242',
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    py: 1.5,
+                                    '&:hover': {
+                                        borderColor: '#dc3545',
+                                        color: '#dc3545',
+                                        backgroundColor: '#fff5f5'
+                                    }
+                                }}
                             >
                                 {file ? file.name : 'Choose Excel File (.xlsx or .xls)'}
                             </Button>
@@ -475,15 +502,56 @@ const HolidayBulkUploadModal = memo(({ open, onClose, onSuccess }) => {
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={handleClose} disabled={uploading}>
+                <DialogActions sx={{ 
+                    p: 3,
+                    backgroundColor: '#ffffff',
+                    borderTop: '1px solid #e0e0e0',
+                    gap: 2
+                }}>
+                    <Button 
+                        onClick={handleClose} 
+                        disabled={uploading}
+                        variant="outlined"
+                        sx={{
+                            color: '#424242',
+                            borderColor: '#d0d0d0',
+                            px: 3,
+                            py: 1,
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            '&:hover': {
+                                borderColor: '#dc3545',
+                                color: '#dc3545',
+                                backgroundColor: '#fff5f5'
+                            },
+                            '&.Mui-disabled': {
+                                borderColor: '#e0e0e0',
+                                color: '#9e9e9e'
+                            }
+                        }}
+                    >
                         Cancel
                     </Button>
                     <Button
                         variant="contained"
                         onClick={handleUpload}
                         disabled={uploading || previewData.length === 0 || errors.length > 0}
-                        startIcon={uploading ? <CircularProgress size={16} /> : <UploadFileIcon />}
+                        startIcon={uploading ? <CircularProgress size={16} sx={{ color: '#ffffff' }} /> : <UploadFileIcon />}
+                        sx={{
+                            backgroundColor: '#dc3545',
+                            color: '#ffffff',
+                            px: 3,
+                            py: 1,
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            '&:hover': {
+                                backgroundColor: '#c82333'
+                            },
+                            '&.Mui-disabled': {
+                                backgroundColor: '#e0e0e0',
+                                color: '#9e9e9e'
+                            }
+                        }}
                     >
                         {uploading ? 'Uploading...' : 'Upload Holidays'}
                     </Button>

@@ -228,8 +228,24 @@ const createIndexes = async () => {
 
     // AttendanceSession indexes - For session tracking
     await createIndexIfNotExists(AttendanceSession.collection, { attendanceLog: 1, endTime: 1 }, { name: "log_endTime" });
-    // Note: Cannot create index on { endTime: null } - MongoDB doesn't allow null values in index keys
-    // For active sessions (where endTime is null), use: { endTime: { $exists: false } } or { endTime: null }
+    // CRITICAL: Unique partial index to prevent duplicate active sessions (race condition prevention)
+    // This ensures only ONE session with endTime = null exists per attendanceLog at database level
+    // The index is created in the model schema, but we ensure it exists here as well for migration safety
+    try {
+      await createIndexIfNotExists(
+        AttendanceSession.collection,
+        { attendanceLog: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { endTime: null },
+          name: "unique_active_session_per_log"
+        }
+      );
+    } catch (indexError) {
+      // If index creation fails (e.g., already exists with different options), log and continue
+      // The schema-level index definition will handle it on model initialization
+      console.log('ℹ️  Unique active session index may already exist or will be created by schema:', indexError.message);
+    }
     // The endTime index will help with queries that check for existing endTime values
     await createIndexIfNotExists(AttendanceSession.collection, { endTime: 1 }, { name: "endTime_index" });
     await createIndexIfNotExists(AttendanceSession.collection, { attendanceLog: 1, endTime: 1 }, { name: "attendanceLog_endTime" }); // For finding active sessions

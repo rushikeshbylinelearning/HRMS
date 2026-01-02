@@ -10,15 +10,13 @@ import {
     Box,
     Chip,
     Avatar,
-    Divider,
     TextField,
     Stack,
-    Card,
-    CardContent,
     IconButton,
     Tooltip,
     Alert,
-    CircularProgress
+    CircularProgress,
+    Paper
 } from '@mui/material';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import api from '../api/axios';
@@ -36,8 +34,9 @@ import {
     AttachFile as AttachFileIcon,
     PictureAsPdf as PdfIcon,
     Image as ImageIcon,
-    OpenInNew as OpenInNewIcon,
-    Visibility as VisibilityIcon
+    Visibility as VisibilityIcon,
+    Receipt as ReceiptIcon,
+    Label as LabelIcon
 } from '@mui/icons-material';
 
 const EnhancedLeaveRequestModal = ({ 
@@ -80,7 +79,16 @@ const EnhancedLeaveRequestModal = ({
         });
     };
 
-    // Utility function to convert individual dates to date ranges
+    // Format date for metadata row (shorter format)
+    const formatShortDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Utility function to convert individual dates to date ranges (for highlight section)
     const formatDateRange = (dateStrings) => {
         if (!dateStrings || dateStrings.length === 0) return 'N/A';
         
@@ -91,40 +99,34 @@ const EnhancedLeaveRequestModal = ({
             .sort((a, b) => a - b);
         
         if (dates.length === 0) return 'N/A';
-        if (dates.length === 1) return formatDate(dates[0]);
-        
-        // Group consecutive dates into ranges
-        const ranges = [];
-        let start = dates[0];
-        let end = dates[0];
-        
-        for (let i = 1; i < dates.length; i++) {
-            const currentDate = dates[i];
-            const previousDate = dates[i - 1];
-            const dayDiff = (currentDate - previousDate) / (1000 * 60 * 60 * 24);
-            
-            if (dayDiff === 1) {
-                // Consecutive date, extend the range
-                end = currentDate;
-            } else {
-                // Gap found, save current range and start new one
-                ranges.push({ start, end });
-                start = currentDate;
-                end = currentDate;
-            }
+        if (dates.length === 1) {
+            const date = dates[0];
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                weekday: 'long'
+            });
         }
         
-        // Add the last range
-        ranges.push({ start, end });
+        // Format as range: "Dec 31, 2025 → Jan 1, 2026"
+        const start = dates[0];
+        const end = dates[dates.length - 1];
         
-        // Format ranges
-        return ranges.map(range => {
-            if (range.start.getTime() === range.end.getTime()) {
-                return formatDate(range.start);
-            } else {
-                return `${formatDate(range.start)} to ${formatDate(range.end)}`;
-            }
-        }).join(', ');
+        const startStr = start.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            weekday: 'long'
+        });
+        const endStr = end.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            weekday: 'long'
+        });
+        
+        return `${startStr} → ${endStr}`;
     };
 
     // Utility function to count total leave days
@@ -135,10 +137,10 @@ const EnhancedLeaveRequestModal = ({
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'Approved': return 'success';
-            case 'Rejected': return 'error';
-            case 'Pending': return 'warning';
-            default: return 'default';
+            case 'Approved': return '#4caf50'; // Green
+            case 'Rejected': return '#f44336'; // Red
+            case 'Pending': return '#ff9800'; // Amber
+            default: return '#757575';
         }
     };
 
@@ -152,9 +154,17 @@ const EnhancedLeaveRequestModal = ({
     };
 
     const handleApprove = async () => {
+        // If blocked by validation, require override reason
+        if (request.validationBlocked && !request.adminOverride) {
+            if (!overrideReason.trim()) {
+                setShowOverrideForm(true);
+                return;
+            }
+        }
+        
         setActionLoading(true);
         try {
-            await onStatusChange(request._id, 'Approved');
+            await onStatusChange(request._id, 'Approved', null, overrideReason.trim() || undefined);
             onClose();
         } catch (error) {
             console.error('Error approving request:', error);
@@ -274,6 +284,8 @@ const EnhancedLeaveRequestModal = ({
 
     if (!request) return null;
 
+    const statusColor = getStatusColor(request.status);
+
     return (
         <Dialog 
             open={open} 
@@ -282,50 +294,69 @@ const EnhancedLeaveRequestModal = ({
             fullWidth
             PaperProps={{
                 sx: { 
-                    borderRadius: 4,
-                    minHeight: '60vh',
+                    borderRadius: 2,
                     background: '#ffffff',
-                    boxShadow: `0 8px 32px ${primaryColor.shadow}`
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    maxHeight: '90vh',
+                    overflow: 'hidden'
                 }
             }}
         >
-            {/* Header */}
+            {/* Sticky Header with Employee Info & Status */}
             <DialogTitle sx={{ 
-                pb: 2, 
-                pt: 3,
-                px: 3,
-                background: primaryColor.gradient,
-                color: 'white',
-                position: 'relative',
-                boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`
+                p: 3,
+                bgcolor: '#ffffff',
+                borderBottom: '1px solid #e0e0e0',
+                position: 'sticky',
+                top: 0,
+                zIndex: 10
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                        <Avatar sx={{ 
-                            bgcolor: 'rgba(255,255,255,0.25)', 
-                            width: 56, 
-                            height: 56,
-                            border: '2px solid rgba(255,255,255,0.3)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                        }}>
-                            <PersonIcon sx={{ fontSize: 28 }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                        <Avatar 
+                            src={request.employee?.profileImageUrl}
+                            sx={{ 
+                                width: 56, 
+                                height: 56, 
+                                bgcolor: primaryColor.main,
+                                fontSize: '1.5rem',
+                                fontWeight: 600
+                            }}
+                        >
+                            {request.employee?.fullName?.charAt(0) || 'E'}
                         </Avatar>
-                        <Box>
-                            <Typography variant="h5" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
-                                Leave Request Details
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: '#212121', mb: 0.5 }}>
+                                {request.employee?.fullName || 'Unknown Employee'}
                             </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }}>
-                                Request ID: {request._id?.slice(-8) || 'N/A'}
+                            <Typography variant="body2" sx={{ color: '#757575', fontWeight: 500 }}>
+                                {request.employee?.employeeCode || 'N/A'}
                             </Typography>
                         </Box>
+                        <Chip
+                            icon={getStatusIcon(request.status)}
+                            label={request.status}
+                            sx={{
+                                bgcolor: statusColor,
+                                color: 'white',
+                                fontWeight: 600,
+                                height: 36,
+                                fontSize: '0.875rem',
+                                '& .MuiChip-icon': {
+                                    color: 'white'
+                                }
+                            }}
+                        />
                     </Box>
                     <IconButton 
                         onClick={handleClose} 
                         sx={{ 
-                            color: 'white',
-                            bgcolor: 'rgba(255,255,255,0.1)',
+                            color: '#757575',
+                            ml: 2,
                             '&:hover': {
-                                bgcolor: 'rgba(255,255,255,0.2)'
+                                bgcolor: '#f5f5f5'
                             }
                         }}
                     >
@@ -334,499 +365,415 @@ const EnhancedLeaveRequestModal = ({
                 </Box>
             </DialogTitle>
 
-            <DialogContent sx={{ p: 3, bgcolor: '#fafafa' }}>
-                {/* Employee Information Card */}
-                <Card sx={{ 
-                    mb: 3, 
-                    boxShadow: `0 2px 12px ${primaryColor.shadow}`,
-                    borderRadius: 3,
-                    border: `1px solid ${primaryColor.border}`,
-                    background: primaryColor.paperGradient
-                }}>
-                    <CardContent sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                            <Avatar 
-                                src={request.employee?.profileImageUrl} 
-                                sx={{ 
-                                    width: 64, 
-                                    height: 64, 
-                                    bgcolor: primaryColor.main,
-                                    border: '3px solid #fff',
-                                    boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`,
-                                    fontSize: '1.5rem',
-                                    fontWeight: 600
-                                }}
-                            >
-                                {request.employee?.fullName?.charAt(0) || 'E'}
-                            </Avatar>
-                            <Box sx={{ flex: 1 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: primaryColor.main, mb: 0.5 }}>
-                                    {request.employee?.fullName || 'Unknown Employee'}
+            <DialogContent sx={{ p: 0, flex: 1, overflow: 'auto', bgcolor: '#fafafa' }}>
+                <Box sx={{ p: 3 }}>
+                    {/* Primary Highlight: Leave Dates Section */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 4,
+                            mb: 3,
+                            bgcolor: '#ffebee',
+                            borderRadius: 2,
+                            border: '1px solid #ffcdd2'
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                            <Box sx={{ flex: 1, minWidth: 200 }}>
+                                <Typography variant="h5" sx={{ fontWeight: 700, color: '#c62828', mb: 1.5, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+                                    {formatDateRange(request.leaveDates)}
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, mb: 0.25 }}>
-                                    {request.employee?.employeeCode || 'N/A'} • {request.employee?.designation || 'N/A'}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {request.employee?.department || 'N/A'}
-                                </Typography>
+                                {request.requestType === 'Compensatory' && request.alternateDate && (
+                                    <Typography variant="body2" sx={{ color: '#424242', mt: 1 }}>
+                                        Alternate Work Date: {formatShortDate(request.alternateDate)}
+                                    </Typography>
+                                )}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                <Chip
+                                    label={`${countLeaveDays(request.leaveDates)} Day${countLeaveDays(request.leaveDates) !== 1 ? 's' : ''}`}
+                                    sx={{
+                                        bgcolor: '#c62828',
+                                        color: 'white',
+                                        fontWeight: 700,
+                                        height: 36,
+                                        fontSize: '0.9375rem'
+                                    }}
+                                />
+                                <Chip
+                                    label={request.leaveType}
+                                    variant="outlined"
+                                    sx={{
+                                        borderColor: '#c62828',
+                                        color: '#c62828',
+                                        fontWeight: 600,
+                                        height: 36,
+                                        fontSize: '0.9375rem'
+                                    }}
+                                />
                             </Box>
                         </Box>
-                    </CardContent>
-                </Card>
+                    </Paper>
 
-                {/* Request Details Grid */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 3 }}>
-                    {/* Request Type & Leave Type */}
-                    <Card sx={{ 
-                        boxShadow: `0 2px 8px ${primaryColor.shadow}`,
-                        borderRadius: 3,
-                        border: `1px solid ${primaryColor.border}`,
-                        background: '#ffffff'
-                    }}>
-                        <CardContent sx={{ p: 2.5 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main, mb: 2 }}>
-                                Request Information
-                            </Typography>
-                            <Stack spacing={2.5}>
-                                <Box>
-                                    <Typography variant="body2" sx={{ 
-                                        mb: 1.5, 
-                                        fontWeight: 700,
-                                        color: '#1976d2',
-                                        fontSize: '0.875rem',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
-                                    }}>
+                    {/* Key Metadata Row */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            mb: 3,
+                            bgcolor: '#ffffff',
+                            borderRadius: 2,
+                            border: '1px solid #e0e0e0',
+                            fontFamily: '"Aptos", "Segoe UI", sans-serif'
+                        }}
+                    >
+                        <Box sx={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, 
+                            gap: 3,
+                            alignItems: 'center'
+                        }}>
+                            <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <TimeIcon sx={{ fontSize: 18, color: '#757575' }} />
+                                    <Typography variant="caption" sx={{ color: '#757575', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'inherit' }}>
+                                        Submitted On
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1565c0', fontFamily: 'inherit' }}>
+                                    {formatShortDate(request.createdAt)}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <ReceiptIcon sx={{ fontSize: 18, color: '#757575' }} />
+                                    <Typography variant="caption" sx={{ color: '#757575', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'inherit' }}>
                                         Request Type
                                     </Typography>
-                                    <Chip 
-                                        label={formatLeaveRequestType(request.requestType)} 
-                                        sx={{ 
-                                            bgcolor: '#1976d2',
-                                            color: 'white',
-                                            border: 'none',
-                                            fontWeight: 700,
-                                            height: 40,
-                                            fontSize: '0.95rem',
-                                            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
-                                            '&:hover': {
-                                                bgcolor: '#1565c0',
-                                                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)'
-                                            }
-                                        }}
-                                        size="medium"
-                                    />
                                 </Box>
-                                <Box>
-                                    <Typography variant="body2" sx={{ 
-                                        mb: 1.5, 
-                                        fontWeight: 700,
-                                        color: '#d32f2f',
-                                        fontSize: '0.875rem',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        Leave Type
-                                    </Typography>
-                                    <Chip 
-                                        label={request.leaveType} 
-                                        sx={{ 
-                                            bgcolor: '#d32f2f',
-                                            color: 'white',
-                                            border: 'none',
-                                            fontWeight: 700,
-                                            height: 40,
-                                            fontSize: '0.95rem',
-                                            boxShadow: '0 2px 8px rgba(211, 47, 47, 0.3)',
-                                            '&:hover': {
-                                                bgcolor: '#c62828',
-                                                boxShadow: '0 4px 12px rgba(211, 47, 47, 0.4)'
-                                            }
-                                        }}
-                                        size="medium"
-                                    />
-                                </Box>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-
-                    {/* Status & Dates */}
-                    <Card sx={{ 
-                        boxShadow: `0 2px 8px ${primaryColor.shadow}`,
-                        borderRadius: 3,
-                        border: `1px solid ${primaryColor.border}`,
-                        background: '#ffffff'
-                    }}>
-                        <CardContent sx={{ p: 2.5 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main, mb: 2 }}>
-                                Status & Timeline
-                            </Typography>
-                            <Stack spacing={2.5}>
-                                <Box>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                                        Status
-                                    </Typography>
-                                    <Chip 
-                                        icon={getStatusIcon(request.status)}
-                                        label={request.status} 
-                                        color={getStatusColor(request.status)}
-                                        size="medium"
-                                        sx={{ 
-                                            fontWeight: 600,
-                                            height: 32,
-                                            '& .MuiChip-icon': {
-                                                color: 'inherit'
-                                            }
-                                        }}
-                                    />
-                                </Box>
-                                <Box sx={{
-                                    bgcolor: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)',
-                                    background: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    border: '2px solid #4caf50',
-                                    boxShadow: '0 4px 12px rgba(76, 175, 80, 0.25)'
-                                }}>
-                                    <Typography variant="body2" sx={{ 
-                                        mb: 1.5, 
-                                        fontWeight: 700,
-                                        color: 'white',
-                                        fontSize: '0.875rem',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        Submitted
-                                    </Typography>
-                                    <Typography variant="body1" sx={{ 
-                                        fontWeight: 700, 
-                                        color: 'white',
-                                        fontSize: '1.1rem',
-                                        textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                                    }}>
-                                        {formatDate(request.createdAt)}
-                                    </Typography>
-                                </Box>
-                                {request.approvedAt && (
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                                            {request.status === 'Approved' ? 'Approved' : 'Rejected'} On
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 500, color: '#424242' }}>
-                                            {formatDate(request.approvedAt)}
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Leave Dates */}
-                <Card sx={{ 
-                    mb: 3, 
-                    boxShadow: `0 2px 8px ${primaryColor.shadow}`,
-                    borderRadius: 3,
-                    border: `1px solid ${primaryColor.border}`,
-                    background: '#ffffff'
-                }}>
-                    <CardContent sx={{ p: 2.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                            <CalendarIcon sx={{ color: primaryColor.dark, fontSize: 24 }} />
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main }}>
-                                Leave Dates
-                            </Typography>
-                        </Box>
-                        {request.requestType === 'Compensatory' && request.alternateDate ? (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                                <Box sx={{ 
-                                    p: 2.5, 
-                                    background: primaryColor.solidGradient,
-                                    borderRadius: 2,
-                                    color: 'white',
-                                    boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`
-                                }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
-                                        <Chip 
-                                            label={`${countLeaveDays(request.leaveDates)} day${countLeaveDays(request.leaveDates) !== 1 ? 's' : ''}`} 
-                                            size="small" 
-                                            sx={{ 
-                                                bgcolor: 'rgba(255,255,255,0.25)',
-                                                color: 'white',
-                                                border: '1px solid rgba(255,255,255,0.4)',
-                                                fontWeight: 700,
-                                                fontSize: '0.75rem',
-                                                minWidth: '70px',
-                                                justifyContent: 'center',
-                                                height: 28
-                                            }}
-                                            variant="outlined"
-                                        />
-                                        <Typography variant="body2" fontWeight={700}>Leave Date</Typography>
-                                    </Box>
-                                    <Typography variant="body1" sx={{ ml: 9, fontWeight: 500 }}>
-                                        {formatDateRange(request.leaveDates)}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ 
-                                    p: 2.5, 
-                                    bgcolor: primaryColor.subtle,
-                                    borderRadius: 2,
-                                    border: `2px solid ${primaryColor.border}`,
-                                    color: primaryColor.main
-                                }}>
-                                    <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
-                                        Alternate Work Date
-                                    </Typography>
-                                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                        {formatDate(request.alternateDate)}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        ) : (
-                            <Box sx={{ 
-                                p: 2.5, 
-                                background: primaryColor.solidGradient,
-                                borderRadius: 2,
-                                color: 'white',
-                                boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`
-                            }}>
-                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                                    <Chip 
-                                        label={`${countLeaveDays(request.leaveDates)} day${countLeaveDays(request.leaveDates) !== 1 ? 's' : ''}`} 
-                                        size="small" 
-                                        sx={{ 
-                                            bgcolor: 'rgba(255,255,255,0.25)',
-                                            color: 'white',
-                                            border: '1px solid rgba(255,255,255,0.4)',
-                                            fontWeight: 700,
-                                            fontSize: '0.75rem',
-                                            minWidth: '70px',
-                                            justifyContent: 'center',
-                                            height: 28
-                                        }}
-                                        variant="outlined"
-                                    />
-                                    <Typography variant="body1" sx={{ fontWeight: 500, pt: 0.5 }}>
-                                        {formatDateRange(request.leaveDates)}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Reason */}
-                <Card sx={{ 
-                    mb: 3, 
-                    boxShadow: `0 2px 8px ${primaryColor.shadow}`,
-                    borderRadius: 3,
-                    border: `1px solid ${primaryColor.border}`,
-                    background: '#ffffff'
-                }}>
-                    <CardContent sx={{ p: 2.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                            <DescriptionIcon sx={{ color: primaryColor.dark, fontSize: 24 }} />
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main }}>
-                                Reason
-                            </Typography>
-                        </Box>
-                        <Box sx={{ 
-                            p: 2.5, 
-                            bgcolor: 'rgba(44, 62, 80, 0.06)',
-                            borderRadius: 2, 
-                            border: `1px solid ${primaryColor.border}`,
-                            minHeight: 80
-                        }}>
-                            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: '#424242', lineHeight: 1.7 }}>
-                                {request.reason}
-                            </Typography>
-                        </Box>
-                    </CardContent>
-                </Card>
-
-                {/* Medical Certificate (for Sick Leave) */}
-                {request.requestType === 'Sick' && request.medicalCertificate && (
-                    <Card sx={{ 
-                        mb: 3, 
-                        boxShadow: `0 2px 8px ${primaryColor.shadow}`,
-                        borderRadius: 3,
-                        border: `1px solid ${primaryColor.border}`,
-                        background: '#ffffff'
-                    }}>
-                        <CardContent sx={{ p: 2.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                                <AttachFileIcon sx={{ color: primaryColor.dark, fontSize: 24 }} />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main }}>
-                                    Medical Certificate
+                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#212121', fontFamily: 'inherit' }}>
+                                    {formatLeaveRequestType(request.requestType)}
                                 </Typography>
                             </Box>
-                            <Box sx={{ 
-                                p: 2.5, 
-                                bgcolor: 'rgba(44, 62, 80, 0.06)',
-                                borderRadius: 2, 
-                                border: `1px solid ${primaryColor.border}`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 2
+                            <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <LabelIcon sx={{ fontSize: 18, color: '#757575' }} />
+                                    <Typography variant="caption" sx={{ color: '#757575', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'inherit' }}>
+                                        Leave Type
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#212121', fontFamily: 'inherit' }}>
+                                    {request.leaveType}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Paper>
+
+                    {/* Reason Section */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            mb: 3,
+                            bgcolor: '#ffffff',
+                            borderRadius: 2,
+                            border: '1px solid #e0e0e0'
+                        }}
+                    >
+                        <Box sx={{ p: 2.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#212121', mb: 2 }}>
+                                Reason for Leave
+                            </Typography>
+                            <Typography variant="body1" sx={{ 
+                                color: '#424242', 
+                                lineHeight: 1.7,
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word'
                             }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                                    {request.medicalCertificate.toLowerCase().endsWith('.pdf') ? (
-                                        <PdfIcon sx={{ color: '#d32f2f', fontSize: 40 }} />
-                                    ) : (
-                                        <ImageIcon sx={{ color: primaryColor.main, fontSize: 40 }} />
-                                    )}
-                                    <Box>
-                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#424242', mb: 0.5 }}>
-                                            Medical Certificate
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                {request.reason || 'No reason provided'}
+                            </Typography>
+                        </Box>
+                    </Paper>
+
+                    {/* Medical Certificate (for Sick Leave) */}
+                    {request.requestType === 'Sick' && request.medicalCertificate && (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                mb: 3,
+                                bgcolor: '#ffffff',
+                                borderRadius: 2,
+                                border: '1px solid #e0e0e0'
+                            }}
+                        >
+                            <Box sx={{ p: 2.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#212121', mb: 2 }}>
+                                    Medical Certificate
+                                </Typography>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    gap: 2,
+                                    p: 2,
+                                    bgcolor: '#f5f5f5',
+                                    borderRadius: 1,
+                                    border: '1px solid #e0e0e0'
+                                }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                                        {request.medicalCertificate.toLowerCase().endsWith('.pdf') ? (
+                                            <PdfIcon sx={{ color: '#d32f2f', fontSize: 36 }} />
+                                        ) : (
+                                            <ImageIcon sx={{ color: '#757575', fontSize: 36 }} />
+                                        )}
+                                        <Typography variant="body2" sx={{ color: '#757575' }}>
                                             {request.medicalCertificate.split('/').pop() || 'Certificate file'}
                                         </Typography>
                                     </Box>
-                                </Box>
-                                <Stack direction="row" spacing={1}>
                                     <Button
                                         variant="outlined"
                                         startIcon={loadingCertificate ? <CircularProgress size={16} /> : <VisibilityIcon />}
                                         onClick={() => handleViewCertificate(request.medicalCertificate)}
                                         disabled={loadingCertificate}
                                         sx={{
-                                            borderColor: primaryColor.borderStrong,
-                                            color: primaryColor.main,
+                                            borderColor: '#757575',
+                                            color: '#212121',
                                             fontWeight: 600,
                                             '&:hover': {
-                                                borderColor: primaryColor.main,
-                                                bgcolor: primaryColor.subtle
-                                            },
-                                            '&:disabled': {
-                                                borderColor: primaryColor.border,
-                                                color: primaryColor.main,
-                                                opacity: 0.6
+                                                borderColor: '#424242',
+                                                bgcolor: '#f5f5f5'
                                             }
                                         }}
                                     >
                                         View
                                     </Button>
-                                    <Button
-                                        variant="contained"
-                                        startIcon={loadingCertificate ? <CircularProgress size={16} /> : <OpenInNewIcon />}
-                                        onClick={() => handleViewCertificate(request.medicalCertificate)}
-                                        disabled={loadingCertificate}
-                                        sx={{
-                                            bgcolor: primaryColor.main,
-                                            color: 'white',
-                                            fontWeight: 600,
-                                            '&:hover': {
-                                                bgcolor: primaryColor.dark
-                                            },
-                                            '&:disabled': {
-                                                bgcolor: primaryColor.light,
-                                                opacity: 0.7
-                                            }
-                                        }}
-                                    >
-                                        Open
-                                    </Button>
-                                </Stack>
+                                </Box>
                             </Box>
-                        </CardContent>
-                    </Card>
-                )}
+                        </Paper>
+                    )}
 
-                {/* Rejection Notes (if exists) */}
-                {request.rejectionNotes && (
-                    <Card sx={{ 
-                        mb: 3, 
-                        boxShadow: `0 2px 8px ${primaryColor.shadowStrong}`,
-                        borderRadius: 3, 
-                        border: `2px solid ${primaryColor.main}`,
-                        background: 'linear-gradient(135deg, #ffecec 0%, #ffdcdc 100%)'
-                    }}>
-                        <CardContent sx={{ p: 2.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                                <WarningIcon sx={{ color: primaryColor.dark, fontSize: 24 }} />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main }}>
-                                    Rejection Reason
-                                </Typography>
-                            </Box>
-                            <Box sx={{ 
-                                p: 2.5, 
-                                bgcolor: primaryColor.subtleStrong,
+                    {/* Validation Blocked Details (if blocked by policy) */}
+                    {request.validationBlocked && (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                mb: 3,
+                                bgcolor: '#fff3e0',
                                 borderRadius: 2,
-                                border: `1px solid ${primaryColor.borderStrong}`,
-                                color: primaryColor.dark
-                            }}>
-                                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', fontWeight: 500 }}>
+                                border: '2px solid #ff9800'
+                            }}
+                        >
+                            <Box sx={{ p: 2.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                    <WarningIcon sx={{ color: '#ff9800', fontSize: 22 }} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#e65100' }}>
+                                        Policy Blocked
+                                    </Typography>
+                                </Box>
+                                <Alert severity="warning" sx={{ mb: 2, bgcolor: '#fff3e0' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                        This leave request was blocked by company policy:
+                                    </Typography>
+                                    {request.blockedRules && request.blockedRules.length > 0 && (
+                                        <Box sx={{ mb: 1 }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                                                Blocked Rules:
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                {request.blockedRules.map((rule, idx) => (
+                                                    <Chip 
+                                                        key={idx}
+                                                        label={rule.replace(/_/g, ' ')}
+                                                        size="small"
+                                                        sx={{ 
+                                                            bgcolor: '#ff9800',
+                                                            color: 'white',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.7rem'
+                                                        }}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    )}
+                                    {request.blockedReason && (
+                                        <Typography variant="body2" sx={{ 
+                                            whiteSpace: 'pre-wrap', 
+                                            color: '#424242',
+                                            lineHeight: 1.7,
+                                            mt: 1
+                                        }}>
+                                            <strong>Reason:</strong> {request.blockedReason}
+                                        </Typography>
+                                    )}
+                                    {request.adminOverride && (
+                                        <Box sx={{ mt: 2, p: 1.5, bgcolor: '#e8f5e9', borderRadius: 1 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#2e7d32', mb: 0.5 }}>
+                                                ✓ Admin Override Applied
+                                            </Typography>
+                                            {request.overrideReason && (
+                                                <Typography variant="caption" sx={{ color: '#424242' }}>
+                                                    Override Reason: {request.overrideReason}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    )}
+                                </Alert>
+                            </Box>
+                        </Paper>
+                    )}
+
+                    {/* Rejection Notes (if exists) */}
+                    {request.rejectionNotes && (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                mb: 3,
+                                bgcolor: '#ffebee',
+                                borderRadius: 2,
+                                border: '1px solid #ffcdd2'
+                            }}
+                        >
+                            <Box sx={{ p: 2.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                    <WarningIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#c62828' }}>
+                                        Rejection Reason
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body1" sx={{ 
+                                    whiteSpace: 'pre-wrap', 
+                                    color: '#424242',
+                                    lineHeight: 1.7
+                                }}>
                                     {request.rejectionNotes}
                                 </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
-                )}
+                        </Paper>
+                    )}
 
-                {/* Rejection Form */}
-                {showRejectForm && (
-                    <Card sx={{ 
-                        mb: 3, 
-                        boxShadow: `0 4px 16px ${primaryColor.shadowStrong}`,
-                        borderRadius: 3, 
-                        border: `2px solid ${primaryColor.main}`,
-                        background: 'linear-gradient(135deg, #ffecec 0%, #ffdcdc 100%)'
-                    }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                                <WarningIcon sx={{ color: primaryColor.dark, fontSize: 26 }} />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: primaryColor.main }}>
-                                    Rejection Reason Required
-                                </Typography>
-                            </Box>
-                            <Alert 
-                                severity="warning" 
-                                sx={{ 
-                                    mb: 2.5,
-                                    bgcolor: 'rgba(255, 152, 0, 0.1)',
-                                    border: '1px solid rgba(255, 152, 0, 0.3)',
-                                    borderRadius: 2,
-                                    '& .MuiAlert-icon': {
-                                        color: '#f57c00'
-                                    }
-                                }}
-                            >
-                                Please provide a reason for rejecting this leave request. This will be visible to the employee and sent as a notification.
-                            </Alert>
-                            <TextField
-                                fullWidth
-                                multiline
-                                rows={4}
-                                label="Rejection Reason"
-                                placeholder="Enter the reason for rejection..."
-                                value={rejectionNotes}
-                                onChange={(e) => setRejectionNotes(e.target.value)}
-                                variant="outlined"
-                                error={!rejectionNotes.trim() && actionLoading}
-                                helperText={!rejectionNotes.trim() && actionLoading ? "Rejection reason is required" : ""}
-                                sx={{
-                                    '& .MuiOutlinedInput-root': {
-                                        bgcolor: 'white',
-                                        '&:hover fieldset': {
-                                            borderColor: primaryColor.main
-                                        },
-                                        '&.Mui-focused fieldset': {
-                                            borderColor: primaryColor.main,
-                                            borderWidth: 2
+                    {/* Override Form (for blocked leaves) */}
+                    {showOverrideForm && request.validationBlocked && !request.adminOverride && (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                mb: 3,
+                                bgcolor: '#fff3e0',
+                                borderRadius: 2,
+                                border: '2px solid #ff9800'
+                            }}
+                        >
+                            <Box sx={{ p: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                    <WarningIcon sx={{ color: '#ff9800', fontSize: 22 }} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#e65100' }}>
+                                        Admin Override Required
+                                    </Typography>
+                                </Box>
+                                <Alert 
+                                    severity="warning" 
+                                    sx={{ 
+                                        mb: 2.5,
+                                        bgcolor: 'rgba(255, 152, 0, 0.1)',
+                                        border: '1px solid rgba(255, 152, 0, 0.3)',
+                                        borderRadius: 1
+                                    }}
+                                >
+                                    This leave request was blocked by company policy. To approve it, you must provide an override reason. This will be logged and visible to the employee.
+                                </Alert>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={4}
+                                    label="Override Reason *"
+                                    placeholder="Enter the reason for overriding the policy block..."
+                                    value={overrideReason}
+                                    onChange={(e) => setOverrideReason(e.target.value)}
+                                    variant="outlined"
+                                    error={!overrideReason.trim() && actionLoading}
+                                    helperText={!overrideReason.trim() && actionLoading ? "Override reason is required" : "This reason will be visible to the employee and logged for audit purposes."}
+                                    sx={{
+                                        bgcolor: '#ffffff',
+                                        '& .MuiOutlinedInput-root': {
+                                            '&:hover fieldset': {
+                                                borderColor: '#ff9800'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: '#ff9800'
+                                            }
                                         }
-                                    }
-                                }}
-                            />
-                        </CardContent>
-                    </Card>
-                )}
+                                    }}
+                                />
+                            </Box>
+                        </Paper>
+                    )}
+
+                    {/* Rejection Form */}
+                    {showRejectForm && (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                mb: 3,
+                                bgcolor: '#ffebee',
+                                borderRadius: 2,
+                                border: '1px solid #ffcdd2'
+                            }}
+                        >
+                            <Box sx={{ p: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                    <WarningIcon sx={{ color: '#d32f2f', fontSize: 22 }} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#c62828' }}>
+                                        Rejection Reason Required
+                                    </Typography>
+                                </Box>
+                                <Alert 
+                                    severity="warning" 
+                                    sx={{ 
+                                        mb: 2.5,
+                                        bgcolor: 'rgba(255, 152, 0, 0.1)',
+                                        border: '1px solid rgba(255, 152, 0, 0.3)',
+                                        borderRadius: 1
+                                    }}
+                                >
+                                    Please provide a reason for rejecting this leave request. This will be visible to the employee and sent as a notification.
+                                </Alert>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={4}
+                                    label="Rejection Reason"
+                                    placeholder="Enter the reason for rejection..."
+                                    value={rejectionNotes}
+                                    onChange={(e) => setRejectionNotes(e.target.value)}
+                                    variant="outlined"
+                                    error={!rejectionNotes.trim() && actionLoading}
+                                    helperText={!rejectionNotes.trim() && actionLoading ? "Rejection reason is required" : ""}
+                                    sx={{
+                                        bgcolor: '#ffffff',
+                                        '& .MuiOutlinedInput-root': {
+                                            '&:hover fieldset': {
+                                                borderColor: '#d32f2f'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: '#d32f2f'
+                                            }
+                                        }
+                                    }}
+                                />
+                            </Box>
+                        </Paper>
+                    )}
+                </Box>
             </DialogContent>
 
-            {/* Actions */}
-            <DialogActions sx={{ p: 3, pt: 2, bgcolor: '#fafafa', borderTop: `1px solid ${primaryColor.border}` }}>
+            {/* Sticky Footer Actions */}
+            <DialogActions sx={{ 
+                p: 3, 
+                bgcolor: '#ffffff', 
+                borderTop: '1px solid #e0e0e0',
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 10
+            }}>
                 <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
                     {/* Left side - Edit/Delete actions */}
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -834,12 +781,10 @@ const EnhancedLeaveRequestModal = ({
                             <IconButton 
                                 onClick={() => onEdit(request)} 
                                 sx={{
-                                    bgcolor: primaryColor.subtle,
-                                    color: primaryColor.dark,
-                                    border: `1px solid ${primaryColor.border}`,
+                                    color: '#757575',
                                     '&:hover': {
-                                        bgcolor: primaryColor.subtleStrong,
-                                        borderColor: primaryColor.main
+                                        bgcolor: '#f5f5f5',
+                                        color: '#212121'
                                     }
                                 }}
                             >
@@ -850,12 +795,10 @@ const EnhancedLeaveRequestModal = ({
                             <IconButton 
                                 onClick={() => onDelete(request)}
                                 sx={{
-                                    bgcolor: primaryColor.subtle,
-                                    color: primaryColor.dark,
-                                    border: `1px solid ${primaryColor.border}`,
+                                    color: '#757575',
                                     '&:hover': {
-                                        bgcolor: primaryColor.subtleStrong,
-                                        borderColor: primaryColor.main
+                                        bgcolor: '#f5f5f5',
+                                        color: '#212121'
                                     }
                                 }}
                             >
@@ -872,13 +815,13 @@ const EnhancedLeaveRequestModal = ({
                                     onClick={handleClose} 
                                     variant="outlined"
                                     sx={{
-                                        borderColor: primaryColor.borderStrong,
-                                        color: primaryColor.main,
+                                        borderColor: '#e0e0e0',
+                                        color: '#424242',
                                         fontWeight: 600,
                                         px: 3,
                                         '&:hover': {
-                                            borderColor: primaryColor.main,
-                                            bgcolor: primaryColor.subtle
+                                            borderColor: '#bdbdbd',
+                                            bgcolor: '#fafafa'
                                         }
                                     }}
                                 >
@@ -887,17 +830,20 @@ const EnhancedLeaveRequestModal = ({
                                 {request.status === 'Pending' && (
                                     <>
                                         <Button 
-                                            onClick={() => setShowRejectForm(true)} 
+                                            onClick={() => {
+                                                setShowRejectForm(true);
+                                                setShowOverrideForm(false);
+                                            }} 
                                             variant="outlined"
                                             startIcon={<CancelIcon />}
                                             sx={{
-                                                borderColor: primaryColor.main,
-                                                color: primaryColor.main,
+                                                borderColor: '#f44336',
+                                                color: '#f44336',
                                                 fontWeight: 600,
                                                 px: 3,
                                                 '&:hover': {
-                                                    borderColor: primaryColor.dark,
-                                                    bgcolor: primaryColor.subtleStrong
+                                                    borderColor: '#d32f2f',
+                                                    bgcolor: '#ffebee'
                                                 }
                                             }}
                                         >
@@ -909,24 +855,64 @@ const EnhancedLeaveRequestModal = ({
                                             startIcon={<CheckIcon />}
                                             disabled={actionLoading}
                                             sx={{
-                                                bgcolor: primaryColor.main,
+                                                bgcolor: request.validationBlocked && !request.adminOverride ? '#ff9800' : '#4caf50',
                                                 color: 'white',
                                                 fontWeight: 700,
                                                 px: 3,
-                                                boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`,
                                                 '&:hover': {
-                                                    bgcolor: primaryColor.dark,
-                                                    boxShadow: `0 6px 16px ${primaryColor.shadowStrong}`
+                                                    bgcolor: request.validationBlocked && !request.adminOverride ? '#f57c00' : '#388e3c'
                                                 },
                                                 '&:disabled': {
-                                                    bgcolor: 'rgba(44, 62, 80, 0.5)'
+                                                    bgcolor: 'rgba(76, 175, 80, 0.5)'
                                                 }
                                             }}
                                         >
-                                            {actionLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Approve'}
+                                            {actionLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : (request.validationBlocked && !request.adminOverride ? 'Override & Approve' : 'Approve')}
                                         </Button>
                                     </>
                                 )}
+                            </>
+                        ) : showOverrideForm ? (
+                            <>
+                                <Button 
+                                    onClick={() => {
+                                        setShowOverrideForm(false);
+                                        setOverrideReason('');
+                                    }} 
+                                    variant="outlined"
+                                    sx={{
+                                        borderColor: '#e0e0e0',
+                                        color: '#424242',
+                                        fontWeight: 600,
+                                        px: 3,
+                                        '&:hover': {
+                                            borderColor: '#bdbdbd',
+                                            bgcolor: '#fafafa'
+                                        }
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    onClick={handleApprove} 
+                                    variant="contained"
+                                    startIcon={<CheckIcon />}
+                                    disabled={!overrideReason.trim() || actionLoading}
+                                    sx={{
+                                        bgcolor: '#ff9800',
+                                        color: 'white',
+                                        fontWeight: 700,
+                                        px: 3,
+                                        '&:hover': {
+                                            bgcolor: '#f57c00'
+                                        },
+                                        '&:disabled': {
+                                            bgcolor: 'rgba(255, 152, 0, 0.5)'
+                                        }
+                                    }}
+                                >
+                                    {actionLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Override & Approve'}
+                                </Button>
                             </>
                         ) : (
                             <>
@@ -934,13 +920,13 @@ const EnhancedLeaveRequestModal = ({
                                     onClick={() => setShowRejectForm(false)} 
                                     variant="outlined"
                                     sx={{
-                                        borderColor: primaryColor.borderStrong,
-                                        color: primaryColor.main,
+                                        borderColor: '#e0e0e0',
+                                        color: '#424242',
                                         fontWeight: 600,
                                         px: 3,
                                         '&:hover': {
-                                            borderColor: primaryColor.main,
-                                            bgcolor: primaryColor.subtle
+                                            borderColor: '#bdbdbd',
+                                            bgcolor: '#fafafa'
                                         }
                                     }}
                                 >
@@ -952,17 +938,15 @@ const EnhancedLeaveRequestModal = ({
                                     startIcon={<CancelIcon />}
                                     disabled={!rejectionNotes.trim() || actionLoading}
                                     sx={{
-                                        bgcolor: primaryColor.main,
+                                        bgcolor: '#f44336',
                                         color: 'white',
                                         fontWeight: 700,
                                         px: 3,
-                                        boxShadow: `0 4px 12px ${primaryColor.shadowStrong}`,
                                         '&:hover': {
-                                            bgcolor: primaryColor.dark,
-                                            boxShadow: `0 6px 16px ${primaryColor.shadowStrong}`
+                                            bgcolor: '#d32f2f'
                                         },
                                         '&:disabled': {
-                                            bgcolor: 'rgba(205, 92, 92, 0.5)'
+                                            bgcolor: 'rgba(244, 67, 54, 0.5)'
                                         }
                                     }}
                                 >

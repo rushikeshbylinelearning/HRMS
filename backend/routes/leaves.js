@@ -11,29 +11,16 @@ const User = require('../models/User');
 const NewNotificationService = require('../services/NewNotificationService');
 const LeaveValidationService = require('../services/leaveValidationService');
 const uploadMedicalCertificate = require('../middleware/uploadMedicalCertificate');
+const { parseISTDate, getTodayIST, formatDateIST } = require('../utils/dateUtils');
 
 const formatLeaveDateRangeForEmail = (leaveDates) => {
-    // CRITICAL FIX: Use IST timezone explicitly to avoid timezone conversion issues
-    const formatDate = (dateString) => {
-        let d;
-        if (dateString instanceof Date) {
-            d = dateString;
-        } else if (typeof dateString === 'string') {
-            // Handle ISO date strings (YYYY-MM-DD) - parse as IST date
-            if (dateString.includes('T')) {
-                // ISO datetime string - convert to IST
-                d = new Date(dateString);
-            } else {
-                // Date-only string (YYYY-MM-DD) - parse as IST date to avoid timezone shift
-                const [year, month, day] = dateString.split('-').map(Number);
-                // Create date in IST timezone (UTC+5:30)
-                d = new Date(Date.UTC(year, month - 1, day, 5, 30, 0)); // IST offset: UTC+5:30
-            }
-        } else {
-            d = new Date(dateString);
-        }
+    // Use centralized IST date utilities
+    const formatDate = (dateInput) => {
+        const dateObj = parseISTDate(dateInput);
+        if (!dateObj) return 'N/A';
+        
         // Format using IST timezone explicitly
-        return d.toLocaleDateString('en-GB', { 
+        return dateObj.toLocaleDateString('en-GB', { 
             day: '2-digit', 
             month: 'short', 
             year: 'numeric',
@@ -154,6 +141,52 @@ router.get('/holidays', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/leaves/planned-leave-history
+// Get planned leave history for the current user (for frontend validation)
+router.get('/planned-leave-history', authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.user;
+        
+        // Get all approved Planned leave requests for this user
+        const plannedLeaves = await LeaveRequest.find({
+            employee: userId,
+            requestType: 'Planned',
+            status: 'Approved'
+        }).sort({ leaveDates: 1 }); // Sort by leave dates
+        
+        // Calculate duration and categorize each leave
+        const history = plannedLeaves.map(leave => {
+            // Calculate duration considering half days
+            const duration = LeaveValidationService.calculateLeaveDuration(leave.leaveDates, leave.leaveType);
+            
+            // Get the first leave date (appliedFrom)
+            const appliedFrom = leave.leaveDates[0];
+            
+            // Categorize based on duration
+            let category;
+            if (duration >= 10) {
+                category = '10PLUS';
+            } else if (duration >= 5 && duration <= 7) {
+                category = '5TO7';
+            } else {
+                category = 'LESS5'; // Less than 5 days (for reference, though frontend may not use this)
+            }
+            
+            return {
+                appliedFrom: appliedFrom,
+                category: category,
+                duration: duration,
+                leaveType: leave.leaveType
+            };
+        });
+        
+        res.json({ history });
+    } catch (error) {
+        console.error('Error fetching planned leave history:', error);
+        res.status(500).json({ error: 'Failed to fetch planned leave history.' });
+    }
+});
+
 // POST /api/leaves/check-eligibility
 // Check leave eligibility before applying (for frontend validation)
 router.post('/check-eligibility', authenticateToken, async (req, res) => {
@@ -168,8 +201,12 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
-        // Convert string dates to Date objects
-        const leaveDatesArray = leaveDates.map(date => new Date(date));
+        // Convert string dates to IST Date objects
+        const leaveDatesArray = leaveDates.map(date => parseISTDate(date)).filter(d => d !== null);
+        
+        if (leaveDatesArray.length === 0) {
+            return res.status(400).json({ error: 'Invalid leave dates provided.' });
+        }
 
         const validation = await LeaveValidationService.validateLeaveRequest(
             employee,
@@ -185,7 +222,12 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
             warnings: validation.warnings,
             ...(validation.halfYearPeriod && { halfYearPeriod: validation.halfYearPeriod }),
             ...(validation.availableDays !== undefined && { availableDays: validation.availableDays }),
-            ...(validation.usedDays !== undefined && { usedDays: validation.usedDays })
+            ...(validation.usedDays !== undefined && { usedDays: validation.usedDays }),
+            ...(validation.validationBlocked && {
+                validationBlocked: true,
+                blockedRules: validation.blockedRules || [],
+                validationDetails: validation.validationDetails || {}
+            })
         });
     } catch (error) {
         console.error('Error checking leave eligibility:', error);
@@ -219,10 +261,14 @@ router.post('/request', authenticateToken, async (req, res) => {
             });
         }
 
-        // Convert string dates to Date objects
-        const leaveDatesArray = leaveDates.map(date => new Date(date));
+        // Convert string dates to IST Date objects
+        const leaveDatesArray = leaveDates.map(date => parseISTDate(date)).filter(d => d !== null);
+        
+        if (leaveDatesArray.length === 0) {
+            return res.status(400).json({ error: 'Invalid leave dates provided.' });
+        }
 
-        // Validate leave request based on company policy
+        // Validate leave request based on company policy (IST-ONLY)
         const validation = await LeaveValidationService.validateLeaveRequest(
             employee,
             requestType,
@@ -231,45 +277,28 @@ router.post('/request', authenticateToken, async (req, res) => {
             medicalCertificate
         );
 
-        if (!validation.valid) {
-            const errorResponse = {
-                error: validation.errors.join(' '),
-                errors: validation.errors,
-                warnings: validation.warnings || []
-            };
-            
-            // Include validation blocking details if leave was blocked by anti-exploitation rules
-            if (validation.validationBlocked) {
-                errorResponse.validationBlocked = true;
-                errorResponse.blockedRules = validation.blockedRules || [];
-                errorResponse.validationDetails = validation.validationDetails || {};
-            }
-            
-            return res.status(400).json(errorResponse);
+        // Normalize requestType: Convert "Backdate" to "Backdated Leave" and "Unpaid" to "Loss of Pay"
+        let finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
+        if (finalRequestType === 'Unpaid') {
+            finalRequestType = 'Loss of Pay';
         }
 
-        // Show warnings but allow submission
-        if (validation.warnings && validation.warnings.length > 0) {
-            console.log(`Leave request warnings for user ${userId}:`, validation.warnings);
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const firstLeaveDate = new Date(leaveDatesArray[0]);
-        firstLeaveDate.setHours(0, 0, 0, 0);
-        const isBackdated = firstLeaveDate < today;
-        const finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
-
-        // Prepare leave request data
+        // Prepare leave request data structure (will be used whether valid or blocked)
         const leaveRequestData = {
             employee: userId,
             requestType: finalRequestType,
             leaveType,
             leaveDates: leaveDatesArray,
-            alternateDate: alternateDate ? new Date(alternateDate) : null,
+            alternateDate: alternateDate ? parseISTDate(alternateDate) : null,
             reason,
-            isBackdated,
+            isBackdated: false, // Will be calculated below
         };
+
+        // Calculate isBackdated using IST
+        const today = getTodayIST();
+        const firstLeaveDate = leaveDatesArray[0];
+        const isBackdated = firstLeaveDate < today;
+        leaveRequestData.isBackdated = isBackdated;
 
         // Add medical certificate for sick leave
         if (requestType === 'Sick' && medicalCertificate) {
@@ -282,6 +311,70 @@ router.post('/request', authenticateToken, async (req, res) => {
             leaveRequestData.halfYearPeriod = validation.halfYearPeriod;
         }
 
+        if (!validation.valid) {
+            // CRITICAL: Store blocked request in database for admin visibility
+            if (validation.validationBlocked) {
+                leaveRequestData.status = 'Pending';
+                leaveRequestData.validationBlocked = true;
+                leaveRequestData.blockedRules = validation.blockedRules || [];
+                leaveRequestData.blockedReason = validation.errors.join('; ');
+                
+                // Store blocked request
+                const blockedRequest = await LeaveRequest.create(leaveRequestData);
+                
+                // Notify admin about blocked request
+                await NewNotificationService.broadcastToAdmins({
+                    message: `${employee.fullName}'s leave request was blocked by policy: ${validation.errors[0]}`,
+                    type: 'leave_blocked',
+                    category: 'leave',
+                    priority: 'high',
+                    navigationData: {
+                        page: '/admin/leaves',
+                        params: {
+                            requestId: blockedRequest._id.toString()
+                        }
+                    },
+                    metadata: {
+                        type: 'LEAVE_BLOCKED',
+                        requestId: blockedRequest._id.toString(),
+                        blockedRules: validation.blockedRules || []
+                    }
+                }, userId);
+                
+                // Notify employee about blocked request
+                await NewNotificationService.notifyLeaveResponse(
+                    userId,
+                    employee.fullName,
+                    'Blocked',
+                    finalRequestType,
+                    `Your leave request was blocked: ${validation.errors.join(' ')}`
+                );
+                
+                return res.status(400).json({
+                    error: validation.errors.join(' '),
+                    errors: validation.errors,
+                    warnings: validation.warnings || [],
+                    validationBlocked: true,
+                    blockedRules: validation.blockedRules || [],
+                    validationDetails: validation.validationDetails || {},
+                    blockedRequestId: blockedRequest._id.toString() // So frontend can reference it
+                });
+            } else {
+                // Regular validation error (not policy-blocked) - don't store
+                return res.status(400).json({
+                    error: validation.errors.join(' '),
+                    errors: validation.errors,
+                    warnings: validation.warnings || []
+                });
+            }
+        }
+
+        // Show warnings but allow submission
+        if (validation.warnings && validation.warnings.length > 0) {
+            console.log(`Leave request warnings for user ${userId}:`, validation.warnings);
+        }
+
+        // Create the leave request (already prepared above)
         const newRequest = await LeaveRequest.create(leaveRequestData);
         
         // --- NOTIFICATIONS ---
@@ -291,31 +384,14 @@ router.post('/request', authenticateToken, async (req, res) => {
         
         // Send real-time notifications via socket
         // Use the saved request's leaveDates to ensure consistency with database values
-        // Format dates consistently using the same format as email notifications
+        // Format dates consistently using IST utilities
         const formatDateForNotification = (date) => {
-            // CRITICAL FIX: Use IST timezone explicitly to avoid timezone conversion issues
-            // When date string is "2024-01-25", new Date() interprets as UTC midnight
-            // which then converts to previous day in timezones ahead of UTC (like IST)
-            // Solution: Use IST timezone explicitly for all date formatting
-            let d;
-            if (date instanceof Date) {
-                d = date;
-            } else if (typeof date === 'string') {
-                // Handle ISO date strings (YYYY-MM-DD) - parse as IST date
-                if (date.includes('T')) {
-                    // ISO datetime string - convert to IST
-                    d = new Date(date);
-                } else {
-                    // Date-only string (YYYY-MM-DD) - parse as IST date to avoid timezone shift
-                    const [year, month, day] = date.split('-').map(Number);
-                    // Create date in IST timezone (UTC+5:30)
-                    d = new Date(Date.UTC(year, month - 1, day, 5, 30, 0)); // IST offset: UTC+5:30
-                }
-            } else {
-                d = new Date(date);
-            }
+            // Use centralized IST date utility
+            const dateObj = parseISTDate(date);
+            if (!dateObj) return 'N/A';
+            
             // Format using IST timezone explicitly
-            return d.toLocaleDateString('en-GB', { 
+            return dateObj.toLocaleDateString('en-GB', { 
                 day: '2-digit', 
                 month: 'short', 
                 year: 'numeric',

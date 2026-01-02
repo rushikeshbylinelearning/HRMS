@@ -18,6 +18,9 @@ const Holiday = require('../models/Holiday');
 const Setting = require('../models/Setting');
 const NewNotificationService = require('../services/NewNotificationService');
 const { getUserDailyStatus, recalculateLateStatus } = require('../services/dailyStatusService');
+const { resolveMultipleDaysStatus, normalizeDateToIST } = require('../utils/attendanceStatusResolver');
+const { determineHalfDayStatus } = require('../services/halfDayService');
+const { formatDateIST, getTodayIST } = require('../utils/dateUtils');
 
 // Middleware to check for Admin/HR role
 const isAdminOrHr = async (req, res, next) => {
@@ -97,6 +100,10 @@ router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => 
 // POST /api/admin/leaves
 router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
+        // Normalize requestType: Convert "Unpaid" to "Loss of Pay"
+        if (req.body.requestType === 'Unpaid') {
+            req.body.requestType = 'Loss of Pay';
+        }
         const newRequest = new LeaveRequest(req.body);
         await newRequest.save();
         res.status(201).json({ message: 'Leave request created successfully.', request: newRequest });
@@ -109,6 +116,10 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
 // PUT /leaves/:id
 router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
+        // Normalize requestType: Convert "Unpaid" to "Loss of Pay"
+        if (req.body.requestType === 'Unpaid') {
+            req.body.requestType = 'Loss of Pay';
+        }
         const updatedRequest = await LeaveRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedRequest) {
             return res.status(404).json({ error: 'Request not found.' });
@@ -121,16 +132,166 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
 });
 
 // DELETE /leaves/:id
+// Delete leave request with automatic balance restoration and attendance recalculation
 router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { id } = req.params;
+    
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
     try {
-        const deletedRequest = await LeaveRequest.findByIdAndDelete(req.params.id);
-        if (!deletedRequest) {
-            return res.status(404).json({ error: 'Request not found.' });
+        // Fetch request before deletion to capture context
+        const request = await LeaveRequest.findById(id).session(session);
+        if (!request) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Leave request not found.' });
         }
-        res.status(204).send();
+        
+        // Block deletion of YEAR_END requests (use dedicated endpoint)
+        if (request.requestType === 'YEAR_END') {
+            await session.abortTransaction();
+            return res.status(400).json({ 
+                error: 'Year-End requests must be deleted through the Year-End specific endpoint.' 
+            });
+        }
+        
+        // Fetch employee for balance restoration
+        const employee = await User.findById(request.employee).session(session);
+        if (!employee) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+        
+        // Store request data for notification and recalculation before deletion
+        const requestData = {
+            employeeId: request.employee,
+            employeeName: employee.fullName,
+            requestType: request.requestType,
+            leaveType: request.leaveType,
+            leaveDates: request.leaveDates,
+            status: request.status,
+            leaveDuration: request.leaveDates.length * (request.leaveType === 'Full Day' ? 1 : 0.5)
+        };
+        
+        // Restore leave balance if request was Approved
+        if (request.status === 'Approved') {
+            // Determine which balance field to restore based on request type
+            let leaveField;
+            switch(request.requestType) {
+                case 'Sick':
+                    leaveField = 'sick';
+                    break;
+                case 'Planned':
+                    leaveField = 'paid'; // Planned leaves use paid leave balance
+                    break;
+                case 'Casual':
+                    leaveField = 'casual'; // Casual leaves use casual leave balance
+                    break;
+                case 'Loss of Pay':
+                case 'Unpaid': // Handle legacy "Unpaid" alias
+                case 'Compensatory':
+                case 'Backdated Leave':
+                    // These don't affect leave balances - no restoration needed
+                    leaveField = null;
+                    break;
+                default:
+                    leaveField = null;
+            }
+            
+            if (leaveField) {
+                // Restore the deducted leave balance
+                employee.leaveBalances[leaveField] = (employee.leaveBalances[leaveField] || 0) + requestData.leaveDuration;
+                await employee.save({ session });
+            }
+        }
+        // For PENDING or REJECTED requests, no balance restoration needed
+        // (PENDING never deducted balance, REJECTED already restored on rejection)
+        
+        // Delete the request
+        await LeaveRequest.findByIdAndDelete(id).session(session);
+        
+        await session.commitTransaction();
+        
+        // Recalculate attendance for all dates in the deleted leave
+        // This ensures attendance status is updated when leave is deleted
+        if (request.status === 'Approved' && request.leaveDates && request.leaveDates.length > 0) {
+            const attendanceRecalculationService = require('../services/attendanceRecalculationService');
+            attendanceRecalculationService.recalculateAttendanceForLeave({
+                employee: request.employee,
+                leaveDates: request.leaveDates,
+                status: request.status
+            })
+            .then(results => {
+                const updatedCount = results.filter(r => r.updated).length;
+                if (updatedCount > 0) {
+                    console.log(`✅ Recalculated attendance for ${updatedCount} date(s) after leave deletion`);
+                }
+            })
+            .catch(err => {
+                console.error('Error recalculating attendance after leave deletion:', err);
+                // Don't fail the request if recalculation fails
+            });
+        }
+        
+        // Send notification to employee
+        const NewNotificationService = require('../services/NewNotificationService');
+        if (request.status === 'Approved') {
+            // Notify about balance restoration
+            await NewNotificationService.createAndEmitNotification({
+                message: `Your ${requestData.requestType} leave request has been deleted by Admin. Leave balance has been restored (${requestData.leaveDuration} day(s)).`,
+                userId: requestData.employeeId,
+                userName: requestData.employeeName,
+                type: 'leave_deleted',
+                recipientType: 'user',
+                category: 'leave',
+                priority: 'high',
+                navigationData: { page: '/leaves' },
+                metadata: {
+                    type: 'LEAVE_DELETED',
+                    requestType: requestData.requestType,
+                    leaveDuration: requestData.leaveDuration,
+                    balanceRestored: true
+                }
+            }).catch(err => console.error('Error sending leave deletion notification:', err));
+        } else {
+            // Notify about deletion (no balance change)
+            await NewNotificationService.createAndEmitNotification({
+                message: `Your ${requestData.requestType} leave request (${requestData.status}) has been deleted by Admin.`,
+                userId: requestData.employeeId,
+                userName: requestData.employeeName,
+                type: 'leave_deleted',
+                recipientType: 'user',
+                category: 'leave',
+                priority: 'medium',
+                navigationData: { page: '/leaves' },
+                metadata: {
+                    type: 'LEAVE_DELETED',
+                    requestType: requestData.requestType,
+                    status: requestData.status,
+                    balanceRestored: false
+                }
+            }).catch(err => console.error('Error sending leave deletion notification:', err));
+        }
+        
+        res.json({ 
+            message: request.status === 'Approved' 
+                ? `Leave request deleted successfully. Leave balance has been restored (${requestData.leaveDuration} day(s)).` 
+                : 'Leave request deleted successfully.',
+            deletedRequest: {
+                _id: id,
+                employee: requestData.employeeId,
+                requestType: requestData.requestType,
+                status: requestData.status,
+                leaveDuration: requestData.leaveDuration,
+                balanceRestored: request.status === 'Approved'
+            }
+        });
     } catch (error) {
-        console.error('Error deleting leave request by admin:', error);
-        res.status(500).json({ error: 'Failed to delete request.' });
+        await session.abortTransaction();
+        console.error(`Error deleting leave request for ID ${id}:`, error);
+        res.status(500).json({ error: 'Failed to delete leave request.' });
+    } finally {
+        session.endSession();
     }
 });
 
@@ -201,6 +362,11 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
             return res.status(404).json({ error: 'Request not found.' });
         }
 
+        // Normalize requestType: Convert legacy "Unpaid" to "Loss of Pay"
+        if (request.requestType === 'Unpaid') {
+            request.requestType = 'Loss of Pay';
+        }
+
         // Block YEAR_END requests from being processed through normal leave status endpoint
         if (request.requestType === 'YEAR_END') {
             await session.abortTransaction();
@@ -231,6 +397,7 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                     leaveField = 'casual'; // Casual leaves use casual leave balance
                     break;
                 case 'Loss of Pay':
+                case 'Unpaid': // Handle legacy "Unpaid" alias
                 case 'Compensatory':
                 case 'Backdated Leave':
                     // These don't affect leave balances
@@ -267,6 +434,9 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                 request.overriddenBy = req.user.userId;
                 request.overriddenAt = new Date();
                 
+                // Clear validation blocked flag since admin is overriding
+                request.validationBlocked = false;
+                
                 // Log the override action
                 const { logAction } = require('../services/auditLogger');
                 await logAction({
@@ -275,11 +445,22 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                     details: {
                         leaveRequestId: id,
                         employeeId: request.employee.toString(),
+                        employeeName: employee.fullName,
                         blockedRules: request.blockedRules || [],
                         overrideReason: overrideReason,
                         timestamp: new Date().toISOString()
                     }
                 });
+                
+                // Notify employee that their blocked leave was overridden and approved
+                const NewNotificationService = require('../services/NewNotificationService');
+                await NewNotificationService.notifyLeaveResponse(
+                    request.employee,
+                    employee.fullName,
+                    'Approved',
+                    request.requestType,
+                    `Your leave request was approved by admin override. Reason: ${overrideReason}`
+                ).catch(err => console.error('Error sending override notification:', err));
             }
         }
         
@@ -287,6 +468,23 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         await request.save({ session });
 
         await session.commitTransaction();
+        
+        // CRITICAL FIX: Recalculate attendance for all dates in this leave request
+        // This ensures attendance status is updated when leave is approved/rejected
+        if (newStatus === 'Approved' || (oldStatus === 'Approved' && newStatus !== 'Approved')) {
+            const attendanceRecalculationService = require('../services/attendanceRecalculationService');
+            attendanceRecalculationService.recalculateAttendanceForLeave(request)
+                .then(results => {
+                    const updatedCount = results.filter(r => r.updated).length;
+                    if (updatedCount > 0) {
+                        console.log(`✅ Recalculated attendance for ${updatedCount} date(s) after leave ${newStatus.toLowerCase()}`);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error recalculating attendance after leave approval:', err);
+                    // Don't fail the request if recalculation fails
+                });
+        }
         
         NewNotificationService.notifyLeaveResponse(request.employee, employee.fullName, newStatus, request.requestType, request.rejectionNotes)
             .catch(err => console.error('Error sending leave response notification:', err));
@@ -472,7 +670,7 @@ router.patch('/breaks/extra/:requestId/status', [authenticateToken, isAdminOrHr]
 
         // Invalidate dashboard cache to update recent activity
         const cacheService = require('../services/cacheService');
-        const today = new Date().toISOString().slice(0, 10);
+        const today = formatDateIST(getTodayIST());
         cacheService.invalidateDashboard(today);
 
         const user = await User.findById(request.user);
@@ -1099,7 +1297,7 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
 // --- DASHBOARD & LOGS ROUTES ---
 
 router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, res) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDateIST(getTodayIST());
     
     try {
         const cacheService = require('../services/cacheService');
@@ -1318,7 +1516,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
 // New endpoint to get detailed employee lists for dashboard cards
 router.get('/dashboard-employees/:type', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { type } = req.params;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDateIST(getTodayIST());
     
     try {
         let employees = [];
@@ -1492,15 +1690,106 @@ router.get('/attendance/user/:userId', [authenticateToken, isAdminOrHr], async (
             return res.status(400).json({ error: 'Start date and end date query parameters are required.' });
         }
 
+        // Fetch attendance logs
         const logs = await AttendanceLog.aggregate([
             { $match: { user: new mongoose.Types.ObjectId(userId), attendanceDate: { $gte: startDate, $lte: endDate } } },
             { $lookup: { from: 'attendancesessions', localField: '_id', foreignField: 'attendanceLog', as: 'sessions' } },
             { $lookup: { from: 'breaklogs', localField: '_id', foreignField: 'attendanceLog', as: 'breaks' } },
-            { $project: { _id: 1, attendanceDate: 1, status: 1, clockInTime: 1, clockOutTime: 1, notes: 1, logoutType: 1, autoLogoutReason: 1, sessions: { $map: { input: "$sessions", as: "s", in: { startTime: "$$s.startTime", endTime: "$$s.endTime", logoutType: "$$s.logoutType", autoLogoutReason: "$$s.autoLogoutReason" } } }, breaks: { $map: { input: "$breaks", as: "b", in: { startTime: "$$b.startTime", endTime: "$$b.endTime", durationMinutes: "$$b.durationMinutes", breakType: "$$b.breakType" } } } } },
+            { $project: { _id: 1, attendanceDate: 1, status: 1, clockInTime: 1, clockOutTime: 1, notes: 1, logoutType: 1, autoLogoutReason: 1, attendanceStatus: 1, isHalfDay: 1, sessions: { $map: { input: "$sessions", as: "s", in: { startTime: "$$s.startTime", endTime: "$$s.endTime", logoutType: "$$s.logoutType", autoLogoutReason: "$$s.autoLogoutReason" } } }, breaks: { $map: { input: "$breaks", as: "b", in: { startTime: "$$b.startTime", endTime: "$$b.endTime", durationMinutes: "$$b.durationMinutes", breakType: "$$b.breakType" } } } } },
             { $sort: { attendanceDate: 1 } }
         ]);
 
-        res.json(logs);
+        // UNIFIED RESOLUTION: Use the same resolver as Employee endpoint
+        const user = await User.findById(userId).lean();
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Generate all dates in range
+        const dates = [];
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dates.push(new Date(d));
+        }
+
+        // Build attendance log map
+        const attendanceLogMap = new Map();
+        logs.forEach(log => {
+            attendanceLogMap.set(log.attendanceDate, log);
+        });
+
+        // Resolve status for all dates using unified resolver
+        const resolvedStatusMap = await resolveMultipleDaysStatus({
+            dates: dates,
+            userId: userId,
+            attendanceLogMap: attendanceLogMap,
+            saturdayPolicy: user.alternateSaturdayPolicy || 'All Saturdays Working'
+        });
+
+        // Merge resolved status with attendance logs
+        const logsWithResolvedStatus = logs.map(log => {
+            const dateStr = log.attendanceDate;
+            const resolved = resolvedStatusMap.get(dateStr);
+            
+            if (resolved) {
+                return {
+                    ...log,
+                    attendanceStatus: resolved.status,
+                    leave: resolved.leave ? {
+                        _id: resolved.leave._id,
+                        requestType: resolved.leave.requestType,
+                        leaveType: resolved.leave.leaveType,
+                        status: resolved.leave.status,
+                        leaveDates: resolved.leave.leaveDates,
+                        reason: resolved.leave.reason
+                    } : null,
+                    holiday: resolved.holiday ? {
+                        _id: resolved.holiday._id,
+                        name: resolved.holiday.name,
+                        date: resolved.holiday.date
+                    } : null,
+                    isOnLeave: resolved.isOnLeave
+                };
+            }
+            
+            return log;
+        });
+
+        // Also include dates without attendance logs but with resolved status (holidays, leaves, weekends)
+        const allDatesWithStatus = [];
+        dates.forEach(date => {
+            const dateStr = normalizeDateToIST(date);
+            const log = attendanceLogMap.get(dateStr);
+            const resolved = resolvedStatusMap.get(dateStr);
+            
+            if (log) {
+                allDatesWithStatus.push({
+                    ...log,
+                    attendanceStatus: resolved ? resolved.status : log.attendanceStatus,
+                    leave: resolved ? resolved.leave : null,
+                    holiday: resolved ? resolved.holiday : null,
+                    isOnLeave: resolved ? resolved.isOnLeave : false
+                });
+            } else if (resolved && resolved.status !== 'N/A') {
+                // Include all resolved statuses (holidays, leaves, weekends, absent) even without attendance log
+                // This ensures Absent days are visible in the UI
+                allDatesWithStatus.push({
+                    attendanceDate: dateStr,
+                    attendanceStatus: resolved.status,
+                    leave: resolved.leave,
+                    holiday: resolved.holiday,
+                    isOnLeave: resolved.isOnLeave,
+                    sessions: [],
+                    breaks: []
+                });
+            }
+        });
+
+        // Sort by date
+        allDatesWithStatus.sort((a, b) => a.attendanceDate.localeCompare(b.attendanceDate));
+
+        res.json(allDatesWithStatus);
 
     } catch (error) {
         console.error('Error fetching user attendance summary:', error);
@@ -1867,25 +2156,27 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         log.notes = notes !== undefined ? notes : log.notes; // Only update if provided
         log.penaltyMinutes = 0;
         
-        // CRITICAL: If clockInTime changed, recalculate derived fields (isLate, isHalfDay, etc.)
+        // CRITICAL: If clockInTime or clockOutTime changed, recalculate half-day status using unified service
         // This ensures admin edits immediately update the status
-        if (clockInTimeChanged && log.clockInTime) {
+        if ((clockInTimeChanged || log.clockOutTime) && log.clockInTime) {
             try {
-                const user = await User.findById(log.user).populate('shiftGroup').lean();
-                if (user && user.shiftGroup && user.shiftGroup.startTime) {
-                    const recalculatedStatus = await recalculateLateStatus(
-                        log.clockInTime,
-                        user.shiftGroup
-                    );
+                const user = await User.findById(log.user).populate('shiftGroup');
+                if (user && user.shiftGroup) {
+                    const halfDayResult = await determineHalfDayStatus(log, {
+                        user: user,
+                        shift: user.shiftGroup,
+                        skipNotifications: true, // Don't send notifications for admin edits
+                        source: 'admin_edit'
+                    });
                     // Update derived fields with recalculated values
-                    log.isLate = recalculatedStatus.isLate;
-                    log.isHalfDay = recalculatedStatus.isHalfDay;
-                    log.lateMinutes = recalculatedStatus.lateMinutes;
-                    log.attendanceStatus = recalculatedStatus.attendanceStatus;
-                    console.log(`✅ Recalculated attendance status after clockInTime update: ${recalculatedStatus.attendanceStatus} (lateMinutes: ${recalculatedStatus.lateMinutes})`);
+                    log.isLate = halfDayResult.lateMinutes > 0 && !halfDayResult.isHalfDay;
+                    log.isHalfDay = halfDayResult.isHalfDay;
+                    log.lateMinutes = halfDayResult.lateMinutes;
+                    log.attendanceStatus = halfDayResult.attendanceStatus;
+                    console.log(`✅ Recalculated attendance status after admin edit: ${halfDayResult.attendanceStatus} (lateMinutes: ${halfDayResult.lateMinutes}, source: ${halfDayResult.source})`);
                 }
             } catch (recalcError) {
-                console.error('Error recalculating late status after clockInTime update:', recalcError);
+                console.error('Error recalculating half-day status after admin edit:', recalcError);
                 // Don't fail the request, but log the error
             }
         } 
@@ -2263,6 +2554,9 @@ router.patch('/leaves/year-end/:id/status', [authenticateToken, isAdminOrHr], as
 
         await session.commitTransaction();
         
+        // CRITICAL FIX: Year-End requests don't have leaveDates, so no attendance recalculation needed
+        // (Year-End is a balance adjustment, not actual leave days)
+        
         // Send notification to employee
         const NewNotificationService = require('../services/NewNotificationService');
         await NewNotificationService.notifyYearEndLeaveResponse(
@@ -2472,56 +2766,20 @@ router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr], a
         const originalIsHalfDay = log.isHalfDay;
         const originalAdminOverride = log.adminOverride;
 
-        // Override half-day: Set adminOverride flag and recompute status
+        // Override half-day: Set adminOverride flag and recompute status using unified service
         log.adminOverride = 'Override Half Day';
         log.isHalfDay = false;
 
-        // CRITICAL: Recompute late/half-day status from CURRENT clockInTime
-        // This ensures derived state is always correct after override
-        if (log.clockInTime && log.user && log.user.shiftGroup && log.user.shiftGroup.startTime) {
-            const recalculatedStatus = await recalculateLateStatus(
-                log.clockInTime,
-                log.user.shiftGroup
-            );
-            
-            // Since we're overriding half-day, we need to determine the correct status
-            // If the employee was actually late (beyond grace period), mark as Late
-            // Otherwise, mark as On-time
-            if (recalculatedStatus.lateMinutes > 0) {
-                // Employee was late - check if within grace period
-                let GRACE_PERIOD_MINUTES = 30;
-                try {
-                    const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-                    if (graceSetting && !isNaN(Number(graceSetting.value))) {
-                        GRACE_PERIOD_MINUTES = Number(graceSetting.value);
-                    }
-                } catch (err) {
-                    console.error('Failed to fetch late grace setting, using default 30 minutes', err);
-                }
+        // Use unified service to recalculate status (will respect admin override)
+        const halfDayResult = await determineHalfDayStatus(log, {
+            user: log.user,
+            shift: log.user.shiftGroup,
+            skipNotifications: true, // Don't send notifications for admin override
+            source: 'admin_override'
+        });
 
-                if (recalculatedStatus.lateMinutes <= GRACE_PERIOD_MINUTES) {
-                    // Within grace period - On-time
-                    log.attendanceStatus = 'On-time';
-                    log.isLate = false;
-                    log.lateMinutes = recalculatedStatus.lateMinutes;
-                } else {
-                    // Beyond grace period - Late (but not half-day due to override)
-                    log.attendanceStatus = 'Late';
-                    log.isLate = true;
-                    log.lateMinutes = recalculatedStatus.lateMinutes;
-                }
-            } else {
-                // Not late - On-time
-                log.attendanceStatus = 'On-time';
-                log.isLate = false;
-                log.lateMinutes = 0;
-            }
-        } else {
-            // No clock-in time or shift info - default to On-time
-            log.attendanceStatus = 'On-time';
-            log.isLate = false;
-            log.lateMinutes = 0;
-        }
+        // Update isLate flag based on lateMinutes (for backward compatibility)
+        log.isLate = halfDayResult.lateMinutes > 0 && !halfDayResult.isHalfDay;
 
         // Save the updated log
         await log.save();
@@ -2631,7 +2889,19 @@ router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr], asyn
         const originalStatus = log.attendanceStatus;
         const wasHalfDay = log.isHalfDay;
         
-        // Update the half-day status
+        // Populate user and shift if not already populated
+        if (!log.user || typeof log.user === 'string') {
+            await log.populate({
+                path: 'user',
+                select: 'fullName employeeCode shiftGroup',
+                populate: {
+                    path: 'shiftGroup',
+                    select: 'startTime endTime durationHours shiftType name'
+                }
+            });
+        }
+        
+        // Update the half-day status manually (admin override)
         log.isHalfDay = isHalfDay;
         
         // Enhanced status transition logic
@@ -2639,20 +2909,65 @@ router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr], asyn
             // Marking as half-day - set status to Half-day regardless of current status
             log.attendanceStatus = 'Half-day';
         } else if (!isHalfDay && wasHalfDay) {
-            // Unmarking half-day - recalculate status based on existing data
-            if (!log.clockInTime) {
-                // No clock-in time = Absent
-                log.attendanceStatus = 'Absent';
-            } else if (log.isLate) {
-                // Has clock-in but was late = Late
-                log.attendanceStatus = 'Late';
+            // Unmarking half-day - use unified service to recalculate status
+            const halfDayResult = await determineHalfDayStatus(log, {
+                user: log.user,
+                shift: log.user?.shiftGroup,
+                skipNotifications: true, // Don't send notifications for admin toggle
+                source: 'admin_toggle'
+            });
+            
+            // If unified service still says half-day (due to late/hours), but admin wants to unmark,
+            // we need to check for leaves/holidays and set appropriate status
+            if (halfDayResult.isHalfDay) {
+                // Unified service says it should be half-day, but admin is unmarking
+                // Check for approved leave before marking as Absent
+                const attendanceRecalculationService = require('../services/attendanceRecalculationService');
+                const recalculationResult = await attendanceRecalculationService.recalculateAttendanceStatus(
+                    log.user.toString(),
+                    log.attendanceDate,
+                    log
+                );
+                
+                if (recalculationResult.leave || recalculationResult.holiday) {
+                    // Has approved leave or holiday - don't mark as Absent
+                    if (!log.clockInTime) {
+                        log.attendanceStatus = 'On-time'; // Leave/holiday overrides Absent
+                    } else if (halfDayResult.lateMinutes > 0) {
+                        log.attendanceStatus = 'Late';
+                        log.isLate = true;
+                    } else {
+                        log.attendanceStatus = 'On-time';
+                    }
+                } else if (!log.clockInTime) {
+                    // No clock-in time and no leave = Absent
+                    log.attendanceStatus = 'Absent';
+                } else if (halfDayResult.lateMinutes > 0) {
+                    // Has clock-in but was late = Late
+                    log.attendanceStatus = 'Late';
+                    log.isLate = true;
+                } else {
+                    // Has clock-in and wasn't late = On-time
+                    log.attendanceStatus = 'On-time';
+                }
             } else {
-                // Has clock-in and wasn't late = On-time
-                log.attendanceStatus = 'On-time';
+                // Unified service agrees - not half-day
+                log.attendanceStatus = halfDayResult.attendanceStatus;
             }
         } else if (isHalfDay && wasHalfDay && log.attendanceStatus !== 'Half-day') {
             // Already marked as half-day but status got changed elsewhere - restore to Half-day
             log.attendanceStatus = 'Half-day';
+        }
+        
+        // Update isLate flag based on lateMinutes (for backward compatibility)
+        if (log.clockInTime && log.user?.shiftGroup) {
+            const halfDayResult = await determineHalfDayStatus(log, {
+                user: log.user,
+                shift: log.user.shiftGroup,
+                skipNotifications: true,
+                source: 'admin_toggle'
+            });
+            log.isLate = halfDayResult.lateMinutes > 0 && !halfDayResult.isHalfDay;
         }
 
         await log.save();

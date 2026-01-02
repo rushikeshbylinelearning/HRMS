@@ -6,6 +6,7 @@ import {
     Typography, Chip, OutlinedInput, IconButton
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { formatDateYYYYMMDD, getTodayIST } from '../utils/dateUtils';
 
 const initialFormState = {
     employeeCode: '',
@@ -16,7 +17,7 @@ const initialFormState = {
     domain: '',
     designation: '',
     department: '',
-    joiningDate: new Date().toISOString().slice(0, 10),
+    joiningDate: formatDateYYYYMMDD(getTodayIST()),
     shiftGroup: '',
     isActive: true,
     alternateSaturdayPolicy: 'All Saturdays Working',
@@ -89,7 +90,7 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                     domain: employee.domain || '',
                     designation: employee.designation || '',
                     department: employee.department || '',
-                    joiningDate: employee.joiningDate ? new Date(employee.joiningDate).toISOString().slice(0, 10) : '',
+                    joiningDate: employee.joiningDate ? formatDateYYYYMMDD(new Date(employee.joiningDate)) : '',
                     shiftGroup: employee.shiftGroup?._id || '',
                     isActive: employee.isActive,
                     alternateSaturdayPolicy: employee.alternateSaturdayPolicy || 'All Saturdays Working',

@@ -1,10 +1,14 @@
 // src/components/ShiftProgressBar.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Stack, Tooltip } from '@mui/material';
+import useGlobalNow from '../hooks/useGlobalNow';
 
-const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, sessions }) => {
-  const [now, setNow] = useState(new Date());
-  const baseShiftMinutes = 540; // 9 hours = 540 minutes
+const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, sessions, calculatedLogoutTime, clockInTime }) => {
+  // Uses shared global time source to prevent multiple timers and reduce re-renders
+  const hasActiveBreak = breaks?.some(b => !b.endTime);
+  const hasActiveSession = sessions?.some(s => !s.endTime);
+  const nowTimestamp = useGlobalNow(hasActiveBreak || hasActiveSession);
+  const now = new Date(nowTimestamp);
 
   // Helper function to format minutes into "Xh Ym"
   const formatMinutesToHM = (minutes) => {
@@ -16,19 +20,20 @@ const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, session
     return `${hours}h ${mins}m`;
   };
   
-  // The total required shift time, adjusted for extra break time
-  const adjustedTotalShiftMinutes = baseShiftMinutes + extraMinutes;
-
-  // Effect to update the 'now' time every second when there's an active break or session
-  useEffect(() => {
-    const hasActiveBreak = breaks?.some(b => !b.endTime);
-    const hasActiveSession = sessions?.some(s => !s.endTime);
-    
-    if (hasActiveBreak || hasActiveSession) {
-      const timerId = setInterval(() => setNow(new Date()), 1000);
-      return () => clearInterval(timerId);
+  // Calculate total required shift duration dynamically from backend calculatedLogoutTime
+  // This is the SINGLE SOURCE OF TRUTH - matches Today's Shift card
+  const totalRequiredShiftMinutes = useMemo(() => {
+    if (!calculatedLogoutTime || !clockInTime) {
+      // Fallback to 9 hours if backend data not available
+      return 540;
     }
-  }, [status, breaks, sessions]);
+    const logoutTime = new Date(calculatedLogoutTime);
+    const clockIn = new Date(clockInTime);
+    const durationMs = logoutTime - clockIn;
+    const durationMinutes = Math.floor(durationMs / 60000);
+    // Ensure minimum of 540 minutes (9 hours) as safety fallback
+    return Math.max(540, durationMinutes);
+  }, [calculatedLogoutTime, clockInTime]);
 
   // Calculate total break minutes (for progress calculation)
   const totalBreakMinutes = useMemo(() => {
@@ -64,9 +69,9 @@ const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, session
         // Calculate elapsed time from session start to break start (includes all previous breaks)
         const elapsedTimeBeforeBreak = (breakStart - sessionStart) / 60000;
         
-        // Position break based on elapsed time in the 9-hour timeline
-        const leftPercent = (elapsedTimeBeforeBreak / baseShiftMinutes) * 100;
-        const widthPercent = (durationMinutes / baseShiftMinutes) * 100;
+        // Position break based on elapsed time in the dynamic shift timeline
+        const leftPercent = (elapsedTimeBeforeBreak / totalRequiredShiftMinutes) * 100;
+        const widthPercent = (durationMinutes / totalRequiredShiftMinutes) * 100;
         
         segments.push({
           left: Math.max(0, Math.min(100, leftPercent)),
@@ -79,19 +84,19 @@ const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, session
     });
 
     return segments;
-  }, [sessions, breaks, now, status]);
+  }, [sessions, breaks, now, status, totalRequiredShiftMinutes]);
 
-  // Progress calculation: total elapsed time (work + break) / total shift time (9 hours)
+  // Progress calculation: total elapsed time (work + break) / total required shift time
   // totalElapsed = workedMinutes + breakMinutes
-  // totalShiftMinutes = 9 * 60 = 540 minutes
+  // totalShiftMinutes = calculatedLogoutTime - clockInTime (from backend)
   // progress = (totalElapsed / totalShiftMinutes) * 100
   const totalElapsedMinutes = workedMinutes + totalBreakMinutes;
-  const workProgress = Math.min((totalElapsedMinutes / baseShiftMinutes) * 100, 100);
+  const workProgress = Math.min((totalElapsedMinutes / totalRequiredShiftMinutes) * 100, 100);
   const activeBreak = breaks?.find(b => !b.endTime);
   
-  // For display, show total elapsed time but cap it at the adjusted total shift minutes
-  // This ensures that when a shift is completed, it shows "9h 0m / 9h 0m" instead of "8h 30m / 9h 0m"
-  const displayElapsedMinutes = Math.min(totalElapsedMinutes, adjustedTotalShiftMinutes);
+  // For display, show total elapsed time but cap it at the total required shift minutes
+  // This ensures that when a shift is completed, it shows the correct duration
+  const displayElapsedMinutes = Math.min(totalElapsedMinutes, totalRequiredShiftMinutes);
 
   return (
     <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
@@ -100,7 +105,7 @@ const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, session
           Shift Progress
         </Typography>
         <Typography variant="body2" color={extraMinutes > 0 ? 'error' : 'textSecondary'}>
-          {formatMinutesToHM(displayElapsedMinutes)} / {formatMinutesToHM(adjustedTotalShiftMinutes)}
+          {formatMinutesToHM(displayElapsedMinutes)} / {formatMinutesToHM(totalRequiredShiftMinutes)}
         </Typography>
       </Stack>
       

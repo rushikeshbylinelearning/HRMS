@@ -1,7 +1,7 @@
 // src/components/AttendanceCalendar.jsx
 import React, { useMemo } from 'react';
 import { Typography, Box } from '@mui/material';
-import { getAttendanceStatus, formatLeaveRequestType } from '../utils/saturdayUtils';
+import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import '../styles/AttendanceCalendar.css';
 
 // Optimized: Calculate 'now' internally to prevent unnecessary re-renders
@@ -81,18 +81,49 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], leav
             const dateKey = `${year}-${month}-${day}`;
             const log = logs.find(l => l.attendanceDate === dateKey);
             
-            // Calculate attendance status and hours
+            // UNIFIED RESOLUTION: Use backend's resolved attendanceStatus
+            // The backend already resolves status using unified logic (Holiday > Leave > Weekend > Present > Absent)
+            // The backend now returns dates with Absent status even when there's no log
             let status = 'blank';
             let hoursWorked = '';
             let isCurrentMonth = current.getMonth() === currentDate.getMonth();
             const now = new Date(); // Calculate inline
             let isToday = current.toDateString() === now.toDateString();
             
-            if (isCurrentMonth) {
-                if (log && log.sessions && log.sessions.length > 0) {
+            // Use backend's resolved status if log/date entry exists (backend returns all dates with status)
+            if (log && log.attendanceStatus) {
+                const resolvedStatus = log.attendanceStatus;
+                
+                // Map backend resolved status to calendar display status
+                if (resolvedStatus.startsWith('Holiday -')) {
+                    status = 'holiday';
+                } else if (resolvedStatus === 'Comp Off') {
+                    status = 'comp-off';
+                } else if (resolvedStatus === 'Swap Leave') {
+                    status = 'swap-leave';
+                } else if (resolvedStatus.startsWith('Leave -')) {
+                    status = 'leave';
+                } else if (resolvedStatus === 'Week Off') {
+                    status = 'week-off';
+                } else if (resolvedStatus === 'Weekend') {
+                    status = 'weekend';
+                } else if (resolvedStatus === 'Present' || resolvedStatus === 'On-time') {
                     status = 'present';
-                    
-                    // Calculate total work time
+                } else if (resolvedStatus === 'Late') {
+                    status = 'present'; // Late is still present, just late
+                } else if (resolvedStatus === 'Half Day' || resolvedStatus === 'Half-day') {
+                    status = 'half-day';
+                } else if (resolvedStatus === 'Absent') {
+                    status = 'absent';
+                } else if (resolvedStatus === 'N/A') {
+                    status = 'blank';
+                } else {
+                    // Fallback for any other status
+                    status = 'blank';
+                }
+                
+                // Calculate hours worked if log has sessions
+                if (log.sessions && log.sessions.length > 0) {
                     let totalWorkTime = 0;
                     let totalBreakTime = 0;
                     
@@ -119,61 +150,63 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], leav
                     const hours = Math.floor(netHours);
                     const minutes = Math.round((netHours - hours) * 60);
                     hoursWorked = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} Hrs`;
-                    
-                    // Check if employee has clocked out (has clockOutTime or all sessions have endTime)
-                    const hasClockOut = log.clockOutTime || (log.sessions && log.sessions.length > 0 && log.sessions.every(s => s.endTime));
-                    
-                    // Check if working hours are less than 8 hours - mark as half-day ONLY if clocked out
-                    const MINIMUM_FULL_DAY_HOURS = 8;
-                    const isHalfDayByHours = hasClockOut && netHours > 0 && netHours < MINIMUM_FULL_DAY_HOURS;
-                    const isHalfDayMarked = hasClockOut && (log.isHalfDay || log.attendanceStatus === 'Half-day' || isHalfDayByHours);
-                    
-                    if (isHalfDayMarked) {
-                        status = 'half-day';
+                }
+            } else if (isCurrentMonth) {
+                // No log for this date - check backend resolved status first
+                // The backend should now include Absent dates, but if not, determine status based on day
+                const dayOfWeek = current.getDay();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const checkDate = new Date(current);
+                checkDate.setHours(0, 0, 0, 0);
+                const isPastDate = checkDate < today;
+                
+                if (dayOfWeek === 0) {
+                    status = 'weekend';
+                } else if (dayOfWeek === 6) {
+                    // Check Saturday policy
+                    const weekNum = Math.ceil(current.getDate() / 7);
+                    let isWorkingSaturday = true;
+                    if (saturdayPolicy === 'All Saturdays Off') {
+                        isWorkingSaturday = false;
+                    } else if (saturdayPolicy === 'Week 1 & 3 Off' && (weekNum === 1 || weekNum === 3)) {
+                        isWorkingSaturday = false;
+                    } else if (saturdayPolicy === 'Week 2 & 4 Off' && (weekNum === 2 || weekNum === 4)) {
+                        isWorkingSaturday = false;
+                    }
+                    if (!isWorkingSaturday) {
+                        status = 'week-off';
+                    } else if (isPastDate) {
+                        // Past working Saturday without log = Absent
+                        status = 'absent';
+                    } else {
+                        status = 'blank'; // Future working day
                     }
                 } else {
-                    // Use centralized attendance status function
-                    const statusInfo = getAttendanceStatus(current, log, saturdayPolicy, holidays, leaves);
-                    
-                    // Map status to calendar status
-                    if (statusInfo.status.startsWith('Holiday -')) {
-                        status = 'holiday';
-                    } else if (statusInfo.status === 'Comp Off') {
-                        status = 'comp-off';
-                    } else if (statusInfo.status === 'Swap Leave') {
-                        status = 'swap-leave';
-                    } else if (statusInfo.status.startsWith('Leave -')) {
-                        status = 'leave';
-                    } else if (statusInfo.status === 'Week Off') {
-                        status = 'week-off';
-                    } else if (statusInfo.status === 'Weekend') {
-                        status = 'weekend';
-                    } else if (statusInfo.status === 'Working Day') {
-                        status = 'working-day';
-                    } else {
+                    // Weekday without log
+                    if (isPastDate) {
+                        // Past working day without log = Absent
                         status = 'absent';
+                    } else {
+                        status = 'blank'; // Future working day
                     }
                 }
             }
             
-            // Determine leave/holiday for this date
-            const leaveForDate = getLeaveForDate(current);
-            const holidayForDate = getHolidayForDate(current);
-
-            // Check for holidays and leaves even if there's a log (holidays/leaves take priority)
-            if (status === 'present') {
-                const statusInfo = getAttendanceStatus(current, log, saturdayPolicy, holidays, leaves);
-                
-                if (statusInfo.status.startsWith('Holiday -')) {
-                    status = 'holiday';
-                } else if (statusInfo.status === 'Comp Off') {
-                    status = 'comp-off';
-                } else if (statusInfo.status === 'Swap Leave') {
-                    status = 'swap-leave';
-                } else if (statusInfo.status.startsWith('Leave -')) {
-                    status = 'leave';
-                }
-            }
+            // Use leave and holiday from backend if available, otherwise fallback to local lookup
+            const holidayForDate = log?.holiday ? {
+                _id: log.holiday._id,
+                name: log.holiday.name,
+                date: log.holiday.date
+            } : getHolidayForDate(current);
+            const leaveForDate = log?.leave ? {
+                _id: log.leave._id,
+                requestType: log.leave.requestType,
+                leaveType: log.leave.leaveType,
+                status: log.leave.status,
+                leaveDates: log.leave.leaveDates,
+                reason: log.leave.reason
+            } : getLeaveForDate(current);
             
             days.push({
                 date: new Date(current),
@@ -306,6 +339,15 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], leav
                                 <div className="attendance-status leave">
                                     <div className="status-label">Leave</div>
                                     <div className="leave-type">{formatLeaveRequestType(leave?.requestType || getLeaveForDate(day.date)?.requestType)}</div>
+                                    {leave?.leaveType && (
+                                        <div className="leave-day-type" style={{ 
+                                            fontSize: '0.7rem', 
+                                            marginTop: '2px',
+                                            fontWeight: 500
+                                        }}>
+                                            {leave.leaveType === 'Full Day' ? 'Full Day' : leave.leaveType}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             

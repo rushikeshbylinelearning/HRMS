@@ -3,6 +3,7 @@
 const { sendEmail } = require('./mailService');
 const User = require('../models/User');
 const AttendanceLog = require('../models/AttendanceLog');
+const { formatDateIST, getTodayIST, addDaysIST } = require('../utils/dateUtils');
 
 // Send late login notification
 const sendLateLoginNotification = async (user, attendanceLog) => {
@@ -183,14 +184,13 @@ const checkAndSendWeeklyLateWarnings = async () => {
     console.log('Checking for weekly late warnings...');
     
     // Get current week start and end dates
-    const now = new Date();
-    const currentDay = now.getDay();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - currentDay);
-    weekStart.setHours(0, 0, 0, 0);
+    const nowIST = getTodayIST();
+    const currentDay = nowIST.getDay();
+    const weekStart = addDaysIST(nowIST, -currentDay);
+    const weekEnd = addDaysIST(weekStart, 6);
     
-    const weekStartStr = weekStart.toISOString().slice(0, 10);
-    const weekEndStr = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const weekStartStr = formatDateIST(weekStart);
+    const weekEndStr = formatDateIST(weekEnd);
     
     // Get all users
     const users = await User.find({ isActive: true });
@@ -227,6 +227,11 @@ module.exports = {
   sendHRWeeklyLateNotification,
   checkAndSendWeeklyLateWarnings
 };
+
+
+
+
+
 
 
 

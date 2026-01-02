@@ -10,7 +10,7 @@ import {
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
-import { getCurrentLocation, getCachedLocationOnly } from '../services/locationService';
+import { getLocationWithTimeout } from '../utils/locationUtils';
 import { getAvatarUrl } from '../utils/avatarUtils';
 import socket from '../socket';
 import WorkTimeTracker from '../components/WorkTimeTracker';
@@ -104,10 +104,41 @@ const EmployeeDashboardPage = () => {
     const isClockedInSession = dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
 
     const fetchAllDataRef = useRef(null);
+    // AbortController ref to track and cancel in-flight requests
+    // This prevents race conditions when multiple refresh triggers occur simultaneously
+    // (e.g., polling + socket update + manual refresh happening at the same time)
+    const abortControllerRef = useRef(null);
     
-    // Create stable fetch function
+    // Create stable fetch function with request deduplication
+    // DEDUPLICATION RATIONALE:
+    // - Multiple triggers can fire simultaneously: polling interval, socket events, manual refresh
+    // - Without deduplication, multiple API calls race each other, causing:
+    //   1. Unnecessary server load
+    //   2. Stale data overwriting fresh data (last response wins, not most recent)
+    //   3. UI flickering from multiple state updates
+    //   4. Potential memory leaks from unresolved promises
+    // - AbortController ensures only ONE request is active at a time
     fetchAllDataRef.current = async (isInitialLoad = false) => {
+        // Cancel any previous in-flight request before starting a new one
+        // This ensures we only have ONE active request at any time
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        
+        // Create new AbortController for this request
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        const signal = abortController.signal;
+        
         const localDate = getLocalDateString();
+        
+        // Helper to check if error is from abort (should be handled silently)
+        const isAbortError = (err) => {
+            return err.name === 'AbortError' || 
+                   err.code === 'ECONNABORTED' || 
+                   signal.aborted;
+        };
         
         if (isInitialLoad) {
             // For initial load, fetch critical data (status) first for instant UI
@@ -115,40 +146,73 @@ const EmployeeDashboardPage = () => {
             setLoading(true);
             try {
                 // Load status immediately - this is critical for UI
-                const statusRes = await api.get(`/attendance/status?date=${localDate}`);
+                const statusRes = await api.get(`/attendance/status?date=${localDate}`, { signal });
+                
+                // Check if request was aborted before updating state
+                if (signal.aborted) return;
+                
                 setDailyData(statusRes.data);
                 setLoading(false); // Allow UI to render immediately after status loads
                 
                 // Load weekly logs and requests in background (non-blocking)
                 Promise.all([
-                    api.get('/attendance/my-weekly-log'),
-                    api.get('/leaves/my-requests'),
+                    api.get('/attendance/my-weekly-log', { signal }),
+                    api.get('/leaves/my-requests', { signal }),
                 ]).then(([weeklyRes, requestsRes]) => {
+                    // Check if request was aborted before updating state
+                    if (signal.aborted) return;
+                    
                     setWeeklyLogs(Array.isArray(weeklyRes.data) ? weeklyRes.data : []);
                     setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
                 }).catch(err => {
+                    // Silently handle aborted requests - they're expected when new request starts
+                    if (isAbortError(err)) {
+                        return; // Don't log or show errors for aborted requests
+                    }
                     console.error("Background data fetch error:", err);
                     // Don't show error for background data - it's not critical
                 });
             } catch (err) {
+                // Silently handle aborted requests - they're expected when new request starts
+                if (isAbortError(err)) {
+                    return; // Don't log or show errors for aborted requests
+                }
                 console.error("Dashboard status fetch error:", err);
                 setError('Failed to load dashboard data. Please refresh the page.');
                 setLoading(false);
+            } finally {
+                // Clear abort controller if this was the active request
+                if (abortControllerRef.current === abortController) {
+                    abortControllerRef.current = null;
+                }
             }
         } else {
             // For subsequent refreshes, fetch all data in parallel (non-blocking)
             try {
                 const [statusRes, weeklyRes, requestsRes] = await Promise.all([
-                    api.get(`/attendance/status?date=${localDate}`),
-                    api.get('/attendance/my-weekly-log'),
-                    api.get('/leaves/my-requests'),
+                    api.get(`/attendance/status?date=${localDate}`, { signal }),
+                    api.get('/attendance/my-weekly-log', { signal }),
+                    api.get('/leaves/my-requests', { signal }),
                 ]);
+                
+                // Check if request was aborted before updating state
+                if (signal.aborted) return;
+                
                 setDailyData(statusRes.data);
                 setWeeklyLogs(Array.isArray(weeklyRes.data) ? weeklyRes.data : []);
                 setMyRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
             } catch (err) {
+                // Silently handle aborted requests - they're expected when new request starts
+                if (isAbortError(err)) {
+                    return; // Don't log or show errors for aborted requests
+                }
                 console.error("Dashboard fetch error:", err);
                 // Don't show error for background refresh - silent fail
+            } finally {
+                // Clear abort controller if this was the active request
+                if (abortControllerRef.current === abortController) {
+                    abortControllerRef.current = null;
+                }
             }
         }
     };
@@ -166,11 +230,56 @@ const EmployeeDashboardPage = () => {
         // This prevents API calls during page refresh before auth state is restored
         if (authLoading || !contextUser) {
             console.log('[EmployeeDashboard] Waiting for auth to initialize...');
+            // Stop polling if user logs out
             return;
         }
         
         let mounted = true;
         let intervalId = null;
+        let isTabVisible = !document.hidden;
+        
+        // ADAPTIVE POLLING: Dynamic interval based on status and tab visibility
+        // - Clocked In/On Break + Tab Visible: 10s (frequent updates for active users)
+        // - Clocked Out + Tab Visible: 60s (less frequent, user not actively working)
+        // - Tab Hidden: 60s (reduce background activity)
+        // - User Logged Out: No polling (handled by early return above)
+        const getPollingInterval = () => {
+            // If tab is hidden, use slower polling regardless of status
+            if (!isTabVisible) {
+                return 60000; // 60 seconds when tab hidden
+            }
+            
+            // When tab is visible, adapt based on status
+            const isActive = dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
+            return isActive ? 10000 : 60000; // 10s when active, 60s when clocked out
+        };
+        
+        const startPolling = () => {
+            // Clear any existing interval
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            // Don't poll if component unmounted or user logged out
+            if (!mounted || !contextUser) {
+                return;
+            }
+            
+            const interval = getPollingInterval();
+            intervalId = setInterval(() => {
+                if (mounted && contextUser && fetchAllDataRef.current) {
+                    fetchAllDataRef.current(false);
+                }
+            }, interval);
+        };
+        
+        // Handle visibility changes to adjust polling
+        const handleVisibilityChange = () => {
+            isTabVisible = !document.hidden;
+            // Restart polling with new interval when visibility changes
+            startPolling();
+        };
         
         const loadData = async () => {
             // Prevent duplicate execution in React StrictMode
@@ -183,39 +292,44 @@ const EmployeeDashboardPage = () => {
             if (fetchAllDataRef.current) {
                 await fetchAllDataRef.current(true);
             }
-            if (mounted) {
-                // Only start polling if user is clocked in (reduces unnecessary API calls)
-                const checkSession = () => {
-                    // Check current status from state
-                    return dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
-                };
-                
+            
+            if (mounted && contextUser) {
                 // Start polling after initial load completes
-                const startPolling = () => {
-                    if (checkSession()) {
-                        intervalId = setInterval(() => {
-                            if (mounted && fetchAllDataRef.current) {
-                                fetchAllDataRef.current(false);
-                            }
-                        }, 30000);
+                // Delay to ensure dailyData is set from initial fetch
+                setTimeout(() => {
+                    if (mounted && contextUser) {
+                        startPolling();
                     }
-                };
-                
-                // Delay polling start to check session status
-                setTimeout(startPolling, 1000);
+                }, 1000);
             }
         };
+        
+        // Listen for visibility changes
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         
         loadData();
         
         return () => {
             mounted = false;
             dataFetchedRef.current = false; // Reset on unmount
+            
+            // Remove visibility listener
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Abort any pending requests on unmount to prevent state updates after component unmounts
+            // This prevents memory leaks and "Can't perform a React state update on an unmounted component" warnings
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            
+            // Stop polling on unmount or logout
             if (intervalId) {
                 clearInterval(intervalId);
+                intervalId = null;
             }
         };
-     }, [contextUser, authLoading]); // Depend on contextUser and authLoading to trigger when auth is ready
+     }, [contextUser, authLoading, dailyData?.status]); // Include dailyData?.status to restart polling when status changes
 
     useEffect(() => {
         if (location.state?.refresh) {
@@ -320,26 +434,45 @@ const EmployeeDashboardPage = () => {
     const handleClockIn = async () => {
         if (clockInActionInFlightRef.current) return;
         
+        // Show immediate loading state for instant feedback
+        clockInActionInFlightRef.current = true;
+        setActionLoading(true);
+        setError('');
+        
+        // Show "Fetching location..." feedback immediately
+        setSnackbar({ open: true, message: 'Fetching location…', severity: 'info' });
+        
+        const previousDailyData = dailyData;
+        
         try {
-            let location = getCachedLocationOnly();
-            if (!location) location = await getCurrentLocation();
-
+            // Attempt to get location with 3-second timeout (tries cached first, then fresh)
+            // This will never block longer than 3 seconds
+            const location = await getLocationWithTimeout(3000);
+            
+            // If location unavailable, show non-blocking warning but allow check-in to proceed
+            if (!location) {
+                setSnackbar({ 
+                    open: true, 
+                    message: 'Location unavailable. Check-in will proceed without location verification.', 
+                    severity: 'warning' 
+                });
+            }
+            
             // Immediate optimistic UI update for instant feedback
-            clockInActionInFlightRef.current = true;
-            setActionLoading(true);
-            setError('');
-            const previousDailyData = dailyData;
             setDailyData(prev => ({ ...prev, status: 'Clocked In', sessions: [{ startTime: new Date().toISOString(), endTime: null }] }));
-            setSnackbar({ open: true, message: 'Checked in successfully!' });
 
             try {
-                const res = await api.post('/attendance/clock-in', location);
+                // Send location (may be null) - backend will handle validation
+                const res = await api.post('/attendance/clock-in', location || {});
 
                 // If backend signals weekly late warning (3+), show a popup but DO NOT lock account
                 const warning = res?.data?.weeklyLateWarning;
                 if (warning && warning.showPopup) {
                     setWeeklyLateDialog({ open: true, lateCount: warning.lateCount || 0, lateDates: warning.lateDates || [] });
                 }
+
+                // Show success message
+                setSnackbar({ open: true, message: 'Checked in successfully!', severity: 'success' });
 
                 // Refresh data from server (non-blocking for UI)
                 if (fetchAllDataRef.current) {
@@ -351,15 +484,18 @@ const EmployeeDashboardPage = () => {
                 // Revert optimistic update on error and show message
                 setDailyData(previousDailyData);
                 setError(err.response?.data?.error || 'Failed to clock in.');
-                setSnackbar({ open: true, message: 'Check in failed. Please try again.' });
+                setSnackbar({ open: true, message: 'Check in failed. Please try again.', severity: 'error' });
             } finally {
                 setActionLoading(false);
                 clockInActionInFlightRef.current = false;
             }
-        } catch (locationError) {
+        } catch (error) {
+            // This should never happen as getLocationWithTimeout never throws, but handle gracefully
+            console.error('Unexpected error in handleClockIn:', error);
             clockInActionInFlightRef.current = false;
             setActionLoading(false);
-            setError('Location access is required to clock in. Please enable location permissions.');
+            setError('An unexpected error occurred. Please try again.');
+            setSnackbar({ open: true, message: 'Check in failed. Please try again.', severity: 'error' });
         }
     };
     const handleClockOut = async () => {
@@ -397,24 +533,81 @@ const EmployeeDashboardPage = () => {
         breakActionInFlightRef.current = true;
         setIsBreakModalOpen(false);
         setError('');
+        
+        // Save previous state for accurate reversion on error
         const previousDailyData = dailyData;
-        // Immediate optimistic update
-        setDailyData(prev => ({ ...prev, status: 'On Break', breaks: [...(prev.breaks || []), { breakType, startTime: new Date().toISOString(), endTime: null }] }));
-        setSnackbar({ open: true, message: `Break started successfully!` });
+        
+        // Optimistic lock: Freeze UI state immediately
+        const clientStartTime = new Date().toISOString();
+        const optimisticBreak = { 
+            breakType, 
+            startTime: clientStartTime, 
+            endTime: null,
+            _optimistic: true // Mark as optimistic - used to identify and remove on failure
+        };
+        
+        // Immediate optimistic update - UI freezes in this state
+        setDailyData(prev => ({ 
+            ...prev, 
+            status: 'On Break', 
+            breaks: [...(prev.breaks || []), optimisticBreak],
+            _breakActionInProgress: true // Lock flag
+        }));
+        setSnackbar({ open: true, message: `Starting break...`, severity: 'info' });
         
         try {
-            await api.post('/breaks/start', { breakType });
-            // Refresh data from server (non-blocking for UI)
-            if (fetchAllDataRef.current) {
-                fetchAllDataRef.current(false).catch(err => {
-                    console.error('Failed to refresh data after break start:', err);
-                });
-            }
+            const response = await api.post('/breaks/start', { breakType });
+            const { break: serverBreak, serverStartTime, calculatedLogoutTime, alreadyActive } = response.data;
+            
+            // Merge-only reconciliation: Never revert, only update forward
+            setDailyData(prev => {
+                // Remove optimistic break and add server break
+                const breaksWithoutOptimistic = (prev.breaks || []).filter(b => !b._optimistic);
+                const updatedBreaks = [...breaksWithoutOptimistic];
+                
+                // If already active, use existing break; otherwise use new break
+                if (alreadyActive && serverBreak) {
+                    updatedBreaks.push(serverBreak);
+                } else if (serverBreak) {
+                    updatedBreaks.push(serverBreak);
+                }
+                
+                return {
+                    ...prev,
+                    breaks: updatedBreaks,
+                    status: 'On Break',
+                    calculatedLogoutTime: calculatedLogoutTime || prev.calculatedLogoutTime,
+                    _breakActionInProgress: false // Unlock
+                };
+            });
+            
+            setSnackbar({ open: true, message: `Break started successfully!`, severity: 'success' });
         } catch (err) {
-            // Revert on error
-            setDailyData(previousDailyData);
-            setError(err.response?.data?.error || 'Failed to start break. Please try again.');
-            setSnackbar({ open: true, message: 'Failed to start break. Please try again.' });
+            // On API failure: Remove optimistic break to ensure UI state matches server truth
+            // The optimistic break was never created on the server, so it must be removed from UI
+            setDailyData(prev => {
+                // Remove optimistic break entries (identified by _optimistic flag)
+                const breaksWithoutOptimistic = (prev.breaks || []).filter(b => !b._optimistic);
+                
+                // Determine correct status: revert to previous status if no active breaks remain
+                // If there are other non-optimistic active breaks, keep 'On Break' status
+                const hasActiveBreak = breaksWithoutOptimistic.some(b => !b.endTime);
+                const previousStatus = previousDailyData?.status || 'Clocked In';
+                const newStatus = hasActiveBreak ? 'On Break' : previousStatus;
+                
+                return {
+                    ...prev,
+                    breaks: breaksWithoutOptimistic,
+                    status: newStatus,
+                    _breakActionInProgress: false, // Unlock UI
+                    _breakError: undefined // Clear any previous break errors
+                };
+            });
+            
+            // Show clear error message to user
+            const errorMessage = err.response?.data?.error || 'Failed to start break. Please try again.';
+            setError(errorMessage);
+            setSnackbar({ open: true, message: errorMessage, severity: 'error' });
         } finally {
             breakActionInFlightRef.current = false;
         }
@@ -424,23 +617,20 @@ const EmployeeDashboardPage = () => {
         if (breakActionInFlightRef.current) return;
         breakActionInFlightRef.current = true;
         setError('');
-        const previousDailyData = dailyData;
         
-        // Find the active break and calculate final duration immediately
+        // Find the active break
         const activeBreak = dailyData?.breaks?.find(b => !b.endTime);
-        const breakEndTime = new Date().toISOString();
-        let finalDurationMinutes = 0;
-        
-        if (activeBreak && activeBreak.startTime) {
-            const startMs = new Date(activeBreak.startTime).getTime();
-            const endMs = new Date(breakEndTime).getTime();
-            finalDurationMinutes = Math.round((endMs - startMs) / (1000 * 60));
+        if (!activeBreak) {
+            breakActionInFlightRef.current = false;
+            return;
         }
         
-        // Immediate optimistic update - update status AND break endTime with final duration
+        // Optimistic lock: Freeze UI state immediately
+        const clientEndTime = new Date().toISOString();
+        
+        // Immediate optimistic update - UI freezes in this state
         setDailyData(prev => {
             const updatedBreaks = (prev.breaks || []).map(b => {
-                // Match break by: same _id OR (no endTime and same startTime - for optimistic updates)
                 const isActiveBreak = !b.endTime && (
                     (activeBreak?._id && b._id === activeBreak._id) ||
                     (!activeBreak?._id && b.startTime === activeBreak?.startTime)
@@ -448,33 +638,74 @@ const EmployeeDashboardPage = () => {
                 if (isActiveBreak) {
                     return {
                         ...b,
-                        endTime: breakEndTime,
-                        durationMinutes: finalDurationMinutes
+                        endTime: clientEndTime,
+                        _optimistic: true, // Mark as optimistic
+                        durationMinutes: b.durationMinutes || Math.round((new Date(clientEndTime) - new Date(b.startTime)) / (1000 * 60))
                     };
                 }
                 return b;
             });
-            return { ...prev, status: 'Clocked In', breaks: updatedBreaks };
+            return { 
+                ...prev, 
+                status: 'Clocked In', 
+                breaks: updatedBreaks,
+                _breakActionInProgress: true // Lock flag
+            };
         });
-        setSnackbar({ open: true, message: 'Break ended successfully!' });
+        setSnackbar({ open: true, message: 'Ending break...', severity: 'info' });
         
-        // Backend sync happens in background - UI already updated
-        api.post('/breaks/end').catch(err => {
-            console.error('Failed to sync break end with backend:', err);
-            // Revert on error
-            setDailyData(previousDailyData);
-            setError(err.response?.data?.error || 'Failed to sync break end. Please refresh.');
-            setSnackbar({ open: true, message: 'Failed to sync break end. Please refresh.' });
-        });
-        
-        // Refresh data from server in background (non-blocking, for eventual consistency)
-        if (fetchAllDataRef.current) {
-            fetchAllDataRef.current(false).catch(err => {
-                console.error('Failed to refresh data after break end:', err);
+        try {
+            const response = await api.post('/breaks/end');
+            const { 
+                break: serverBreak, 
+                finalDurationMinutes, 
+                calculatedLogoutTime,
+                updatedAttendanceSnapshot,
+                alreadyEnded 
+            } = response.data;
+            
+            // Merge-only reconciliation: Never revert, only update forward
+            setDailyData(prev => {
+                // Remove optimistic break and add server break
+                const breaksWithoutOptimistic = (prev.breaks || []).map(b => {
+                    if (b._optimistic && !b.endTime) {
+                        // This was the optimistic break - replace with server data
+                        return serverBreak || { ...b, endTime: clientEndTime, _optimistic: false };
+                    }
+                    return { ...b, _optimistic: false };
+                });
+                
+                // If server returned updated break, use it
+                const updatedBreaks = serverBreak 
+                    ? breaksWithoutOptimistic.map(b => 
+                        (b._id === serverBreak._id || (!b._id && b.startTime === activeBreak?.startTime)) 
+                            ? serverBreak 
+                            : b
+                      )
+                    : breaksWithoutOptimistic;
+                
+                return {
+                    ...prev,
+                    breaks: updatedBreaks,
+                    status: 'Clocked In',
+                    calculatedLogoutTime: calculatedLogoutTime || prev.calculatedLogoutTime,
+                    _breakActionInProgress: false // Unlock
+                };
             });
+            
+            setSnackbar({ open: true, message: 'Break ended successfully!', severity: 'success' });
+        } catch (err) {
+            // Merge-only: On error, keep UI state but mark as error
+            setDailyData(prev => ({
+                ...prev,
+                _breakActionInProgress: false,
+                _breakError: err.response?.data?.error || 'Failed to end break. Please try again.'
+            }));
+            setError(err.response?.data?.error || 'Failed to end break. Please try again.');
+            setSnackbar({ open: true, message: 'Failed to end break. Please refresh.', severity: 'error' });
+        } finally {
+            breakActionInFlightRef.current = false;
         }
-        
-        breakActionInFlightRef.current = false;
     };
     
     const handleRequestExtraBreak = async () => {
@@ -585,7 +816,15 @@ const EmployeeDashboardPage = () => {
                                     className={`time-tracking-content ${isClockedInSession ? 'visible' : 'hidden'}`}
                                     sx={{ my: 'auto' }}
                                 >
-                                    <MemoizedShiftProgressBar workedMinutes={workedMinutes} extraMinutes={serverCalculated.unpaidBreakMinutesTaken} status={dailyData.status} breaks={dailyData.breaks} sessions={dailyData.sessions} />
+                                    <MemoizedShiftProgressBar 
+                                        workedMinutes={workedMinutes} 
+                                        extraMinutes={serverCalculated.unpaidBreakMinutesTaken} 
+                                        status={dailyData.status} 
+                                        breaks={dailyData.breaks} 
+                                        sessions={dailyData.sessions}
+                                        calculatedLogoutTime={dailyData.calculatedLogoutTime}
+                                        clockInTime={dailyData.sessions?.[0]?.startTime}
+                                    />
                                     <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
                                         <Grid item xs={12} md={6}>
                                             <Typography variant="overline" color="text.secondary">WORK DURATION</Typography>
@@ -612,7 +851,15 @@ const EmployeeDashboardPage = () => {
                                         <>
                                             <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
                                                 <span>
-                                                    <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
+                                                    <Button 
+                                                        variant="contained" 
+                                                        className="theme-button-red theme-button-break" 
+                                                        onClick={handleOpenBreakModal} 
+                                                        startIcon={breakActionInFlightRef.current ? <CircularProgress size={16} color="inherit" /> : <FreeBreakfastIcon />} 
+                                                        disabled={!isAnyBreakPossible || breakActionInFlightRef.current || dailyData?._breakActionInProgress}
+                                                    >
+                                                        {breakActionInFlightRef.current || dailyData?._breakActionInProgress ? 'Processing...' : 'Start Break'}
+                                                    </Button>
                                                 </span>
                                             </Tooltip>
                                             {canAccess.checkOut() ? (
@@ -622,7 +869,17 @@ const EmployeeDashboardPage = () => {
                                             )}
                                         </>
                                     ) : dailyData.status === 'On Break' ? (
-                                        <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
+                                        <Button 
+                                            fullWidth 
+                                            variant="contained" 
+                                            color="success" 
+                                            className="theme-button-break-end" 
+                                            onClick={handleEndBreak} 
+                                            startIcon={breakActionInFlightRef.current ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
+                                            disabled={breakActionInFlightRef.current || dailyData?._breakActionInProgress}
+                                        >
+                                            {breakActionInFlightRef.current || dailyData?._breakActionInProgress ? 'Processing...' : 'End Break'}
+                                        </Button>
                                     ) : null}
                                 </Stack>
                             </Paper>
@@ -730,19 +987,52 @@ const EmployeeDashboardPage = () => {
                         >
                             <Tooltip title={!paidBreakCheck.allowed ? paidBreakCheck.message : (hasExhaustedPaidBreak ? 'You have used all your paid break time' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6">Paid Break</Typography><Typography variant="body2" color="text.secondary">{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
+                                    <Paper 
+                                        className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed || breakActionInFlightRef.current ? 'disabled' : ''}`} 
+                                        onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed && !breakActionInFlightRef.current ? () => handleStartBreak('Paid') : undefined}
+                                    >
+                                        {breakActionInFlightRef.current ? <CircularProgress size={24} /> : <AccountBalanceWalletIcon className="break-modal-icon paid" />}
+                                        <Box>
+                                            <Typography variant="h6">Paid Break</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {breakActionInFlightRef.current ? 'Processing...' : `${Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining`}
+                                            </Typography>
+                                        </Box>
+                                    </Paper>
                                 </Box>
                             </Tooltip>
                             
                             <Tooltip title={!unpaidBreakCheck.allowed ? unpaidBreakCheck.message : (hasTakenUnpaidBreak ? 'You have already taken an unpaid break today' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6">Unpaid Break</Typography><Typography variant="body2" color="text.secondary">10 minute break</Typography></Box></Paper>
+                                    <Paper 
+                                        className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed || breakActionInFlightRef.current ? 'disabled' : ''}`} 
+                                        onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed && !breakActionInFlightRef.current ? () => handleStartBreak('Unpaid') : undefined}
+                                    >
+                                        {breakActionInFlightRef.current ? <CircularProgress size={24} /> : <NoMealsIcon className="break-modal-icon unpaid" />}
+                                        <Box>
+                                            <Typography variant="h6">Unpaid Break</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {breakActionInFlightRef.current ? 'Processing...' : '10 minute break'}
+                                            </Typography>
+                                        </Box>
+                                    </Paper>
                                 </Box>
                             </Tooltip>
 
                             <Tooltip title={!extraBreakCheck.allowed ? extraBreakCheck.message : (hasPendingExtraBreak ? 'Your request is pending' : hasTakenExtraBreak ? 'You have already used an extra break' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6">{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary">{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
+                                    <Paper 
+                                        className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed || breakActionInFlightRef.current) ? 'disabled' : ''}`} 
+                                        onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed && !breakActionInFlightRef.current ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed || breakActionInFlightRef.current ? undefined : handleOpenReasonModal)}
+                                    >
+                                        {breakActionInFlightRef.current ? <CircularProgress size={24} /> : <MoreTimeIcon className="break-modal-icon extra" />}
+                                        <Box>
+                                            <Typography variant="h6">{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {breakActionInFlightRef.current ? 'Processing...' : (hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval')}
+                                            </Typography>
+                                        </Box>
+                                    </Paper>
                                 </Box>
                             </Tooltip>
                         </Stack>
@@ -780,9 +1070,16 @@ const EmployeeDashboardPage = () => {
                     open={snackbar.open} 
                     autoHideDuration={4000} 
                     onClose={() => setSnackbar({ ...snackbar, open: false })} 
-                    message={snackbar.message}
                     anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                />
+                >
+                    <Alert 
+                        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+                        severity={snackbar.severity || 'info'}
+                        sx={{ width: '100%' }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
             </Box>
         </Box>
     );

@@ -5,6 +5,7 @@ const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const Setting = require('../models/Setting');
+const { determineHalfDayStatus } = require('./halfDayService');
 
 const DEFAULT_OPTIONS = {
     includeSessions: true,
@@ -173,9 +174,28 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     
     // ============================================
     // Calculate total break minutes (including active break if present)
+    // IMPORTANT: Calculate from actual break records to get true totals
+    // (paidBreakMinutesTaken is capped at allowance, excess goes to penaltyMinutes)
     // ============================================
-    let paidBreakMinutesTaken = attendanceLog.paidBreakMinutesTaken || 0;
-    let unpaidBreakMinutesTaken = attendanceLog.unpaidBreakMinutesTaken || 0;
+    let paidBreakMinutesTaken = 0;
+    let unpaidBreakMinutesTaken = 0;
+    
+    // Calculate total break time from completed breaks
+    if (breaks && Array.isArray(breaks)) {
+        breaks.forEach(breakLog => {
+            if (breakLog.endTime && breakLog.startTime) {
+                const breakType = (breakLog.breakType || breakLog.type || '').toString().trim();
+                const breakDuration = breakLog.durationMinutes || 
+                    Math.floor((new Date(breakLog.endTime) - new Date(breakLog.startTime)) / (1000 * 60));
+                
+                if (breakType === 'Paid') {
+                    paidBreakMinutesTaken += breakDuration;
+                } else if (breakType === 'Unpaid' || breakType === 'Extra') {
+                    unpaidBreakMinutesTaken += breakDuration;
+                }
+            }
+        });
+    }
     
     // Include active break duration if present
     if (activeBreak && activeBreak.startTime) {
@@ -279,18 +299,30 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     response.hasLog = true;
     response.attendanceLog = mapAttendanceLog(attendanceLog);
 
-    // CRITICAL: Recalculate late/half-day status from CURRENT clockInTime
+    // CRITICAL: Recalculate late/half-day status from CURRENT clockInTime using unified service
     // This ensures admin edits to clockInTime immediately affect the response
     if (attendanceLog.clockInTime && response.shift && response.shift.startTime) {
-        const recalculatedStatus = await recalculateLateStatus(
-            attendanceLog.clockInTime,
-            response.shift
-        );
-        // Override stored values with recalculated values
-        response.attendanceLog.isLate = recalculatedStatus.isLate;
-        response.attendanceLog.isHalfDay = recalculatedStatus.isHalfDay;
-        response.attendanceLog.lateMinutes = recalculatedStatus.lateMinutes;
-        response.attendanceLog.attendanceStatus = recalculatedStatus.attendanceStatus;
+        // Reload attendance log as document for unified service
+        const logDoc = await AttendanceLog.findById(attendanceLog._id);
+        if (logDoc) {
+            const halfDayResult = await determineHalfDayStatus(logDoc, {
+                user: user,
+                shift: response.shift,
+                skipNotifications: true, // Don't send notifications on status check
+                source: 'daily-status'
+            });
+            // Override stored values with recalculated values
+            response.attendanceLog.isLate = halfDayResult.lateMinutes > 0 && !halfDayResult.isHalfDay;
+            response.attendanceLog.isHalfDay = halfDayResult.isHalfDay;
+            response.attendanceLog.lateMinutes = halfDayResult.lateMinutes;
+            response.attendanceLog.attendanceStatus = halfDayResult.attendanceStatus;
+        } else {
+            // Fallback if log not found
+            response.attendanceLog.isLate = false;
+            response.attendanceLog.isHalfDay = false;
+            response.attendanceLog.lateMinutes = 0;
+            response.attendanceLog.attendanceStatus = 'On-time';
+        }
     } else {
         // Fallback if shift or clockInTime is missing
         response.attendanceLog.isLate = false;
