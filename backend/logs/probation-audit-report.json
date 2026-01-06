@@ -1,0 +1,521 @@
+{
+  "auditDate": "2025-12-29T13:08:19.414Z",
+  "summary": {
+    "totalEmployees": 21,
+    "employeesWithIssues": 21,
+    "totalIssues": 53
+  },
+  "issueBreakdown": {
+    "Days Remaining": 20,
+    "Probation End Date": 14,
+    "Database Fields": 19
+  },
+  "detailedFindings": [
+    {
+      "employeeId": "687ddeb737735aa0fc5be0b7",
+      "employeeName": "Koteswara Katakam\t",
+      "employeeCode": "#BYL202508-E76",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "47 calendar days",
+          "actual": "90 working days",
+          "difference": "43 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        }
+      ]
+    },
+    {
+      "employeeId": "687f2517a9dfd2a01b782b6d",
+      "employeeName": "Manish Patil",
+      "employeeCode": "#BYL202508-E77",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Mar 1, 2026",
+          "actual": "May 10, 2026",
+          "difference": "70 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "62 calendar days",
+          "actual": "92 working days",
+          "difference": "30 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "689c3e0088765df0f95b5807",
+      "employeeName": "Radha Nandedkar",
+      "employeeCode": "#BYL-IN-08-0825",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "45 calendar days",
+          "actual": "147 working days",
+          "difference": "102 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        }
+      ]
+    },
+    {
+      "employeeId": "689ddd2e35a11aee6a182009",
+      "employeeName": "Shivam Dongare",
+      "employeeCode": "BYL-HR-002",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "233 calendar days",
+          "actual": "165 working days",
+          "difference": "68 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "68bea6d506b7a7115f2e18c7",
+      "employeeName": "Anushka Ubriani",
+      "employeeCode": "#BYL202508-E79",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Mar 8, 2026",
+          "actual": "May 18, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "69 calendar days",
+          "actual": "103 working days",
+          "difference": "34 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "68bea78806b7a7115f2e1962",
+      "employeeName": "Aayush Trehan",
+      "employeeCode": "#BYL202508-E78",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Mar 8, 2026",
+          "actual": "May 18, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "69 calendar days",
+          "actual": "101 working days",
+          "difference": "32 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "68d29f4cce5f5ad421bb6f93",
+      "employeeName": "Achal Shukla ",
+      "employeeCode": "#BYL202508-E80",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Mar 22, 2026",
+          "actual": "Jun 1, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "83 calendar days",
+          "actual": "108 working days",
+          "difference": "25 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "69004f78b1f6863b649d216c",
+      "employeeName": "Sanika Pastapure",
+      "employeeCode": "#BYL-IN-10-1025",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Jan 27, 2026",
+          "actual": "Jul 6, 2026",
+          "difference": "160 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "29 calendar days",
+          "actual": "140 working days",
+          "difference": "111 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "690209593669c87858a316bd",
+      "employeeName": "Varad Ravande",
+      "employeeCode": "#BYL-IN-11-1025",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Jan 29, 2026",
+          "actual": "Jul 8, 2026",
+          "difference": "160 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "31 calendar days",
+          "actual": "141 working days",
+          "difference": "110 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "69089f32549111e069b6775f",
+      "employeeName": "Aleena Suman",
+      "employeeCode": "#BYL-IN-12-1125",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Feb 3, 2026",
+          "actual": "Jul 12, 2026",
+          "difference": "159 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "36 calendar days",
+          "actual": "138 working days",
+          "difference": "102 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "6908a3e9549111e069b67f80",
+      "employeeName": "Harish Toke",
+      "employeeCode": "#BYL202511-E82",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 3, 2026",
+          "actual": "Jul 12, 2026",
+          "difference": "70 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "125 calendar days",
+          "actual": "137 working days",
+          "difference": "12 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "6908a430549111e069b68003",
+      "employeeName": "Yashodeep Joshi",
+      "employeeCode": "#BYL202511-E81",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 3, 2026",
+          "actual": "Jul 12, 2026",
+          "difference": "70 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "125 calendar days",
+          "actual": "137 working days",
+          "difference": "12 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "690b551dab52086e45b50d84",
+      "employeeName": "Gauri Ingle",
+      "employeeCode": "#BYL202511-E83",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 5, 2026",
+          "actual": "Jul 15, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "127 calendar days",
+          "actual": "142 working days",
+          "difference": "15 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "690b563aab52086e45b50ead",
+      "employeeName": "Yuja Prabhudesai",
+      "employeeCode": "#BYL-IN-13-1125",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "Feb 5, 2026",
+          "actual": "Jul 15, 2026",
+          "difference": "160 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "38 calendar days",
+          "actual": "144 working days",
+          "difference": "106 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "691177970f3bc7c194c6c8bc",
+      "employeeName": "Shubham Jawale",
+      "employeeCode": "#BYL202511-E85",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 10, 2026",
+          "actual": "Jul 20, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "132 calendar days",
+          "actual": "143 working days",
+          "difference": "11 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "691177e10f3bc7c194c6c990",
+      "employeeName": "Vishakh Krishnakumar",
+      "employeeCode": "#BYL202511-E84",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 10, 2026",
+          "actual": "Jul 20, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "691af3d1469c22f64733dcf2",
+      "employeeName": "Sukhada Joshi",
+      "employeeCode": "#BYL202511-E87",
+      "issues": [
+        {
+          "field": "Probation End Date",
+          "expected": "May 17, 2026",
+          "actual": "Jul 27, 2026",
+          "difference": "71 days",
+          "rootCause": "Frontend calculates using 1.4 multiplier, backend uses working days"
+        },
+        {
+          "field": "Days Remaining",
+          "expected": "139 calendar days",
+          "actual": "151 working days",
+          "difference": "12 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "69411d12ba2a6021f52cc87f",
+      "employeeName": "Tanmay Waghe",
+      "employeeCode": "#BYL202505-E63",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "11 calendar days",
+          "actual": "173 working days",
+          "difference": "162 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "69411d64ba2a6021f52cc9c8",
+      "employeeName": "Jitesh Ambekar",
+      "employeeCode": "#BYL202505-E66",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "22 calendar days",
+          "actual": "172 working days",
+          "difference": "150 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "69411dc3ba2a6021f52ccc6b",
+      "employeeName": "Swapnil Chavan",
+      "employeeCode": "#BYL202505-E72",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "50 calendar days",
+          "actual": "172 working days",
+          "difference": "122 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    },
+    {
+      "employeeId": "694f6b1dd4c85d71fbd89466",
+      "employeeName": "Shriraj Bujbal",
+      "employeeCode": "BYL202504-E59",
+      "issues": [
+        {
+          "field": "Days Remaining",
+          "expected": "1 calendar days",
+          "actual": "179 working days",
+          "difference": "178 days",
+          "rootCause": "Backend returns working days, frontend displays as calendar days"
+        },
+        {
+          "field": "Database Fields",
+          "issue": "Missing probationStartDate and probationEndDate",
+          "impact": "All calculations are estimated",
+          "rootCause": "Probation dates not set during employee creation/update"
+        }
+      ]
+    }
+  ],
+  "rootCauseAnalysis": {
+    "dateCalculationMismatch": "Backend uses working days, frontend uses calendar days",
+    "missingProbationDates": "Many employees lack probationStartDate/probationEndDate in database",
+    "timezoneHandling": "Potential timezone offsets in date comparisons",
+    "leaveCalculation": "Leaves filtered by start-to-today instead of start-to-end",
+    "unitConfusion": "Backend returns working days, frontend displays as calendar days"
+  }
+}
