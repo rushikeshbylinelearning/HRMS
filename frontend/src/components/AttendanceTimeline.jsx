@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { Typography, Box, Paper } from '@mui/material';
 import DailyTimelineRow from './DailyTimelineRow';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
-import { findLeaveForDate, findHolidayForDate } from '../utils/dateUtils';
 import '../styles/AttendanceTimeline.css';
 
 // Helper to format shift time from "HH:mm" to "hh:mm AM/PM"
@@ -26,16 +25,50 @@ const formatDuration = (totalMins) => {
 const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'All Saturdays Working', shiftInfo, isAdminView, holidays = [], leaves = [] }) => {
 
     // Helper function to check if a date is a holiday
-    // CRITICAL FIX: Use centralized date utility to handle timezone issues
     const getHolidayForDate = (date) => {
-        return findHolidayForDate(date, holidays);
+        // Use local date formatting to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const holiday = holidays.find(holiday => {
+            // Skip tentative holidays (no date or isTentative flag)
+            if (!holiday.date || holiday.isTentative) {
+                return false;
+            }
+            const holidayDate = new Date(holiday.date);
+            if (isNaN(holidayDate.getTime())) {
+                return false;
+            }
+            const holidayYear = holidayDate.getFullYear();
+            const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
+            const holidayDay = String(holidayDate.getDate()).padStart(2, '0');
+            const holidayDateStr = `${holidayYear}-${holidayMonth}-${holidayDay}`;
+            return holidayDateStr === dateStr;
+        });
+        return holiday;
     };
 
     // Helper function to check if a date is a leave
-    // CRITICAL FIX: Use centralized date utility to handle timezone issues
-    // This ensures compensatory leaves and all leave types are found correctly
     const getLeaveForDate = (date) => {
-        return findLeaveForDate(date, leaves);
+        // Use local date formatting to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        return leaves.find(leave => {
+            if (leave.status !== 'Approved') return false;
+            return leave.leaveDates.some(leaveDateItem => {
+                const leaveDate = new Date(leaveDateItem);
+                const leaveYear = leaveDate.getFullYear();
+                const leaveMonth = String(leaveDate.getMonth() + 1).padStart(2, '0');
+                const leaveDay = String(leaveDate.getDate()).padStart(2, '0');
+                const leaveDateStr = `${leaveYear}-${leaveMonth}-${leaveDay}`;
+                return leaveDateStr === dateStr;
+            });
+        });
     };
 
     const weekDays = useMemo(() => {
@@ -56,17 +89,27 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
             const log = logMap.get(dateString);
             let status = ''; 
 
-            // UNIFIED RESOLUTION: Use backend's resolved attendanceStatus
-            // The backend already resolves status using unified logic (Holiday > Leave > Weekend > Present > Absent)
-            if (log && log.attendanceStatus) {
-                // Use backend's resolved status directly
-                status = log.attendanceStatus;
+            // Check for holidays and leaves first (regardless of log existence)
+            // CRITICAL: Approved leaves take priority over attendance logs (including Absent status)
+            const holiday = getHolidayForDate(d);
+            const leave = getLeaveForDate(d);
+            
+            if (holiday) {
+                status = `Holiday - ${holiday.name}`;
+            } else if (leave) {
+                // CRITICAL: Approved leave takes priority over any attendance log
+                // Even if there's a log marked as Absent, the approved leave should override it
+                if (leave.requestType === 'Compensatory') {
+                    status = 'Comp Off';
+                } else if (leave.requestType === 'Swap Leave') {
+                    status = 'Swap Leave';
+                } else {
+                    status = `Leave - ${formatLeaveRequestType(leave.requestType)}`;
+                }
             } else {
-                // No log - determine status based on day of week and Saturday policy
+                // Always respect the saturdayPolicy for Saturdays (dayOfWeek === 6)
                 const dayOfWeek = d.getDay();
-                if (dayOfWeek === 0) {
-                    status = 'Weekend';
-                } else if (dayOfWeek === 6) {
+                if (dayOfWeek === 6) {
                     const weekNum = Math.ceil(d.getDate() / 7);
                     let isWorkingSaturday = true;
                     if (saturdayPolicy === 'All Saturdays Off') {
@@ -78,36 +121,28 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
                     }
 
                     if (!isWorkingSaturday) {
-                        status = 'Week Off';
-                    } else if (d.getTime() < today.getTime()) {
-                        status = 'Absent';
-                    } else {
-                        status = 'Working Day';
-                    }
-                } else {
-                    // Weekday without log
-                    if (d.getTime() < today.getTime()) {
-                        status = 'Absent';
-                    } else {
-                        status = 'Working Day';
+                        status = 'Day Off';
+                        // push the day even if there is a log; status should reflect scheduled day off
+                        days.push({ date: d, log: log, status: status });
+                        continue;
                     }
                 }
+
+                // If not a scheduled day off, handle absence/working day logic
+                let expectedStatus = 'Working Day';
+                if (dayOfWeek === 0) expectedStatus = 'Weekend';
+
+                if (!log) {
+                    if (expectedStatus === 'Working Day' && d.getTime() < today.getTime()) {
+                        status = 'Absent';
+                    } else {
+                        status = expectedStatus;
+                    }
+                } else {
+                    // If there is a log, and not a scheduled day off, consider present (handled later in summary)
+                    status = '';
+                }
             }
-            
-            // Use leave and holiday from backend if available, otherwise fallback to local lookup
-            const holiday = log?.holiday ? {
-                _id: log.holiday._id,
-                name: log.holiday.name,
-                date: log.holiday.date
-            } : getHolidayForDate(d);
-            const leave = log?.leave ? {
-                _id: log.leave._id,
-                requestType: log.leave.requestType,
-                leaveType: log.leave.leaveType,
-                status: log.leave.status,
-                leaveDates: log.leave.leaveDates,
-                reason: log.leave.reason
-            } : getLeaveForDate(d);
 
             days.push({ 
                 date: d, 

@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
-import { formatDateYYYYMMDD } from '../utils/dateUtils';
 
 const EmployeeAnalyticsModalMinimal = ({ open, onClose, employeeId, employeeName }) => {
   const { user } = useAuth();
@@ -29,8 +28,8 @@ const EmployeeAnalyticsModalMinimal = ({ open, onClose, employeeId, employeeName
       const prev = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1);
       const startOfMonth = new Date(prev.getFullYear(), prev.getMonth(), 1);
       const endOfMonth = new Date(prev.getFullYear(), prev.getMonth() + 1, 0);
-      const startDate = formatDateYYYYMMDD(startOfMonth);
-      const endDate = formatDateYYYYMMDD(endOfMonth);
+      const startDate = startOfMonth.toISOString().slice(0, 10);
+      const endDate = endOfMonth.toISOString().slice(0, 10);
       
       console.log(`Fetching analytics for employee ${employeeId} from ${startDate} to ${endDate}`);
       

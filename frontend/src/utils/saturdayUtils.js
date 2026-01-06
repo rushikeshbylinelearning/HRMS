@@ -1,7 +1,6 @@
 /**
  * Utility functions for handling Saturday policies and attendance status
  */
-import { findLeaveForDate, findHolidayForDate } from './dateUtils';
 
 /**
  * Get attendance status for a specific date
@@ -23,23 +22,51 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
   // should still indicate scheduled Weekend/Week Off days even if they are in the future.
   // Future working days without logs will still be represented as 'N/A' later.
   
-  // CRITICAL FIX: Use centralized date utilities to ensure consistent date matching
-  // This fixes timezone issues that cause compensatory leaves to not be found
   // Helper function to check if a date is a holiday
   const getHolidayForDate = (date) => {
-    return findHolidayForDate(date, holidays);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    return holidays.find(holiday => {
+      // Skip tentative holidays (no date or isTentative flag)
+      if (!holiday.date || holiday.isTentative) {
+        return false;
+      }
+      const holidayDate = new Date(holiday.date);
+      if (isNaN(holidayDate.getTime())) {
+        return false;
+      }
+      const holidayYear = holidayDate.getFullYear();
+      const holidayMonth = String(holidayDate.getMonth() + 1).padStart(2, '0');
+      const holidayDay = String(holidayDate.getDate()).padStart(2, '0');
+      const holidayDateStr = `${holidayYear}-${holidayMonth}-${holidayDay}`;
+      return holidayDateStr === dateStr;
+    });
   };
 
   // Helper function to check if a date is a leave
-  // CRITICAL: This now uses centralized date matching that handles timezone issues
-  // This ensures compensatory leaves on alternate Saturdays are found correctly
   const getLeaveForDate = (date) => {
-    return findLeaveForDate(date, leaves);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    return leaves.find(leave => {
+      if (leave.status !== 'Approved') return false;
+      return leave.leaveDates.some(leaveDateItem => {
+        const leaveDate = new Date(leaveDateItem);
+        const leaveYear = leaveDate.getFullYear();
+        const leaveMonth = String(leaveDate.getMonth() + 1).padStart(2, '0');
+        const leaveDay = String(leaveDate.getDate()).padStart(2, '0');
+        const leaveDateStr = `${leaveYear}-${leaveMonth}-${leaveDay}`;
+        return leaveDateStr === dateStr;
+      });
+    });
   };
 
-  // CRITICAL FIX: Check for holidays and leaves FIRST (regardless of log existence)
-  // This ensures approved leaves ALWAYS override Absent status, even if an attendance log exists
-  // Priority order: Holiday > Approved Leave > Attendance Log Status
+  // Check for holidays and leaves first (regardless of log existence)
   const holiday = getHolidayForDate(date);
   const leave = getLeaveForDate(date);
   
@@ -51,7 +78,6 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
     };
   }
   
-  // CRITICAL: Approved leave takes priority over ANY attendance log status (including Absent)
   if (leave) {
     // Handle special leave types with distinct colors and labels
     if (leave.requestType === 'Compensatory') {
@@ -72,9 +98,8 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
       };
     } else {
       const formattedRequestType = leave.requestType === 'Loss of Pay' ? 'Loss of pay' : leave.requestType;
-      const leaveTypeText = leave.leaveType === 'Full Day' ? 'Full Day' : (leave.leaveType || 'Full Day');
       return { 
-        status: `Leave - ${formattedRequestType} (${leaveTypeText})`, 
+        status: `Leave - ${formattedRequestType}`, 
         color: '#e74c3c', 
         bgColor: '#ffeaea',
         leaveType: formattedRequestType,
@@ -82,8 +107,8 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
       };
     }
   }
-
-  // If there's a log with sessions, determine status based on sessions
+  
+  // If there's a log, determine status based on sessions
   if (log && log.sessions && log.sessions.length > 0) {
     // Check if it's a late arrival (this would need to be determined by comparing with shift start time)
     // For now, just return Present
@@ -118,8 +143,7 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
   }
   
   // If it's a working day and it's in the past, mark as absent
-  // BUT: Only if there's no approved leave (we already checked for leave above)
-  if (expectedStatus === 'Working Day' && currentDate < today && !leave) {
+  if (expectedStatus === 'Working Day' && currentDate < today) {
     return { 
       status: 'Absent', 
       color: '#e74c3c', 

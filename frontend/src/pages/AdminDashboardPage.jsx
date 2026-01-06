@@ -120,8 +120,6 @@ const WhosInItem = memo(({ employee }) => {
             // Update immediately
             calculateLiveLogoutTime();
             
-            // TODO: Replace this local timer with useGlobalNow hook to reduce multiple timers
-            // Example: const now = useGlobalNow(true); then use new Date(now) in calculateLiveLogoutTime()
             // Use requestAnimationFrame for smoother updates
             intervalRef.current = setInterval(() => {
                 if (rafRef.current) {

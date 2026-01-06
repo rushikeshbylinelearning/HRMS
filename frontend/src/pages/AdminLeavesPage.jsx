@@ -27,7 +27,6 @@ import EnhancedLeaveRequestModal from '../components/EnhancedLeaveRequestModal';
 import PageHeroHeader from '../components/PageHeroHeader';
 import HolidayBulkUploadModal from '../components/HolidayBulkUploadModal';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
-import { normalizeDate, formatDateYYYYMMDD } from '../utils/dateUtils';
 import '../styles/AdminLeavesPage.css'; // Import the new stylesheet
 import { TableSkeleton } from '../components/SkeletonLoaders';
 import PeopleIcon from '@mui/icons-material/People';
@@ -313,16 +312,8 @@ const LeaveCountSummaryTab = memo(() => {
     // Fetch analytics data for working days calculation
     const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
         try {
-            // Use local date formatting (IST) instead of UTC to avoid timezone issues
-            const formatDateLocal = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-            
-            const startStr = formatDateLocal(startDate);
-            const endStr = formatDateLocal(endDate);
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
             
             const analyticsRes = await api.get('/analytics/all', {
                 params: {
@@ -425,11 +416,8 @@ const LeaveCountSummaryTab = memo(() => {
                 if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
                 
                 const hasDateInRange = leave.leaveDates.some(date => {
-                    // Use normalized date strings for comparison (IST-aware)
-                    const leaveDateStr = formatDateYYYYMMDD(date) || normalizeDate(date);
-                    const startDateStr = formatDateYYYYMMDD(startDate) || normalizeDate(startDate);
-                    const endDateStr = formatDateYYYYMMDD(endDate) || normalizeDate(endDate);
-                    return leaveDateStr && startDateStr && endDateStr && leaveDateStr >= startDateStr && leaveDateStr <= endDateStr;
+                    const leaveDate = new Date(date);
+                    return leaveDate >= startDate && leaveDate <= endDate;
                 });
                 
                 if (!hasDateInRange) return false;
@@ -445,19 +433,15 @@ const LeaveCountSummaryTab = memo(() => {
             const approvedCount = empLeaves.filter(l => l.status === 'Approved').length;
             
             // Calculate total leave days (only approved)
-            // NOTE: This is display-only aggregation, not business logic
             let totalLeaveDays = 0;
             const leaveTypeBreakdown = {};
             
             empLeaves.forEach(leave => {
                 if (leave.status === 'Approved' && leave.leaveDates) {
-                    // Count days within the date range (display only - backend calculates actual working days)
+                    // Count days within the date range
                     const daysInRange = leave.leaveDates.filter(date => {
-                        // Use normalized date strings for comparison (IST-aware)
-                        const leaveDateStr = formatDateYYYYMMDD(date) || normalizeDate(date);
-                        const startDateStr = formatDateYYYYMMDD(startDate) || normalizeDate(startDate);
-                        const endDateStr = formatDateYYYYMMDD(endDate) || normalizeDate(endDate);
-                        return leaveDateStr && startDateStr && endDateStr && leaveDateStr >= startDateStr && leaveDateStr <= endDateStr;
+                        const leaveDate = new Date(date);
+                        return leaveDate >= startDate && leaveDate <= endDate;
                     }).length;
                     
                     // Adjust for half days
@@ -1334,16 +1318,8 @@ const InternLeaveCountSummaryTab = memo(() => {
     // Fetch analytics data for working days calculation
     const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
         try {
-            // Use local date formatting (IST) instead of UTC to avoid timezone issues
-            const formatDateLocal = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-            
-            const startStr = formatDateLocal(startDate);
-            const endStr = formatDateLocal(endDate);
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
             
             const analyticsRes = await api.get('/analytics/all', {
                 params: {
@@ -1421,11 +1397,8 @@ const InternLeaveCountSummaryTab = memo(() => {
                 if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
                 
                 const hasDateInRange = leave.leaveDates.some(date => {
-                    // Use normalized date strings for comparison (IST-aware)
-                    const leaveDateStr = formatDateYYYYMMDD(date) || normalizeDate(date);
-                    const startDateStr = formatDateYYYYMMDD(startDate) || normalizeDate(startDate);
-                    const endDateStr = formatDateYYYYMMDD(endDate) || normalizeDate(endDate);
-                    return leaveDateStr && startDateStr && endDateStr && leaveDateStr >= startDateStr && leaveDateStr <= endDateStr;
+                    const leaveDate = new Date(date);
+                    return leaveDate >= startDate && leaveDate <= endDate;
                 });
                 
                 if (!hasDateInRange) return false;
@@ -1442,13 +1415,9 @@ const InternLeaveCountSummaryTab = memo(() => {
             
             empLeaves.forEach(leave => {
                 if (leave.status === 'Approved' && leave.leaveDates) {
-                    // Count days within the date range (display only - backend calculates actual working days)
                     const daysInRange = leave.leaveDates.filter(date => {
-                        // Use normalized date strings for comparison (IST-aware)
-                        const leaveDateStr = formatDateYYYYMMDD(date) || normalizeDate(date);
-                        const startDateStr = formatDateYYYYMMDD(startDate) || normalizeDate(startDate);
-                        const endDateStr = formatDateYYYYMMDD(endDate) || normalizeDate(endDate);
-                        return leaveDateStr && startDateStr && endDateStr && leaveDateStr >= startDateStr && leaveDateStr <= endDateStr;
+                        const leaveDate = new Date(date);
+                        return leaveDate >= startDate && leaveDate <= endDate;
                     }).length;
                     
                     const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
@@ -2347,312 +2316,59 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
     };
 
     return (
-        <Dialog 
-            open={open} 
-            onClose={onClose} 
-            fullWidth 
-            maxWidth="sm"
-            PaperProps={{ 
-                sx: { 
-                    borderRadius: '12px',
-                    backgroundColor: '#ffffff',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    maxHeight: '90vh',
-                    display: 'flex',
-                    flexDirection: 'column'
-                } 
-            }}
-        >
-            {/* Professional Header */}
-            <DialogTitle sx={{ 
-                backgroundColor: '#ffffff',
-                color: '#212121', 
-                fontWeight: 600,
-                fontSize: '1.25rem',
-                py: 2.5,
-                px: 3,
-                borderBottom: '2px solid #dc3545'
-            }}>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+            <DialogTitle>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <CalendarMonthIcon sx={{ color: '#dc3545', fontSize: '1.5rem' }} />
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#212121' }}>
-                        Holiday Management
-                    </Typography>
+                    <CalendarMonthIcon />Holiday Management
                 </Box>
             </DialogTitle>
-
-            <DialogContent sx={{ 
-                backgroundColor: '#ffffff', 
-                p: 3,
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1
-            }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3, color: '#757575' }}>
-                    Add or remove company-wide holidays.
-                </Typography>
+            <DialogContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Add or remove company-wide holidays.</Typography>
+                {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
                 
-                {error && (
-                    <Alert 
-                        severity="error" 
-                        sx={{ 
-                            mb: 2,
-                            borderRadius: '8px',
-                            '& .MuiAlert-icon': {
-                                color: '#dc3545'
-                            }
-                        }} 
-                        onClose={() => setError('')}
-                    >
-                        {error}
-                    </Alert>
-                )}
-                
-                {/* Upload Section */}
-                <Box sx={{ 
-                    mb: 3, 
-                    display: 'flex', 
-                    justifyContent: 'flex-end',
-                    pb: 2,
-                    borderBottom: '1px solid #e0e0e0'
-                }}>
+                {/* Bulk Upload Button */}
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                         variant="outlined"
                         startIcon={<UploadFileIcon />}
                         onClick={() => setBulkUploadOpen(true)}
-                        sx={{ 
-                            borderColor: '#d0d0d0',
-                            color: '#424242',
-                            textTransform: 'none',
-                            fontWeight: 500,
-                            px: 2,
-                            '&:hover': {
-                                borderColor: '#dc3545',
-                                color: '#dc3545',
-                                backgroundColor: '#fff5f5'
-                            }
-                        }}
+                        sx={{ mr: 1 }}
                     >
                         Upload Holidays (Excel)
                     </Button>
                 </Box>
                 
-                {/* Add Holiday Form */}
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#212121' }}>
-                        Add New Holiday
-                    </Typography>
-                    <Grid container spacing={2} alignItems="flex-end">
-                        <Grid item xs={12} sm={5}>
-                            <TextField 
-                                label="Holiday Name" 
-                                size="small" 
-                                fullWidth 
-                                value={newHoliday.name} 
-                                onChange={(e) => setNewHoliday(p => ({ ...p, name: e.target.value }))}
-                                sx={{
-                                    '& .MuiOutlinedInput-root': {
-                                        backgroundColor: '#ffffff',
-                                        '& fieldset': {
-                                            borderColor: '#d0d0d0'
-                                        },
-                                        '&:hover fieldset': {
-                                            borderColor: '#dc3545'
-                                        },
-                                        '&.Mui-focused fieldset': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        }
-                                    },
-                                    '& .MuiInputLabel-root.Mui-focused': {
-                                        color: '#dc3545'
-                                    }
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={5}>
-                            <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                <DatePicker 
-                                    label="Holiday Date" 
-                                    value={newHoliday.date} 
-                                    onChange={(d) => setNewHoliday(p => ({ ...p, date: d }))} 
-                                    slotProps={{ 
-                                        textField: { 
-                                            size: 'small', 
-                                            fullWidth: true,
-                                            sx: {
-                                                backgroundColor: '#ffffff',
-                                                '& .MuiOutlinedInput-root': {
-                                                    '& fieldset': {
-                                                        borderColor: '#d0d0d0'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: '#dc3545'
-                                                    },
-                                                    '&.Mui-focused fieldset': {
-                                                        borderColor: '#dc3545',
-                                                        borderWidth: '2px'
-                                                    }
-                                                },
-                                                '& .MuiInputLabel-root.Mui-focused': {
-                                                    color: '#dc3545'
-                                                }
-                                            }
-                                        } 
-                                    }} 
-                                />
-                            </LocalizationProvider>
-                        </Grid>
-                        <Grid item xs={12} sm={2}>
-                            <Button 
-                                variant="contained" 
-                                fullWidth 
-                                onClick={handleAddHoliday}
-                                sx={{
-                                    backgroundColor: '#dc3545',
-                                    color: '#ffffff',
-                                    textTransform: 'none',
-                                    fontWeight: 500,
-                                    py: 1,
-                                    '&:hover': {
-                                        backgroundColor: '#c82333'
-                                    }
-                                }}
-                            >
-                                Add
-                            </Button>
-                        </Grid>
+                <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                    <Grid item xs={12} sm={6}><TextField label="Holiday Name" size="small" fullWidth value={newHoliday.name} onChange={(e) => setNewHoliday(p => ({ ...p, name: e.target.value }))} /></Grid>
+                    <Grid item xs={12} sm={4}>
+                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                            <DatePicker label="Holiday Date" value={newHoliday.date} onChange={(d) => setNewHoliday(p => ({ ...p, date: d }))} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
+                        </LocalizationProvider>
                     </Grid>
-                </Box>
-
-                {/* Holidays List Section */}
-                <Box sx={{ 
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 0
-                }}>
-                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#212121' }}>
-                        Existing Holidays ({holidays.length})
-                    </Typography>
-                    <Box sx={{ 
-                        flex: 1,
-                        overflowY: 'auto',
-                        maxHeight: '400px',
-                        pr: 1,
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px',
-                        p: 2,
-                        backgroundColor: '#fafafa',
-                        '&::-webkit-scrollbar': {
-                            width: '8px'
-                        },
-                        '&::-webkit-scrollbar-track': {
-                            backgroundColor: '#f5f5f5',
-                            borderRadius: '4px'
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                            backgroundColor: '#dc3545',
-                            borderRadius: '4px',
-                            '&:hover': {
-                                backgroundColor: '#c82333'
-                            }
-                        }
-                    }}>
-                        {loading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                <CircularProgress size={24} sx={{ color: '#dc3545' }} />
-                            </Box>
-                        ) : holidays.length > 0 ? (
-                            <Box sx={{ 
-                                display: 'flex', 
-                                flexWrap: 'wrap', 
-                                gap: 1.5 
-                            }}>
-                                {holidays.map(h => {
-                                    const isTentative = !h.date || h.isTentative;
-                                    const dateDisplay = isTentative ? 'Tentative' : new Date(h.date).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                    });
-                                    return (
-                                        <Chip 
-                                            key={h._id} 
-                                            label={`${h.name} (${dateDisplay})`}
-                                            onDelete={() => handleDeleteHoliday(h._id)}
-                                            sx={{
-                                                backgroundColor: isTentative ? '#fff3e0' : '#ffffff',
-                                                border: `1px solid ${isTentative ? '#ff9800' : '#d0d0d0'}`,
-                                                color: isTentative ? '#e65100' : '#424242',
-                                                fontWeight: 500,
-                                                height: '32px',
-                                                '&:hover': {
-                                                    borderColor: '#dc3545',
-                                                    backgroundColor: '#fff5f5'
-                                                },
-                                                '& .MuiChip-deleteIcon': {
-                                                    color: '#757575',
-                                                    fontSize: '18px',
-                                                    '&:hover': {
-                                                        color: '#dc3545'
-                                                    }
-                                                },
-                                                '& .MuiChip-label': {
-                                                    px: 1.5,
-                                                    fontSize: '0.875rem'
-                                                }
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </Box>
-                        ) : (
-                            <Box sx={{ 
-                                display: 'flex', 
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                py: 4,
-                                color: '#757575'
-                            }}>
-                                <InfoOutlinedIcon sx={{ fontSize: '2.5rem', mb: 1, color: '#bdbdbd' }} />
-                                <Typography variant="body2" sx={{ color: '#757575' }}>
-                                    No holidays configured.
-                                </Typography>
-                            </Box>
-                        )}
-                    </Box>
-                </Box>
+                    <Grid item xs={12} sm={2}><Button variant="contained" fullWidth onClick={handleAddHoliday}>Add</Button></Grid>
+                </Grid>
+                <Divider sx={{ my: 3 }} />
+                <div className="recipients-box">
+                    {loading ? <CircularProgress size={20} /> : holidays.length > 0 ? (
+                        holidays.map(h => {
+                            const isTentative = !h.date || h.isTentative;
+                            const dateDisplay = isTentative ? 'Tentative' : new Date(h.date).toLocaleDateString();
+                            return (
+                                <Chip 
+                                    key={h._id} 
+                                    label={`${h.name} (${dateDisplay})`}
+                                    onDelete={() => handleDeleteHoliday(h._id)}
+                                    color={isTentative ? 'warning' : 'default'}
+                                />
+                            );
+                        })
+                    ) : (
+                        <div className="no-recipients-box"><InfoOutlinedIcon fontSize="small" /><Typography variant="body2">No holidays configured.</Typography></div>
+                    )}
+                </div>
             </DialogContent>
-
-            {/* Footer */}
-            <DialogActions sx={{ 
-                p: 3,
-                backgroundColor: '#ffffff',
-                borderTop: '1px solid #e0e0e0',
-                gap: 2
-            }}>
-                <Button 
-                    onClick={onClose}
-                    variant="outlined"
-                    sx={{
-                        color: '#424242',
-                        borderColor: '#d0d0d0',
-                        px: 3,
-                        py: 1,
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        '&:hover': {
-                            borderColor: '#dc3545',
-                            color: '#dc3545',
-                            backgroundColor: '#fff5f5'
-                        }
-                    }}
-                >
-                    Close
-                </Button>
+            <DialogActions sx={{ p: 2 }}>
+                <Button onClick={onClose}>Close</Button>
             </DialogActions>
             
             {/* Bulk Upload Modal */}
@@ -2669,61 +2385,48 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
 });
 
 
-// Format single date for display (IST-aware, using centralized utility)
-const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    // Use normalizeDate to ensure IST consistency
-    const dateStr = normalizeDate(dateString);
-    // Format for display (backend dates are already in correct timezone)
-    return dateStr || 'N/A';
-};
+const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-CA') : 'N/A';
 
-// Utility function to convert individual dates to date ranges (display only - no business logic)
+// Utility function to convert individual dates to date ranges
 const formatDateRange = (dateStrings) => {
     if (!dateStrings || dateStrings.length === 0) return 'N/A';
     
-    // Normalize all dates using centralized utility
-    const dateStrs = dateStrings
-        .map(dateStr => normalizeDate(dateStr))
-        .filter(dateStr => dateStr !== null && dateStr !== undefined);
+    // Convert to Date objects and sort
+    const dates = dateStrings
+        .map(dateStr => new Date(dateStr))
+        .filter(date => !isNaN(date.getTime()))
+        .sort((a, b) => a - b);
     
-    if (dateStrs.length === 0) return 'N/A';
-    if (dateStrs.length === 1) return formatDate(dateStrs[0]);
-    
-    // Sort dates (as strings YYYY-MM-DD)
-    const sortedDates = [...dateStrs].sort();
+    if (dates.length === 0) return 'N/A';
+    if (dates.length === 1) return formatDate(dates[0]);
     
     // Group consecutive dates into ranges
     const ranges = [];
-    let rangeStart = sortedDates[0];
-    let rangeEnd = sortedDates[0];
+    let start = dates[0];
+    let end = dates[0];
     
-    for (let i = 1; i < sortedDates.length; i++) {
-        const currentDateStr = sortedDates[i];
-        const previousDateStr = sortedDates[i - 1];
-        
-        // Parse as dates to check if consecutive
-        const currentDate = new Date(currentDateStr + 'T00:00:00');
-        const previousDate = new Date(previousDateStr + 'T00:00:00');
+    for (let i = 1; i < dates.length; i++) {
+        const currentDate = dates[i];
+        const previousDate = dates[i - 1];
         const dayDiff = (currentDate - previousDate) / (1000 * 60 * 60 * 24);
         
         if (dayDiff === 1) {
             // Consecutive date, extend the range
-            rangeEnd = currentDateStr;
+            end = currentDate;
         } else {
             // Gap found, save current range and start new one
-            ranges.push({ start: rangeStart, end: rangeEnd });
-            rangeStart = currentDateStr;
-            rangeEnd = currentDateStr;
+            ranges.push({ start, end });
+            start = currentDate;
+            end = currentDate;
         }
     }
     
     // Add the last range
-    ranges.push({ start: rangeStart, end: rangeEnd });
+    ranges.push({ start, end });
     
-    // Format ranges for display
+    // Format ranges
     return ranges.map(range => {
-        if (range.start === range.end) {
+        if (range.start.getTime() === range.end.getTime()) {
             return formatDate(range.start);
         } else {
             return `${formatDate(range.start)} to ${formatDate(range.end)}`;
@@ -2791,29 +2494,7 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
                 )}
             </TableCell>
             <TableCell>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                    <Chip 
-                        label={request.status} 
-                        color={statusColors[request.status] || 'default'} 
-                        size="small" 
-                    />
-                    {request.validationBlocked && !request.adminOverride && (
-                        <Chip 
-                            label="Policy Blocked" 
-                            color="warning" 
-                            size="small"
-                            sx={{ fontSize: '0.65rem', height: '18px' }}
-                        />
-                    )}
-                    {request.adminOverride && (
-                        <Chip 
-                            label="Overridden" 
-                            color="info" 
-                            size="small"
-                            sx={{ fontSize: '0.65rem', height: '18px' }}
-                        />
-                    )}
-                </Box>
+                <Chip label={request.status} color={statusColors[request.status] || 'default'} size="small" />
             </TableCell>
             <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                 <div className="actions-cell">
@@ -3076,21 +2757,14 @@ const AdminLeavesPage = () => {
         }
     };
 
-    const handleStatusChange = async (requestId, status, rejectionNotes = '', overrideReason = '') => {
+    const handleStatusChange = async (requestId, status, rejectionNotes = '') => {
         try {
             const payload = { status };
             if (status === 'Rejected' && rejectionNotes) {
                 payload.rejectionNotes = rejectionNotes;
             }
-            // Include overrideReason if provided (for approving blocked leaves)
-            if (status === 'Approved' && overrideReason) {
-                payload.overrideReason = overrideReason;
-            }
             await api.patch(`/admin/leaves/${requestId}/status`, payload);
-            const message = overrideReason 
-                ? `Leave request has been approved with admin override.` 
-                : `Leave request has been ${status.toLowerCase()}.`;
-            setSnackbar({ open: true, message, severity: 'success' });
+            setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.`, severity: 'success' });
             fetchInitialData();
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Action failed.', severity: 'error' });

@@ -5,7 +5,6 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import UpdateIcon from '@mui/icons-material/Update';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TimerOffIcon from '@mui/icons-material/TimerOff';
-import useGlobalNow from '../hooks/useGlobalNow';
 import '../styles/ShiftInfoDisplay.css';
 
 const formatTimeIST = (time) => {
@@ -64,17 +63,27 @@ const getShiftStartDateTimeIST = (onDate, shiftStartTime) => {
 
 
 const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
-    // Uses shared global time source to prevent multiple timers and reduce re-renders
+    const [liveLogoutTime, setLiveLogoutTime] = useState(null);
     const { shift, sessions, breaks, status } = dailyData || {};
     const clockInTime = sessions?.[0]?.startTime;
-    const nowTimestamp = useGlobalNow(status === 'Clocked In');
-    const [liveLogoutTime, setLiveLogoutTime] = useState(null);
+    const intervalRef = useRef(null);
+    const rafRef = useRef(null);
     const lastTimeStringRef = useRef('');
     
     // Use shift from dailyData, or fallback to the user's assigned shift
     const effectiveShift = shift || fallbackShift;
 
     useEffect(() => {
+        // Clear any existing timers
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+
         // Check if log exists - if not, reset all state
         const hasLog = dailyData?.hasLog === true && dailyData?.attendanceLog !== null;
         if (!hasLog) {
@@ -109,7 +118,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
         }
 
         const calculateLiveLogoutTime = () => {
-            const now = new Date(nowTimestamp);
+            const now = new Date();
             
             // Check if this is the special 10 AM - 7 PM shift with early clock-in
             const isSpecialShift = effectiveShift?.shiftType === 'Fixed' && 
@@ -154,8 +163,28 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
             }
         };
         
-        calculateLiveLogoutTime();
-    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog, nowTimestamp, liveLogoutTime]);
+        calculateLiveLogoutTime(); // Run once immediately
+
+        // Use requestAnimationFrame for smoother updates
+        intervalRef.current = setInterval(() => {
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+            }
+            rafRef.current = requestAnimationFrame(calculateLiveLogoutTime);
+        }, 1000);
+        
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
+        }; 
+
+    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog]);
 
     if (!effectiveShift) {
         return <div className="shift-info-display-container no-shift">No shift assigned for today.</div>;

@@ -148,15 +148,8 @@
 }
 
 .attendance-status.absent {
-  background-color: #fde2e2;
-  border: 1px solid #f5a5a5;
-  width: 100%;
-  padding: 0.5rem;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
 }
 
 .attendance-status.weekend {
@@ -209,9 +202,7 @@
 }
 
 .attendance-status.absent .status-label {
-  color: #b42318;
-  font-weight: 600;
-  font-size: 0.875rem;
+  color: #721c24;
 }
 
 .attendance-status.weekend .status-label {

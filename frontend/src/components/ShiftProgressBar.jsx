@@ -1,14 +1,9 @@
 // src/components/ShiftProgressBar.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Stack, Tooltip } from '@mui/material';
-import useGlobalNow from '../hooks/useGlobalNow';
 
 const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, sessions, calculatedLogoutTime, clockInTime }) => {
-  // Uses shared global time source to prevent multiple timers and reduce re-renders
-  const hasActiveBreak = breaks?.some(b => !b.endTime);
-  const hasActiveSession = sessions?.some(s => !s.endTime);
-  const nowTimestamp = useGlobalNow(hasActiveBreak || hasActiveSession);
-  const now = new Date(nowTimestamp);
+  const [now, setNow] = useState(new Date());
 
   // Helper function to format minutes into "Xh Ym"
   const formatMinutesToHM = (minutes) => {
@@ -34,6 +29,17 @@ const ShiftProgressBar = ({ workedMinutes, extraMinutes, status, breaks, session
     // Ensure minimum of 540 minutes (9 hours) as safety fallback
     return Math.max(540, durationMinutes);
   }, [calculatedLogoutTime, clockInTime]);
+
+  // Effect to update the 'now' time every second when there's an active break or session
+  useEffect(() => {
+    const hasActiveBreak = breaks?.some(b => !b.endTime);
+    const hasActiveSession = sessions?.some(s => !s.endTime);
+    
+    if (hasActiveBreak || hasActiveSession) {
+      const timerId = setInterval(() => setNow(new Date()), 1000);
+      return () => clearInterval(timerId);
+    }
+  }, [status, breaks, sessions]);
 
   // Calculate total break minutes (for progress calculation)
   const totalBreakMinutes = useMemo(() => {

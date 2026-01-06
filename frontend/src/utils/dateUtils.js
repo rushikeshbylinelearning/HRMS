@@ -1,207 +1,33 @@
 /**
- * Date utility functions for consistent date handling across the application
- * All dates are normalized to YYYY-MM-DD format in local timezone (IST)
- */
-
-/**
- * Normalize a date to YYYY-MM-DD string format
- * Handles Date objects, ISO strings, and date strings
- * Uses local timezone to avoid UTC conversion issues
+ * Frontend IST (Asia/Kolkata) Date Utilities
  * 
- * @param {Date|string} date - Date to normalize
- * @returns {string} YYYY-MM-DD format string
+ * Prevents timezone conversion bugs by treating all dates as IST.
+ * Critical: Never use new Date("YYYY-MM-DD") directly - it parses as UTC midnight,
+ * which then converts to previous day in IST (e.g., "2025-09-01" → 31 Aug in IST).
  */
-export const normalizeDate = (date) => {
-    let dateObj;
+
+/**
+ * Parse a date string as IST (treats YYYY-MM-DD as IST midnight)
+ * @param {string|null|undefined} dateStr - Date string in YYYY-MM-DD format
+ * @returns {Date|null} Date object representing IST midnight, or null if invalid
+ */
+export function parseISTDate(dateStr) {
+    if (!dateStr) return null;
     
-    if (date instanceof Date) {
-        dateObj = date;
-    } else if (typeof date === 'string') {
-        // If it's already in YYYY-MM-DD format, return as-is
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            return date;
-        }
-        // Otherwise parse as date
-        dateObj = new Date(date);
-    } else {
-        dateObj = new Date(date);
+    // If already a Date object, return as-is (assuming it's correct)
+    if (dateStr instanceof Date) {
+        return dateStr;
     }
     
-    // Use local timezone components to avoid UTC conversion
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
-};
-
-/**
- * Check if two dates are the same day (ignoring time)
- * @param {Date|string} date1 - First date
- * @param {Date|string} date2 - Second date
- * @returns {boolean} True if same day
- */
-export const isSameDay = (date1, date2) => {
-    return normalizeDate(date1) === normalizeDate(date2);
-};
-
-/**
- * Check if a date string is in a leave's leaveDates array
- * Handles timezone issues by normalizing all dates
- * 
- * @param {string} dateStr - Date string in YYYY-MM-DD format
- * @param {Object} leave - Leave object with leaveDates array
- * @returns {boolean} True if date is in leaveDates
- */
-export const isDateInLeaveDates = (dateStr, leave) => {
-    if (!leave || !leave.leaveDates || !Array.isArray(leave.leaveDates)) {
-        return false;
-    }
-    
-    const normalizedDateStr = normalizeDate(dateStr);
-    
-    return leave.leaveDates.some(leaveDateItem => {
-        const leaveDateStr = normalizeDate(leaveDateItem);
-        return leaveDateStr === normalizedDateStr;
-    });
-};
-
-/**
- * Find a leave for a specific date from an array of leaves
- * Handles timezone issues and ensures only approved leaves are considered
- * 
- * @param {Date|string} date - Date to check
- * @param {Array} leaves - Array of leave objects
- * @returns {Object|null} Leave object if found, null otherwise
- */
-export const findLeaveForDate = (date, leaves) => {
-    if (!leaves || !Array.isArray(leaves)) {
-        return null;
-    }
-    
-    const dateStr = normalizeDate(date);
-    
-    return leaves.find(leave => {
-        // Only consider approved leaves
-        if (leave.status !== 'Approved') {
-            return false;
-        }
-        
-        // Check if date is in leaveDates
-        return isDateInLeaveDates(dateStr, leave);
-    }) || null;
-};
-
-/**
- * Find a holiday for a specific date from an array of holidays
- * 
- * @param {Date|string} date - Date to check
- * @param {Array} holidays - Array of holiday objects
- * @returns {Object|null} Holiday object if found, null otherwise
- */
-export const findHolidayForDate = (date, holidays) => {
-    if (!holidays || !Array.isArray(holidays)) {
-        return null;
-    }
-    
-    const dateStr = normalizeDate(date);
-    
-    return holidays.find(holiday => {
-        // Skip tentative holidays
-        if (!holiday.date || holiday.isTentative) {
-            return false;
-        }
-        
-        const holidayDateStr = normalizeDate(holiday.date);
-        return holidayDateStr === dateStr;
-    }) || null;
-};
-
-/**
- * Get today's date in IST (at midnight) as a Date object
- * @returns {Date} Today's date at 00:00:00 IST
- */
-export const getTodayIST = () => {
-    const now = new Date();
-    const istFormatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
-    const parts = istFormatter.formatToParts(now);
-    const year = parts.find(p => p.type === 'year').value;
-    const month = parts.find(p => p.type === 'month').value;
-    const day = parts.find(p => p.type === 'day').value;
-    return new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-};
-
-/**
- * Format a date as YYYY-MM-DD string in IST timezone
- * @param {Date|string|null|undefined} dateInput - Date to format
- * @returns {string|null} Date string in YYYY-MM-DD format, or null if invalid
- */
-export const formatDateYYYYMMDD = (dateInput) => {
-    if (!dateInput) return null;
-    
-    let dateObj;
-    
-    if (dateInput instanceof Date) {
-        dateObj = dateInput;
-    } else if (typeof dateInput === 'string') {
-        // If it's already in YYYY-MM-DD format, return as-is
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-            return dateInput;
-        }
-        dateObj = new Date(dateInput);
-    } else {
-        dateObj = new Date(dateInput);
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-        return null;
-    }
-    
-    // Format using IST timezone to get correct date components
-    const istFormatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
-    
-    return istFormatter.format(dateObj);
-};
-
-/**
- * Parse a date string or Date object as IST midnight
- * @param {string|Date|null|undefined} dateInput - Date string (YYYY-MM-DD) or Date object
- * @returns {Date} Date object representing IST midnight of the given date
- */
-export const parseISTDate = (dateInput) => {
-    if (!dateInput) return null;
-    
-    let date;
-    
-    // If already a Date object, extract date parts in IST
-    if (dateInput instanceof Date) {
-        const istFormatter = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Kolkata',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        });
-        const parts = istFormatter.formatToParts(dateInput);
-        const year = parts.find(p => p.type === 'year').value;
-        const month = parts.find(p => p.type === 'month').value;
-        const day = parts.find(p => p.type === 'day').value;
-        const dateStr = `${year}-${month}-${day}`;
-        date = new Date(`${dateStr}T00:00:00+05:30`);
-    } else if (typeof dateInput === 'string') {
-        // Handle date strings (YYYY-MM-DD or ISO format)
-        if (dateInput.includes('T')) {
-            // ISO format - parse and extract date part in IST
-            const tempDate = new Date(dateInput);
+    // Handle YYYY-MM-DD format - parse as IST midnight
+    if (typeof dateStr === 'string') {
+        // Check if it's already ISO format with timezone
+        if (dateStr.includes('T')) {
+            // ISO format - parse and create IST date
+            const tempDate = new Date(dateStr);
+            if (isNaN(tempDate.getTime())) return null;
+            
+            // Extract date parts in IST
             const istFormatter = new Intl.DateTimeFormat('en-CA', {
                 timeZone: 'Asia/Kolkata',
                 year: 'numeric',
@@ -212,61 +38,106 @@ export const parseISTDate = (dateInput) => {
             const year = parts.find(p => p.type === 'year').value;
             const month = parts.find(p => p.type === 'month').value;
             const day = parts.find(p => p.type === 'day').value;
-            date = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+            
+            // Create date as IST midnight
+            return new Date(`${year}-${month}-${day}T00:00:00+05:30`);
         } else {
-            // YYYY-MM-DD format - parse as IST midnight
-            date = new Date(`${dateInput}T00:00:00+05:30`);
+            // YYYY-MM-DD format - parse as IST midnight directly
+            // This is the critical fix: append IST timezone offset
+            return new Date(`${dateStr}T00:00:00+05:30`);
         }
-    } else {
-        return null;
     }
     
-    // Validate
-    if (isNaN(date.getTime())) {
-        console.warn('[dateUtils] Invalid date input:', dateInput);
-        return null;
-    }
-    
-    return date;
-};
+    return null;
+}
 
 /**
- * Format a date using IST timezone for display
- * Formats dates as readable strings (e.g., "Jan 15, 2025")
- * Handles timezone issues by using IST explicitly
- * 
- * @param {Date|string|null|undefined} dateInput - Date to format
- * @returns {string} Formatted date string or 'N/A' if invalid
+ * Format a date as readable string in IST
+ * @param {string|Date|null|undefined} dateInput - Date to format
+ * @param {object} options - Intl.DateTimeFormat options
+ * @returns {string} Formatted date string, or 'N/A' if invalid
  */
-export const formatDateIST = (dateInput) => {
+export function formatDateIST(dateInput, options = {}) {
     if (!dateInput) return 'N/A';
     
-    let dateObj;
+    const date = parseISTDate(dateInput);
+    if (!date || isNaN(date.getTime())) return 'N/A';
     
-    if (dateInput instanceof Date) {
-        dateObj = dateInput;
-    } else if (typeof dateInput === 'string') {
-        // If it's already in YYYY-MM-DD format, parse it as IST date
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-            const [year, month, day] = dateInput.split('-').map(Number);
-            // Create date in IST timezone (UTC+5:30)
-            dateObj = new Date(Date.UTC(year, month - 1, day, 5, 30, 0));
-        } else {
-            dateObj = new Date(dateInput);
-        }
-    } else {
-        dateObj = new Date(dateInput);
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-        return 'N/A';
-    }
-    
-    // Format using IST timezone explicitly
-    return dateObj.toLocaleDateString('en-US', {
+    const defaultOptions = {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         timeZone: 'Asia/Kolkata'
+    };
+    
+    return date.toLocaleDateString('en-US', { ...defaultOptions, ...options });
+}
+
+/**
+ * Format a date as YYYY-MM-DD string in IST
+ * @param {string|Date|null|undefined} dateInput - Date to format
+ * @returns {string|null} Date string in YYYY-MM-DD format, or null if invalid
+ */
+export function formatDateYYYYMMDD(dateInput) {
+    if (!dateInput) return null;
+    
+    const date = parseISTDate(dateInput);
+    if (!date || isNaN(date.getTime())) return null;
+    
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
     });
-};
+    
+    return istFormatter.format(date);
+}
+
+/**
+ * Get today's date in IST (as YYYY-MM-DD string)
+ * @returns {string} Today's date in YYYY-MM-DD format
+ */
+export function getTodayIST() {
+    const now = new Date();
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    return istFormatter.format(now);
+}
+
+/**
+ * Calculate days difference between two dates in IST
+ * @param {string|Date} date1 - First date
+ * @param {string|Date} date2 - Second date
+ * @returns {number|null} Number of days (date2 - date1), or null if invalid
+ */
+export function daysDifferenceIST(date1, date2) {
+    const d1 = parseISTDate(date1);
+    const d2 = parseISTDate(date2);
+    
+    if (!d1 || !d2) return null;
+    
+    // Normalize to midnight for accurate day calculations
+    d1.setHours(0, 0, 0, 0);
+    d2.setHours(0, 0, 0, 0);
+    
+    const diffTime = d2 - d1;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Normalize a date to YYYY-MM-DD format string in IST
+ * Used for creating consistent date keys in maps and comparisons
+ * @param {string|Date|null|undefined} dateInput - Date to normalize
+ * @returns {string} Date string in YYYY-MM-DD format, or empty string if invalid
+ */
+export function normalizeDate(dateInput) {
+    return formatDateYYYYMMDD(dateInput) || '';
+}
+
+
+

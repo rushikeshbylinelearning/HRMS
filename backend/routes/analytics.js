@@ -13,7 +13,6 @@ const Holiday = require('../models/Holiday');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const { sendEmail } = require('../services/mailService');
 const { determineHalfDayStatus } = require('../services/halfDayService');
-const { formatDateIST, getTodayIST, parseISTDate, addMonthsIST } = require('../utils/dateUtils');
 
 const router = express.Router();
 
@@ -82,8 +81,8 @@ const getWorkingDatesForRange = async (startDate, endDate, employee) => {
 // Helper function to calculate analytics metrics
 const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyContextDays) => { // <-- ADDED PARAM
   // Ensure dates are in YYYY-MM-DD format (string comparison for MongoDB)
-  const normalizedStartDate = typeof startDate === 'string' ? startDate : formatDateIST(parseISTDate(startDate));
-  const normalizedEndDate = typeof endDate === 'string' ? endDate : formatDateIST(parseISTDate(endDate));
+  const normalizedStartDate = typeof startDate === 'string' ? startDate : new Date(startDate).toISOString().slice(0, 10);
+  const normalizedEndDate = typeof endDate === 'string' ? endDate : new Date(endDate).toISOString().slice(0, 10);
   
   // Fetch employee to get alternateSaturdayPolicy for working days calculation
   // This is required to determine which Saturdays are working days for this employee
@@ -203,12 +202,11 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   }
 
   // Calculate total leave days for the requested period
-  // Use string comparison (YYYY-MM-DD) to avoid timezone issues
   let totalLeaveDays = 0;
   leaveRequests.forEach(leave => {
     const leaveDaysInPeriod = leave.leaveDates.filter(date => {
-      const leaveDateStr = formatDateIST(date);
-      return leaveDateStr && leaveDateStr >= normalizedStartDate && leaveDateStr <= normalizedEndDate;
+      const leaveDate = new Date(date);
+      return leaveDate >= startDateObj && leaveDate <= endDateObj;
     }).length;
     totalLeaveDays += leaveDaysInPeriod;
   });
@@ -231,12 +229,10 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   }
 
   let totalLeaveDaysYTD = 0;
-  const ytdStartStr = formatDateIST(ytdStart);
-  const todayDateStr = formatDateIST(todayDate);
   leaveRequestsYTD.forEach(leave => {
     totalLeaveDaysYTD += leave.leaveDates.filter(d => {
-      const leaveDateStr = formatDateIST(d);
-      return leaveDateStr && leaveDateStr >= ytdStartStr && leaveDateStr <= todayDateStr;
+      const ld = new Date(d);
+      return ld >= ytdStart && ld <= todayDate;
     }).length;
   });
 
@@ -412,8 +408,8 @@ router.get('/monthly-overview', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: { $in: userIds },
         attendanceDate: { 
-          $gte: formatDateIST(monthStart),
-          $lte: formatDateIST(monthEnd)
+          $gte: monthStart.toISOString().slice(0, 10),
+          $lte: monthEnd.toISOString().slice(0, 10)
         }
       }).populate('user', 'fullName email department').lean();
       
@@ -447,7 +443,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const targetDate = date || formatDateIST(getTodayIST());
+    const targetDate = date || new Date().toISOString().slice(0, 10);
     
     // Get all active users
     const users = await User.find({ isActive: true }).lean();
@@ -574,11 +570,10 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
 
     // Default to last 3 months if no dates provided to get more data
     // Use IST timezone for consistent date calculations
-    const nowIST = getTodayIST();
-    const firstDayOfThreeMonthsAgo = new Date(nowIST.getFullYear(), nowIST.getMonth() - 3, 1);
-    const lastDayOfCurrentMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
-    const defaultStartDate = formatDateIST(firstDayOfThreeMonthsAgo);
-    const defaultEndDate = formatDateIST(lastDayOfCurrentMonth);
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const defaultStartDate = new Date(nowIST.getFullYear(), nowIST.getMonth() - 3, 1).toISOString().slice(0, 10);
+    const defaultEndDate = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0).toISOString().slice(0, 10);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -810,8 +805,8 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const weekLogs = await AttendanceLog.find({
         user: id,
         attendanceDate: { 
-          $gte: formatDateIST(weekStart),
-          $lte: formatDateIST(weekEnd)
+          $gte: weekStart.toISOString().slice(0, 10),
+          $lte: weekEnd.toISOString().slice(0, 10)
         }
       });
       
@@ -840,8 +835,8 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: id,
         attendanceDate: { 
-          $gte: formatDateIST(monthStart),
-          $lte: formatDateIST(monthEnd)
+          $gte: monthStart.toISOString().slice(0, 10),
+          $lte: monthEnd.toISOString().slice(0, 10)
         }
       });
       
@@ -901,11 +896,9 @@ router.get('/all', authenticateToken, async (req, res) => {
     }
 
     // Default to current month if no dates provided
-    const nowIST = getTodayIST();
-    const firstDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
-    const lastDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
-    const defaultStartDate = formatDateIST(firstDayOfMonth);
-    const defaultEndDate = formatDateIST(lastDayOfMonth);
+    const now = new Date();
+    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -1337,11 +1330,9 @@ router.get('/export', authenticateToken, async (req, res) => {
     }
 
     // Default to current month if no dates provided
-    const nowIST = getTodayIST();
-    const firstDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
-    const lastDayOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
-    const defaultStartDate = formatDateIST(firstDayOfMonth);
-    const defaultEndDate = formatDateIST(lastDayOfMonth);
+    const now = new Date();
+    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;

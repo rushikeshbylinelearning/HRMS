@@ -68,7 +68,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import { io } from 'socket.io-client';
-import { formatDateYYYYMMDD } from '../utils/dateUtils';
 
 // Format hours as Hrs.mm (e.g., 8.30 for 8h 30m)
 const formatHoursAsHrsDotMM = (hours) => {
@@ -228,8 +227,8 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
 
       const startOfMonth = new Date(year, month, 1);
       const endOfMonth = new Date(year, month + 1, 0);
-      const startDate = formatDateYYYYMMDD(startOfMonth);
-      const endDate = formatDateYYYYMMDD(endOfMonth);
+      const startDate = startOfMonth.toISOString().slice(0, 10);
+      const endDate = endOfMonth.toISOString().slice(0, 10);
       
       console.log('Fetching analytics for date range:', { startDate, endDate });
       const response = await axios.get(`/analytics/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`);

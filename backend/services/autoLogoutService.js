@@ -20,7 +20,6 @@ const Setting = require('../models/Setting');
 const { getUserDailyStatus } = require('./dailyStatusService');
 const NewNotificationService = require('./NewNotificationService');
 const logAction = require('./logAction');
-const { formatDateIST, getTodayIST } = require('../utils/dateUtils');
 
 // Note: We cannot import computeCalculatedLogoutTime directly as it requires sessions/breaks arrays
 // Instead, we use getUserDailyStatus which internally computes the logout time correctly
@@ -195,7 +194,8 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
         // CRITICAL: Use IST timezone for date comparison to ensure accuracy
         const attendanceDateStr = attendanceLog.attendanceDate; // YYYY-MM-DD format
         // Get today's date in IST timezone
-        const todayDateStr = formatDateIST(getTodayIST()); // Get YYYY-MM-DD
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const todayDateStr = nowIST.toISOString().slice(0, 10); // Get YYYY-MM-DD
         const isPastDate = attendanceDateStr < todayDateStr;
 
         // Calculate expected logout time once (used for both past date handling and overrun calculation)
@@ -690,7 +690,8 @@ const checkAndAutoLogout = async () => {
                 // CRITICAL: Use IST timezone for accurate date comparison
                 const attendanceDateStr = attendanceLog.attendanceDate; // YYYY-MM-DD format
                 // Get today's date in IST timezone
-                const todayDateStr = formatDateIST(getTodayIST()); // Get YYYY-MM-DD
+                const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+                const todayDateStr = nowIST.toISOString().slice(0, 10); // Get YYYY-MM-DD
                 
                 // Calculate days difference using date strings (timezone-safe)
                 const attendanceDateObj = new Date(attendanceDateStr + 'T00:00:00+05:30'); // IST
@@ -732,7 +733,8 @@ const checkAndAutoLogout = async () => {
                 // For overnight shifts, the logout time might be on the next day
                 // Check if the expected logout time is actually on the next day compared to attendance date
                 // Use IST timezone for accurate comparison
-                const expectedLogoutDateStr = formatDateIST(new Date(expectedLogoutTime));
+                const expectedLogoutIST = new Date(new Date(expectedLogoutTime).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+                const expectedLogoutDateStr = expectedLogoutIST.toISOString().slice(0, 10);
                 const isOvernightShift = expectedLogoutDateStr > attendanceDateStr;
                 
                 if (isOvernightShift) {

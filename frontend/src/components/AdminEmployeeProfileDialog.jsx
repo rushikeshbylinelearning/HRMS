@@ -22,7 +22,6 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CountryCodeSelector from './CountryCodeSelector';
 import api from '../api/axios';
-import { formatDateYYYYMMDD } from '../utils/dateUtils';
 
 const roles = ['Admin', 'HR', 'Employee', 'Intern'];
 const statusOptions = ['Active', 'Inactive'];
@@ -99,7 +98,7 @@ const AdminEmployeeProfileDialog = ({
         email: data?.email || '',
         role: data?.role || 'Employee',
         status: data?.isActive === false ? 'Inactive' : 'Active',
-        joiningDate: data?.joiningDate ? formatDateYYYYMMDD(new Date(data.joiningDate)) : '',
+        joiningDate: data?.joiningDate ? new Date(data.joiningDate).toISOString().slice(0, 10) : '',
         bloodGroup: data?.personalDetails?.bloodGroup || '',
         phoneNumber: data?.personalDetails?.phoneNumber || '',
         phoneCountryCode: data?.personalDetails?.phoneCountryCode || '+91',

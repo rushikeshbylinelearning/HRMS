@@ -187,8 +187,6 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
     }, [log]);
     
     // Only run timer if today and has active session
-    // TODO: Replace this local timer with useGlobalNow hook to reduce multiple timers
-    // Example: const now = useGlobalNow(isToday && hasActiveSession);
     useEffect(() => {
         if (!isToday || !hasActiveSession) {
             if (intervalRef.current) {
@@ -249,9 +247,16 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
     const durationInfo = getDurationInfo(log, now);
     
     // Check if employee has clocked out (has clockOutTime or all sessions have endTime)
-    // Use backend status directly (no UI recalculation)
-    // Backend determines half-day based on: applied leave, worked hours < 8.5, or late beyond grace period
-    const isHalfDayMarked = log?.isHalfDay || log?.attendanceStatus === 'Half-day' || log?.attendanceStatus === 'Half Day';
+    const hasClockOut = log?.clockOutTime || (log?.sessions && log.sessions.length > 0 && log.sessions.every(s => s.endTime));
+    
+    // Calculate working hours to check for half-day (at component level so it's accessible everywhere)
+    const workingHours = durationInfo.totalMinutes / 60;
+    const MINIMUM_FULL_DAY_HOURS = 8;
+    // Only mark as half-day if employee has clocked out AND worked less than 8 hours
+    const isHalfDayByHours = hasClockOut && workingHours > 0 && workingHours < MINIMUM_FULL_DAY_HOURS;
+    
+    // Check if attendance is marked as half-day (late beyond grace period or working hours < 8 after clock-out)
+    const isHalfDayMarked = hasClockOut && (log?.isHalfDay || log?.attendanceStatus === 'Half-day' || isHalfDayByHours);
     
     // Check if there's a half day leave
     const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
@@ -311,7 +316,7 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                             whiteSpace: 'nowrap',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                         }}>
-                            Half Day
+                            Half Day {isHalfDayByHours ? '(Less than 8 hours)' : '(Late beyond grace period)'}
                         </div>
                     )}
                     <div className="timeline-line" style={
@@ -453,7 +458,7 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
             // Get leave type information (Full Day or Half Day)
             const leaveTypeInfo = leave?.leaveType || '';
             const isHalfDay = leaveTypeInfo && leaveTypeInfo.startsWith('Half Day');
-            const isFullDay = leaveTypeInfo === 'Full Day';
+            const halfDayInfo = isHalfDay ? leaveTypeInfo : '';
             
             return (
                 <div className="timeline-content">
@@ -461,14 +466,14 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                         <div className="status-line leave-line"></div>
                         <div className="status-label leave-label">Leave</div>
                         <div className="leave-type">{leaveType}</div>
-                        {leaveTypeInfo && (
-                            <div className="leave-day-type-info" style={{ 
+                        {isHalfDay && (
+                            <div className="leave-half-day-info" style={{ 
                                 fontSize: '0.75rem', 
-                                color: isHalfDay ? '#f57c00' : '#1976d2', 
+                                color: '#f57c00', 
                                 fontWeight: 600,
                                 marginTop: '4px'
                             }}>
-                                {isFullDay ? 'Full Day' : (isHalfDay ? leaveTypeInfo : '')}
+                                {halfDayInfo}
                             </div>
                         )}
                     </div>
@@ -616,7 +621,7 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                         borderRadius: '4px',
                         border: '1px solid #d32f2f'
                     }}>
-                        Half Day
+                        Half Day {isHalfDayByHours ? '(Less than 8 hours)' : '(Late)'}
                     </div>
                 )}
             </div>

@@ -58,26 +58,33 @@ const newSession = await AttendanceSession.create({ attendanceLog: attendanceLog
 
 **After (Safe):**
 ```javascript
-try {
-  newSession = await AttendanceSession.create({
+const newSession = await AttendanceSession.findOneAndUpdate(
+  {
     attendanceLog: attendanceLog._id,
-    startTime: clockInTime,
-    logoutType: 'MANUAL'
-  });
-} catch (error) {
-  if (error.code === 11000 || error.codeName === 'DuplicateKey') {
-    // Active session already exists
-    return res.status(400).json({ error: 'You are already clocked in.' });
+    endTime: null,
+    _raceConditionGuard: { $exists: false } // Filter never matches existing docs
+  },
+  {
+    $setOnInsert: {
+      attendanceLog: attendanceLog._id,
+      startTime: clockInTime,
+      logoutType: 'MANUAL'
+    }
+  },
+  {
+    upsert: true, // Atomically create if doesn't exist
+    new: true,
+    runValidators: true
   }
-  throw error;
-}
+);
 ```
 
 **Key Features:**
 - **Atomic**: Single database operation (no race window)
-- **Unique Index**: Prevents duplicates at database level - if two requests race, only one succeeds
-- **Error Handling**: Catches duplicate key errors (E11000) and returns user-friendly message
-- **Simpler**: Uses direct `create()` instead of `findOneAndUpdate` with upsert
+- **Filter Strategy**: Uses non-existent field `_raceConditionGuard` to ensure filter never matches existing documents
+- **Upsert**: Creates document if filter doesn't match (which it won't)
+- **Unique Index**: Prevents duplicates if two requests race
+- **Error Handling**: Catches duplicate key errors and returns user-friendly message
 
 ### 3. Index Creation in Database Utils
 

@@ -85,7 +85,6 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import { io } from 'socket.io-client';
-import { formatDateYYYYMMDD, getTodayIST } from '../utils/dateUtils';
 import './ViewAnalyticsModal.css';
 
 const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
@@ -233,10 +232,14 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
       console.log('Employee ID:', employeeId);
       console.log('Employee Name:', employeeName);
       
+      // Get current date in IST for API call
+      const todayIST = new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"});
+      const todayISTDate = new Date(todayIST);
+      
       // Format dates properly to avoid timezone issues
       const startYear = selectedYear;
       const startDate = `${startYear}-01-01`;
-      const endDate = formatDateYYYYMMDD(getTodayIST());
+      const endDate = todayISTDate.toISOString().slice(0, 10);
       
       console.log('Fetching analytics for:', `/analytics/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`);
       

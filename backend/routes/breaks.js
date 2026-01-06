@@ -10,9 +10,6 @@ const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const NewNotificationService = require('../services/NewNotificationService');
 const { getUserDailyStatus } = require('../services/dailyStatusService');
-const { formatDateIST, getTodayIST } = require('../utils/dateUtils');
-const { deleteCache } = require('../utils/redisClient');
-const { queueNotification } = require('../queues/notificationQueue');
 
 const router = express.Router();
 
@@ -22,7 +19,7 @@ const EXTRA_BREAK_ALLOWANCE_MINUTES = 10;
 router.post('/start', authenticateToken, async (req, res) => {
     const { userId } = req.user;
     const { breakType } = req.body;
-    const today = formatDateIST(getTodayIST());
+    const today = new Date().toISOString().slice(0, 10);
 
     if (!breakType || !['Paid', 'Unpaid', 'Extra'].includes(breakType)) {
         return res.status(400).json({ error: 'A valid break type is required.' });
@@ -91,41 +88,30 @@ router.post('/start', authenticateToken, async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // PARALLELIZATION: These queries are independent after transaction commit
-        // - getUserDailyStatus reads attendance data (doesn't depend on user data)
-        // - User.findById reads user data (doesn't depend on attendance data)
-        // Both are read-only operations on different collections, safe to run concurrently
-        const [dailyStatus, user] = await Promise.all([
-            getUserDailyStatus(userId, today, {
-                includeSessions: true,
-                includeBreaks: true,
-                includeAutoBreak: true
-            }),
-            User.findById(userId)
-        ]);
-        // Queue notifications for background processing (non-blocking)
-        // API responds immediately, notifications processed async by queue worker
+        // Get updated daily status for authoritative values
+        const dailyStatus = await getUserDailyStatus(userId, today, {
+            includeSessions: true,
+            includeBreaks: true,
+            includeAutoBreak: true
+        });
+
+        const user = await User.findById(userId);
         if (user) {
             // FIX: Prevent user from getting their own notification
             if (user.role !== 'Admin' && user.role !== 'HR') {
-                queueNotification.custom({
+                NewNotificationService.createAndEmitNotification({
                     message: `You have started a ${breakType} break.`,
-                    notificationType: 'info',
+                    type: 'info',
                     userId,
                     userName: user.fullName,
                     recipientType: 'user',
                     category: 'break',
-                });
+                }).catch(err => console.error('Error sending break start confirmation to user:', err));
             }
             // Always notify admins
-            queueNotification.breakStart(userId, user.fullName, breakType);
+            NewNotificationService.notifyBreakStart(userId, user.fullName, breakType)
+                .catch(err => console.error('Error sending break start notification to admins:', err));
         }
-
-        // Invalidate cache for this user's today status
-        const cacheKey = `status:${userId}:${today}`;
-        deleteCache(cacheKey).catch(err => 
-            console.warn(`[Cache] Error invalidating cache for ${cacheKey}:`, err.message)
-        );
 
         res.status(201).json({ 
             message: 'Break started successfully.', 
@@ -143,7 +129,7 @@ router.post('/start', authenticateToken, async (req, res) => {
 
 router.post('/end', authenticateToken, async (req, res) => {
     const { userId } = req.user;
-    const today = formatDateIST(getTodayIST());
+    const today = new Date().toISOString().slice(0, 10);
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -222,45 +208,34 @@ router.post('/end', authenticateToken, async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // PARALLELIZATION: These queries are independent after transaction commit
-        // - getUserDailyStatus reads attendance data (doesn't depend on user data)
-        // - User.findById reads user data (doesn't depend on attendance data)
-        // Both are read-only operations on different collections, safe to run concurrently
-        const [dailyStatus, user] = await Promise.all([
-            getUserDailyStatus(userId, today, {
-                includeSessions: true,
-                includeBreaks: true,
-                includeAutoBreak: true
-            }),
-            User.findById(userId)
-        ]);
-        // Queue notifications for background processing (non-blocking)
-        // API responds immediately, notifications processed async by queue worker
+        // Get updated daily status for authoritative values
+        const dailyStatus = await getUserDailyStatus(userId, today, {
+            includeSessions: true,
+            includeBreaks: true,
+            includeAutoBreak: true
+        });
+
+        const user = await User.findById(userId);
         if (user) {
             // FIX: Prevent user from getting their own notification
             if (user.role !== 'Admin' && user.role !== 'HR') {
-                queueNotification.custom({
+                NewNotificationService.createAndEmitNotification({
                     message: `Your ${activeBreak.breakType} break has ended.`,
-                    notificationType: 'info',
+                    type: 'info',
                     userId,
                     userName: user.fullName,
                     recipientType: 'user',
                     category: 'break',
-                });
+                }).catch(err => console.error('Error sending break end confirmation to user:', err));
             }
             // Always notify admins
-            queueNotification.breakEnd(userId, user.fullName, activeBreak.breakType);
+            NewNotificationService.notifyBreakEnd(userId, user.fullName, activeBreak.breakType)
+                .catch(err => console.error('Error sending break end notification to admins:', err));
         }
 
         // Invalidate dashboard cache to ensure updated logout time is reflected
         const cacheService = require('../services/cacheService');
         cacheService.invalidateDashboard(today);
-
-        // Invalidate Redis cache for this user's today status
-        const cacheKey = `status:${userId}:${today}`;
-        deleteCache(cacheKey).catch(err => 
-            console.warn(`[Cache] Error invalidating cache for ${cacheKey}:`, err.message)
-        );
 
         res.json({ 
             message: 'Break ended successfully.', 
@@ -286,7 +261,7 @@ router.post('/request-extra', authenticateToken, async (req, res) => {
     // ... this route's logic is already correct
     const { userId } = req.user;
     const { reason } = req.body;
-    const today = formatDateIST(getTodayIST());
+    const today = new Date().toISOString().slice(0, 10);
     if (!reason || reason.trim().length === 0) return res.status(400).json({ error: 'A reason is required.' });
     try {
         const log = await AttendanceLog.findOne({ user: userId, attendanceDate: today });

@@ -1,7 +1,6 @@
 // backend/services/weeklyLateTrackingService.js
 
 const WeeklyLateTracking = require('../models/WeeklyLateTracking');
-const { formatDateIST, getTodayIST, addDaysIST } = require('../utils/dateUtils');
 
 /**
  * Get the start and end dates of the current week (Monday to Sunday)
@@ -19,10 +18,9 @@ const getCurrentWeekDates = () => {
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
   
-  const { formatDateIST } = require('../utils/dateUtils');
   return {
-    startDate: formatDateIST(weekStart),
-    endDate: formatDateIST(weekEnd)
+    startDate: weekStart.toISOString().slice(0, 10),
+    endDate: weekEnd.toISOString().slice(0, 10)
   };
 };
 

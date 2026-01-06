@@ -67,7 +67,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
-import { formatDateYYYYMMDD } from '../utils/dateUtils';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 // Import the comprehensive analytics modal
 import ViewAnalyticsModal from '../components/ViewAnalyticsModal';
@@ -612,8 +611,8 @@ const AnalyticsPage = () => {
               try {
                 const leavesRes = await axios.get('/leaves/my-requests', { params: { page: 1, limit: 200 } });
                 const requests = Array.isArray(leavesRes.data?.requests) ? leavesRes.data.requests : [];
-                const monthStart = formatDateYYYYMMDD(startDate);
-                const monthEnd = formatDateYYYYMMDD(endDate);
+                const monthStart = startDate.toISOString().slice(0, 10);
+                const monthEnd = endDate.toISOString().slice(0, 10);
                 const isInMonth = (dateStr) => dateStr >= monthStart && dateStr <= monthEnd;
                 const filtered = requests
                   .map(req => {
@@ -1165,7 +1164,7 @@ const AnalyticsPage = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `analytics-${formatDateYYYYMMDD(startDate)}-to-${formatDateYYYYMMDD(endDate)}.csv`);
+      link.setAttribute('download', `analytics-${startDate.toISOString().slice(0, 10)}-to-${endDate.toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();

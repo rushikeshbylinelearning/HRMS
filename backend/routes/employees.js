@@ -146,12 +146,9 @@ router.get('/probation/calculations', [authenticateToken, isAdminOrHr], async (r
                 leaveRequests.forEach(leave => {
                     leave.leaveDates.forEach(leaveDate => {
                         const leaveDateObj = parseISTDate(leaveDate);
-                        if (leaveDateObj) {
-                            // Use string comparison (YYYY-MM-DD) to avoid timezone issues
+                        if (leaveDateObj && leaveDateObj >= joiningDateIST) {
                             const leaveDateStr = formatDateIST(leaveDateObj);
-                            
-                            // Only count leaves on or after joining date using string comparison
-                            if (leaveDateStr && leaveDateStr >= joiningDateStr && !leaveDatesSet.has(leaveDateStr)) {
+                            if (leaveDateStr && !leaveDatesSet.has(leaveDateStr)) {
                                 leaveDatesSet.add(leaveDateStr);
                                 if (leave.leaveType === 'Full Day') {
                                     fullDayLeaveCount++;
@@ -484,12 +481,9 @@ router.get('/internship/calculations', [authenticateToken, isAdminOrHr], async (
                 leaveRequests.forEach(leave => {
                     leave.leaveDates.forEach(leaveDate => {
                         const leaveDateObj = parseISTDate(leaveDate);
-                        if (leaveDateObj) {
-                            // Use string comparison (YYYY-MM-DD) to avoid timezone issues
+                        if (leaveDateObj && leaveDateObj >= joiningDateIST) {
                             const leaveDateStr = formatDateIST(leaveDateObj);
-                            
-                            // Only count leaves on or after joining date using string comparison
-                            if (leaveDateStr && leaveDateStr >= joiningDateStr && !leaveDatesSet.has(leaveDateStr)) {
+                            if (leaveDateStr && !leaveDatesSet.has(leaveDateStr)) {
                                 leaveDatesSet.add(leaveDateStr);
                                 if (leave.leaveType === 'Full Day') {
                                     fullDayLeaveCount++;

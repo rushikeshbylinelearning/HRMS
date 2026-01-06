@@ -24,7 +24,6 @@ const ssoService = require('./services/ssoService');
 const performanceMonitor = require('./services/performanceMonitor');
 const cacheService = require('./services/cacheService');
 const ssoTokenAuth = require('./middleware/ssoTokenAuth');
-const { startNotificationWorker } = require('./queues/notificationQueue');
 
 // Pre-load all Mongoose models
 require('./models/User');
@@ -807,17 +806,6 @@ const startServer = async () => {
     httpServer.listen(PORT, HOST, () => {
       console.log(`🚀 Server is running on ${HOST}:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      
-      // Start notification queue worker for background processing
-      (async () => {
-        try {
-          await startNotificationWorker();
-          // Worker start message is logged inside startNotificationWorker
-        } catch (error) {
-          console.warn('⚠️  Failed to start notification queue worker:', error.message);
-          console.warn('⚠️  Notifications will be processed synchronously (fallback mode)');
-        }
-      })();
       
       console.log('✅ Server initialization complete');
     });

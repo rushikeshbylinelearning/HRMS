@@ -293,29 +293,7 @@ const AttendanceSummaryPage = () => {
             let statusColor = '#ff6b6b';
             let shift = 'Morning';
             
-            // Check for holidays and leaves FIRST (they take priority over attendance logs)
-            const holiday = getHolidayForDate(date);
-            const leave = getLeaveForDate(date);
-            
-            if (holiday) {
-                status = `Holiday - ${holiday.name}`;
-                statusColor = '#9c27b0';
-                payableHours = '09:00';
-            } else if (leave) {
-                // Handle different leave types
-                if (leave.requestType === 'Compensatory') {
-                    status = 'Comp Off';
-                    statusColor = '#1976d2';
-                } else if (leave.requestType === 'Swap Leave') {
-                    status = 'Swap Leave';
-                    statusColor = '#f57c00';
-                } else {
-                    const leaveTypeText = leave.leaveType === 'Full Day' ? 'Full Day' : (leave.leaveType || 'Full Day');
-                    status = `Leave - ${formatLeaveRequestType(leave.requestType)} (${leaveTypeText})`;
-                    statusColor = '#74c0fc';
-                }
-                payableHours = leave.leaveType === 'Full Day' ? '00:00' : '04:30';
-            } else if (log && log.sessions && log.sessions.length > 0) {
+            if (log && log.sessions && log.sessions.length > 0) {
                 // Sort sessions by start time
                 const sortedSessions = log.sessions.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
                 
@@ -389,41 +367,49 @@ const AttendanceSummaryPage = () => {
                 
                 payableHours = '09:00';
                 
-                // Determine status - use backend status directly (no UI recalculation)
-                // Backend determines half-day based on: applied leave, worked hours < 8.5, or late beyond grace period
+                // Check if employee has clocked out (has clockOutTime or all sessions have endTime)
+                const hasClockOut = log.clockOutTime || (log.sessions && log.sessions.length > 0 && log.sessions.every(s => s.endTime));
+                
+                // Determine status - check for half-day based on working hours (< 8 hours) ONLY if clocked out
+                const MINIMUM_FULL_DAY_HOURS = 8;
+                const isHalfDayByHours = hasClockOut && netHours > 0 && netHours < MINIMUM_FULL_DAY_HOURS;
+                const isHalfDayMarked = hasClockOut && (log.isHalfDay || log.attendanceStatus === 'Half-day' || isHalfDayByHours);
+                
                 if (log.status === 'On Leave') {
                     status = 'On Leave';
                     statusColor = '#74c0fc';
-                } else if (log.isHalfDay || log.attendanceStatus === 'Half-day' || log.attendanceStatus === 'Half Day') {
+                } else if (isHalfDayMarked) {
                     status = 'Half Day';
                     statusColor = '#ff9800';
                 } else {
                     // If there are work sessions, they are present regardless of log.status
-                    // Note: We've already checked for holidays/leaves above, so if we reach here,
-                    // there's no holiday/leave, or it's a half-day leave (which allows attendance)
                     status = 'Present';
                     statusColor = '#51cf66';
                 }
             } else {
-                // No log with sessions - use centralized attendance status function
-                // This will properly check for holidays/leaves before marking as Absent
-                const statusInfo = getAttendanceStatus(date, log, user?.alternateSaturdayPolicy || 'All Saturdays Working', holidays, leaves);
-                status = statusInfo.status;
-                statusColor = statusInfo.statusColor || statusInfo.color;
+                // Check for holidays and leaves first
+                const holiday = getHolidayForDate(date);
+                const leave = getLeaveForDate(date);
                 
-                // Map status to appropriate payable hours
-                if (statusInfo.status.startsWith('Holiday -')) {
+                if (holiday) {
+                    status = `Holiday - ${holiday.name}`;
+                    statusColor = '#9c27b0';
                     payableHours = '09:00';
-                } else if (statusInfo.status === 'Comp Off' || statusInfo.status.startsWith('Leave -')) {
-                    // Check if it's a half-day leave
-                    const leave = getLeaveForDate(date);
-                    payableHours = leave && leave.leaveType && leave.leaveType.startsWith('Half Day') ? '04:30' : '00:00';
-                } else if (statusInfo.status === 'Weekend' || statusInfo.status === 'Week Off') {
-                    payableHours = '09:00';
-                } else if (statusInfo.status === 'Absent') {
-                    payableHours = '00:00';
+                } else if (leave) {
+                    status = `Leave - ${formatLeaveRequestType(leave.requestType)}`;
+                    statusColor = '#74c0fc';
+                    payableHours = leave.leaveType === 'Full Day' ? '00:00' : '04:30';
                 } else {
-                    payableHours = '09:00';
+                    // Handle different statuses
+                    const dayOfWeek = date.getDay();
+                    if (dayOfWeek === 0 || dayOfWeek === 6) {
+                        status = 'Weekend';
+                        statusColor = '#ffd43b';
+                        payableHours = '09:00';
+                    } else {
+                        status = 'Absent';
+                        statusColor = '#ff6b6b';
+                    }
                 }
             }
             
