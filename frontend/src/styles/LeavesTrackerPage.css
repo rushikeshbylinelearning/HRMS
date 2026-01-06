@@ -1,0 +1,311 @@
+/* LeavesTrackerPage.css */
+
+/* Saturday Schedule Manager Enhancements - White & Black with Red Borders */
+.saturday-schedule-overview {
+    background: white;
+    border: 2px solid #000;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    color: #000;
+    box-shadow: none;
+}
+
+.schedule-stat-box {
+    text-align: center;
+    padding: 16px;
+    border-radius: 8px;
+    border: 2px solid #dc3545;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.schedule-stat-box:hover {
+    background: #f8f9fa;
+    transform: translateY(-4px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.schedule-stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.schedule-stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.employee-chip-enhanced {
+    height: auto !important;
+    padding: 8px 12px !important;
+    margin: 6px 6px 12px 0 !important;
+    border-radius: 8px !important;
+    border: 2px solid #dc3545 !important;
+    background: white !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+}
+
+.employee-chip-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+.schedule-category-card {
+    border-radius: 8px !important;
+    border: 2px solid #dc3545 !important;
+    background: white !important;
+    box-shadow: none !important;
+    transition: all 0.3s ease !important;
+    overflow: hidden;
+}
+
+.schedule-category-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.schedule-category-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.schedule-category-icon {
+    margin-right: 12px;
+    font-size: 24px;
+}
+
+.department-section {
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 2px solid #000;
+    background: white;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.department-header {
+    padding: 20px 24px;
+    background: white;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.department-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #000;
+    margin: 0;
+}
+
+.employee-count-badge {
+    margin-left: 12px;
+    padding: 4px 12px;
+    background: #dc3545;
+    color: white;
+    font-weight: bold;
+    border-radius: 8px;
+    border: 1px solid #dc3545;
+}
+
+.view-toggle-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.view-toggle-btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+.filter-section {
+    background: white;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: none;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.schedule-grid-container {
+    margin-top: 24px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animated-enter {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .schedule-stat-number {
+        font-size: 2rem;
+    }
+    
+    .schedule-stat-label {
+        font-size: 0.8rem;
+    }
+    
+    .view-toggle-buttons {
+        flex-direction: column;
+    }
+    
+    .view-toggle-btn {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .department-title {
+        font-size: 1.2rem;
+    }
+}
+
+/* Custom scrollbar for employee lists */
+.employee-list-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.employee-list-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.employee-list-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.employee-list-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Tooltip enhancements */
+.schedule-tooltip {
+    background: rgba(0, 0, 0, 0.9) !important;
+    font-size: 0.875rem !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+}
+
+/* Color scheme for different categories - White & Black with Red Borders */
+.category-week-1-3 {
+    background: white;
+    border: 2px solid #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+.category-week-2-4 {
+    background: white;
+    border: 2px solid #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+.category-all-working {
+    background: white;
+    border: 2px solid #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+.category-all-off {
+    background: white;
+    border: 2px solid #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+/* Drag and Drop Effects */
+.employee-chip-dragging {
+    opacity: 0.4;
+    cursor: grabbing !important;
+}
+
+.employee-chip-draggable {
+    cursor: grab;
+    transition: all 0.3s ease;
+    background: white;
+    border: 2px solid #dc3545;
+}
+
+.employee-chip-draggable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+.drop-zone-active {
+    border: 3px dashed #dc3545 !important;
+    background: #f8f9fa !important;
+    transform: scale(1.02);
+}
+
+.drop-zone-hover {
+    background: #f8f9fa;
+    border-color: #dc3545 !important;
+}
+
+.drop-indicator {
+    position: relative;
+}
+
+.drop-indicator::after {
+    content: '⬇ Drop Here';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #dc3545;
+    font-weight: bold;
+    font-size: 1.2rem;
+    pointer-events: none;
+    animation: pulse 1s infinite;
+}
+
+/* Loading state */
+.schedule-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+/* Success state for swap actions */
+.swap-success {
+    animation: pulse 0.6s ease;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+

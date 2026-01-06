@@ -1,0 +1,159 @@
+/* frontend/src/components/Sidebar.css */
+
+/* --- Red, Black, & White Theme Variables --- */
+:root {
+  --sidebar-bg: #212121; /* Black */
+  --sidebar-link-bg: #424242; /* Dark Gray */
+  --sidebar-link-hover-bg: #616161; /* Hover Gray */
+  --sidebar-active-bg: #D32F2F; /* Red */
+  --sidebar-icon-color: #EEEEEE; /* Icon Gray */
+  --sidebar-icon-active: #FFFFFF; /* Active Icon White */
+  --sidebar-text-color: #BDBDBD; /* Text Gray */
+  --sidebar-text-active: #FFFFFF; /* Active Text White */
+  --sidebar-tooltip-bg: #212121; /* Tooltip Black */
+}
+
+/* --- Sidebar Container & Layout --- */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: var(--sidebar-width); 
+  z-index: 1010;
+  background-color: var(--sidebar-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  /* NEW: Flex layout to push footer to the bottom */
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Sidebar Header --- */
+.sidebar-header {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+  margin-bottom: 10px;
+}
+
+/* --- Navigation Layout --- */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* --- NEW: Sidebar Footer for Notifications --- */
+.sidebar-footer {
+    margin-top: auto; /* This pushes the footer to the bottom */
+    padding-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* --- Sidebar Link --- */
+.sidebar-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  position: relative;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.sidebar-link:hover {
+  background-color: var(--sidebar-link-hover-bg);
+}
+
+/* --- Icon Container --- */
+.icon-container {
+  width: 32px;
+  height: 32px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  background-color: var(--sidebar-link-bg);
+  transition: all 0.2s ease-in-out;
+  position: relative; /* ADDED: For badge positioning */
+}
+
+.icon-container .MuiSvgIcon-root {
+  color: var(--sidebar-icon-color);
+  font-size: 20px;
+  transition: color 0.2s ease-in-out;
+}
+
+/* --- NEW: Notification Badge --- */
+.notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    background-color: var(--sidebar-active-bg);
+    border-radius: 50%;
+    border: 2px solid var(--sidebar-link-bg);
+}
+
+/* --- Label Styling --- */
+.sidebar-label {
+  color: var(--sidebar-text-color);
+  font-size: 10px;
+  font-weight: 500;
+  text-align: center;
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Active State --- */
+.sidebar-link.active .icon-container {
+  background-color: var(--sidebar-active-bg);
+}
+
+.sidebar-link.active .icon-container .MuiSvgIcon-root {
+  color: var(--sidebar-icon-active);
+}
+
+.sidebar-link.active .sidebar-label {
+  color: var(--sidebar-text-active);
+}
+
+/* --- Tooltip --- */
+.sidebar-link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.95);
+  background-color: var(--sidebar-tooltip-bg);
+  color: var(--sidebar-icon-active);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.sidebar-link:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) scale(1);
+  transition-delay: 0.3s;
+}

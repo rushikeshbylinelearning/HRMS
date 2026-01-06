@@ -1,0 +1,198 @@
+import { defineConfig } from 'vite'
+import path from 'node:path'
+import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
+
+export default defineConfig({
+  plugins: [
+    react({
+      // Use automatic JSX runtime (modern standard for React 17+)
+      // This doesn't require explicit React imports in every file
+      jsxRuntime: 'automatic',
+    }),
+    // Vite plugin to set iframe embedding headers
+    {
+      name: 'configure-response-headers',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          // Remove X-Frame-Options
+          res.removeHeader('X-Frame-Options');
+          
+          // Set CSP frame-ancestors for HTML responses
+          if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
+            const allowedOrigins = process.env.NODE_ENV === 'development' 
+              ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
+              : "https://sso.bylinelms.com https://attendance.bylinelms.com";
+            
+            const existingCSP = res.getHeader('Content-Security-Policy') || '';
+            if (existingCSP && !existingCSP.includes('frame-ancestors')) {
+              res.setHeader('Content-Security-Policy', `${existingCSP}; frame-ancestors ${allowedOrigins};`);
+            } else if (!existingCSP) {
+              res.setHeader('Content-Security-Policy', `frame-ancestors ${allowedOrigins};`);
+            }
+          }
+          
+          next();
+        });
+      },
+    },
+    // Bundle analyzer for production builds
+    process.env.ANALYZE && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ].filter(Boolean),
+  server: {
+    // Increase HMR timeout to prevent connection issues
+    hmr: {
+      overlay: true,
+    },
+    proxy: {
+      // --- Development proxy configuration ---
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            // Only log if it's not a connection refused error (server might be starting)
+            if (err.code !== 'ECONNREFUSED') {
+              console.log('[Vite Proxy] Error:', err.message);
+            }
+            // Don't send response if already sent
+            if (!res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'Backend server is not available. Please ensure the backend server is running on port 3001.' 
+              }));
+            }
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Add timeout handling
+            proxyReq.setTimeout(10000, () => {
+              if (!res.headersSent) {
+                res.writeHead(504, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request timeout' }));
+              }
+            });
+          });
+        },
+      },
+      // --- WebSocket proxy for development ---
+      '/api/socket.io': {
+        target: 'http://127.0.0.1:3001',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+      },
+      // --- Avatar images proxy for development ---
+      '/avatars': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            // Only log if it's not a connection refused error (server might be starting)
+            if (err.code !== 'ECONNREFUSED') {
+              console.log('[Vite Proxy] Avatar error:', err.message);
+            }
+            // Don't send response if already sent
+            if (!res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'Backend server is not available.' 
+              }));
+            }
+          });
+        },
+      }
+    }
+  },
+  build: {
+    // Optimized build configuration for production
+    target: 'es2015',
+    minify: 'terser',
+    // Module preload to ensure proper loading order
+    modulePreload: {
+      polyfill: true,
+    },
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console logs in production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+      format: {
+        comments: false, // Remove comments
+      },
+    },
+    // Let Vite handle chunking automatically - safest approach
+    rollupOptions: {
+      output: {
+        // Let Vite's automatic chunking handle everything
+        // This prevents circular dependencies and ensures proper load order
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name.split('.');
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico|webp/i.test(ext)) {
+            return `assets/images/[name]-[hash][extname]`;
+          } else if (/woff|woff2|eot|ttf|otf/i.test(ext)) {
+            return `assets/fonts/[name]-[hash][extname]`;
+          }
+          return `assets/[ext]/[name]-[hash][extname]`;
+        },
+      },
+    },
+    // Disable source maps for production
+    sourcemap: false,
+    // Increase chunk size limit (after splitting, individual chunks should be smaller)
+    chunkSizeWarningLimit: 600,
+    // Optimize assets
+    assetsInlineLimit: 4096, // 4kb - inline small assets as base64
+    cssCodeSplit: true, // Split CSS for better caching
+    reportCompressedSize: true, // Report compressed size
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      '@emotion/react',
+      '@emotion/styled',
+      '@emotion/cache',
+      '@mui/material',
+      '@mui/icons-material',
+      'react-is',
+      'prop-types',
+    ],
+    esbuildOptions: {
+      // Ensure proper initialization order
+      target: 'es2015',
+    },
+    // Force re-optimization to fix stale cache issues
+    force: true, // Will force re-optimization on next dev server start
+  },
+  // Resolve configuration to prevent React duplication
+  resolve: {
+    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', 'react-is', 'prop-types'],
+    alias: {
+      react: path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      '@emotion/react': path.resolve(__dirname, 'node_modules/@emotion/react'),
+      '@emotion/styled': path.resolve(__dirname, 'node_modules/@emotion/styled'),
+      'prop-types': path.resolve(__dirname, 'node_modules/prop-types'),
+    },
+  },
+  // CSS optimization
+  css: {
+    devSourcemap: false,
+  },
+});
