@@ -1,5 +1,5 @@
 // src/components/AttendanceTimeline.jsx - IST-ENFORCED, BACKEND-DRIVEN
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import { Typography, Box, Paper } from '@mui/material';
 import DailyTimelineRow from './DailyTimelineRow';
 import { 
@@ -163,4 +163,5 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
     );
 };
 
-export default AttendanceTimeline;
+// PERFORMANCE OPTIMIZATION: Memoize component to prevent unnecessary re-renders
+export default memo(AttendanceTimeline);

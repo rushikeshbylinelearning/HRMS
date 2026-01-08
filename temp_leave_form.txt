@@ -1,5 +1,5 @@
-// src/components/LeaveRequestForm.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+﻿// src/components/LeaveRequestForm.jsx
+import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
     Stack, Typography, Alert, FormControl, InputLabel, Select, MenuItem, Divider,
@@ -14,19 +14,19 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { getAllowedLeaveTypes, normalizeEmploymentType } from '../utils/leaveTypePolicy';
-
 // isPlannedLeaveDisabled removed - Validation is now server-side only
 
-// redesigned modal UI – neutral theme
-const PRIMARY_COLOR = '#111827';
-const PRIMARY_LIGHT = '#374151';
-const PRIMARY_DARK = '#111827';
-const PRIMARY_BORDER = 'rgba(17, 24, 39, 0.12)';
-const PRIMARY_SHADOW = 'rgba(17, 24, 39, 0.12)';
+
+const PRIMARY_COLOR = '#2C3E50';
+const PRIMARY_LIGHT = '#34495e';
+const PRIMARY_DARK = '#23313f';
+const PRIMARY_BORDER = 'rgba(44, 62, 80, 0.3)';
+const PRIMARY_SHADOW = 'rgba(44, 62, 80, 0.3)';
 
 const initialState = {
+    // --- START OF FIX: Changed default to 'Casual' to match the first visible option ---
     requestType: 'Casual',
+    // --- END OF FIX ---
     leaveType: 'Full Day',
     startDate: null,
     endDate: null,
@@ -44,9 +44,6 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
     const [uploadingCertificate, setUploadingCertificate] = useState(false);
     const [plannedLeaveHistory, setPlannedLeaveHistory] = useState([]);
 
-    const employeeType = normalizeEmploymentType(user?.employmentStatus);
-    const allowedLeaveTypes = useMemo(() => getAllowedLeaveTypes(employeeType), [employeeType]);
-
     // Remove planned leave history fetching - validation is server-side only
     useEffect(() => {
         if (open) {
@@ -57,15 +54,12 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
 
     useEffect(() => {
         if (open) {
-            // Reset form to initial state - set a safe default requestType based on employee type
-            const nextRequestType = allowedLeaveTypes.includes(initialState.requestType)
-                ? initialState.requestType
-                : (allowedLeaveTypes[0] || 'Loss of Pay');
-            setFormData({ ...initialState, requestType: nextRequestType });
+            // Reset form to initial state - let backend handle employee type restrictions
+            setFormData({ ...initialState });
             setError('');
             setUploadingCertificate(false);
         }
-    }, [open, user, allowedLeaveTypes]);
+    }, [open, user]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -132,10 +126,6 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
 
     const handleSubmit = async () => {
         setError('');
-        if (!allowedLeaveTypes.includes(formData.requestType)) {
-            setError('Selected leave type is not available for your employment status.');
-            return;
-        }
         if (!formData.reason || !formData.startDate) {
             setError('Please select a start date and provide a reason.');
             return;
@@ -195,70 +185,76 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
         : 'Please fill out the details for your request.';
 
     return (
-        // redesigned modal UI – neutral theme
         <Dialog
             open={open}
             onClose={onClose}
             PaperProps={{
                 sx: {
-                    borderRadius: '16px',
-                    width: '580px',
-                    maxHeight: '80vh',
-                    backgroundColor: '#FFFFFF',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #E5E7EB',
+                    borderRadius: 4,
+                    minWidth: '450px',
+                    background: '#ffffff',
+                    boxShadow: '0 8px 32px rgba(44, 62, 80, 0.12)',
                     overflow: 'hidden'
                 }
             }}
         >
-            {/* redesigned header UI – neutral theme */}
+            {/* Header with red gradient */}
             <DialogTitle sx={{
-                backgroundColor: '#FFFFFF',
-                borderBottom: '1px solid #E5E7EB',
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                fontWeight: 700,
+                pb: 2,
+                pt: 3,
+                px: 3,
+                background: `linear-gradient(135deg, ${PRIMARY_COLOR} 0%, ${PRIMARY_LIGHT} 50%, ${PRIMARY_DARK} 100%)`,
+                color: 'white',
+                boxShadow: `0 4px 12px ${PRIMARY_SHADOW}`,
+                position: 'relative'
             }}>
-                <Box>
-                    <Typography variant="h6" sx={{ color: '#111827', fontWeight: 600, fontSize: '1.125rem' }}>
-                        Apply for Leave
-                    </Typography>
-                    <Typography sx={{ color: '#6B7280', fontWeight: 400, fontSize: '0.875rem', mt: '4px' }}>
-                        Please fill out the details for your leave request.
-                    </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{
+                            bgcolor: 'rgba(255,255,255,0.25)',
+                            width: 48,
+                            height: 48,
+                            border: '2px solid rgba(255,255,255,0.3)'
+                        }}>
+                            <CalendarTodayIcon />
+                        </Avatar>
+                        <Box>
+                            <Typography variant="h5" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
+                                {modalTitle}
+                            </Typography>
+                            <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }}>
+                                {descriptionText}
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton
+                        onClick={onClose}
+                        sx={{
+                            color: 'white',
+                            bgcolor: 'rgba(255,255,255,0.1)',
+                            '&:hover': {
+                                bgcolor: 'rgba(255,255,255,0.2)'
+                            }
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
                 </Box>
-                <IconButton
-                    onClick={onClose}
-                    sx={{
-                        color: '#6B7280',
-                        '&:hover': {
-                            backgroundColor: '#F3F4F6',
-                            color: '#111827',
-                        },
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
             </DialogTitle>
 
-            <DialogContent sx={{ 
-                padding: '24px',
-                backgroundColor: '#FFFFFF',
-                overflow: 'auto'
-            }}>
-                <Stack spacing={3}>
+            <DialogContent sx={{ p: 3, bgcolor: '#fafafa' }}>
+                <Stack spacing={3} sx={{ mt: 1 }}>
                     {error && (
-                        // redesigned error alert UI – neutral theme
                         <Alert
-                            severity="warning" // Use a less aggressive severity
+                            severity="error"
                             sx={{
-                                backgroundColor: '#F9FAFB',
-                                color: '#111827',
-                                border: '1px solid #E5E7EB',
-                                borderRadius: '8px',
+                                bgcolor: '#ffebee',
+                                border: `1px solid ${PRIMARY_COLOR}`,
+                                color: PRIMARY_COLOR,
+                                borderRadius: 2,
                                 '& .MuiAlert-icon': {
-                                    color: '#6B7280'
+                                    color: PRIMARY_COLOR
                                 }
                             }}
                         >
@@ -266,58 +262,46 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                         </Alert>
                     )}
 
-                    <FormControl fullWidth size="medium" sx={{
-                        // redesigned form field UI – neutral theme
-                        '& .MuiInputLabel-root': {
-                            color: '#6B7280',
-                            fontSize: '0.875rem',
-                            '&.Mui-focused': {
-                                color: '#111827',
-                            },
-                        },
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '8px',
-                            '& .MuiOutlinedInput-notchedOutline': {
-                                borderColor: '#D1D5DB',
-                            },
-                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                borderColor: '#9CA3AF',
-                            },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                borderColor: '#111827',
-                                borderWidth: '1px',
-                            },
-                        },
-                    }}>
-                        <InputLabel>Leave Category</InputLabel>
+                    <FormControl fullWidth size="medium">
+                        <InputLabel
+                            sx={{
+                                color: PRIMARY_COLOR,
+                                fontWeight: 600,
+                                '&.Mui-focused': {
+                                    color: PRIMARY_COLOR
+                                }
+                            }}
+                        >
+                            Leave Category
+                        </InputLabel>
                         <Select
                             name="requestType"
                             value={formData.requestType}
                             label="Leave Category"
                             onChange={handleChange}
+                            sx={{
+                                bgcolor: 'white',
+                                borderRadius: 2,
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: PRIMARY_BORDER
+                                },
+                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: PRIMARY_COLOR
+                                },
+                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: PRIMARY_COLOR,
+                                    borderWidth: 2
+                                }
+                            }}
                         >
-                            {allowedLeaveTypes.includes('Casual') && (
-                                <MenuItem value="Casual">Casual Leave</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Planned') && (
-                                <MenuItem value="Planned">Planned Leave (Earned)</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Sick') && (
-                                <MenuItem value="Sick">Sick Leave</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Loss of Pay') && (
-                                <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Compensatory') && (
-                                <MenuItem value="Compensatory">Comp-Off</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Backdated Leave') && (
-                                <>
-                                    <Divider />
-                                    <MenuItem value="Backdated Leave">Backdate Leave</MenuItem>
-                                </>
-                            )}
+                            {/* Employee type restrictions handled by backend */}
+                            <MenuItem value="Casual">Casual Leave</MenuItem>
+                            <MenuItem value="Planned">Planned Leave (Earned)</MenuItem>
+                            <MenuItem value="Sick">Sick Leave</MenuItem>
+                            <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
+                            <MenuItem value="Compensatory">Comp-Off</MenuItem>
+                            <Divider />
+                            <MenuItem value="Backdated Leave">Backdate Leave</MenuItem>
                         </Select>
                     </FormControl>
 
@@ -331,28 +315,27 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                     size: 'medium',
                                     fullWidth: true,
                                     sx: {
-                                        // redesigned form field UI – neutral theme
-                                        '& .MuiInputLabel-root': {
-                                            color: '#6B7280',
-                                            fontSize: '0.875rem',
-                                            '&.Mui-focused': {
-                                                color: '#111827',
-                                            },
-                                        },
+                                        bgcolor: 'white',
+                                        borderRadius: 2,
                                         '& .MuiOutlinedInput-root': {
-                                            backgroundColor: '#FFFFFF',
-                                            borderRadius: '8px',
-                                            '& .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#D1D5DB',
+                                            '& fieldset': {
+                                                borderColor: PRIMARY_BORDER
                                             },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#9CA3AF',
+                                            '&:hover fieldset': {
+                                                borderColor: PRIMARY_COLOR
                                             },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#111827',
-                                                borderWidth: '1px',
-                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: PRIMARY_COLOR,
+                                                borderWidth: 2
+                                            }
                                         },
+                                        '& .MuiInputLabel-root': {
+                                            color: PRIMARY_COLOR,
+                                            fontWeight: 600,
+                                            '&.Mui-focused': {
+                                                color: PRIMARY_COLOR
+                                            }
+                                        }
                                     }
                                 }
                             }}
@@ -371,28 +354,27 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                     size: 'medium',
                                     fullWidth: true,
                                     sx: {
-                                        // redesigned form field UI – neutral theme
-                                        '& .MuiInputLabel-root': {
-                                            color: '#6B7280',
-                                            fontSize: '0.875rem',
-                                            '&.Mui-focused': {
-                                                color: '#111827',
-                                            },
-                                        },
+                                        bgcolor: 'white',
+                                        borderRadius: 2,
                                         '& .MuiOutlinedInput-root': {
-                                            backgroundColor: '#FFFFFF',
-                                            borderRadius: '8px',
-                                            '& .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#D1D5DB',
+                                            '& fieldset': {
+                                                borderColor: PRIMARY_BORDER
                                             },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#9CA3AF',
+                                            '&:hover fieldset': {
+                                                borderColor: PRIMARY_COLOR
                                             },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#111827',
-                                                borderWidth: '1px',
-                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: PRIMARY_COLOR,
+                                                borderWidth: 2
+                                            }
                                         },
+                                        '& .MuiInputLabel-root': {
+                                            color: PRIMARY_COLOR,
+                                            fontWeight: 600,
+                                            '&.Mui-focused': {
+                                                color: PRIMARY_COLOR
+                                            }
+                                        }
                                     }
                                 }
                             }}
@@ -400,36 +382,37 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                     </LocalizationProvider>
 
                     {formData.requestType !== 'Compensatory' && (
-                        <FormControl fullWidth size="medium" sx={{
-                            // redesigned form field UI – neutral theme
-                            '& .MuiInputLabel-root': {
-                                color: '#6B7280',
-                                fontSize: '0.875rem',
-                                '&.Mui-focused': {
-                                    color: '#111827',
-                                },
-                            },
-                            '& .MuiOutlinedInput-root': {
-                                backgroundColor: '#FFFFFF',
-                                borderRadius: '8px',
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#D1D5DB',
-                                },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#9CA3AF',
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#111827',
-                                    borderWidth: '1px',
-                                },
-                            },
-                        }}>
-                            <InputLabel>Day Type</InputLabel>
+                        <FormControl fullWidth size="medium">
+                            <InputLabel
+                                sx={{
+                                    color: PRIMARY_COLOR,
+                                    fontWeight: 600,
+                                    '&.Mui-focused': {
+                                        color: PRIMARY_COLOR
+                                    }
+                                }}
+                            >
+                                Day Type
+                            </InputLabel>
                             <Select
                                 name="leaveType"
                                 value={formData.leaveType}
                                 label="Day Type"
                                 onChange={handleChange}
+                                sx={{
+                                    bgcolor: 'white',
+                                    borderRadius: 2,
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: PRIMARY_BORDER
+                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: PRIMARY_COLOR
+                                    },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: PRIMARY_COLOR,
+                                        borderWidth: 2
+                                    }
+                                }}
                             >
                                 <MenuItem value="Full Day">Full Day</MenuItem>
                                 <MenuItem value="Half Day - First Half">Half Day - First Half</MenuItem>
@@ -450,28 +433,27 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                         size: 'medium',
                                         fullWidth: true,
                                         sx: {
-                                            // redesigned form field UI – neutral theme
-                                            '& .MuiInputLabel-root': {
-                                                color: '#6B7280',
-                                                fontSize: '0.875rem',
-                                                '&.Mui-focused': {
-                                                    color: '#111827',
-                                                },
-                                            },
+                                            bgcolor: 'white',
+                                            borderRadius: 2,
                                             '& .MuiOutlinedInput-root': {
-                                                backgroundColor: '#FFFFFF',
-                                                borderRadius: '8px',
-                                                '& .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: '#D1D5DB',
+                                                '& fieldset': {
+                                                    borderColor: PRIMARY_BORDER
                                                 },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: '#9CA3AF',
+                                                '&:hover fieldset': {
+                                                    borderColor: PRIMARY_COLOR
                                                 },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: '#111827',
-                                                    borderWidth: '1px',
-                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: PRIMARY_COLOR,
+                                                    borderWidth: 2
+                                                }
                                             },
+                                            '& .MuiInputLabel-root': {
+                                                color: PRIMARY_COLOR,
+                                                fontWeight: 600,
+                                                '&.Mui-focused': {
+                                                    color: PRIMARY_COLOR
+                                                }
+                                            }
                                         }
                                     }
                                 }}
@@ -481,20 +463,29 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
 
                     {formData.requestType === 'Sick' && (
                         <Box>
-                            {/* redesigned form field UI – neutral theme */}
-                            <Typography variant="body2" sx={{ mb: 1, color: '#374151', fontWeight: 500 }}>
-                                Medical Certificate <span style={{ color: '#6B7280' }}>*</span>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    mb: 1.5,
+                                    color: PRIMARY_COLOR,
+                                    fontWeight: 600,
+                                    fontSize: '0.875rem'
+                                }}
+                            >
+                                Medical Certificate <span style={{ color: PRIMARY_COLOR }}>*</span>
                             </Typography>
                             <Box
                                 sx={{
-                                    border: formData.medicalCertificateUrl ? '2px dashed #9CA3AF' : '2px dashed #D1D5DB',
-                                    borderRadius: '8px',
-                                    padding: '16px',
-                                    backgroundColor: formData.medicalCertificateUrl ? '#F9FAFB' : '#FFFFFF',
-                                    transition: 'all 0.2s ease-in-out',
+                                    border: formData.medicalCertificateUrl
+                                        ? '2px dashed #2e7d32'
+                                        : `2px dashed ${PRIMARY_BORDER}`,
+                                    borderRadius: 2,
+                                    p: 2,
+                                    bgcolor: formData.medicalCertificateUrl ? '#f1f8f4' : 'white',
+                                    transition: 'all 0.3s ease',
                                     '&:hover': {
-                                        borderColor: formData.medicalCertificateUrl ? '#6B7280' : '#9CA3AF',
-                                        backgroundColor: formData.medicalCertificateUrl ? '#F3F4F6' : '#F9FAFB',
+                                        borderColor: formData.medicalCertificateUrl ? '#2e7d32' : PRIMARY_COLOR,
+                                        bgcolor: formData.medicalCertificateUrl ? '#f1f8f4' : 'rgba(44, 62, 80, 0.02)'
                                     }
                                 }}
                             >
@@ -506,11 +497,11 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                         </Typography>
                                     </Box>
                                 ) : formData.medicalCertificateUrl ? (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <CheckCircleIcon sx={{ color: '#6B7280', fontSize: 24 }} />
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <CheckCircleIcon sx={{ color: '#2e7d32', fontSize: 24 }} />
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>
-                                                Certificate Uploaded
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#2e7d32' }}>
+                                                Medical certificate uploaded
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary">
                                                 {formData.medicalCertificate?.name || 'File uploaded successfully'}
@@ -518,14 +509,20 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                         </Box>
                                         <Button
                                             size="small"
-                                            variant="text"
-                                            onClick={() => setFormData(prev => ({ ...prev, medicalCertificate: null, medicalCertificateUrl: null }))}
+                                            variant="outlined"
+                                            onClick={() => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    medicalCertificate: null,
+                                                    medicalCertificateUrl: null
+                                                }));
+                                            }}
                                             sx={{
-                                                color: '#6B7280',
-                                                textTransform: 'none',
+                                                borderColor: PRIMARY_COLOR,
+                                                color: PRIMARY_COLOR,
                                                 '&:hover': {
-                                                    backgroundColor: '#F3F4F6',
-                                                    color: '#111827',
+                                                    borderColor: PRIMARY_DARK,
+                                                    bgcolor: 'rgba(44, 62, 80, 0.05)'
                                                 }
                                             }}
                                         >
@@ -548,29 +545,44 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                                                 startIcon={<UploadFileIcon />}
                                                 fullWidth
                                                 sx={{
-                                                    borderColor: '#D1D5DB',
-                                                    color: '#374151',
+                                                    borderColor: PRIMARY_BORDER,
+                                                    color: PRIMARY_COLOR,
                                                     fontWeight: 600,
-                                                    textTransform: 'none',
                                                     py: 1.5,
                                                     '&:hover': {
-                                                        borderColor: '#9CA3AF',
-                                                        backgroundColor: '#F9FAFB',
+                                                        borderColor: PRIMARY_COLOR,
+                                                        bgcolor: 'rgba(44, 62, 80, 0.05)'
                                                     }
                                                 }}
                                             >
-                                                Upload Certificate
+                                                Upload Medical Certificate
                                             </Button>
                                         </label>
-                                        <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary', textAlign: 'center' }}>
+                                        <Typography
+                                            variant="caption"
+                                            sx={{
+                                                display: 'block',
+                                                mt: 1,
+                                                color: 'text.secondary',
+                                                textAlign: 'center'
+                                            }}
+                                        >
                                             PDF, JPEG, PNG, or GIF (Max 10MB)
                                         </Typography>
                                     </Box>
                                 )}
                             </Box>
                             {!formData.medicalCertificateUrl && (
-                                <Typography variant="caption" sx={{ mt: 1, color: '#6B7280', fontSize: '0.75rem', display: 'block' }}>
-                                    A medical certificate is mandatory for sick leave applications.
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        mt: 0.5,
+                                        color: PRIMARY_COLOR,
+                                        fontSize: '0.75rem',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Medical certificate is mandatory for sick leave applications.
                                 </Typography>
                             )}
                         </Box>
@@ -590,93 +602,110 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                             formData.reason.trim().length > 0 && formData.reason.trim().length < 100
                                 ? `Please write at least ${100 - formData.reason.trim().length} more characters (${formData.reason.trim().length}/100)`
                                 : formData.reason.trim().length >= 100
-                                    ? `${formData.reason.trim().length} characters ✓`
+                                    ? `${formData.reason.trim().length} characters âœ“`
                                     : 'Please provide a detailed reason for your leave request (minimum 100 characters)'
                         }
                         FormHelperTextProps={{
                             sx: {
-                                color: '#6B7280',
-                                fontWeight: 500,
+                                color: formData.reason.trim().length >= 100
+                                    ? '#2e7d32'
+                                    : formData.reason.trim().length > 0 && formData.reason.trim().length < 100
+                                        ? PRIMARY_COLOR
+                                        : 'rgba(44, 62, 80, 0.7)',
+                                fontWeight: formData.reason.trim().length >= 100 ? 600 : 500,
                                 fontSize: '0.75rem',
-                                mt: 0.5
+                                mt: 1
                             }
                         }}
                         sx={{
-                            // redesigned form field UI – neutral theme
+                            bgcolor: 'white',
+                            borderRadius: 2,
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderColor: formData.reason.trim().length > 0 && formData.reason.trim().length < 100
+                                        ? PRIMARY_COLOR
+                                        : PRIMARY_BORDER
+                                },
+                                '&:hover fieldset': {
+                                    borderColor: PRIMARY_COLOR
+                                },
+                                '&.Mui-focused fieldset': {
+                                    borderColor: PRIMARY_COLOR,
+                                    borderWidth: 2
+                                },
+                                '&.Mui-error fieldset': {
+                                    borderColor: PRIMARY_COLOR
+                                }
+                            },
                             '& .MuiInputLabel-root': {
-                                color: '#6B7280',
-                                fontSize: '0.875rem',
+                                color: PRIMARY_COLOR,
+                                fontWeight: 600,
                                 '&.Mui-focused': {
-                                    color: '#111827',
+                                    color: PRIMARY_COLOR
                                 },
                                 '&.Mui-error': {
-                                    color: '#6B7280',
-                                },
-                            },
-                            '& .MuiOutlinedInput-root': {
-                                backgroundColor: '#FFFFFF',
-                                borderRadius: '8px',
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#D1D5DB',
-                                },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#9CA3AF',
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#111827',
-                                    borderWidth: '1px',
-                                },
-                                '&.Mui-error .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#9CA3AF',
-                                },
-                            },
+                                    color: PRIMARY_COLOR
+                                }
+                            }
                         }}
                     />
                 </Stack>
             </DialogContent>
-            {/* redesigned footer UI – neutral theme */}
             <DialogActions sx={{
-                padding: '16px 24px',
-                backgroundColor: '#FFFFFF',
-                borderTop: '1px solid #E5E7EB',
+                p: 3,
+                pt: 2,
+                bgcolor: '#fafafa',
+                borderTop: '1px solid rgba(44, 62, 80, 0.1)',
+                gap: 2
             }}>
                 <Button
                     onClick={onClose}
-                    variant="outlined"
                     disabled={loading}
+                    variant="outlined"
                     sx={{
-                        // redesigned secondary button UI – neutral theme
-                        borderColor: '#D1D5DB',
-                        color: '#374151',
+                        borderColor: PRIMARY_BORDER,
+                        color: PRIMARY_COLOR,
                         fontWeight: 600,
-                        borderRadius: '8px',
-                        textTransform: 'none',
+                        px: 3,
+                        borderRadius: 2,
                         '&:hover': {
-                            borderColor: '#9CA3AF',
-                            backgroundColor: '#F9FAFB',
+                            borderColor: PRIMARY_COLOR,
+                            bgcolor: 'rgba(44, 62, 80, 0.05)'
                         },
+                        '&:disabled': {
+                            borderColor: 'rgba(44, 62, 80, 0.2)',
+                            color: 'rgba(44, 62, 80, 0.4)'
+                        }
                     }}
                 >
                     Cancel
                 </Button>
                 <Button
-                    onClick={handleSubmit}
                     variant="contained"
-                    disabled={loading}
+                    onClick={handleSubmit}
+                    disabled={
+                        loading ||
+                        !formData.reason ||
+                        formData.reason.trim().length < 100 ||
+                        !formData.startDate ||
+                        (formData.requestType === 'Sick' && !formData.medicalCertificateUrl) ||
+                        uploadingCertificate
+                    }
                     sx={{
-                        // redesigned primary button UI – neutral theme
-                        backgroundColor: '#111827',
-                        color: '#FFFFFF',
-                        fontWeight: 600,
-                        borderRadius: '8px',
-                        textTransform: 'none',
-                        boxShadow: 'none',
+                        bgcolor: PRIMARY_COLOR,
+                        color: 'white',
+                        fontWeight: 700,
+                        px: 3,
+                        borderRadius: 2,
+                        boxShadow: `0 4px 12px ${PRIMARY_SHADOW}`,
                         '&:hover': {
-                            backgroundColor: '#1F2937',
+                            bgcolor: PRIMARY_LIGHT,
+                            boxShadow: '0 6px 16px rgba(44, 62, 80, 0.4)'
                         },
                         '&:disabled': {
-                            backgroundColor: '#D1D5DB',
-                            color: '#9CA3AF',
+                            bgcolor: 'rgba(44, 62, 80, 0.5)',
+                            boxShadow: 'none',
+                            color: 'rgba(255, 255, 255, 0.6)'
                         }
                     }}
                 >

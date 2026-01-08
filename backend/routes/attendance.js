@@ -16,6 +16,9 @@ const { getUserDailyStatus } = require('../services/dailyStatusService');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const cache = require('../utils/cache');
 const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime } = require('../utils/istTime');
+const { getGracePeriod } = require('../services/gracePeriodCache');
+const { batchFetchLeaves } = require('../services/leaveCache');
+const { invalidateStatus } = require('../services/statusCache');
 
 const router = express.Router();
 
@@ -56,11 +59,11 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
     const todayStr = getISTDateString();
     try {
         // PHASE 2 OPTIMIZATION: Parallelize independent queries
-        // Batch 1: User + TodayLog + GraceSetting (independent, can run in parallel)
-        const [user, todayLog, graceSetting] = await Promise.all([
+        // Batch 1: User + TodayLog (independent, can run in parallel)
+        // Note: Removed graceSetting from parallel batch - now using cache
+        const [user, todayLog] = await Promise.all([
             User.findById(userId).populate('shiftGroup'),
-            AttendanceLog.findOne({ user: userId, attendanceDate: todayStr }),
-            Setting.findOne({ key: 'lateGraceMinutes' })
+            AttendanceLog.findOne({ user: userId, attendanceDate: todayStr })
         ]);
 
         if (!user) { return res.status(404).json({ error: 'User not found.' }); }
@@ -113,17 +116,12 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         let isHalfDay = false;
         let attendanceStatus = 'On-time';
 
-        // Grace period: configurable via settings (default 30 minutes)
-        // PHASE 2 OPTIMIZATION: Already fetched in parallel batch above
+        // Grace period: configurable via cached setting (1-hour TTL)
         let GRACE_PERIOD_MINUTES = 30;
-        if (graceSetting) {
-            // FIX: Explicitly convert to integer to ensure type consistency
-            const graceValue = parseInt(Number(graceSetting.value), 10);
-            if (!isNaN(graceValue) && graceValue >= 0) {
-                GRACE_PERIOD_MINUTES = graceValue;
-            } else {
-                console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
-            }
+        try {
+            GRACE_PERIOD_MINUTES = await getGracePeriod();
+        } catch (err) {
+            console.error('Failed to fetch grace period from cache, using default 30', err);
         }
         console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes})`);
 
@@ -263,12 +261,15 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         cache.delete(cacheKey);
         // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
+        // PERFORMANCE OPTIMIZATION: Invalidate status cache
+        invalidateStatus(userId, todayStr);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
             const { getIO } = require('../socketManager');
             const io = getIO();
             if (io) {
+                // PERFORMANCE OPTIMIZATION: Minimal payload for real-time updates
                 io.emit('attendance_log_updated', {
                     logId: attendanceLog._id,
                     userId: userId,
@@ -276,9 +277,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
                     attendanceStatus: attendanceStatus,
                     isHalfDay: isHalfDay,
                     isLate: isLate,
-                    lateMinutes: lateMinutes,
-                    clockInTime: newSession.startTime,
-                    clockOutTime: null,
+                    halfDayReasonText: halfDayReasonText,
                     timestamp: getISTNow().toISOString(),
                     message: `${user.fullName} clocked in`
                 });
@@ -423,23 +422,22 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         cache.delete(cacheKey);
         // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
+        // PERFORMANCE OPTIMIZATION: Invalidate status cache
+        invalidateStatus(userId, today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
             const { getIO } = require('../socketManager');
             const io = getIO();
             if (io) {
+                // PERFORMANCE OPTIMIZATION: Minimal payload for real-time updates
                 io.emit('attendance_log_updated', {
                     logId: log._id,
                     userId: userId,
                     attendanceDate: today,
                     attendanceStatus: updatedLog?.attendanceStatus || log.attendanceStatus,
                     isHalfDay: updatedLog?.isHalfDay || updateData.isHalfDay || log.isHalfDay,
-                    isLate: updatedLog?.isLate || log.isLate,
-                    clockInTime: log.clockInTime,
-                    clockOutTime: clockOutTime,
-                    totalWorkingHours: totalWorkingHours,
-                    halfDayReason: updatedLog?.halfDayReasonText || updateData.halfDayReasonText || null,
+                    halfDayReasonText: updatedLog?.halfDayReasonText || updateData.halfDayReasonText || null,
                     timestamp: getISTNow().toISOString(),
                     message: updateData.isHalfDay ? `Clocked out - Marked as half-day (insufficient hours)` : `Clocked out successfully`
                 });
@@ -1061,7 +1059,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 
         // Parallelize: Fetch employee, logs, holidays, and leave requests
         const shouldIncludeHolidays = includeHolidays === 'true' || includeHolidays === true;
-        const [employee, logs, holidays, leaveRequests] = await Promise.all([
+        const [employee, logs, holidays, leaveRequestsMap] = await Promise.all([
             // Fetch employee to get Saturday policy
             User.findById(targetUserId).select('alternateSaturdayPolicy').lean(),
             // Fetch attendance logs for date range
@@ -1150,18 +1148,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 }).sort({ date: 1 }).lean();
                 return holidays;
             })() : Promise.resolve([]),
-            // Fetch all approved leave requests for the date range
-            // LeaveRequest uses leaveDates array, so we need to check if any leaveDate falls within range
-            LeaveRequest.find({
-                user: new mongoose.Types.ObjectId(targetUserId),
-                status: 'Approved',
-                leaveDates: {
-                    $elemMatch: {
-                        $gte: parseISTDate(startDate),
-                        $lte: parseISTDate(endDate + 'T23:59:59+05:30')
-                    }
-                }
-            }).sort({ createdAt: 1 }).lean()
+            // PERFORMANCE OPTIMIZATION: Use batched leave fetching with caching
+            batchFetchLeaves(targetUserId, startDate, endDate)
         ]);
 
         // Get Saturday policy (from User.alternateSaturdayPolicy field)
@@ -1184,21 +1172,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
             logsMap.set(log.attendanceDate, log);
         });
 
-        const leaveRequestsMap = new Map();
-        leaveRequests.forEach(leave => {
-            // LeaveRequest model uses leaveDates array (not startDate/endDate)
-            if (Array.isArray(leave.leaveDates) && leave.leaveDates.length > 0) {
-                leave.leaveDates.forEach(leaveDate => {
-                    const leaveDateStr = getISTDateString(leaveDate);
-                    if (leaveDateStr >= startDate && leaveDateStr <= endDate) {
-                        // If multiple leaves overlap, keep the first one (or most recent)
-                        if (!leaveRequestsMap.has(leaveDateStr)) {
-                            leaveRequestsMap.set(leaveDateStr, leave);
-                        }
-                    }
-                });
-            }
-        });
+        // leaveRequestsMap is already a Map from batchFetchLeaves
 
         // Process each date in the range and resolve status
         const resolvedLogs = dateRange.map(attendanceDate => {

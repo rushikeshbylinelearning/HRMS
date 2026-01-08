@@ -78,17 +78,28 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     const [overrideModalOpen, setOverrideModalOpen] = useState(false);
     const [overrideReason, setOverrideReason] = useState('');
     const [isOverriding, setIsOverriding] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        if (log) {
-            const newEditableLog = JSON.parse(JSON.stringify(log));
-            newEditableLog.sessions = (newEditableLog.sessions || []).map(s => ({ ...s, _id: s._id || uuidv4() }));
-            newEditableLog.breaks = (Array.isArray(newEditableLog.breaks) ? newEditableLog.breaks : []).map(b => ({ ...b, _id: b._id || uuidv4() }));
-            setEditableLog(newEditableLog);
-        }
         if (open) {
-            if (isAdmin) setAdminView('view');
+            setIsLoading(true);
             setLocalError('');
+            
+            if (log) {
+                const newEditableLog = JSON.parse(JSON.stringify(log));
+                newEditableLog.sessions = (newEditableLog.sessions || []).map(s => ({ ...s, _id: s._id || uuidv4() }));
+                newEditableLog.breaks = (Array.isArray(newEditableLog.breaks) ? newEditableLog.breaks : []).map(b => ({ ...b, _id: b._id || uuidv4() }));
+                setEditableLog(newEditableLog);
+            } else {
+                setEditableLog(null);
+            }
+            
+            if (isAdmin) setAdminView('view');
+            
+            // Small delay to prevent flicker
+            setTimeout(() => setIsLoading(false), 100);
+        } else {
+            setIsLoading(false);
         }
     }, [log, open, isAdmin]);
 
@@ -102,6 +113,26 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     // Allow modal to open even without log if there's holiday or leave info
     if (!date) return null;
     if (!log && !holiday && !leave) return null;
+    
+    // PERFORMANCE OPTIMIZATION: Show loading state to prevent flicker
+    if (isLoading) {
+        return (
+            <Dialog 
+                open={open} 
+                onClose={onClose} 
+                maxWidth="lg"
+                fullWidth
+                PaperProps={{
+                    className: 'log-detail-modal-paper'
+                }}
+            >
+                <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+                    <CircularProgress />
+                </DialogContent>
+            </Dialog>
+        );
+    }
+    
     if (log && !editableLog) return null;
 
     const fullDateStr = date.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });

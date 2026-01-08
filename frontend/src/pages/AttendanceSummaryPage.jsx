@@ -52,6 +52,8 @@ const AttendanceSummaryPage = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '' });
     const [viewMode, setViewMode] = useState('timeline');
     const [notesModal, setNotesModal] = useState({ open: false, logId: null, notes: '', date: '' });
+    // Track data freshness for debugging (internal only - not displayed to users)
+    const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
     const fetchLogsForWeekRef = useRef(null);
     
@@ -91,6 +93,8 @@ const AttendanceSummaryPage = () => {
             
             setLogs(fetchedLogs);
             setHolidays(fetchedHolidays);
+            // Update freshness timestamp when fresh data is received
+            setLastUpdatedAt(Date.now());
 
         } catch (err) {
             setError('Failed to fetch attendance summary.');
@@ -132,6 +136,8 @@ const AttendanceSummaryPage = () => {
         };
 
         const handleAttendanceUpdate = (data) => {
+            // Verify event belongs to logged-in employee
+            // Handles both regular attendance and admin overrides (both emit attendance_log_updated)
             const isRelevantUpdate = (
                 data.userId?.toString() === user.id?.toString() ||
                 data.userId?.toString() === user._id?.toString() ||
@@ -140,6 +146,8 @@ const AttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
+                // Refetch to get latest data from backend (includes admin overrides)
+                // Backend is single source of truth - we trust its resolved status
                 if (fetchLogsForWeekRef.current) {
                     fetchLogsForWeekRef.current(currentDate).catch(err => {
                         console.error('Failed to refresh after attendance update:', err);
@@ -503,8 +511,6 @@ const AttendanceSummaryPage = () => {
                         logs={logs}
                         currentDate={currentDate}
                         onDayClick={handleDayClick}
-                        holidays={holidays}
-                        saturdayPolicy={user?.alternateSaturdayPolicy || 'All Saturdays Working'}
                     />
                 )}
             </div>

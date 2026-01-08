@@ -27,6 +27,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import LeaveRequestForm from '../components/LeaveRequestForm';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
+import { normalizeEmploymentType } from '../utils/leaveTypePolicy';
 import socket from '../socket';
 import '../styles/LeavesPage.css';
 import { CardSkeleton, TableSkeleton } from '../components/SkeletonLoaders';
@@ -54,6 +55,8 @@ const ContentCard = ({ title, children }) => (
 
 const LeavesPage = () => {
     const { user } = useAuth();
+    const employeeType = normalizeEmploymentType(user?.employmentStatus);
+    const isPermanentEmployee = employeeType === 'PERMANENT';
     const [myRequests, setMyRequests] = useState([]);
     const [leaveBalances, setLeaveBalances] = useState({ paid: 0, sick: 0, casual: 0 });
     const [holidays, setHolidays] = useState([]);
@@ -479,7 +482,7 @@ const LeavesPage = () => {
                     <Button className="apply-leave-button" onClick={handleOpenModal} startIcon={<AddCircleOutlineIcon />}>
                         Apply Leave
                     </Button>
-                    {yearEndFeatureEnabled && user?.employmentStatus === 'Permanent' && (
+                    {yearEndFeatureEnabled && isPermanentEmployee && (
                         <IconButton
                             onClick={(e) => {
                                 setYearEndMenuAnchor(e.currentTarget);
@@ -522,23 +525,25 @@ const LeavesPage = () => {
             </Menu>
 
             {/* Balance Boxes - Small Rounded Boxes */}
-            <Box className="balance-grid">
-                <BalanceBox 
-                    title="Sick Leave" 
-                    balance={leaveBalances.sick} 
-                    icon={<SickIcon className="balance-icon" />}
-                />
-                <BalanceBox 
-                    title="Casual Leave" 
-                    balance={leaveBalances.casual} 
-                    icon={<WorkOutlineIcon className="balance-icon" />}
-                />
-                <BalanceBox 
-                    title="Planned Leave" 
-                    balance={leaveBalances.paid} 
-                    icon={<BeachAccessIcon className="balance-icon" />}
-                />
-            </Box>
+            {isPermanentEmployee && (
+                <Box className="balance-grid">
+                    <BalanceBox 
+                        title="Sick Leave" 
+                        balance={leaveBalances.sick} 
+                        icon={<SickIcon className="balance-icon" />}
+                    />
+                    <BalanceBox 
+                        title="Casual Leave" 
+                        balance={leaveBalances.casual} 
+                        icon={<WorkOutlineIcon className="balance-icon" />}
+                    />
+                    <BalanceBox 
+                        title="Planned Leave" 
+                        balance={leaveBalances.paid} 
+                        icon={<BeachAccessIcon className="balance-icon" />}
+                    />
+                </Box>
+            )}
 
             {/* Carryforward/Encashment Section */}
             {carryforwardStatus && carryforwardStatus.hasPendingDecision && (
@@ -1242,7 +1247,7 @@ const LeavesPage = () => {
                                 Year-End Leave Actions Unavailable
                             </Typography>
                             <Typography variant="body2">
-                                {user?.employmentStatus !== 'Permanent' 
+                                {!isPermanentEmployee 
                                     ? 'Year-End Leave requests are only available for permanent employees.'
                                     : 'Year-End Leave actions are currently disabled by Admin.'}
                             </Typography>

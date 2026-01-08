@@ -11,6 +11,8 @@ const {
     PAID_BREAK_ALLOWANCE_MINUTES,
     calculateRequiredLogoutTime 
 } = require('../config/shiftPolicy');
+const { getGracePeriod } = require('./gracePeriodCache');
+const { getStatus, setStatus } = require('./statusCache');
 
 const DEFAULT_OPTIONS = {
     includeSessions: true,
@@ -42,25 +44,14 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
     const shiftStartTime = getShiftDateTimeIST(clockIn, shift.startTime);
     const lateMinutes = Math.max(0, Math.floor((clockIn - shiftStartTime) / (1000 * 60)));
 
-    // Get grace period from settings if not provided
+    // Get grace period from cache if not provided
     let GRACE_PERIOD_MINUTES = gracePeriodMinutes;
     if (GRACE_PERIOD_MINUTES === null || GRACE_PERIOD_MINUTES === undefined) {
         try {
-            const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-            if (graceSetting) {
-                // FIX: Explicitly convert to integer to ensure type consistency
-                const graceValue = parseInt(Number(graceSetting.value), 10);
-                if (!isNaN(graceValue) && graceValue >= 0) {
-                    GRACE_PERIOD_MINUTES = graceValue;
-                } else {
-                    console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
-                    GRACE_PERIOD_MINUTES = 30; // Default
-                }
-            } else {
-                GRACE_PERIOD_MINUTES = 30; // Default
-            }
+            // Use cached grace period (1-hour TTL, safe fallback)
+            GRACE_PERIOD_MINUTES = await getGracePeriod();
         } catch (err) {
-            console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
+            console.error('Failed to fetch grace period from cache, falling back to 30 minutes', err);
             GRACE_PERIOD_MINUTES = 30;
         }
     }
@@ -303,6 +294,13 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
 
 const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     const resolvedOptions = { ...DEFAULT_OPTIONS, ...options };
+    
+    // PERFORMANCE OPTIMIZATION: Check cache first (60-second TTL)
+    const cachedStatus = getStatus(userId, targetDate);
+    if (cachedStatus) {
+        return cachedStatus;
+    }
+    
     const response = buildBaseResponse(resolvedOptions);
 
     // PHASE 2 OPTIMIZATION: Parallelize independent queries
@@ -489,6 +487,12 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     } else {
         response.calculatedLogoutTime = null;
         response.logoutBreakdown = null;
+    }
+
+    // PERFORMANCE OPTIMIZATION: Cache the response (60-second TTL)
+    // Don't cache if admin override exists - these should always be fresh
+    if (!response.attendanceLog?.overriddenByAdmin) {
+        setStatus(userId, targetDate, response);
     }
 
     return response;

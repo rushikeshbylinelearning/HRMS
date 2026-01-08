@@ -20,6 +20,8 @@ const Setting = require('../models/Setting');
 const NewNotificationService = require('../services/NewNotificationService');
 const { getUserDailyStatus, recalculateLateStatus } = require('../services/dailyStatusService');
 const { syncAttendanceOnLeaveApproval, syncAttendanceOnLeaveRejection } = require('../services/leaveAttendanceSyncService');
+const { invalidateUserLeaves } = require('../services/leaveCache');
+const { invalidateStatus, invalidateUserStatus } = require('../services/statusCache');
 
 // Middleware to check for Admin/HR role
 const isAdminOrHr = async (req, res, next) => {
@@ -437,25 +439,33 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         const newStatus = req.body.status;
         // oldStatus is already declared above
 
-        // PHASE 7: STRICT POLICY ENFORCEMENT AT APPROVAL
+        // PHASE 7: ADMIN OVERRIDE POLICY ENFORCEMENT
         if (newStatus === 'Approved') {
             // Validate against Central Policy Engine
-            // We pass 'overrideReason' (from req.body) to allow admins to bypass blocks if they provided a reason.
+            // Admin can override with mandatory reason
             const policyCheck = await LeavePolicyService.validateRequest(
                 request.employee,
                 request.leaveDates,
                 request.requestType,
                 request.leaveType,
-                overrideReason
+                overrideReason // Admin override reason
             );
 
-            if (!policyCheck.allowed) {
+            if (!policyCheck.allowed && !overrideReason) {
                 await session.abortTransaction();
                 return res.status(400).json({
-                    error: `Policy Violation: ${policyCheck.reason}`,
+                    error: `Policy Violation: ${policyCheck.reason}. Admin override reason required.`,
                     rule: policyCheck.rule,
                     requiresOverride: true
                 });
+            }
+
+            // If admin provided override reason, log it and allow
+            if (!policyCheck.allowed && overrideReason) {
+                request.adminOverride = true;
+                request.overrideReason = overrideReason;
+                request.overriddenBy = req.user.userId;
+                request.overriddenAt = new Date();
             }
         }
 
@@ -565,6 +575,10 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         }
 
         await session.commitTransaction();
+
+        // PERFORMANCE OPTIMIZATION: Invalidate caches after leave status change
+        invalidateUserLeaves(request.employee.toString());
+        invalidateUserStatus(request.employee.toString());
 
         NewNotificationService.notifyLeaveResponse(request.employee, employee.fullName, newStatus, request.requestType, request.rejectionNotes)
             .catch(err => console.error('Error sending leave response notification:', err));
@@ -2306,20 +2320,16 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
             const { getIO } = require('../socketManager');
             const io = getIO();
             if (io) {
-                // Emit to all connected clients
+                // PERFORMANCE OPTIMIZATION: Minimal payload for real-time updates
                 io.emit('attendance_log_updated', {
                     logId: log._id,
                     userId: log.user,
                     attendanceDate: log.attendanceDate,
                     attendanceStatus: log.attendanceStatus,
                     isHalfDay: log.isHalfDay,
-                    isLate: log.isLate,
-                    totalWorkingHours: log.totalWorkingHours,
-                    clockInTime: log.clockInTime,
-                    clockOutTime: log.clockOutTime,
-                    updatedBy: req.user.userId,
+                    halfDayReasonText: log.halfDayReasonText,
                     timestamp: new Date().toISOString(),
-                    message: `Attendance log updated by admin - Working hours: ${log.totalWorkingHours.toFixed(2)}h`
+                    message: `Attendance log updated by admin`
                 });
                 console.log(`📡 Emitted attendance_log_updated event for log ${log._id}`);
             }
@@ -2339,6 +2349,8 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (re
         const cacheService = require('../services/cacheService');
         cacheService.invalidateAttendance(log.user, log.attendanceDate);
         cacheService.invalidateDashboard(log.attendanceDate);
+        // PERFORMANCE OPTIMIZATION: Invalidate status cache
+        invalidateStatus(log.user.toString(), log.attendanceDate);
 
         const response = {
             success: true,

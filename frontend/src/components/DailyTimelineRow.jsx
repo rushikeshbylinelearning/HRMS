@@ -1,5 +1,5 @@
 // src/components/DailyTimelineRow.jsx - IST-ENFORCED, BACKEND-DRIVEN
-import React, { Fragment, useState, useEffect, useRef, useMemo } from 'react';
+import React, { Fragment, useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Typography, Box, Chip } from '@mui/material';
 import dayjs from 'dayjs';
 import { 
@@ -620,4 +620,5 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
     );
 };
 
-export default DailyTimelineRow;
+// PERFORMANCE OPTIMIZATION: Memoize component to prevent unnecessary re-renders
+export default memo(DailyTimelineRow);

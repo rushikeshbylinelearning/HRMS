@@ -5,9 +5,7 @@ const leaveRequestSchema = new mongoose.Schema({
     employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     requestType: {
         type: String,
-        // --- START OF FIX: Added 'Casual' to the enum ---
-        enum: ['Planned', 'Sick', 'Loss of Pay', 'Compensatory', 'Backdated Leave', 'Casual', 'YEAR_END'],
-        // --- END OF FIX ---
+        enum: ['Planned', 'Sick', 'Loss of Pay', 'Compensatory', 'Backdated Leave', 'Casual', 'YEAR_END', 'Comp-Off'],
         required: true,
     },
     leaveType: {

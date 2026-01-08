@@ -1,5 +1,5 @@
 // src/components/AttendanceCalendar.jsx - IST-ENFORCED, BACKEND-DRIVEN
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import { Typography, Box } from '@mui/material';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { 
@@ -16,7 +16,145 @@ import {
 } from '../utils/attendanceRenderUtils';
 import '../styles/AttendanceCalendar.css';
 
-const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], saturdayPolicy = 'All Saturdays Working' }) => {
+// Memoized calendar day cell component to prevent unnecessary re-renders
+// Only re-renders when day-specific props change (status, log, etc.)
+const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
+    const isFutureDate = day.date > getISTNow() && !day.log && day.status !== 'holiday' && day.status !== 'leave' && day.status !== 'weekend' && day.status !== 'week-off';
+    const hasNoAttendanceData = !day.log || !day.log.sessions || day.log.sessions.length === 0;
+    const isNotHolidayOrLeave = !day.status || (!day.status.startsWith('holiday') && !day.status.startsWith('leave') && day.status !== 'comp-off' && day.status !== 'swap-leave');
+    const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave);
+
+    // Determine if this is a half-day leave for UI rendering (UI-only; backend remains source of truth)
+    const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
+    const leaveTypeText = day.log?.leaveInfo?.requestType
+        ? formatLeaveRequestType(day.log.leaveInfo.requestType)
+        : leave?.requestType
+            ? formatLeaveRequestType(leave.requestType)
+            : 'Leave';
+
+    const lateMinutes = Number(day.log?.lateMinutes || 0);
+    const isLateHalfDay = day.status === 'half-day' && lateMinutes > 0;
+
+    const dayData = {
+        log: day.log,
+        date: day.date,
+        status: day.status,
+        holiday,
+        leave,
+        hoursWorked: day.hoursWorked
+    };
+
+    return (
+        <div 
+            className={`calendar-day ${day.status} ${day.isToday ? 'today' : ''} ${!day.isCurrentMonth ? 'other-month' : ''} ${!isClickable ? 'non-clickable' : ''}`}
+            onClick={isClickable ? () => onDayClick(dayData) : undefined}
+        >
+            <div className="day-number-wrapper">
+                <div className="day-number">{day.dayNumber}</div>
+            </div>
+            
+            {day.status === 'present' && (
+                <div className="attendance-status present">
+                    <div className="status-label">Present</div>
+                    <div className="hours-worked">{day.hoursWorked}</div>
+                </div>
+            )}
+            
+            {day.status === 'half-day' && (
+                <div className="attendance-status half-day">
+                    {day.hoursWorked && (
+                        <div className="status-meta status-meta-top">{day.hoursWorked}</div>
+                    )}
+                    <div className="status-badge">Half Day</div>
+                    {isLateHalfDay ? (
+                        <>
+                            <div className="status-primary">Late Arrival</div>
+                            <div className="status-secondary">Late by {lateMinutes} minutes</div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="status-primary">Half Day</div>
+                            {day.log?.halfDayReason && (
+                                <div className="status-secondary">{day.log.halfDayReason}</div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+            
+            {day.status === 'absent' && (
+                <div className="attendance-status absent">
+                    <div className="status-label">Absent</div>
+                </div>
+            )}
+            
+            {day.status === 'weekend' && (
+                <div className="attendance-status weekend">
+                    <div className="status-label">Weekend</div>
+                </div>
+            )}
+            
+            {day.status === 'week-off' && (
+                <div className="attendance-status week-off">
+                    <div className="status-label">Week Off</div>
+                </div>
+            )}
+            
+            {day.status === 'working-day' && (
+                <div className="attendance-status working-day">
+                    <div className="status-label">Working Day</div>
+                </div>
+            )}
+            
+            {day.status === 'holiday' && (
+                <div className="attendance-status holiday">
+                    <div className="holiday-name">{holiday?.name}</div>
+                </div>
+            )}
+            
+            {day.status === 'leave' && (
+                <div className={`attendance-status leave ${isHalfDayLeave ? 'half-day-leave' : 'full-day-leave'}`} title={leave?.reason || ''}>
+                    {/* Half-day leave: keep badge, move leave type into the translucent secondary box (no "Applied leave") */}
+                    {isHalfDayLeave ? (
+                        <>
+                            {day.hoursWorked && (
+                                <div className="status-meta status-meta-top">{day.hoursWorked}</div>
+                            )}
+                            <div className="status-badge">Half Day</div>
+                            <div className="status-secondary">Leave — {leaveTypeText}</div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Full-day leave: remove redundant top "Leave" text */}
+                            <div className="status-primary">Full Day</div>
+                            <div className="status-secondary">Leave — {leaveTypeText}</div>
+                        </>
+                    )}
+                </div>
+            )}
+            
+            {day.status === 'comp-off' && (
+                <div className="attendance-status comp-off">
+                    <div className="status-label">⚙️ Comp Off</div>
+                    <div className="comp-off-type">Comp Off</div>
+                </div>
+            )}
+            
+            {day.status === 'swap-leave' && (
+                <div className="attendance-status swap-leave">
+                    <div className="status-label">🔁 Swap Leave</div>
+                    <div className="swap-leave-type">Swap Leave</div>
+                </div>
+            )}
+        </div>
+    );
+});
+
+DayCell.displayName = 'DayCell';
+
+// Status resolution is backend-driven; calendar only renders resolved data.
+// All status logic (holidays, weekly offs, leaves, attendance) is determined by backend API.
+const AttendanceCalendar = ({ logs, currentDate, onDayClick }) => {
     
     // Generate calendar data for the current month in IST
     const calendarData = useMemo(() => {
@@ -26,17 +164,21 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], satu
         
         // Get first day of month and last day of month in IST
         const firstDay = parseISTDate(`${year}-${String(parts.month).padStart(2, '0')}-01`);
+        // Note: new Date(year, monthIndex + 1, 0) uses browser timezone temporarily
+        // This is immediately converted to IST string and parsed back for safety
         const lastDay = new Date(year, monthIndex + 1, 0);
         const lastDayIST = parseISTDate(getISTDateString(lastDay));
         
         // Get first Sunday of the calendar view in IST
         const firstDayWeekday = firstDay.getDay();
+        // Temporary Date object for calculation - immediately converted to IST
         const startDate = new Date(firstDay);
         startDate.setDate(startDate.getDate() - firstDayWeekday);
         const startDateIST = parseISTDate(getISTDateString(startDate));
         
         // Get last Saturday of the calendar view in IST
         const lastDayWeekday = lastDayIST.getDay();
+        // Temporary Date object for calculation - immediately converted to IST
         const endDate = new Date(lastDayIST);
         endDate.setDate(endDate.getDate() + (6 - lastDayWeekday));
         const endDateIST = parseISTDate(getISTDateString(endDate));
@@ -47,8 +189,11 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], satu
         const todayStr = getISTDateString(todayIST);
         
         // Iterate through calendar days in IST
+        // Start with IST date, but use temporary Date for iteration
+        // Each iteration converts to IST string then parses back to ensure IST correctness
         let current = new Date(startDateIST);
         while (current <= endDateIST) {
+            // CRITICAL: Convert to IST string then parse to ensure IST timezone
             const currentIST = parseISTDate(getISTDateString(current));
             const dateKey = getISTDateString(currentIST);
             const log = logMap.get(dateKey);
@@ -75,6 +220,11 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], satu
                     status = 'swap-leave';
                 } else if (statusInfo.status.startsWith('Leave -') || statusInfo.status === 'Leave' || statusInfo.status === 'On Leave') {
                     status = 'leave';
+                    // UI-only: if backend indicates a half-day leave and provides worked minutes, display it (no recalculation)
+                    const isHalfDayLeave = log?.leaveInfo?.leaveType && String(log.leaveInfo.leaveType).startsWith('Half Day');
+                    if (isHalfDayLeave && log?.totalWorkedMinutes) {
+                        hoursWorked = formatDuration(log.totalWorkedMinutes) + ' Hrs';
+                    }
                 } else if (statusInfo.status === 'Weekly Off' || statusInfo.status === 'Week Off' || statusInfo.status === 'Day Off') {
                     status = 'week-off';
                 } else if (statusInfo.status === 'Weekend') {
@@ -130,7 +280,7 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], satu
         }
         
         return days;
-    }, [logs, currentDate]); // Removed holidays and saturdayPolicy - backend handles all
+    }, [logs, currentDate]); // Backend provides all resolved status data - no local props needed
 
     const monthName = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Kolkata',
@@ -157,131 +307,15 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick, holidays = [], satu
                 </div>
                 
                 <div className="calendar-days">
-                    {calendarData.map((day, index) => {
-                        const isFutureDate = day.date > getISTNow() && !day.log && day.status !== 'holiday' && day.status !== 'leave' && day.status !== 'weekend' && day.status !== 'week-off';
-                        const hasNoAttendanceData = !day.log || !day.log.sessions || day.log.sessions.length === 0;
-                        const isNotHolidayOrLeave = !day.status || (!day.status.startsWith('holiday') && !day.status.startsWith('leave') && day.status !== 'comp-off' && day.status !== 'swap-leave');
-                        const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave);
-
-                        const holiday = day.holiday;
-                        const leave = day.leave;
-                        const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
-                        const leaveInitial = leave ? (isHalfDayLeave ? 'HF' : 'FF') : null;
-
-                        const dayData = {
-                            log: day.log,
-                            date: day.date,
-                            status: day.status,
-                            holiday,
-                            leave,
-                            hoursWorked: day.hoursWorked
-                        };
-                        
-                        return (
-                            <div 
-                                key={index}
-                                className={`calendar-day ${day.status} ${day.isToday ? 'today' : ''} ${!day.isCurrentMonth ? 'other-month' : ''} ${!isClickable ? 'non-clickable' : ''}`}
-                                onClick={isClickable ? () => onDayClick(dayData) : undefined}
-                            >
-                                <div className={`day-number-wrapper ${leaveInitial ? 'has-leave' : ''}`}>
-                                    <div className="day-number">{day.dayNumber}</div>
-                                    {leaveInitial && (
-                                        <span className={`leave-initial-chip ${isHalfDayLeave ? 'half-day' : 'full-day'}`}>
-                                            {leaveInitial}
-                                        </span>
-                                    )}
-                                </div>
-                                
-                                {day.status === 'present' && (
-                                    <div className="attendance-status present">
-                                        <div className="status-label">Present</div>
-                                        <div className="hours-worked">{day.hoursWorked}</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'half-day' && (
-                                    <div className="attendance-status half-day">
-                                        <div className="status-label">Half Day</div>
-                                        {day.log?.halfDayReason && (
-                                            <div className="half-day-reason" style={{ 
-                                                fontSize: '0.65rem', 
-                                                color: '#666',
-                                                marginTop: '2px',
-                                                padding: '0 4px',
-                                                maxWidth: '100%',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
-                                            }} title={day.log.halfDayReason}>
-                                                {day.log.halfDayReason}
-                                            </div>
-                                        )}
-                                        {day.hoursWorked && (
-                                            <div className="hours-worked">{day.hoursWorked}</div>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                {day.status === 'absent' && (
-                                    <div className="attendance-status absent">
-                                        <div className="status-label">Absent</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'weekend' && (
-                                    <div className="attendance-status weekend">
-                                        <div className="status-label">Weekend</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'week-off' && (
-                                    <div className="attendance-status week-off">
-                                        <div className="status-label">Week Off</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'working-day' && (
-                                    <div className="attendance-status working-day">
-                                        <div className="status-label">Working Day</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'holiday' && (
-                                    <div className="attendance-status holiday">
-                                        <div className="status-label">Holiday</div>
-                                        <div className="holiday-name">{holiday?.name}</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'leave' && (
-                                    <div className="attendance-status leave">
-                                        <div className="status-label">Leave</div>
-                                        <div className="leave-type">
-                                            {day.log?.leaveInfo?.requestType 
-                                                ? formatLeaveRequestType(day.log.leaveInfo.requestType)
-                                                : leave?.requestType 
-                                                    ? formatLeaveRequestType(leave.requestType)
-                                                    : 'Leave'}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'comp-off' && (
-                                    <div className="attendance-status comp-off">
-                                        <div className="status-label">⚙️ Comp Off</div>
-                                        <div className="comp-off-type">Comp Off</div>
-                                    </div>
-                                )}
-                                
-                                {day.status === 'swap-leave' && (
-                                    <div className="attendance-status swap-leave">
-                                        <div className="status-label">🔁 Swap Leave</div>
-                                        <div className="swap-leave-type">Swap Leave</div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                    {calendarData.map((day, index) => (
+                        <DayCell
+                            key={day.log?.attendanceDate || `day-${index}`}
+                            day={day}
+                            onDayClick={onDayClick}
+                            holiday={day.holiday}
+                            leave={day.leave}
+                        />
+                    ))}
                 </div>
             </div>
         </div>
