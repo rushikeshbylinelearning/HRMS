@@ -1,5 +1,6 @@
 /**
  * Utility functions for handling Saturday policies and attendance status
+ * Frontend display only - all policy logic handled by backend
  */
 
 /**

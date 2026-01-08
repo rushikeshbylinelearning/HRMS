@@ -183,16 +183,6 @@ router.post('/request', authenticateToken, async (req, res) => {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
-        // Restrict certain leave types for employees on probation
-        // Probation employees may apply only for Loss of Pay or Compensatory leaves
-        const isProbation = employee.employmentStatus === 'Probation';
-        const restrictedForProbation = ['Planned', 'Sick', 'Casual'];
-        if (isProbation && restrictedForProbation.includes(requestType)) {
-            return res.status(403).json({ 
-                error: 'You are currently on probation. Only Loss of Pay or Compensatory leave is allowed.' 
-            });
-        }
-
         // Convert string dates to Date objects (parse as IST)
         const leaveDatesArray = leaveDates.map(date => parseISTDate(date));
 

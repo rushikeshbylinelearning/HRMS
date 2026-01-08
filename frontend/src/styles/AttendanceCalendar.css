@@ -107,30 +107,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   width: 100%;
 }
 
-.leave-initial-chip {
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 999px;
-  border: 1px solid;
-  letter-spacing: 0.5px;
-}
-
-.leave-initial-chip.full-day {
-  background-color: #e3f2fd;
-  border-color: #64b5f6;
-  color: #0d47a1;
-}
-
-.leave-initial-chip.half-day {
-  background-color: #fff3cd;
-  border-color: #ffc107;
-  color: #856404;
-}
+/* Removed leave-initial-chip (HF/FF) - using full text in status badge for clarity */
 
 .attendance-status {
   width: 100%;
@@ -140,6 +120,11 @@
   font-size: 0.75rem;
   font-weight: 600;
   margin-top: auto;
+  /* Unified card layout (UI-only): consistent hierarchy across half-day/leave variants */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.25rem;
 }
 
 .attendance-status.present {
@@ -201,6 +186,46 @@
   margin-bottom: 0.25rem;
 }
 
+/* Calendar card typography helpers (used by half-day + leave variants) */
+.status-badge {
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.status-primary {
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.status-secondary {
+  font-weight: 600;
+  font-size: 0.62rem;
+  line-height: 1.25;
+  color: rgba(0, 0, 0, 0.72);
+  padding: 2px 4px;
+  background-color: rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.status-meta {
+  margin-top: auto;
+  font-weight: 700;
+  font-size: 0.62rem;
+  line-height: 1.1;
+  text-align: right;
+  opacity: 0.95;
+}
+
+/* Variant: meta shown at the top of the card (used by half-day leave) */
+.status-meta-top {
+  margin-top: 0;
+  margin-bottom: 0.1rem;
+}
+
 .attendance-status.absent .status-label {
   color: #721c24;
 }
@@ -229,6 +254,27 @@
   color: #e65100;
 }
 
+/* State-specific colors for unified card fields */
+.attendance-status.half-day .status-badge,
+.attendance-status.half-day .status-primary,
+.attendance-status.half-day .status-meta {
+  color: #e65100;
+}
+
+.attendance-status.leave .status-badge,
+.attendance-status.leave .status-primary,
+.attendance-status.leave .status-meta {
+  color: #0d47a1;
+}
+
+/* Half-day leave: orange text for emphasis (UI-only) */
+.attendance-status.leave.half-day-leave .status-badge,
+.attendance-status.leave.half-day-leave .status-primary,
+.attendance-status.leave.half-day-leave .status-secondary,
+.attendance-status.leave.half-day-leave .status-meta {
+  color: #e65100;
+}
+
 .attendance-status.comp-off .status-label {
   color: #1976d2;
 }
@@ -245,6 +291,27 @@
 
 .attendance-status.half-day .hours-worked {
   color: #e65100;
+  margin-top: 0.3rem;
+}
+
+/* Half-day reason text - improved visibility and spacing */
+.attendance-status.half-day .half-day-reason {
+  font-size: 0.65rem;
+  color: #424242;
+  margin-top: 0.3rem;
+  padding: 0 4px;
+  max-width: 100%;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-height: 1.2em;
+}
+
+/* Ensure text is fully visible with good contrast */
+.attendance-status.half-day .half-day-reason {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  padding: 2px 4px;
 }
 
 .holiday-name, .leave-type {
@@ -258,6 +325,47 @@
   color: #0d47a1;
 }
 
+/* Holiday name: show full text (no truncation) and render in uppercase */
+.attendance-status.holiday .holiday-name {
+  text-transform: uppercase;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.2;
+  font-size: 0.62rem; /* slightly smaller to fit longer holiday names */
+}
+
+/* Leave Half-Day styling - matches Late Half-Day structure */
+.attendance-status.leave.half-day-leave {
+  /* Half-day leave uses Leave (blue) palette but same typography/layout as half-day card */
+  background-color: #bbdefb;
+  border: 1px solid #90caf9;
+}
+
+.attendance-status.leave.half-day-leave .status-label {
+  color: #0d47a1;
+}
+
+.leave-type-half-day {
+  color: #424242;
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-top: 0.3rem;
+  padding: 2px 4px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.attendance-status.leave.half-day-leave .hours-worked {
+  color: #e65100;
+  margin-top: 0.3rem;
+}
+
 .comp-off-type {
   color: #1976d2;
 }
@@ -268,8 +376,13 @@
 
 /* Half Day Leave Styling */
 .attendance-status.leave.half-day-leave {
-  border: 2px dashed #ff9800;
-  border-top: 2px solid #ff9800;
+  /* Ensure no dashed border for half-day leave to keep consistent Leave styling */
+  border: 1px solid #90caf9;
+}
+
+.attendance-status.leave.full-day-leave {
+  background-color: #bbdefb;
+  border: 1px solid #90caf9;
 }
 
 .leave-half-day-badge {

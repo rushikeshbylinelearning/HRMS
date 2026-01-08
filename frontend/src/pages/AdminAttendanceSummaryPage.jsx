@@ -54,6 +54,8 @@ const AdminAttendanceSummaryPage = () => {
     const [now, setNow] = useState(getISTNow());
     const [viewMode, setViewMode] = useState('timeline');
     const [holidays, setHolidays] = useState([]);
+    // Track data freshness for debugging (internal only - not displayed to users)
+    const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
     
     // Note: selectedHoliday and selectedLeave are used for modal display - kept for UI purposes
 
@@ -157,6 +159,8 @@ const AdminAttendanceSummaryPage = () => {
             });
             
             setLogs(processedLogs);
+            // Update freshness timestamp when fresh data is received
+            setLastUpdatedAt(Date.now());
 
         } catch (err) {
             setError('Failed to fetch attendance summary for the selected employee.');
@@ -173,6 +177,55 @@ const AdminAttendanceSummaryPage = () => {
             setLogs([]);
         }
     }, [currentDate, selectedEmployeeId, fetchLogsForWeek]);
+
+    // Real-time sync: Listen for attendance and leave updates
+    // Backend emits these events when attendance is logged, edited, or leave status changes
+    useEffect(() => {
+        if (!selectedEmployeeId) return;
+
+        // Handle attendance log updates (clock-in, clock-out, admin overrides)
+        const handleAttendanceUpdate = (data) => {
+            // Verify event belongs to currently selected employee
+            const isRelevantUpdate = (
+                data.userId?.toString() === selectedEmployeeId ||
+                data.userId?.toString() === selectedEmployeeId.toString()
+            );
+
+            if (isRelevantUpdate) {
+                // Refetch data to get latest status from backend
+                // Backend is single source of truth - we don't mutate logs directly
+                fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
+                    console.error('Failed to refresh after attendance update:', err);
+                });
+            }
+        };
+
+        // Handle leave request updates (approval, rejection, date changes)
+        const handleLeaveUpdate = (data) => {
+            // Verify event belongs to currently selected employee
+            const isRelevantUpdate = (
+                data.employeeId?.toString() === selectedEmployeeId ||
+                data.employeeId?.toString() === selectedEmployeeId.toString()
+            );
+
+            if (isRelevantUpdate) {
+                // Refetch data to get updated leave status resolution from backend
+                fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
+                    console.error('Failed to refresh after leave update:', err);
+                });
+            }
+        };
+
+        // Register socket listeners
+        socket.on('attendance_log_updated', handleAttendanceUpdate);
+        socket.on('leave_request_updated', handleLeaveUpdate);
+
+        // Cleanup on unmount or when dependencies change
+        return () => {
+            socket.off('attendance_log_updated', handleAttendanceUpdate);
+            socket.off('leave_request_updated', handleLeaveUpdate);
+        };
+    }, [selectedEmployeeId, currentDate, fetchLogsForWeek]);
 
     const handleWeekChange = (direction) => {
         setCurrentDate(prevDate => {
@@ -394,8 +447,6 @@ const AdminAttendanceSummaryPage = () => {
                     logs={logs}
                     currentDate={currentDate}
                     onDayClick={handleDayClick}
-                    holidays={holidays}
-                    saturdayPolicy={selectedEmployeeObject?.alternateSaturdayPolicy || 'All Saturdays Working'}
                 />
             );
         }

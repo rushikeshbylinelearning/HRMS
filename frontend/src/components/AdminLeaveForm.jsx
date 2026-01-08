@@ -3,13 +3,14 @@ import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
     Select, MenuItem, InputLabel, FormControl, CircularProgress, Stack, Divider, Box, Typography,
-    Autocomplete
+    Autocomplete, IconButton, Avatar
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import CloseIcon from '@mui/icons-material/Close'; // UI unified with Employee Leave Modal
 
 const initialFormState = {
     employee: '',
@@ -77,56 +78,57 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
             PaperProps={{ 
                 sx: { 
                     borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
+                    width: '580px',
+                    maxHeight: '80vh',
+                    backgroundColor: '#FFFFFF',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #E5E7EB',
+                    overflow: 'hidden' // Keep overflow hidden on the container
                 } 
             }}
         >
-            {/* Header */}
+            {/* redesigned header UI – neutral theme */}
             <DialogTitle sx={{ 
-                background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
-                color: '#ffffff', 
-                fontWeight: 'bold',
-                fontSize: '1.375rem',
-                py: 2.5,
-                px: 3,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                position: 'relative',
-                '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '3px',
-                    background: 'rgba(255,255,255,0.2)'
-                }
+                backgroundColor: '#FFFFFF',
+                borderBottom: '1px solid #E5E7EB',
+                padding: '16px 24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
             }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <EditCalendarOutlinedIcon sx={{ color: '#ffffff', fontSize: '1.5rem' }} />
-                    <Typography 
-                        variant="h6" 
-                        sx={{ 
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            fontSize: '1.375rem',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                    >
-                        {isEditing ? 'Edit Leave Request' : 'Log New Leave Request'}
+                <Box>
+                    <Typography variant="h6" sx={{ color: '#111827', fontWeight: 600, fontSize: '1.125rem' }}>
+                        {isEditing ? 'Edit Leave Request' : 'Log Leave Request'}
+                    </Typography>
+                    <Typography sx={{ color: '#6B7280', fontWeight: 400, fontSize: '0.875rem', mt: '4px' }}>
+                        Log a new leave of absence for an employee.
                     </Typography>
                 </Box>
+                <IconButton
+                    onClick={onClose}
+                    sx={{
+                        color: '#6B7280',
+                        '&:hover': {
+                            backgroundColor: '#F3F4F6',
+                            color: '#111827',
+                        },
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
             </DialogTitle>
 
             <DialogContent sx={{ 
-                backgroundColor: '#ffffff',
-                p: '20px',
+                backgroundColor: '#ffffff', // UI unified with Employee Leave Modal
+                p: 3, // UI unified with Employee Leave Modal - 24px padding
+                maxHeight: 'calc(90vh - 200px)', // UI unified with Employee Leave Modal - internal scroll
+                overflow: 'auto',
                 '&.MuiDialogContent-root': {
-                    paddingTop: '20px'
+                    paddingTop: 3
                 }
             }}>
-                <Stack spacing={2}>
-                    {/* Employee Dropdown with Search */}
+                <Stack spacing={3}> {/* UI unified with Employee Leave Modal - consistent spacing */}
+                    {/* Employee Dropdown with Search - Admin only field */}
                     <Autocomplete
                         options={employees}
                         getOptionLabel={(option) => `${option.fullName} (${option.employeeCode})`}
@@ -137,6 +139,31 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         disabled={!employees.length}
                         loading={!employees.length}
                         aria-label="Select employee"
+                        PaperComponent={({ children }) => (
+                            <Box sx={{
+                                // redesigned dropdown UI – neutral theme
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                border: '1px solid #E5E7EB',
+                                marginTop: '8px',
+                            }}>{children}</Box>
+                        )}
+                        renderOption={(props, option) => (
+                            <Box component="li" sx={{ '& > img': { mr: 2, flexShrink: 0 } }} {...props}>
+                                <Avatar sx={{ mr: 2, bgcolor: '#E5E7EB', color: '#4B5563' }}>
+                                    {option.fullName.charAt(0)}
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                        {option.fullName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        (#{option.employeeCode})
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        )}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -144,72 +171,79 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                 required
                                 aria-required="true"
                                 sx={{
+                                    // redesigned form field UI – neutral theme
+                                    '& .MuiInputLabel-root': {
+                                        color: '#6B7280',
+                                        fontSize: '0.875rem',
+                                        '&.Mui-focused': {
+                                            color: '#111827',
+                                        },
+                                    },
                                     '& .MuiOutlinedInput-root': {
+                                        backgroundColor: '#FFFFFF',
                                         borderRadius: '8px',
                                         '& fieldset': {
-                                            borderColor: selectedEmployee ? '#dc3545' : '#d0d0d0',
-                                            borderWidth: selectedEmployee ? '2px' : '1px'
+                                            borderColor: '#D1D5DB',
                                         },
                                         '&:hover fieldset': {
-                                            borderColor: '#dc3545'
+                                            borderColor: '#9CA3AF',
                                         },
                                         '&.Mui-focused fieldset': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        }
+                                            borderColor: '#111827',
+                                            borderWidth: '1px',
+                                        },
                                     },
-                                    '& .MuiInputLabel-root.Mui-focused': {
-                                        color: '#dc3545'
-                                    }
                                 }}
                             />
                         )}
-                        sx={{
-                            '& .MuiAutocomplete-inputRoot': {
-                                paddingTop: '8px !important',
-                                paddingBottom: '8px !important'
-                            }
-                        }}
                     />
-                    {/* Request Type & Leave Type - Side by Side */}
+
+                    {/* Leave Category & Leave Type - Side by Side */}
                     <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth required>
-                                <InputLabel 
-                                    id="request-type-label"
-                                    sx={{ 
-                                        color: '#6c757d', 
-                                        '&.Mui-focused': { color: '#dc3545' } 
-                                    }}
-                                >
-                                    Request Type *
-                                </InputLabel>
+                            <FormControl fullWidth required sx={{
+                                // redesigned form field UI – neutral theme
+                                '& .MuiInputLabel-root': {
+                                    color: '#6B7280',
+                                    fontSize: '0.875rem',
+                                    '&.Mui-focused': {
+                                        color: '#111827',
+                                    },
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '8px',
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#D1D5DB',
+                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#9CA3AF',
+                                    },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#111827',
+                                        borderWidth: '1px',
+                                    },
+                                },
+                            }}>
+                                <InputLabel>Leave Category</InputLabel>
                                 <Select 
                                     name="requestType" 
-                                    labelId="request-type-label"
-                                    label="Request Type *" 
+                                    label="Leave Category" 
                                     value={formData.requestType} 
                                     onChange={handleChange}
                                     aria-label="Request type"
                                     aria-required="true"
-                                    sx={{
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#d0d0d0'
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                // redesigned dropdown UI – neutral theme
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                                border: '1px solid #E5E7EB',
+                                                marginTop: '8px',
+                                            },
                                         },
-                                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
                                     }}
                                 >
                                     <MenuItem value="Planned">Planned Leave</MenuItem>
@@ -221,42 +255,49 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             </FormControl>
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth required>
-                                <InputLabel 
-                                    id="leave-type-label"
-                                    sx={{ 
-                                        color: '#6c757d', 
-                                        '&.Mui-focused': { color: '#dc3545' } 
-                                    }}
-                                >
-                                    Leave Type *
-                                </InputLabel>
+                            <FormControl fullWidth required sx={{
+                                // redesigned form field UI – neutral theme
+                                '& .MuiInputLabel-root': {
+                                    color: '#6B7280',
+                                    fontSize: '0.875rem',
+                                    '&.Mui-focused': {
+                                        color: '#111827',
+                                    },
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '8px',
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#D1D5DB',
+                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#9CA3AF',
+                                    },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#111827',
+                                        borderWidth: '1px',
+                                    },
+                                },
+                            }}>
+                                <InputLabel>Leave Type</InputLabel>
                                 <Select 
                                     name="leaveType" 
-                                    labelId="leave-type-label"
-                                    label="Leave Type *" 
+                                    label="Leave Type" 
                                     value={formData.leaveType} 
                                     onChange={handleChange}
                                     aria-label="Leave type"
                                     aria-required="true"
-                                    sx={{
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#d0d0d0'
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                // redesigned dropdown UI – neutral theme
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                                border: '1px solid #E5E7EB',
+                                                marginTop: '8px',
+                                            },
                                         },
-                                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
                                     }}
                                 >
                                     <MenuItem value="Full Day">Full Day</MenuItem>
@@ -266,10 +307,10 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             </FormControl>
                         </Grid>
                     </Grid>
-                    {/* Leave Date with Calendar Icon */}
+                    {/* Start Date */}
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                         <DatePicker 
-                            label="Leave Date *" 
+                            label="Start Date" 
                             value={formData.leaveDates[0]} 
                             onChange={handleDateChange}
                             slotProps={{
@@ -279,45 +320,88 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                     placeholder: 'Select Date',
                                     'aria-label': 'Leave date',
                                     'aria-required': 'true',
-                                    InputProps: {
-                                        endAdornment: (
-                                            <CalendarTodayIcon 
-                                                sx={{ 
-                                                    color: '#dc3545',
-                                                    mr: 1,
-                                                    pointerEvents: 'none'
-                                                }} 
-                                            />
-                                        )
-                                    },
                                     sx: {
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: '8px',
-                                            '& fieldset': {
-                                                borderColor: '#d0d0d0'
+                                        // redesigned form field UI – neutral theme
+                                        '& .MuiInputLabel-root': {
+                                            color: '#6B7280',
+                                            fontSize: '0.875rem',
+                                            '&.Mui-focused': {
+                                                color: '#111827',
                                             },
-                                            '&:hover fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            }
                                         },
-                                        '& .MuiInputLabel-root.Mui-focused': {
-                                            color: '#dc3545'
-                                        }
+                                        '& .MuiOutlinedInput-root': {
+                                            backgroundColor: '#FFFFFF',
+                                            borderRadius: '8px',
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#D1D5DB',
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#9CA3AF',
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#111827',
+                                                borderWidth: '1px',
+                                            },
+                                        },
                                     }
                                 }
                             }}
                         />
                     </LocalizationProvider>
+
+                    {/* End Date (optional) - UI unified with Employee Leave Modal */}
+                    {formData.requestType !== 'Compensatory' && (
+                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                            <DatePicker 
+                                label="End Date (optional)" 
+                                value={formData.leaveDates[1] || null} 
+                                onChange={(date) => {
+                                    setFormData(prev => ({ 
+                                        ...prev, 
+                                        leaveDates: date ? [prev.leaveDates[0], date] : [prev.leaveDates[0]]
+                                    }));
+                                }}
+                                minDate={formData.leaveDates[0]}
+                                disabled={!formData.leaveDates[0]}
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        placeholder: 'Select Date',
+                                        sx: {
+                                            // redesigned form field UI – neutral theme
+                                            '& .MuiInputLabel-root': {
+                                                color: '#6B7280',
+                                                fontSize: '0.875rem',
+                                                '&.Mui-focused': {
+                                                    color: '#111827',
+                                                },
+                                            },
+                                            '& .MuiOutlinedInput-root': {
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '8px',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#D1D5DB',
+                                                },
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#9CA3AF',
+                                                },
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#111827',
+                                                    borderWidth: '1px',
+                                                },
+                                            },
+                                        }
+                                    }
+                                }}
+                            />
+                        </LocalizationProvider>
+                    )}
+
+                    {/* Alternate Date for Compensatory Leave */}
                     {formData.requestType === 'Compensatory' && (
                         <LocalizationProvider dateAdapter={AdapterDateFns}>
                             <DatePicker 
-                                label="Alternate Date *" 
+                                label="Alternate Working Date" 
                                 value={formData.alternateDate} 
                                 onChange={handleAlternateDateChange}
                                 slotProps={{
@@ -325,36 +409,29 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                         fullWidth: true,
                                         required: true,
                                         placeholder: 'Select Date',
-                                        InputProps: {
-                                            endAdornment: (
-                                                <CalendarTodayIcon 
-                                                    sx={{ 
-                                                        color: '#dc3545',
-                                                        mr: 1,
-                                                        pointerEvents: 'none'
-                                                    }} 
-                                                />
-                                            )
-                                        },
                                         sx: {
-                                            borderRadius: '8px',
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: '8px',
-                                                '& fieldset': {
-                                                    borderColor: '#d0d0d0'
+                                            // redesigned form field UI – neutral theme
+                                            '& .MuiInputLabel-root': {
+                                                color: '#6B7280',
+                                                fontSize: '0.875rem',
+                                                '&.Mui-focused': {
+                                                    color: '#111827',
                                                 },
-                                                '&:hover fieldset': {
-                                                    borderColor: '#dc3545',
-                                                    borderWidth: '2px'
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: '#dc3545',
-                                                    borderWidth: '2px'
-                                                }
                                             },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
-                                            }
+                                            '& .MuiOutlinedInput-root': {
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '8px',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#D1D5DB',
+                                                },
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#9CA3AF',
+                                                },
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#111827',
+                                                    borderWidth: '1px',
+                                                },
+                                            },
                                         }
                                     }
                                 }}
@@ -364,9 +441,9 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     {/* Reason Textarea */}
                     <TextField 
                         name="reason" 
-                        label="Reason *" 
+                        label="Reason" 
                         multiline 
-                        rows={3} 
+                        rows={4} // UI unified with Employee Leave Modal - consistent rows
                         value={formData.reason} 
                         onChange={handleChange} 
                         fullWidth 
@@ -375,70 +452,87 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         aria-label="Reason for leave"
                         aria-required="true"
                         sx={{
-                            borderRadius: '8px',
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: '8px',
-                                '& fieldset': {
-                                    borderColor: '#d0d0d0'
+                            // redesigned form field UI – neutral theme
+                            '& .MuiInputLabel-root': {
+                                color: '#6B7280',
+                                fontSize: '0.875rem',
+                                '&.Mui-focused': {
+                                    color: '#111827',
                                 },
-                                '&:hover fieldset': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
-                                },
-                                '&.Mui-focused fieldset': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
-                                }
                             },
-                            '& .MuiInputLabel-root.Mui-focused': {
-                                color: '#dc3545'
-                            }
+                            '& .MuiOutlinedInput-root': {
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '8px',
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: '#D1D5DB',
+                                },
+                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: '#9CA3AF',
+                                },
+                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: '#111827',
+                                    borderWidth: '1px',
+                                },
+                            },
                         }}
                     />
-                    {/* Status Dropdown with Color Coding */}
-                    <FormControl fullWidth required>
-                        <InputLabel 
-                            id="status-label"
-                            sx={{ 
-                                color: '#6c757d', 
-                                '&.Mui-focused': { color: '#dc3545' } 
-                            }}
-                        >
-                            Status *
-                        </InputLabel>
+                    {/* Status Dropdown - Admin only field */}
+                    <FormControl fullWidth required sx={{
+                        // redesigned form field UI – neutral theme
+                        '& .MuiInputLabel-root': {
+                            color: '#6B7280',
+                            fontSize: '0.875rem',
+                            '&.Mui-focused': {
+                                color: '#111827',
+                            },
+                        },
+                        '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: '8px',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#D1D5DB',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#9CA3AF',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#111827',
+                                borderWidth: '1px',
+                            },
+                        },
+                    }}>
+                        <InputLabel>Status</InputLabel>
                         <Select 
                             name="status" 
-                            labelId="status-label"
-                            label="Status *" 
+                            label="Status" 
                             value={formData.status} 
                             onChange={handleChange}
                             aria-label="Leave request status"
                             aria-required="true"
-                            sx={{
-                                borderRadius: '8px',
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#d0d0d0'
+                            MenuProps={{
+                                PaperProps: {
+                                    sx: {
+                                        // redesigned dropdown UI – neutral theme
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                        border: '1px solid #E5E7EB',
+                                        marginTop: '8px',
+                                    },
                                 },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#dc3545',
-                                    borderWidth: '2px'
-                                }
                             }}
                         >
                             <MenuItem 
                                 value="Pending"
                                 sx={{
+                                    // redesigned dropdown item UI – neutral theme
                                     '&:hover': {
-                                        backgroundColor: 'rgba(255, 193, 7, 0.1)'
+                                        backgroundColor: '#F9FAFB'
                                     },
                                     '&.Mui-selected': {
-                                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                                        backgroundColor: '#F3F4F6',
                                         '&:hover': {
-                                            backgroundColor: 'rgba(255, 193, 7, 0.3)'
+                                            backgroundColor: '#F9FAFB'
                                         }
                                     }
                                 }}
@@ -449,7 +543,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                             width: 12, 
                                             height: 12, 
                                             borderRadius: '50%', 
-                                            backgroundColor: '#ffc107' 
+                                            backgroundColor: '#9CA3AF' 
                                         }} 
                                     />
                                     Pending
@@ -458,13 +552,14 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             <MenuItem 
                                 value="Approved"
                                 sx={{
+                                    // redesigned dropdown item UI – neutral theme
                                     '&:hover': {
-                                        backgroundColor: 'rgba(40, 167, 69, 0.1)'
+                                        backgroundColor: '#F9FAFB'
                                     },
                                     '&.Mui-selected': {
-                                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                                        backgroundColor: '#F3F4F6',
                                         '&:hover': {
-                                            backgroundColor: 'rgba(40, 167, 69, 0.3)'
+                                            backgroundColor: '#F9FAFB'
                                         }
                                     }
                                 }}
@@ -475,7 +570,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                             width: 12, 
                                             height: 12, 
                                             borderRadius: '50%', 
-                                            backgroundColor: '#28a745' 
+                                            backgroundColor: '#6B7280' 
                                         }} 
                                     />
                                     Approved
@@ -484,13 +579,14 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             <MenuItem 
                                 value="Rejected"
                                 sx={{
+                                    // redesigned dropdown item UI – neutral theme
                                     '&:hover': {
-                                        backgroundColor: 'rgba(220, 53, 69, 0.1)'
+                                        backgroundColor: '#F9FAFB'
                                     },
                                     '&.Mui-selected': {
-                                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                                        backgroundColor: '#F3F4F6',
                                         '&:hover': {
-                                            backgroundColor: 'rgba(220, 53, 69, 0.3)'
+                                            backgroundColor: '#F9FAFB'
                                         }
                                     }
                                 }}
@@ -501,7 +597,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                             width: 12, 
                                             height: 12, 
                                             borderRadius: '50%', 
-                                            backgroundColor: '#dc3545' 
+                                            backgroundColor: '#4B5563' 
                                         }} 
                                     />
                                     Rejected
@@ -512,37 +608,27 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                 </Stack>
             </DialogContent>
 
-            {/* Footer Actions */}
+            {/* redesigned footer UI – neutral theme */}
             <DialogActions sx={{ 
-                p: '20px',
-                backgroundColor: '#ffffff',
-                borderTop: '1px solid #e0e0e0',
-                justifyContent: 'flex-end',
-                gap: 2,
-                flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                padding: '16px 24px',
+                backgroundColor: '#FFFFFF',
+                borderTop: '1px solid #E5E7EB',
             }}>
                 <Button 
                     onClick={onClose}
                     variant="outlined"
+                    disabled={isSaving}
                     sx={{
-                        color: '#dc3545',
-                        borderColor: '#dc3545',
-                        borderWidth: '1.5px',
-                        px: 3,
-                        py: 1.25,
-                        minWidth: { xs: '100%', sm: '100px' },
+                        // redesigned secondary button UI – neutral theme
+                        borderColor: '#D1D5DB',
+                        color: '#374151',
+                        fontWeight: 600,
                         borderRadius: '8px',
-                        fontWeight: 500,
                         textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        transition: 'all 0.2s ease-in-out',
                         '&:hover': {
-                            backgroundColor: '#fff5f5',
-                            borderColor: '#dc3545',
-                            borderWidth: '1.5px',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.15)'
-                        }
+                            borderColor: '#9CA3AF',
+                            backgroundColor: '#F9FAFB',
+                        },
                     }}
                 >
                     Cancel
@@ -552,35 +638,23 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     variant="contained" 
                     disabled={isSaving} 
                     sx={{ 
-                        minWidth: { xs: '100%', sm: '120px' },
-                        backgroundColor: '#dc3545',
-                        color: '#ffffff',
+                        // redesigned primary button UI – neutral theme
+                        backgroundColor: '#111827',
+                        color: '#FFFFFF',
                         fontWeight: 600,
-                        px: 4,
-                        py: 1.25,
                         borderRadius: '8px',
                         textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        boxShadow: '0 2px 8px rgba(220, 53, 69, 0.3)',
-                        transition: 'all 0.2s ease-in-out',
+                        boxShadow: 'none',
                         '&:hover': {
-                            backgroundColor: '#c82333',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.4)'
+                            backgroundColor: '#1F2937',
                         },
-                        '&:active': {
-                            transform: 'translateY(0)',
-                            boxShadow: '0 2px 6px rgba(220, 53, 69, 0.3)'
-                        },
-                        '&.Mui-disabled': {
-                            backgroundColor: '#cccccc',
-                            color: '#666666',
-                            boxShadow: 'none',
-                            transform: 'none'
+                        '&:disabled': {
+                            backgroundColor: '#D1D5DB',
+                            color: '#9CA3AF',
                         }
                     }}
                 >
-                    {isSaving ? <CircularProgress size={24} sx={{ color: '#ffffff' }} /> : 'Save'}
+                    {isSaving ? <CircularProgress size={24} sx={{ color: '#FFFFFF' }} /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

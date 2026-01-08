@@ -18,6 +18,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import CancelIcon from '@mui/icons-material/Cancel';
+import CloseIcon from '@mui/icons-material/Close';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -2265,37 +2266,155 @@ const HrEmailManagerModal = memo(({ open, onClose }) => {
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <EmailIcon />
-                    Notification Recipients
+        <Dialog 
+            open={open} 
+            onClose={onClose} 
+            fullWidth 
+            maxWidth="sm"
+            PaperProps={{
+                sx: {
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #E5E7EB',
+                }
+            }}
+        >
+            <DialogTitle sx={{
+                backgroundColor: '#FFFFFF',
+                borderBottom: '1px solid #E5E7EB',
+                padding: '16px 24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+            }}>
+                <Box>
+                    <Typography variant="h6" sx={{ color: '#111827', fontWeight: 600, fontSize: '1.125rem' }}>
+                        Notification Recipients
+                    </Typography>
                 </Box>
+                <IconButton
+                    onClick={onClose}
+                    sx={{
+                        color: '#6B7280',
+                        '&:hover': {
+                            backgroundColor: '#F3F4F6',
+                            color: '#111827',
+                        },
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
             </DialogTitle>
-            <DialogContent>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            <DialogContent sx={{ padding: '24px', backgroundColor: '#FFFFFF' }}>
+                <Typography variant="body2" sx={{ color: '#6B7280', mb: 3 }}>
                     Add or remove email addresses that receive leave request notifications.
                 </Typography>
                 {loading ? <CircularProgress size={24} /> : (
                     <>
                         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
                         <Grid container spacing={2} alignItems="center">
-                            <Grid item xs><TextField label="Add new recipient email" variant="outlined" size="small" fullWidth value={newEmail} onChange={(e) => setNewEmail(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddEmail()} /></Grid>
-                            <Grid item xs="auto"><Button variant="contained" onClick={handleAddEmail} sx={{ bgcolor: 'var(--theme-red)', '&:hover': { bgcolor: '#A02020' } }}>Add</Button></Grid>
+                            <Grid item xs>
+                                <TextField 
+                                    label="Add new recipient email" 
+                                    variant="outlined" 
+                                    size="small" 
+                                    fullWidth 
+                                    value={newEmail} 
+                                    onChange={(e) => setNewEmail(e.target.value)} 
+                                    onKeyPress={(e) => e.key === 'Enter' && handleAddEmail()} 
+                                    sx={{
+                                        '& .MuiInputLabel-root': {
+                                            color: '#6B7280',
+                                            fontSize: '0.875rem',
+                                            '&.Mui-focused': {
+                                                color: '#111827',
+                                            },
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            backgroundColor: '#FFFFFF',
+                                            borderRadius: '8px',
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#D1D5DB',
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#9CA3AF',
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: '#111827',
+                                                borderWidth: '1px',
+                                            },
+                                        },
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item>
+                                <Button 
+                                    variant="contained" 
+                                    onClick={handleAddEmail}
+                                    sx={{
+                                        backgroundColor: '#111827',
+                                        color: '#FFFFFF',
+                                        fontWeight: 600,
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        boxShadow: 'none',
+                                        '&:hover': {
+                                            backgroundColor: '#1F2937',
+                                        },
+                                    }}
+                                >
+                                    Add
+                                </Button>
+                            </Grid>
                         </Grid>
-                        <Divider sx={{ my: 3 }} />
-                        <div className="recipients-box">
-                            {emails.length > 0 ? (
-                                emails.map(email => (<Chip key={email} label={email} onDelete={() => handleDeleteEmail(email)} variant="outlined" />))
-                            ) : (
-                                <div className="no-recipients-box"><InfoOutlinedIcon fontSize="small" /><Typography variant="body2">No recipient emails are configured.</Typography></div>
-                            )}
-                        </div>
+                        <Divider sx={{ my: 3, borderColor: '#E5E7EB' }} />
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {emails.map((email) => (
+                                <Chip
+                                    key={email}
+                                    label={email}
+                                    onDelete={() => handleDeleteEmail(email)}
+                                    deleteIcon={<CloseIcon sx={{ fontSize: '1rem' }} />}
+                                    sx={{
+                                        backgroundColor: '#F3F4F6',
+                                        color: '#374151',
+                                        borderRadius: '6px',
+                                        border: '1px solid #E5E7EB',
+                                        '& .MuiChip-deleteIcon': {
+                                            color: '#9CA3AF',
+                                            '&:hover': {
+                                                color: '#374151',
+                                            },
+                                        },
+                                    }}
+                                />
+                            ))}
+                        </Box>
                     </>
                 )}
             </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-                <Button onClick={onClose}>Close</Button>
+            <DialogActions sx={{
+                padding: '16px 24px',
+                backgroundColor: '#FFFFFF',
+                borderTop: '1px solid #E5E7EB',
+            }}>
+                <Button 
+                    onClick={onClose}
+                    variant="outlined"
+                    sx={{
+                        borderColor: '#D1D5DB',
+                        color: '#374151',
+                        fontWeight: 600,
+                        borderRadius: '8px',
+                        textTransform: 'none',
+                        '&:hover': {
+                            borderColor: '#9CA3AF',
+                            backgroundColor: '#F9FAFB',
+                        },
+                    }}
+                >
+                    Close
+                </Button>
             </DialogActions>
         </Dialog>
     );

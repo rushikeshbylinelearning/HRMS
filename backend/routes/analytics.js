@@ -13,6 +13,7 @@ const Holiday = require('../models/Holiday');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const { sendEmail } = require('../services/mailService');
 const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime, getISTDateParts } = require('../utils/istTime');
+const { invalidateGracePeriod } = require('../services/gracePeriodCache');
 
 const router = express.Router();
 
@@ -1232,6 +1233,9 @@ router.put('/late-grace-settings', authenticateToken, async (req, res) => {
       { value: numeric }, // Store as number
       { upsert: true, new: true }
     );
+
+    // PERFORMANCE OPTIMIZATION: Invalidate grace period cache
+    invalidateGracePeriod();
 
     // FIX: Ensure response value is always a number
     const responseValue = Number(setting.value);

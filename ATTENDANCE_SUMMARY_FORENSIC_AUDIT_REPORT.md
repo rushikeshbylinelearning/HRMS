@@ -1118,3 +1118,11 @@ const isHalfDayMarked = hasClockOut && (log.isHalfDay || log.attendanceStatus ==
 **END OF AUDIT REPORT**
 
 
+
+
+
+
+
+
+
+
