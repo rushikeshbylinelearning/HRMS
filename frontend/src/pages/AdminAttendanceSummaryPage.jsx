@@ -39,6 +39,7 @@ const AdminAttendanceSummaryPage = () => {
     const [employees, setEmployees] = useState([]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
     const [logs, setLogs] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(false);
     const [loadingEmployees, setLoadingEmployees] = useState(true);
     const [error, setError] = useState('');
@@ -131,16 +132,19 @@ const AdminAttendanceSummaryPage = () => {
             const summaryRes = await api.get(`/attendance/summary?startDate=${startDate}&endDate=${endDate}&userId=${employeeId}&includeHolidays=true`);
             
             // Handle response format
-            let fetchedLogs, fetchedHolidays;
+            let fetchedLogs, fetchedHolidays, fetchedSummary;
             if (Array.isArray(summaryRes.data)) {
                 fetchedLogs = summaryRes.data;
                 fetchedHolidays = [];
+                fetchedSummary = null;
             } else {
                 fetchedLogs = Array.isArray(summaryRes.data.logs) ? summaryRes.data.logs : [];
                 fetchedHolidays = Array.isArray(summaryRes.data.holidays) ? summaryRes.data.holidays : [];
+                fetchedSummary = summaryRes.data.summary || null;
             }
             
             setHolidays(fetchedHolidays);
+            setSummary(fetchedSummary);
             
             // Backend provides all computed fields - no frontend processing needed
             // Only fix sessions without endTime for past dates (display only)
@@ -475,6 +479,7 @@ const AdminAttendanceSummaryPage = () => {
                         saturdayPolicy={selectedEmployeeObject?.alternateSaturdayPolicy || 'All Saturdays Working'}
                         shiftInfo={mappedShiftInfo}
                         holidays={holidays}
+                        summary={summary}
                     />
                 </div>
             </div>

@@ -60,9 +60,15 @@ const attendanceLogSchema = new mongoose.Schema({
   }, // Track if clock-out was manual, automatic, or system cleanup
   autoLogoutReason: { type: String }, // Reason for auto-logout
   isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
+  // FIXED: Preserve worked hours when backdated leave approved
+  preservedWorkingHours: { type: Number }, // Original working hours before leave approval
+  preservedClockIn: { type: Date }, // Original clock-in before leave approval
+  preservedClockOut: { type: Date }, // Original clock-out before leave approval
 }, { timestamps: true });
 
 // Ensure a user can only have one log per day
 attendanceLogSchema.index({ user: 1, attendanceDate: 1 }, { unique: true });
+// Admin Dashboard query alignment: fast lookup by business date
+attendanceLogSchema.index({ attendanceDate: 1 }, { background: true });
 
 module.exports = mongoose.model('AttendanceLog', attendanceLogSchema);

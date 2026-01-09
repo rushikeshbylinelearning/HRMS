@@ -11,8 +11,7 @@
  * - Leave data always takes precedence over attendance
  */
 
-const LeaveRequest = require('../models/LeaveRequest');
-const { parseISTDate, getISTDateString } = require('../utils/istTime');
+const { getApprovedLeaveMapBulk } = require('./leaveSummaryCoreService');
 
 class LeaveCache {
     constructor() {
@@ -166,34 +165,8 @@ const batchFetchLeaves = async (userId, startDate, endDate) => {
     }
 
     try {
-        // Fetch all approved leave requests for the date range
-        const leaveRequests = await LeaveRequest.find({
-            employee: userId,
-            status: 'Approved',
-            leaveDates: {
-                $elemMatch: {
-                    $gte: parseISTDate(startDate),
-                    $lte: parseISTDate(endDate + 'T23:59:59+05:30')
-                }
-            }
-        }).sort({ createdAt: 1 }).lean();
-
-        // Create map of date strings to leave requests
-        const leaveMap = new Map();
-        
-        leaveRequests.forEach(leave => {
-            if (Array.isArray(leave.leaveDates) && leave.leaveDates.length > 0) {
-                leave.leaveDates.forEach(leaveDate => {
-                    const leaveDateStr = getISTDateString(leaveDate);
-                    if (leaveDateStr >= startDate && leaveDateStr <= endDate) {
-                        // If multiple leaves overlap, keep the first one (or most recent)
-                        if (!leaveMap.has(leaveDateStr)) {
-                            leaveMap.set(leaveDateStr, leave);
-                        }
-                    }
-                });
-            }
-        });
+        const bulk = await getApprovedLeaveMapBulk({ employeeIds: [userId], startDate, endDate });
+        const leaveMap = bulk.get(userId.toString()) || new Map();
 
         // Cache the result
         leaveCache.set(userId, startDate, endDate, leaveMap);

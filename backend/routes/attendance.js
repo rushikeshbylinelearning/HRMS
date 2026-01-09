@@ -15,6 +15,7 @@ const logAction = require('../services/logAction');
 const { getUserDailyStatus } = require('../services/dailyStatusService');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const cache = require('../utils/cache');
+const cacheService = require('../services/cacheService');
 const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime } = require('../utils/istTime');
 const { getGracePeriod } = require('../services/gracePeriodCache');
 const { batchFetchLeaves } = require('../services/leaveCache');
@@ -263,6 +264,8 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         cache.deletePattern(`dashboard-summary:*`);
         // PERFORMANCE OPTIMIZATION: Invalidate status cache
         invalidateStatus(userId, todayStr);
+        // Ensure Admin Dashboard cache refreshes after clock-in
+        cacheService.invalidateDashboard(todayStr);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -424,6 +427,8 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         cache.deletePattern(`dashboard-summary:*`);
         // PERFORMANCE OPTIMIZATION: Invalidate status cache
         invalidateStatus(userId, today);
+        // Ensure Admin Dashboard cache refreshes after clock-out
+        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -1051,242 +1056,43 @@ router.get('/summary', authenticateToken, async (req, res) => {
             targetUserId = userId;
         }
 
-        // Import status resolver
-        const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
+        /**
+         * @deprecated
+         * Attendance summary resolution logic has been extracted to
+         * backend/services/attendanceSummaryCoreService.js.
+         * Routes must not implement attendance resolution.
+         */
 
-        // Generate full date series for the range (IST)
-        const dateRange = generateDateRange(startDate, endDate);
-
-        // Parallelize: Fetch employee, logs, holidays, and leave requests
+        const { computeAttendanceSummary } = require('../services/attendanceSummaryCoreService');
         const shouldIncludeHolidays = includeHolidays === 'true' || includeHolidays === true;
-        const [employee, logs, holidays, leaveRequestsMap] = await Promise.all([
-            // Fetch employee to get Saturday policy
-            User.findById(targetUserId).select('alternateSaturdayPolicy').lean(),
-            // Fetch attendance logs for date range
-            AttendanceLog.aggregate([
-            { 
-                $match: { 
-                    user: new mongoose.Types.ObjectId(targetUserId), 
-                    attendanceDate: { $gte: startDate, $lte: endDate } 
-                } 
-            },
-            { 
-                $lookup: { 
-                    from: 'attendancesessions', 
-                    localField: '_id', 
-                    foreignField: 'attendanceLog', 
-                    as: 'sessions' 
-                } 
-            },
-            { 
-                $lookup: { 
-                    from: 'breaklogs', 
-                    localField: '_id', 
-                    foreignField: 'attendanceLog', 
-                    as: 'breaks' 
-                } 
-            },
-            { 
-                $project: { 
-                    _id: 1, 
-                    attendanceDate: 1, 
-                    attendanceStatus: 1,
-                    clockInTime: 1, 
-                    clockOutTime: 1, 
-                    notes: 1, 
-                    isLate: 1,
-                    isHalfDay: 1,
-                    halfDayReasonCode: 1,
-                    halfDayReasonText: 1,
-                    halfDaySource: 1,
-                    overriddenByAdmin: 1,
-                    overriddenAt: 1,
-                    overriddenBy: 1,
-                    lateMinutes: 1,
-                    totalWorkingHours: 1,
-                    paidBreakMinutesTaken: 1,
-                    unpaidBreakMinutesTaken: 1,
-                    penaltyMinutes: 1,
-                    logoutType: 1,
-                    autoLogoutReason: 1,
-                    sessions: { 
-                        $map: { 
-                            input: "$sessions", 
-                            as: "s", 
-                            in: { 
-                                startTime: "$$s.startTime", 
-                                endTime: "$$s.endTime" 
-                            } 
-                        } 
-                    }, 
-                    breaks: { 
-                        $map: { 
-                            input: "$breaks", 
-                            as: "b", 
-                            in: { 
-                                startTime: "$$b.startTime", 
-                                endTime: "$$b.endTime", 
-                                durationMinutes: "$$b.durationMinutes", 
-                                breakType: "$$b.breakType" 
-                            } 
-                        } 
-                    } 
-                } 
-            },
-            { $sort: { attendanceDate: 1 } }
-            ]),
-            // Fetch holidays filtered by date range (IST)
-            shouldIncludeHolidays ? (async () => {
-                const startDateIST = parseISTDate(startDate);
-                const endDateIST = parseISTDate(endDate);
-                const holidays = await Holiday.find({
-                    date: {
-                        $gte: startDateIST,
-                        $lte: endDateIST
-                    },
-                    isTentative: { $ne: true }
-                }).sort({ date: 1 }).lean();
-                return holidays;
-            })() : Promise.resolve([]),
-            // PERFORMANCE OPTIMIZATION: Use batched leave fetching with caching
-            batchFetchLeaves(targetUserId, startDate, endDate)
-        ]);
 
-        // Get Saturday policy (from User.alternateSaturdayPolicy field)
-        if (!employee) {
+        const computed = await computeAttendanceSummary({
+            employeeId: targetUserId,
+            startDate,
+            endDate,
+            includeHolidays: shouldIncludeHolidays
+        });
+
+        if (!computed) {
+            console.error(`[ATTENDANCE SUMMARY] Missing computed summary for userId: ${targetUserId}`);
+            return res.status(500).json({ error: 'Internal server error while fetching attendance summary.' });
+        }
+        if (computed.error === 'Employee not found.') {
             console.error(`[ATTENDANCE SUMMARY] Employee not found for userId: ${targetUserId}`);
             return res.status(404).json({ error: 'Employee not found.' });
         }
-        let saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
-        
-        // Defensive check: Validate saturdayPolicy value
-        const validPolicies = ['Week 1 & 3 Off', 'Week 2 & 4 Off', 'All Saturdays Working', 'All Saturdays Off'];
-        if (!validPolicies.includes(saturdayPolicy)) {
-            console.warn(`[ATTENDANCE SUMMARY] Invalid saturdayPolicy for userId ${targetUserId}: ${saturdayPolicy}, defaulting to 'All Saturdays Working'`);
-            saturdayPolicy = 'All Saturdays Working';
-        }
 
-        // Create maps for quick lookup
-        const logsMap = new Map();
-        logs.forEach(log => {
-            logsMap.set(log.attendanceDate, log);
-        });
-
-        // leaveRequestsMap is already a Map from batchFetchLeaves
-
-        // Process each date in the range and resolve status
-        const resolvedLogs = dateRange.map(attendanceDate => {
-            const log = logsMap.get(attendanceDate) || null;
-            const leaveRequest = leaveRequestsMap.get(attendanceDate) || null;
-
-            // Resolve status using the resolver (enforces precedence)
-            const statusInfo = resolveAttendanceStatus({
-                attendanceDate,
-                attendanceLog: log,
-                holidays: holidays || [],
-                leaveRequest,
-                saturdayPolicy
-            });
-
-            // Build the response object
-            const result = {
-                attendanceDate,
-                // FINAL resolved status (backend is single source of truth)
-                attendanceStatus: statusInfo.status,
-                // Status flags
-                isWorkingDay: statusInfo.isWorkingDay,
-                isHoliday: statusInfo.isHoliday,
-                isWeeklyOff: statusInfo.isWeeklyOff,
-                isLeave: statusInfo.isLeave,
-                isAbsent: statusInfo.isAbsent,
-                isHalfDay: statusInfo.isHalfDay,
-                // Status reasons (for display)
-                statusReason: statusInfo.statusReason || null,
-                halfDayReason: statusInfo.halfDayReason || null,
-                halfDayReasonCode: statusInfo.halfDayReasonCode || null,
-                halfDaySource: statusInfo.halfDaySource || null,
-                overriddenByAdmin: statusInfo.overriddenByAdmin || false,
-                leaveReason: statusInfo.leaveReason || null,
-                // Holiday/Leave info
-                holidayInfo: statusInfo.holidayInfo,
-                leaveInfo: statusInfo.leaveInfo,
-                // Attendance log data (if exists)
-                _id: log?._id || null,
-                clockInTime: log?.clockInTime || null,
-                clockOutTime: log?.clockOutTime || null,
-                notes: log?.notes || null,
-                isLate: log?.isLate || false,
-                lateMinutes: log?.lateMinutes || 0,
-                penaltyMinutes: log?.penaltyMinutes || 0,
-                logoutType: log?.logoutType || null,
-                autoLogoutReason: log?.autoLogoutReason || null,
-                // Sessions and breaks
-                sessions: log?.sessions || [],
-                breaks: Array.isArray(log?.breaks) ? log.breaks : [],
-                breaksSummary: {
-                    paid: log?.paidBreakMinutesTaken || 0,
-                    unpaid: log?.unpaidBreakMinutesTaken || 0,
-                    total: (log?.paidBreakMinutesTaken || 0) + (log?.unpaidBreakMinutesTaken || 0)
-                },
-                // Computed fields
-                firstIn: null,
-                lastOut: null,
-                totalWorkedMinutes: log?.totalWorkingHours ? Math.round(log.totalWorkingHours * 60) : 0,
-                // Payable minutes based on resolved status
-                payableMinutes: (() => {
-                    if (statusInfo.status === 'Holiday' || statusInfo.status === 'Weekly Off') {
-                        return 0;
-                    }
-                    if (statusInfo.status === 'Leave') {
-                        if (statusInfo.isHalfDay) {
-                            return 270; // 4.5 hours = 270 minutes for half day leave
-                        }
-                        return 0; // Full day leave = 0 payable
-                    }
-                    if (statusInfo.status === 'Half-day' || statusInfo.isHalfDay) {
-                        return 240; // 4 hours = 240 minutes for half day
-                    }
-                    if (statusInfo.status === 'Absent') {
-                        return 0;
-                    }
-                    // Present or other status - full day
-                    return 480; // 8 hours = 480 minutes for full day
-                })()
-            };
-
-            // Compute firstIn and lastOut from sessions
-            if (log?.sessions && Array.isArray(log.sessions) && log.sessions.length > 0) {
-                const sortedSessions = [...log.sessions].sort((a, b) => 
-                    new Date(a.startTime) - new Date(b.startTime)
-                );
-                
-                if (sortedSessions[0]?.startTime) {
-                    result.firstIn = sortedSessions[0].startTime;
-                }
-                
-                const sessionsWithEnd = sortedSessions.filter(s => s.endTime);
-                if (sessionsWithEnd.length > 0) {
-                    const lastSession = sessionsWithEnd[sessionsWithEnd.length - 1];
-                    result.lastOut = lastSession.endTime;
-                }
-            }
-
-            return result;
-        });
-
-        // Return response with holidays if requested
         if (shouldIncludeHolidays) {
             res.json({
-                logs: resolvedLogs,
-                holidays: (holidays || []).map(h => ({
-                    _id: h._id,
-                    name: h.name,
-                    date: h.date,
-                    isTentative: h.isTentative || false
-                }))
+                logs: computed.logs,
+                holidays: computed.holidays,
+                summary: computed.summary
             });
         } else {
-            res.json(resolvedLogs);
+            res.json({
+                logs: computed.logs,
+                summary: computed.summary
+            });
         }
     } catch (error) {
         console.error('Error fetching attendance summary:', error);

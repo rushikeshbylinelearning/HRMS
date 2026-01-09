@@ -11,4 +11,7 @@ const extraBreakRequestSchema = new mongoose.Schema({
   isUsed: { type: Boolean, default: false }, // <-- ADDED THIS LINE
 }, { timestamps: true });
 
+// Admin Dashboard query alignment: pending queue ordering
+extraBreakRequestSchema.index({ status: 1, createdAt: -1 }, { background: true });
+
 module.exports = mongoose.model('ExtraBreakRequest', extraBreakRequestSchema);

@@ -86,21 +86,31 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
             const hasClockIn = existingLog.clockInTime && existingLog.clockInTime instanceof Date;
 
             if (hasClockIn) {
-                // STRICT POLICY: NO HYBRID STATES
-                // Void the attendance but keep audit trail in notes
-                const auditNote = `[AUTO-VOID] Leave Approved. Voided Clock-In: ${existingLog.clockInTime?.toISOString()} - ${existingLog.clockOutTime?.toISOString() || 'Active'}`;
+                // FIXED: Preserve worked hours, don't void attendance
+                // Store original attendance data in metadata for payroll
+                const workedHours = existingLog.totalWorkingHours || 0;
+                const clockInTime = existingLog.clockInTime;
+                const clockOutTime = existingLog.clockOutTime;
+                
+                const auditNote = `[LEAVE-APPROVED-BACKDATED] Attendance preserved for payroll. Worked: ${workedHours}h. Clock-In: ${clockInTime?.toISOString()} - Clock-Out: ${clockOutTime?.toISOString() || 'Active'}. Leave Type: ${leaveRequest.leaveType || 'Full Day'}`;
 
                 existingLog.notes = existingLog.notes ? existingLog.notes + '; ' + auditNote : auditNote;
-                existingLog.clockInTime = null;
-                existingLog.clockOutTime = null;
-                existingLog.attendanceStatus = 'Leave';
+                
+                // If Half-Day leave, preserve attendance as Half-Day Present
+                if (leaveRequest.leaveType && leaveRequest.leaveType.startsWith('Half Day')) {
+                    existingLog.attendanceStatus = 'Half-Day';
+                    existingLog.isHalfDay = true;
+                    // Keep clock times - employee worked half day
+                } else {
+                    // Full-Day leave - mark as Leave but preserve hours in metadata
+                    existingLog.attendanceStatus = 'Leave';
+                    // Store worked hours in custom field for payroll reference
+                    existingLog.preservedWorkingHours = workedHours;
+                    existingLog.preservedClockIn = clockInTime;
+                    existingLog.preservedClockOut = clockOutTime;
+                    // Don't delete clock times - keep for audit trail
+                }
                 existingLog.leaveRequest = leaveRequest._id;
-
-                // Reset stats
-                existingLog.totalWorkingHours = 0;
-                existingLog.lateMinutes = 0;
-                existingLog.isLate = false;
-                existingLog.isHalfDay = false;
             } else {
                 // No clock-in - safe to mark as Leave
                 existingLog.attendanceStatus = 'Leave';

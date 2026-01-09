@@ -32,7 +32,7 @@ const formatShiftTime = (time) => {
 };
 
 // Optimized: Calculate 'now' internally using IST
-const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'All Saturdays Working', shiftInfo, isAdminView, holidays = [] }) => {
+const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'All Saturdays Working', shiftInfo, isAdminView, holidays = [], summary = null }) => {
     
     const weekDays = useMemo(() => {
         // Generate week days in IST
@@ -94,6 +94,11 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
     }, [weekDays]);
 
     const summaryHours = useMemo(() => {
+        // FIXED: Use backend summary if available (includes all dates in range)
+        if (summary && summary.totalWorkedMinutes !== undefined) {
+            return formatDuration(summary.totalWorkedMinutes);
+        }
+        // Fallback: Calculate from weekDays (only for backward compatibility)
         let totalMinutes = 0;
         weekDays.forEach(day => {
             if (day.log && day.log.totalWorkedMinutes) {
@@ -102,7 +107,16 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
             }
         });
         return formatDuration(totalMinutes);
-    }, [weekDays]);
+    }, [weekDays, summary]);
+    
+    const payableHours = useMemo(() => {
+        // FIXED: Use backend payable hours calculation based on working days and alternate Saturday policy
+        if (summary && summary.totalPayableMinutes !== undefined) {
+            return formatDuration(summary.totalPayableMinutes);
+        }
+        // Fallback: Old calculation (incorrect - only for backward compatibility)
+        return formatDuration(summaryStats.present * 540); // 9 hours per present day
+    }, [summaryStats, summary]);
 
     const timeAxisLabels = ['10AM', '11AM', '12PM', '01PM', '02PM', '03PM', '04PM', '05PM', '06PM', '07PM'];
 
@@ -147,7 +161,7 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
                         <div className="summary-card-indicator"></div>
                         <div className="summary-card-content">
                             <span className="summary-card-label">Payable Hours</span>
-                            <span className="summary-card-value">{formatDuration(summaryStats.present * 480)}</span>
+                            <span className="summary-card-value">{payableHours}</span>
                         </div>
                     </div>
                     <div className="summary-card present-hours">

@@ -45,6 +45,7 @@ require('./models/ExtraBreakRequest');
 require('./models/NewNotification'); // <-- THIS IS THE FIX
 require('./models/Holiday');
 require('./models/OfficeLocation');
+require('./models/ProbationAuditLog'); // <-- PROBATION AUDIT LOG MODEL
 // TODO: Uncomment when these models are implemented
 // require('./models/LeaveYearEndAction');
 // require('./models/LeaveEncashment');

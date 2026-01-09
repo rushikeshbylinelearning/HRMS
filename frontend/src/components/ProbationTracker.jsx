@@ -219,44 +219,55 @@ const ProbationTracker = () => {
     setExpandedRows(newExpanded);
   };
 
-  // Summary Card Component with red theme
-  const SummaryCard = ({ title, value, icon, color = '#c62828' }) => (
+  // Modern Summary Card Component
+  const SummaryCard = ({ title, value, icon, accentColor = '#3B82F6' }) => (
     <Card
       sx={{
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(198, 40, 40, 0.15)',
-        border: '1px solid rgba(198, 40, 40, 0.2)',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 4px 16px rgba(198, 40, 40, 0.25)',
-          borderColor: 'rgba(198, 40, 40, 0.4)'
-        },
+        borderRadius: '8px',
+        backgroundColor: 'white',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        transition: 'all 0.2s ease',
         height: '100%',
-        background: 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)'
+        position: 'relative',
+        overflow: 'hidden',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          borderColor: '#D1D5DB'
+        },
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: '4px',
+          backgroundColor: accentColor
+        }
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: 3, pl: 4 }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box>
-            <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-              {title}
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', color }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#1F2937', mb: 1 }}>
               {value}
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 500 }}>
+              {title}
             </Typography>
           </Box>
           <Box
             sx={{
-              width: 56,
-              height: 56,
-              borderRadius: '12px',
-              backgroundColor: `${color}20`,
+              width: 48,
+              height: 48,
+              borderRadius: '8px',
+              backgroundColor: `${accentColor}10`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color,
-              border: `1px solid ${color}30`
+              color: accentColor,
+              opacity: 0.7
             }}
           >
             {icon}
@@ -269,19 +280,88 @@ const ProbationTracker = () => {
   // Loading skeleton
   if (loading) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Skeleton variant="text" width={200} height={40} />
-          <Skeleton variant="circular" width={40} height={40} />
+      <Box className="probation-tracker" sx={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
+        {/* Sticky Header Skeleton */}
+        <Box 
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: '#F8FAFC',
+            borderBottom: '1px solid #E2E8F0',
+            py: 3,
+            px: 3,
+            mb: 3
+          }}
+        >
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+            <Box>
+              <Skeleton variant="text" width={200} height={40} sx={{ mb: 1 }} />
+              <Skeleton variant="text" width={300} height={20} />
+            </Box>
+            <Skeleton variant="circular" width={48} height={48} />
+          </Box>
         </Box>
-        <Grid container spacing={3} sx={{ mb: 3 }}>
+
+        {/* Summary Cards Skeleton */}
+        <Grid container spacing={3} sx={{ mb: 3, px: 3 }}>
           {[1, 2, 3, 4].map((i) => (
             <Grid item xs={12} sm={6} md={3} key={i}>
-              <Skeleton variant="rectangular" height={120} sx={{ borderRadius: '12px' }} />
+              <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Box sx={{ flex: 1 }}>
+                      <Skeleton variant="text" width={60} height={32} sx={{ mb: 1 }} />
+                      <Skeleton variant="text" width={120} height={16} />
+                    </Box>
+                    <Skeleton variant="circular" width={48} height={48} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
           ))}
         </Grid>
-        <Skeleton variant="rectangular" height={400} sx={{ borderRadius: '12px' }} />
+
+        {/* Filters Bar Skeleton */}
+        <Box sx={{ px: 3, mb: 3 }}>
+          <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" gap={3}>
+                <Box display="flex" alignItems="center" gap={2} flex={1}>
+                  <Skeleton variant="text" width={60} height={20} />
+                  <Skeleton variant="rectangular" width={400} height={36} sx={{ borderRadius: '6px' }} />
+                </Box>
+                <Skeleton variant="rectangular" width={180} height={36} sx={{ borderRadius: '6px' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Table Skeleton */}
+        <Box sx={{ px: 3, mb: 3 }}>
+          <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB' }}>
+            <CardContent sx={{ p: 0 }}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Box key={i} sx={{ p: 2, borderBottom: '1px solid #F3F4F6' }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Skeleton variant="circular" width={40} height={40} />
+                    <Box sx={{ flex: 1 }}>
+                      <Skeleton variant="text" width={200} height={16} sx={{ mb: 1 }} />
+                      <Skeleton variant="text" width={100} height={12} />
+                    </Box>
+                    <Skeleton variant="text" width={100} height={16} />
+                    <Skeleton variant="text" width={100} height={16} />
+                    <Skeleton variant="text" width={100} height={16} />
+                    <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: '12px' }} />
+                    <Skeleton variant="text" width={60} height={16} />
+                    <Skeleton variant="text" width={60} height={16} />
+                    <Skeleton variant="circular" width={32} height={32} />
+                  </Box>
+                </Box>
+              ))}
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
     );
   }
@@ -293,7 +373,12 @@ const ProbationTracker = () => {
         <Alert 
           severity="error" 
           action={
-            <IconButton color="inherit" size="small" onClick={fetchProbationData}>
+            <IconButton 
+              color="inherit" 
+              size="small" 
+              onClick={fetchProbationData}
+              aria-label="retry"
+            >
               <Refresh />
             </IconButton>
           }
@@ -305,32 +390,62 @@ const ProbationTracker = () => {
   }
 
   return (
-    <Box className="probation-tracker" sx={{ p: 3 }}>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#c62828' }}>
-          Probation Tracker
-        </Typography>
-        <IconButton 
-          onClick={fetchProbationData} 
-          size="small"
-          sx={{ 
-            color: '#c62828',
-            '&:hover': { backgroundColor: 'rgba(198, 40, 40, 0.1)' }
-          }}
-        >
-          <Refresh />
-        </IconButton>
+    <Box className="probation-tracker" sx={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
+      {/* Sticky Header */}
+      <Box 
+        className="page-header"
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: '#F8FAFC',
+          borderBottom: '1px solid #E2E8F0',
+          py: 3,
+          px: 3,
+          mb: 3
+        }}
+      >
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1F2937', mb: 1 }}>
+              Probation Tracker
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6B7280' }}>
+              Monitor probation progress, extensions, and risks
+            </Typography>
+          </Box>
+          <IconButton 
+            onClick={fetchProbationData} 
+            size="medium"
+            sx={{ 
+              backgroundColor: 'white',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              color: '#6B7280',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.2s ease',
+              '&:hover': { 
+                backgroundColor: '#F9FAFB',
+                borderColor: '#D1D5DB',
+                color: '#374151',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
+              }
+            }}
+          >
+            <Refresh />
+          </IconButton>
+        </Box>
       </Box>
 
       {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 3, px: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Total on Probation"
             value={summaryMetrics.totalOnProbation}
             icon={<People />}
-            color="#c62828"
+            accentColor="#3B82F6"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -338,7 +453,7 @@ const ProbationTracker = () => {
             title="Ending This Month"
             value={summaryMetrics.endingThisMonth}
             icon={<CalendarToday />}
-            color="#d32f2f"
+            accentColor="#10B981"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -346,7 +461,7 @@ const ProbationTracker = () => {
             title="Extended"
             value={summaryMetrics.extended}
             icon={<Schedule />}
-            color="#e53935"
+            accentColor="#F59E0B"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -354,144 +469,261 @@ const ProbationTracker = () => {
             title="Overdue"
             value={summaryMetrics.overdue}
             icon={<ErrorOutline />}
-            color="#b71c1c"
+            accentColor="#EF4444"
           />
         </Grid>
       </Grid>
 
-      {/* Filters Row */}
-      <Card sx={{ mb: 3, borderRadius: '12px', border: '1px solid rgba(198, 40, 40, 0.2)' }}>
-        <CardContent sx={{ p: 2 }}>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <FilterList sx={{ color: '#c62828' }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#c62828' }}>
+      {/* Filters Bar */}
+      <Box sx={{ px: 3, mb: 3 }}>
+        <Box 
+          sx={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            p: 3,
+            borderBottom: '1px solid #E5E7EB'
+          }}
+        >
+          <Box display="flex" alignItems="center" justifyContent="space-between" gap={3}>
+            <Box display="flex" alignItems="center" gap={2} flex={1}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151' }}>
                 Filters
               </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search by name or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                sx={{
+                  maxWidth: 400,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#F9FAFB',
+                    borderRadius: '6px',
+                    border: '1px solid #E5E7EB',
+                    '&:hover': {
+                      borderColor: '#D1D5DB'
+                    },
+                    '&.Mui-focused': {
+                      borderColor: '#3B82F6',
+                      backgroundColor: 'white'
+                    }
+                  }
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search fontSize="small" sx={{ color: '#6B7280' }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
             </Box>
-            <IconButton
-              size="small"
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-            >
-              {filtersExpanded ? <ExpandLess /> : <ExpandMore />}
-            </IconButton>
-          </Box>
-          <Collapse in={filtersExpanded}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search by name or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search fontSize="small" />
-                      </InputAdornment>
-                    )
+            <Box display="flex" alignItems="center" gap={2}>
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel sx={{ color: '#6B7280' }}>Status</InputLabel>
+                <Select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  label="Status"
+                  sx={{
+                    backgroundColor: '#F9FAFB',
+                    borderRadius: '6px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#E5E7EB'
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#D1D5DB'
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#3B82F6'
+                    }
                   }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    label="Status"
-                  >
-                    <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="on-track">On Track</MenuItem>
-                    <MenuItem value="ending-soon">Ending Soon (≤7 days)</MenuItem>
-                    <MenuItem value="extended">Extended</MenuItem>
-                    <MenuItem value="overdue">Overdue</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-          </Collapse>
-        </CardContent>
-      </Card>
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="on-track">On Track</MenuItem>
+                  <MenuItem value="ending-soon">Ending Soon (≤7 days)</MenuItem>
+                  <MenuItem value="extended">Extended</MenuItem>
+                  <MenuItem value="overdue">Overdue</MenuItem>
+                </Select>
+              </FormControl>
+              {(searchQuery || selectedStatus !== 'all') && (
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: '#3B82F6', 
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    '&:hover': { color: '#2563EB' }
+                  }}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedStatus('all');
+                  }}
+                >
+                  Clear Filters
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
 
       {/* Empty State */}
       {filteredEmployees.length === 0 && !loading && (
-        <Card sx={{ borderRadius: '12px' }}>
-          <CardContent sx={{ textAlign: 'center', py: 6 }}>
-            <People sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              {employees.length === 0
-                ? 'No employees currently on probation'
-                : 'No employees match the selected filters'}
-            </Typography>
-          </CardContent>
-        </Card>
+        <Box sx={{ px: 3, mb: 3 }}>
+          <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB' }}>
+            <CardContent sx={{ textAlign: 'center', py: 8 }}>
+              <People sx={{ fontSize: 64, color: '#9CA3AF', mb: 2 }} />
+              <Typography variant="h6" sx={{ color: '#6B7280', mb: 1 }}>
+                {employees.length === 0
+                  ? 'No employees currently on probation'
+                  : 'No employees found for the selected filters'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#9CA3AF' }}>
+                Try adjusting your search or filter criteria
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
       )}
 
       {/* Table */}
       {filteredEmployees.length > 0 && (
-        <Card sx={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(198, 40, 40, 0.2)' }}>
-          <TableContainer 
-            component={Paper} 
-            sx={{ 
-              borderRadius: '12px', 
-              overflow: 'auto',
-              maxHeight: 'calc(100vh - 500px)',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-                height: '8px'
-              },
-              '&::-webkit-scrollbar-track': {
-                background: '#f1f1f1',
-                borderRadius: '4px'
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: '#c62828',
-                borderRadius: '4px',
-                '&:hover': {
-                  background: '#b71c1c'
+        <Box sx={{ px: 3, mb: 3 }}>
+          <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
+            <TableContainer 
+              component={Paper} 
+              elevation={0}
+              sx={{ 
+                borderRadius: '8px',
+                overflow: 'auto',
+                maxHeight: 'calc(100vh - 500px)',
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                  height: '6px'
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: '#F3F4F6',
+                  borderRadius: '3px'
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: '#D1D5DB',
+                  borderRadius: '3px',
+                  '&:hover': {
+                    background: '#9CA3AF'
+                  }
                 }
-              },
-              '& .MuiTableHead-root': {
-                position: 'sticky',
-                top: 0,
-                zIndex: 10,
-                backgroundColor: '#ffffff'
-              }
-            }}
-          >
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#ffffff', borderBottom: '2px solid #000000' }}>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 200, borderBottom: '2px solid #000000' }}>
-                    Employee
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 120, borderBottom: '2px solid #000000' }}>
-                    Joining Date
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 140, borderBottom: '2px solid #000000' }}>
-                    Base End Date
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 140, borderBottom: '2px solid #000000' }}>
-                    Final End Date
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 130, textAlign: 'center', borderBottom: '2px solid #000000' }}>
-                    Days Left
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 120, textAlign: 'right', borderBottom: '2px solid #000000' }}>
-                    Leave Ext.
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', minWidth: 120, textAlign: 'right', borderBottom: '2px solid #000000' }}>
-                    Absent Ext.
-                  </TableCell>
-                  <TableCell sx={{ color: '#000000', fontWeight: 'bold', width: 50, borderBottom: '2px solid #000000' }}>
-                    <Tooltip title="View details">
-                      <Info fontSize="small" />
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
+              }}
+            >
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 200, 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Employee
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 120, 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Joining Date
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 140, 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Base End Date
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 140, 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Final End Date
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 130, 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Days Left
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 120, 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Leave Ext.
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      minWidth: 120, 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Absent Ext.
+                    </TableCell>
+                    <TableCell sx={{ 
+                      color: '#374151', 
+                      fontWeight: 600, 
+                      width: 50, 
+                      borderBottom: '1px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      <Tooltip title="View details">
+                        <Info fontSize="small" />
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
               <TableBody>
                 {paginatedEmployees.map((emp, index) => {
                 const isExpanded = expandedRows.has(emp.employeeId);
@@ -502,39 +734,62 @@ const ProbationTracker = () => {
                   <React.Fragment key={emp.employeeId}>
                     <TableRow
                       sx={{
-                        '&:hover': { backgroundColor: '#fff5f5' },
-                        backgroundColor: emp.daysLeft < 0 ? '#ffebee' : index % 2 === 0 ? 'white' : '#fffbfb',
+                        '&:hover': { backgroundColor: '#F9FAFB' },
+                        backgroundColor: emp.daysLeft < 0 ? '#FEF2F2' : index % 2 === 0 ? 'white' : '#FAFAFA',
                         cursor: 'pointer',
-                        borderLeft: emp.daysLeft < 0 ? '3px solid #c62828' : '3px solid transparent',
-                        transition: 'all 0.2s ease'
+                        borderLeft: emp.daysLeft < 0 ? '3px solid #EF4444' : '3px solid transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: '1px solid #F3F4F6'
                       }}
                       onClick={() => toggleRowExpansion(emp.employeeId)}
                     >
                       {/* Employee Info */}
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {emp.employeeName}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {emp.employeeCode}
-                          </Typography>
+                      <TableCell sx={{ py: 2 }}>
+                        <Box display="flex" alignItems="center" gap={2}>
+                          <Box
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              backgroundColor: '#F3F4F6',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#6B7280',
+                              fontWeight: 600,
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {emp.employeeName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </Box>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                              {emp.employeeName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                              {emp.employeeCode}
+                            </Typography>
+                          </Box>
                         </Box>
                       </TableCell>
 
                       {/* Dates */}
-                      <TableCell>{formatDateIST(emp.joiningDate)}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
+                      <TableCell sx={{ py: 2 }}>
+                        <Typography variant="body2" sx={{ color: '#374151' }}>
+                          {formatDateIST(emp.joiningDate)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        <Typography variant="body2" sx={{ color: '#374151' }}>
                           {formatDateIST(emp.baseProbationEndDate)}
                         </Typography>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ py: 2 }}>
                         <Typography 
                           variant="body2" 
                           sx={{ 
                             fontWeight: hasExtensions ? 600 : 'normal',
-                            color: hasExtensions ? '#c62828' : 'inherit'
+                            color: hasExtensions ? '#DC2626' : '#374151'
                           }}
                         >
                           {formatDateIST(emp.finalProbationEndDate)}
@@ -542,37 +797,70 @@ const ProbationTracker = () => {
                       </TableCell>
 
                       {/* Days Left */}
-                      <TableCell align="center">
-                        <Chip
-                          label={daysLeftStatus.label}
-                          color={daysLeftStatus.color}
-                          variant={daysLeftStatus.variant}
-                          size="small"
-                          sx={{ fontWeight: 600 }}
-                        />
+                      <TableCell align="center" sx={{ py: 2 }}>
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            px: 2,
+                            py: 1,
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: 
+                              emp.daysLeft < 0 ? '#FEE2E2' :
+                              emp.daysLeft <= 30 ? '#FEF3C7' :
+                              emp.daysLeft <= 60 ? '#DBEAFE' :
+                              '#D1FAE5',
+                            color: 
+                              emp.daysLeft < 0 ? '#DC2626' :
+                              emp.daysLeft <= 30 ? '#D97706' :
+                              emp.daysLeft <= 60 ? '#2563EB' :
+                              '#059669'
+                          }}
+                        >
+                          {emp.daysLeft < 0 
+                            ? `${Math.abs(emp.daysLeft)} overdue`
+                            : `${emp.daysLeft} days`
+                          }
+                        </Box>
                       </TableCell>
 
                       {/* Extensions */}
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {emp.leaveExtensionDays?.toFixed(1) || '0.0'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          days
-                        </Typography>
+                      <TableCell align="center" sx={{ py: 2 }}>
+                        <Tooltip title="Leave extension days">
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                              {emp.leaveExtensionDays?.toFixed(1) || '0.0'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                              days
+                            </Typography>
+                          </Box>
+                        </Tooltip>
                       </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {emp.absentExtensionDays?.toFixed(1) || '0.0'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          days
-                        </Typography>
+                      <TableCell align="center" sx={{ py: 2 }}>
+                        <Tooltip title="Absent extension days">
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                              {emp.absentExtensionDays?.toFixed(1) || '0.0'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                              days
+                            </Typography>
+                          </Box>
+                        </Tooltip>
                       </TableCell>
 
                       {/* Expand Icon */}
-                      <TableCell>
-                        <IconButton size="small">
+                      <TableCell sx={{ py: 2 }}>
+                        <IconButton 
+                          size="small" 
+                          sx={{ 
+                            color: '#6B7280',
+                            '&:hover': { backgroundColor: '#F3F4F6', color: '#374151' }
+                          }}
+                        >
                           {isExpanded ? <ExpandLess /> : <ExpandMore />}
                         </IconButton>
                       </TableCell>
@@ -580,58 +868,125 @@ const ProbationTracker = () => {
 
                     {/* Expanded Row - Details */}
                     <TableRow>
-                      <TableCell colSpan={8} sx={{ py: 0, backgroundColor: '#f9f9f9' }}>
+                      <TableCell colSpan={8} sx={{ py: 0, backgroundColor: '#F9FAFB' }}>
                         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                          <Box sx={{ p: 2 }}>
+                          <Box sx={{ p: 3 }}>
                             <Grid container spacing={3}>
+                              {/* Leave Breakdown Card */}
                               <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                                  Leave Breakdown
-                                </Typography>
-                                <Box display="flex" gap={2} flexWrap="wrap">
-                                  <Chip
-                                    label={`Full Day: ${emp.fullDayLeaves || 0}`}
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  <Chip
-                                    label={`Half Day: ${emp.halfDayLeaves || 0}`}
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  <Chip
-                                    label={`Total: ${emp.leaveExtensionDays?.toFixed(1) || '0.0'} days`}
-                                    size="small"
-                                    color="primary"
-                                  />
-                                </Box>
+                                <Card 
+                                  sx={{
+                                    backgroundColor: 'white',
+                                    borderRadius: '8px',
+                                    border: '1px solid #E5E7EB',
+                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                                  }}
+                                >
+                                  <CardContent sx={{ p: 3 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#374151' }}>
+                                      Leave Extensions
+                                    </Typography>
+                                    <Box display="flex" flexDirection="column" gap={2}>
+                                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Full Day</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                                          {emp.fullDayLeaves || 0}
+                                        </Typography>
+                                      </Box>
+                                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Half Day</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                                          {emp.halfDayLeaves || 0}
+                                        </Typography>
+                                      </Box>
+                                      <Box 
+                                        sx={{
+                                          pt: 2,
+                                          mt: 1,
+                                          borderTop: '1px solid #E5E7EB'
+                                        }}
+                                      >
+                                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151' }}>Total</Typography>
+                                          <Typography 
+                                            variant="h6" 
+                                            sx={{ 
+                                              fontWeight: 700, 
+                                              color: '#3B82F6',
+                                              backgroundColor: '#EFF6FF',
+                                              px: 2,
+                                              py: 1,
+                                              borderRadius: '6px'
+                                            }}
+                                          >
+                                            {emp.leaveExtensionDays?.toFixed(1) || '0.0'} days
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    </Box>
+                                  </CardContent>
+                                </Card>
                               </Grid>
+                              
+                              {/* Absent Breakdown Card */}
                               <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                                  Absent Breakdown
-                                </Typography>
-                                <Box display="flex" gap={2} flexWrap="wrap">
-                                  <Chip
-                                    label={`Full Day: ${emp.fullDayAbsents || 0}`}
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  <Chip
-                                    label={`Half Day: ${emp.halfDayAbsents || 0}`}
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  <Chip
-                                    label={`Total: ${emp.absentExtensionDays?.toFixed(1) || '0.0'} days`}
-                                    size="small"
-                                    color="error"
-                                  />
-                                </Box>
+                                <Card 
+                                  sx={{
+                                    backgroundColor: 'white',
+                                    borderRadius: '8px',
+                                    border: '1px solid #E5E7EB',
+                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                                  }}
+                                >
+                                  <CardContent sx={{ p: 3 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#374151' }}>
+                                      Absence Extensions
+                                    </Typography>
+                                    <Box display="flex" flexDirection="column" gap={2}>
+                                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Full Day</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                                          {emp.fullDayAbsents || 0}
+                                        </Typography>
+                                      </Box>
+                                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Half Day</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                                          {emp.halfDayAbsents || 0}
+                                        </Typography>
+                                      </Box>
+                                      <Box 
+                                        sx={{
+                                          pt: 2,
+                                          mt: 1,
+                                          borderTop: '1px solid #E5E7EB'
+                                        }}
+                                      >
+                                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151' }}>Total</Typography>
+                                          <Typography 
+                                            variant="h6" 
+                                            sx={{ 
+                                              fontWeight: 700, 
+                                              color: '#EF4444',
+                                              backgroundColor: '#FEF2F2',
+                                              px: 2,
+                                              py: 1,
+                                              borderRadius: '6px'
+                                            }}
+                                          >
+                                            {emp.absentExtensionDays?.toFixed(1) || '0.0'} days
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    </Box>
+                                  </CardContent>
+                                </Card>
                               </Grid>
                             </Grid>
-                            <Box mt={2} pt={2} borderTop="1px solid #e0e0e0">
-                              <Typography variant="caption" color="text.secondary">
-                                <Info fontSize="inherit" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                            <Box mt={3} p={2} sx={{ backgroundColor: '#F3F4F6', borderRadius: '6px' }}>
+                              <Typography variant="caption" sx={{ color: '#6B7280', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Info fontSize="inherit" sx={{ verticalAlign: 'middle' }} />
                                 Probation end date calculated from joining date + 6 months + leave extensions + absent extensions
                               </Typography>
                             </Box>
@@ -654,26 +1009,29 @@ const ProbationTracker = () => {
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[5, 10, 25, 50]}
             sx={{
-              borderTop: '1px solid rgba(198, 40, 40, 0.2)',
+              borderTop: '1px solid #E5E7EB',
+              backgroundColor: '#FAFAFA',
               '& .MuiTablePagination-toolbar': {
-                backgroundColor: '#fffbfb'
+                padding: '16px'
               },
               '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                color: '#c62828',
+                color: '#374151',
                 fontWeight: 500
               },
               '& .MuiIconButton-root': {
-                color: '#c62828',
+                color: '#6B7280',
                 '&:hover': {
-                  backgroundColor: 'rgba(198, 40, 40, 0.1)'
+                  backgroundColor: '#F3F4F6',
+                  color: '#374151'
                 },
                 '&.Mui-disabled': {
-                  color: 'rgba(198, 40, 40, 0.3)'
+                  color: '#D1D5DB'
                 }
               }
             }}
           />
-        </Card>
+          </Card>
+        </Box>
       )}
 
     </Box>

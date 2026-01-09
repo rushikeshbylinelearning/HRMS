@@ -228,6 +228,14 @@ class CacheService {
     if (date) {
       this.dashboardCache.del(`dashboard_${date}`);
       this.dashboardCache.del(`recent_activity_${date}`);
+      // Also invalidate any dashboard-scoped pending-leaves pages for this date
+      // (keys created by Admin Dashboard pagination support)
+      const keys = this.dashboardCache.keys();
+      keys.forEach(key => {
+        if (key.includes(`dashboard_pending_leaves_${date}_`)) {
+          this.dashboardCache.del(key);
+        }
+      });
     } else {
       this.dashboardCache.flushAll();
     }

@@ -31,25 +31,55 @@ import api from '../api/axios';
 const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState('');
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [total, setTotal] = useState(null);
+
+    const PAGE_SIZE = 50; // Hard cap keeps UI smooth (no virtualization needed)
 
     useEffect(() => {
         if (open && cardType) {
-            fetchEmployees();
+            // Reset pagination each time modal opens / cardType changes
+            setEmployees([]);
+            setPage(1);
+            setHasMore(false);
+            setTotal(null);
+            fetchEmployees(1, true);
         }
     }, [open, cardType]);
 
-    const fetchEmployees = async () => {
-        setLoading(true);
-        setError('');
+    const fetchEmployees = async (pageToFetch = 1, isInitial = false) => {
+        if (isInitial) {
+            setLoading(true);
+        } else {
+            setLoadingMore(true);
+        }
+        if (isInitial) setError('');
         try {
-            const { data } = await api.get(`/admin/dashboard-employees/${cardType}`);
-            setEmployees(data || []);
+            const { data } = await api.get(`/admin/dashboard-employees/${cardType}`, {
+                params: { page: pageToFetch, limit: PAGE_SIZE }
+            });
+
+            // Backward-compatible handling:
+            // - New paged response: { items, page, limit, total, hasMore }
+            // - Legacy response: array
+            const items = Array.isArray(data) ? data : (data?.items || []);
+            const nextHasMore = Array.isArray(data) ? (items.length === PAGE_SIZE) : !!data?.hasMore;
+            const nextTotal = Array.isArray(data) ? null : (typeof data?.total === 'number' ? data.total : null);
+
+            setTotal(nextTotal);
+            setHasMore(nextHasMore);
+            setPage(pageToFetch);
+
+            setEmployees(prev => (pageToFetch === 1 ? items : [...prev, ...items]));
         } catch (err) {
             console.error('Error fetching employees:', err);
             setError('Failed to load employee list');
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -505,6 +535,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                     fontWeight: 500
                 }}>
                     {employees.length} employee{employees.length !== 1 ? 's' : ''} found
+                    {typeof total === 'number' ? ` (showing ${employees.length} of ${total})` : ''}
                 </Typography>
             </DialogTitle>
             
@@ -636,6 +667,27 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                                 {employees.map((employee) => (
                                     renderEmployeeItem(employee)
                                 ))}
+                                {hasMore && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                                        <Button
+                                            variant="outlined"
+                                            onClick={() => fetchEmployees(page + 1, false)}
+                                            disabled={loadingMore}
+                                            sx={{
+                                                borderColor: '#D32F2F',
+                                                color: '#D32F2F',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                '&:hover': {
+                                                    borderColor: '#B71C1C',
+                                                    backgroundColor: 'rgba(211, 47, 47, 0.06)'
+                                                }
+                                            }}
+                                        >
+                                            {loadingMore ? <CircularProgress size={20} sx={{ color: '#D32F2F' }} /> : 'Load more'}
+                                        </Button>
+                                    </Box>
+                                )}
                             </List>
                         </Box>
                     </Box>
