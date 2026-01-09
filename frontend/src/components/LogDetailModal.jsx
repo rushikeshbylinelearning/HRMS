@@ -1,4 +1,11 @@
 // src/components/LogDetailModal.jsx
+/**
+ * RECENT FIXES (2026-01-08):
+ * 1. Fixed modal scroll at 100% browser zoom (max-height constraint on content)
+ * 2. Added smooth open/close animation (GPU-accelerated fade + scale)
+ * 3. Enhanced break visualization for consistency (admin + employee views)
+ * 4. No backend/API/timezone changes - purely UI/UX improvements
+ */
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, DialogActions, 
@@ -82,7 +89,6 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
 
     useEffect(() => {
         if (open) {
-            setIsLoading(true);
             setLocalError('');
             
             if (log) {
@@ -96,8 +102,8 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
             
             if (isAdmin) setAdminView('view');
             
-            // Small delay to prevent flicker
-            setTimeout(() => setIsLoading(false), 100);
+            // Content renders immediately - smooth animation from CSS
+            setIsLoading(false);
         } else {
             setIsLoading(false);
         }
@@ -113,26 +119,6 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     // Allow modal to open even without log if there's holiday or leave info
     if (!date) return null;
     if (!log && !holiday && !leave) return null;
-    
-    // PERFORMANCE OPTIMIZATION: Show loading state to prevent flicker
-    if (isLoading) {
-        return (
-            <Dialog 
-                open={open} 
-                onClose={onClose} 
-                maxWidth="lg"
-                fullWidth
-                PaperProps={{
-                    className: 'log-detail-modal-paper'
-                }}
-            >
-                <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
-                    <CircularProgress />
-                </DialogContent>
-            </Dialog>
-        );
-    }
-    
     if (log && !editableLog) return null;
 
     const fullDateStr = date.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
@@ -904,6 +890,16 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
             maxWidth="md"
             PaperProps={{ 
                 className: 'log-detail-dialog'
+            }}
+            TransitionProps={{
+                timeout: {
+                    enter: 300,
+                    exit: 200
+                }
+            }}
+            transitionDuration={{
+                enter: 300,
+                exit: 200
             }}
         >
             <DialogTitle className="dialog-header">

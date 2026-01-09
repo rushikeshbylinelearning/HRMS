@@ -9,6 +9,7 @@ const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const NewNotificationService = require('../services/NewNotificationService');
 const cache = require('../utils/cache');
+const cacheService = require('../services/cacheService');
 const { getISTNow, getISTDateString } = require('../utils/istTime');
 const { 
     UNPAID_BREAK_ALLOWANCE_MINUTES, 
@@ -75,6 +76,8 @@ router.post('/start', authenticateToken, async (req, res) => {
         cache.delete(cacheKey);
         // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
+        // Ensure Admin Dashboard cache refreshes after break start
+        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {

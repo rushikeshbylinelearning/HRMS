@@ -46,7 +46,9 @@ import {
   AccordionSummary,
   AccordionDetails,
   Autocomplete,
-  Stack
+  Stack,
+  TablePagination,
+  Skeleton
 } from '@mui/material';
 import {
   ArrowBack,
@@ -670,6 +672,11 @@ const LeavesTrackerPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  
+  // UPGRADED: Pagination state for Leave Balances table
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
   
   const [activeTab, setActiveTab] = useState(0);
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -693,6 +700,14 @@ const LeavesTrackerPage = () => {
     employeeId: '', sickLeaveEntitlement: 12, casualLeaveEntitlement: 12, paidLeaveEntitlement: 0, year: new Date().getFullYear() });
   const [bulkAllocateForm, setBulkAllocateForm] = useState({
     employeeIds: [], sickLeaveEntitlement: 12, casualLeaveEntitlement: 12, paidLeaveEntitlement: 0, year: new Date().getFullYear() });
+
+  // UPGRADED: Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchAllData = useCallback(async () => {
       setLoading(true);
@@ -749,20 +764,33 @@ const LeavesTrackerPage = () => {
   }, [fetchAllData]);
 
   const calculateLeaveBalances = (leaves, employee) => {
-    // --- START OF FIX: Use entitlements as the source of truth for total leaves ---
+    // FIXED: Backend is source of truth for balances - no frontend calculation
+    // Use backend-provided balances and entitlements directly
     const entitlements = {
         sick: employee.leaveEntitlements?.sick ?? 12,
         casual: employee.leaveEntitlements?.casual ?? 12,
         paid: employee.leaveEntitlements?.paid ?? 0,
     };
 
-    const used = { sick: 0, casual: 0, paid: 0, unpaid: 0 };
+    const balances = {
+        sick: employee.leaveBalances?.sick ?? entitlements.sick,
+        casual: employee.leaveBalances?.casual ?? entitlements.casual,
+        paid: employee.leaveBalances?.paid ?? entitlements.paid,
+    };
+
+    // Calculate used from entitlements - balances (backend already deducted)
+    const used = {
+        sick: Math.max(0, entitlements.sick - balances.sick),
+        casual: Math.max(0, entitlements.casual - balances.casual),
+        paid: Math.max(0, entitlements.paid - balances.paid),
+        unpaid: 0, // LOP doesn't deduct from balance
+    };
+
+    // Count LOP days separately (doesn't affect balance)
     leaves.forEach(leave => {
-        if (leave.status === 'Approved') {
-            const days = leave.leaveDates.length * (leave.leaveType.startsWith('Half Day') ? 0.5 : 1);
-            if (leave.requestType === 'Sick') used.sick += days;
-            else if (leave.requestType === 'Planned') used.casual += days; // Mapping "Planned" request type to "Casual" leave
-            else if (leave.requestType === 'Loss of Pay') used.unpaid += days;
+        if (leave.status === 'Approved' && leave.requestType === 'Loss of Pay') {
+            const days = leave.leaveDates.length * (leave.leaveType?.startsWith('Half Day') ? 0.5 : 1);
+            used.unpaid += days;
         }
     });
 
@@ -772,30 +800,89 @@ const LeavesTrackerPage = () => {
     return {
         entitlements,
         used,
-        balances: {
-            sick: employee.leaveBalances?.sick ?? entitlements.sick,
-            casual: employee.leaveBalances?.casual ?? entitlements.casual,
-            paid: employee.leaveBalances?.paid ?? entitlements.paid,
-        },
+        balances,
         totalUsed,
         totalEntitlement,
     };
-    // --- END OF FIX ---
   };
 
+  // UPGRADED: Better memoization with debounced search and proper dependency tracking
+  // FIXED PART 1: Filter to show ONLY Permanent Employees in Leave Balances tab
   const filteredLeaveData = useMemo(() => {
+    if (!leaveData || leaveData.length === 0) return [];
+    
     return leaveData.filter(data => {
       const emp = data.employee;
-      const matchesSearch = !searchTerm || emp.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || emp.employeeCode.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!emp) return false;
+      
+      // PART 1 FIX: Exclude Probation and Intern employees from Leave Balances
+      // Only show employees with employmentStatus === 'Permanent' OR probationStatus === 'Permanent'
+      const isPermanent = emp.employmentStatus === 'Permanent' || emp.probationStatus === 'Permanent';
+      if (!isPermanent) return false;
+      
+      const matchesSearch = !debouncedSearchTerm || 
+        (emp.fullName && emp.fullName.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+        (emp.employeeCode && emp.employeeCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
       const matchesDepartment = !selectedDepartment || emp.department === selectedDepartment;
-      return matchesSearch && matchesDepartment;
+      const matchesEmployee = !selectedEmployee || emp._id === selectedEmployee;
+      
+      return matchesSearch && matchesDepartment && matchesEmployee;
     });
-  }, [leaveData, searchTerm, selectedDepartment]);
+  }, [leaveData, debouncedSearchTerm, selectedDepartment, selectedEmployee]);
+
+  // UPGRADED: Paginated leave data for current page
+  const paginatedLeaveData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredLeaveData.slice(startIndex, endIndex);
+  }, [filteredLeaveData, page, rowsPerPage]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearchTerm, selectedDepartment, selectedEmployee, selectedYear]);
 
   const departments = useMemo(() => {
     const deptSet = new Set(employees.map(emp => emp.department).filter(Boolean));
     return Array.from(deptSet).sort();
   }, [employees]);
+
+  // FIXED: Memoize filtered leave requests to prevent recalculation on every render
+  const filteredLeaveRequests = useMemo(() => {
+    const getWeekOfMonth = (d) => {
+      try {
+        const date = new Date(d);
+        if (isNaN(date)) return null;
+        return Math.ceil(date.getDate() / 7);
+      } catch (e) { return null; }
+    };
+
+    return leaveRequests.filter(req => {
+      const emp = req.employee || {};
+      // year filter (use first leave date if available)
+      const firstDateStr = Array.isArray(req.leaveDates) && req.leaveDates.length ? req.leaveDates[0] : req.createdAt || null;
+      const firstDate = firstDateStr ? new Date(firstDateStr) : null;
+      if (selectedYear && firstDate && firstDate.getFullYear() !== Number(selectedYear)) return false;
+
+      if (selectedMonth !== '' && firstDate) {
+        if (firstDate.getMonth() !== Number(selectedMonth)) return false;
+      }
+      if (selectedWeek !== '' && firstDate) {
+        const wk = getWeekOfMonth(firstDate);
+        if (wk !== Number(selectedWeek)) return false;
+      }
+
+      if (selectedDepartment && emp.department !== selectedDepartment) return false;
+      if (selectedEmployee && emp._id !== selectedEmployee) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const name = (emp.fullName || '').toLowerCase();
+        const code = (emp.employeeCode || '').toLowerCase();
+        if (!name.includes(q) && !code.includes(q) && !(req.requestType || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [leaveRequests, selectedYear, selectedMonth, selectedWeek, selectedDepartment, selectedEmployee, searchTerm]);
   
   const handleAssignLeave = async (formData) => {
     setIsAssigningLeave(true);
@@ -908,8 +995,7 @@ const LeavesTrackerPage = () => {
 
   const handleBack = () => navigate(-1);
   
-  // Fetch leave usage data for a specific year
-  // When year is selected (e.g., 2024), we show data for the previous year (2023) that led to the current year's balance
+  // FIXED: Fetch leave usage data - optimized to only fetch employee-specific data
   const fetchLeaveUsageForYear = useCallback(async (employeeId, year, employeeData) => {
     if (!employeeId || !year) return;
     
@@ -918,13 +1004,12 @@ const LeavesTrackerPage = () => {
       // Get previous year (year - 1) - this is what we're analyzing for year-end summary
       const previousYear = year - 1;
       
-      // Fetch all leave requests for this employee:
-      // 1. Previous year (for year-end summary calculations)
-      // 2. Current year (for KPI calculations - showing current year usage)
+      // FIXED: Fetch employee-specific data only - no global fetching
       const [leaveRequestsResPrevious, leaveRequestsResCurrent, yearEndRes] = await Promise.all([
         axios.get(`/admin/leaves/employee/${employeeId}?year=${previousYear}`),
-        axios.get(`/admin/leaves/employee/${employeeId}?year=${year}`), // Current year for KPIs
-        axios.get(`/admin/leaves/year-end-requests?year=${previousYear}&limit=100`)
+        axios.get(`/admin/leaves/employee/${employeeId}?year=${year}`),
+        // FIXED: Fetch employee-specific year-end requests only
+        axios.get(`/admin/leaves/year-end-requests?employeeId=${employeeId}&year=${previousYear}`)
       ]);
 
       const allLeaveRequestsPrevious = leaveRequestsResPrevious.data || [];
@@ -934,10 +1019,8 @@ const LeavesTrackerPage = () => {
       const normalLeaveRequestsPrevious = allLeaveRequestsPrevious.filter(r => r.requestType !== 'YEAR_END');
       const normalLeaveRequestsCurrent = allLeaveRequestsCurrent.filter(r => r.requestType !== 'YEAR_END');
       
-      // Filter year-end requests for this employee (for the previous year)
-      const employeeYearEndRequests = (yearEndRes.data.requests || yearEndRes.data || []).filter(req => 
-        req.employee?._id === employeeId || req.employee === employeeId
-      );
+      // FIXED: Backend already filtered by employeeId - no client-side filtering needed
+      const employeeYearEndRequests = yearEndRes.data.requests || yearEndRes.data || [];
 
       // Calculate utilized leaves by type for the PREVIOUS year
       const utilized = { sick: 0, casual: 0, paid: 0 };
@@ -1001,13 +1084,11 @@ const LeavesTrackerPage = () => {
       setLoadingYearEndHistory(true);
       setLoadingLeaveUsage(true);
       
-      // Fetch Year-End requests
-      axios.get(`/admin/leaves/year-end-requests?limit=100`)
+      // FIXED: Fetch employee-specific Year-End requests only
+      axios.get(`/admin/leaves/year-end-requests?employeeId=${dialogEmployee._id}&limit=100`)
         .then(res => {
-          // Filter Year-End requests for this employee
-          const employeeYearEndRequests = (res.data.requests || []).filter(req => 
-            req.employee?._id === dialogEmployee._id || req.employee === dialogEmployee._id
-          );
+          // Backend already filtered by employeeId
+          const employeeYearEndRequests = res.data.requests || [];
           setYearEndHistory(employeeYearEndRequests);
         })
         .catch(err => {
@@ -1039,134 +1120,315 @@ const LeavesTrackerPage = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} sx={{ backgroundColor: '#2C3E50', borderRadius: '12px', p: 2 }}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <IconButton onClick={handleBack} size="small" sx={{ color: '#FFFFFF' }}><ArrowBack /></IconButton>
-            <Typography variant="h4" component="h1" sx={{ color: '#FFFFFF', fontWeight: 'bold' }}>Employee Leaves Tracker</Typography>
+      <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+        {/* UPGRADED: Clean header with better responsiveness */}
+        <Paper elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Box sx={{ p: 2, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <IconButton onClick={handleBack} size="small" sx={{ color: 'primary.main' }}>
+                <ArrowBack />
+              </IconButton>
+              <Typography variant="h5" component="h1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Employee Leaves Tracker
+              </Typography>
+            </Box>
+            <Box display="flex" gap={1.5} flexWrap="wrap">
+              <Button 
+                variant="contained" 
+                size="small"
+                startIcon={<Add />} 
+                onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }}
+                sx={{ textTransform: 'none' }}
+              >
+                Assign Leave
+              </Button>
+              <Button 
+                variant="contained" 
+                size="small"
+                startIcon={<Assignment />} 
+                onClick={() => setShowAllocateDialog(true)}
+                color="info"
+                sx={{ textTransform: 'none' }}
+              >
+                Allocate
+              </Button>
+              <Button 
+                variant="contained" 
+                size="small"
+                startIcon={<Group />} 
+                onClick={() => setShowBulkAllocateDialog(true)}
+                color="secondary"
+                sx={{ textTransform: 'none' }}
+              >
+                Bulk Allocate
+              </Button>
+            </Box>
           </Box>
-          <Box display="flex" gap={2}>
-            <Button variant="contained" startIcon={<Add />} onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }} sx={{ backgroundColor: '#28a745', '&:hover': { backgroundColor: '#218838' } }}>Assign Leave</Button>
-            <Button variant="contained" startIcon={<Assignment />} onClick={() => setShowAllocateDialog(true)} sx={{ backgroundColor: '#17a2b8', '&:hover': { backgroundColor: '#138496' } }}>Allocate Leaves</Button>
-            <Button variant="contained" startIcon={<Group />} onClick={() => setShowBulkAllocateDialog(true)} sx={{ backgroundColor: '#6f42c1', '&:hover': { backgroundColor: '#5a32a3' } }}>Bulk Allocate</Button>
-          </Box>
-        </Box>
+        </Paper>
         
-        <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-            <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tab label="Leave Balances" />
-                <Tab label="Leave Requests" />
-                <Tab label="Saturday Schedule" />
-            </Tabs>
-        </Card>
+        {/* UPGRADED: Tabs with cleaner styling */}
+        <Paper elevation={0} sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, newValue) => setActiveTab(newValue)} 
+            sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              '& .MuiTab-root': { textTransform: 'none', fontWeight: 500 }
+            }}
+          >
+            <Tab label="Leave Balances" />
+            <Tab label="Leave Requests" />
+            <Tab label="Saturday Schedule" />
+          </Tabs>
+        </Paper>
 
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <Card sx={{ borderRadius: '16px', mb: 3 }}>
-            <CardContent>
-                <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={6} md={3}><TextField fullWidth label="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }} size="small" /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Department</InputLabel><Select value={selectedDepartment} label="Department" onChange={(e) => setSelectedDepartment(e.target.value)}><MenuItem value="">All Departments</MenuItem>{departments.map((dept) => (<MenuItem key={dept} value={dept}>{dept}</MenuItem>))}</Select></FormControl></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Employee</InputLabel><Select value={selectedEmployee} label="Employee" onChange={(e) => setSelectedEmployee(e.target.value)}><MenuItem value="">All Employees</MenuItem>{employees.map((emp) => (<MenuItem key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</MenuItem>))}</Select></FormControl></Grid>
-                    <Grid item xs={12} sm={6} md={3}><FormControl fullWidth size="small"><InputLabel>Year</InputLabel><Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value)}>{[2023, 2024, 2025, 2026].map((year) => (<MenuItem key={year} value={year}>{year}</MenuItem>))}</Select></FormControl></Grid>
-                </Grid>
-            </CardContent>
-        </Card>
+        {/* UPGRADED: Cleaner filters card */}
+        <Paper elevation={0} sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField 
+                fullWidth 
+                label="Search employees..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                placeholder="Name or code..."
+                InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }} 
+                size="small" 
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Department</InputLabel>
+                <Select value={selectedDepartment} label="Department" onChange={(e) => setSelectedDepartment(e.target.value)}>
+                  <MenuItem value="">All Departments</MenuItem>
+                  {departments.map((dept) => (<MenuItem key={dept} value={dept}>{dept}</MenuItem>))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Employee</InputLabel>
+                <Select value={selectedEmployee} label="Employee" onChange={(e) => setSelectedEmployee(e.target.value)}>
+                  <MenuItem value="">All Employees</MenuItem>
+                  {employees.map((emp) => (<MenuItem key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</MenuItem>))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Year</InputLabel>
+                <Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value)}>
+                  {[2023, 2024, 2025, 2026].map((year) => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
         
-    {/* --- START OF FIX: Dynamic Table Rendering --- */}
+    {/* UPGRADED: Modern Leave Balances table with pagination */}
         {activeTab === 0 && (
-            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, color: '#dc3545' }}>Leave Balances Overview</Typography>
-                    {filteredLeaveData.length === 0 ? (<Box textAlign="center" py={4}><Typography variant="h6" color="textSecondary">No leave data found for the selected filters.</Typography></Box>) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table><TableHead><TableRow sx={{ backgroundColor: '#f8f9fa' }}><TableCell sx={{ fontWeight: 'bold' }}>Employee</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Total Leave (Used/Total)</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Sick Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Casual Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Planned Leave</TableCell><TableCell sx={{ fontWeight: 'bold' }}>LOP Loss of Pay</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell></TableRow></TableHead>
-                            <TableBody>
-                                {filteredLeaveData.map((data) => {
-                                    const { employee, balances } = data;
-                                    const { totalUsed, totalEntitlement } = balances;
-                                    const { used, entitlements } = balances;
-
-                                    return (
-                                        <TableRow 
-                                            key={employee._id} 
-                                            hover 
-                                            sx={{ cursor: 'pointer' }}
-                                            onClick={() => {
-                                                setDialogEmployee(employee);
-                                                setSelectedRequest(null);
-                                                setShowEmployeeDialog(true);
-                                            }}
-                                        >
-                                            <TableCell><Box display="flex" alignItems="center" gap={1}><Avatar sx={{ width: 30, height: 30 }}>{employee.fullName.charAt(0)}</Avatar><Box><Typography variant="body2" fontWeight="bold">{employee.fullName}</Typography><Typography variant="caption" color="textSecondary">{employee.employeeCode}</Typography></Box></Box></TableCell>
-                                            <TableCell>{employee.department || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight="bold">{totalUsed} / {totalEntitlement} days</Typography>
-                                                <LinearProgress variant="determinate" value={(totalUsed / totalEntitlement) * 100 || 0} color={getProgressColor(totalUsed, totalEntitlement)} sx={{ height: 8, borderRadius: 5, backgroundColor: '#e0e0e0' }} />
-                                                <Typography variant="caption" color="textSecondary">{((totalUsed / totalEntitlement) * 100 || 0).toFixed(1)}% used</Typography>
-                                            </TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.sick}</Typography><Typography variant="body2">Balance: {balances.balances.sick}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.sick}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.casual}</Typography><Typography variant="body2">Balance: {balances.balances.casual}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.casual}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.paid}</Typography><Typography variant="body2">Balance: {balances.balances.paid}</Typography><Typography variant="caption" color="textSecondary">Total: {entitlements.paid}</Typography></TableCell>
-                                            <TableCell><Typography variant="body2">Used: {used.unpaid}</Typography></TableCell>
-                                            <TableCell onClick={(e) => e.stopPropagation()}>
-                                                <Box display="flex" gap={1}>
-                                                    <Tooltip title="Assign Leave">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => { 
-                                                                setAssignLeaveRequest({ employee: { _id: employee._id } }); 
-                                                                setShowAssignDialog(true); 
-                                                            }} 
-                                                            sx={{ color: '#28a745' }}
-                                                        >
-                                                            <Add />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="View Leave History">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => {
-                                                                setDialogEmployee(employee);
-                                                                setSelectedRequest(null);
-                                                                setShowEmployeeDialog(true);
-                                                            }}
-                                                            sx={{ color: '#17a2b8' }}
-                                                        >
-                                                            <History />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Allocate Leaves">
-                                                        <IconButton 
-                                                            size="small" 
-                                                            onClick={() => { 
-                                                                setAllocateForm({ ...allocateForm, employeeId: employee._id }); 
-                                                                setShowAllocateDialog(true); 
-                                                            }} 
-                                                            sx={{ color: '#17a2b8' }}
-                                                        >
-                                                            <Assignment />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Box>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+            <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Leave Balances Overview
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {filteredLeaveData.length} employee{filteredLeaveData.length !== 1 ? 's' : ''} found
+                    </Typography>
+                </Box>
+                
+                {loading ? (
+                    <Box sx={{ p: 2 }}>
+                        {[...Array(5)].map((_, index) => (
+                            <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 1 }} />
+                        ))}
                     </Box>
+                ) : filteredLeaveData.length === 0 ? (
+                    <Box textAlign="center" py={8}>
+                        <Typography variant="h6" color="text.secondary" gutterBottom>
+                            No employees found
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Try adjusting your search filters
+                        </Typography>
+                    </Box>
+                ) : (
+                    <>
+                        <TableContainer sx={{ maxHeight: { xs: '60vh', md: '70vh' } }}>
+                            <Table stickyHeader size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', py: 1.5 }}>Employee</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Department</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Total (Used/Total)</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Sick</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Casual</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Planned</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>LOP</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', textAlign: 'center' }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {paginatedLeaveData.map((data) => {
+                                        const { employee, balances } = data;
+                                        const { totalUsed, totalEntitlement } = balances;
+                                        const { used, entitlements } = balances;
+
+                                        return (
+                                            <TableRow 
+                                                key={employee._id} 
+                                                hover 
+                                                sx={{ 
+                                                    cursor: 'pointer',
+                                                    '&:hover': { bgcolor: 'action.hover' },
+                                                    '& td': { py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
+                                                }}
+                                                onClick={() => {
+                                                    setDialogEmployee(employee);
+                                                    setSelectedRequest(null);
+                                                    setShowEmployeeDialog(true);
+                                                }}
+                                            >
+                                                <TableCell>
+                                                    <Box display="flex" alignItems="center" gap={1.5}>
+                                                        <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem', bgcolor: 'primary.main' }}>
+                                                            {employee.fullName.charAt(0)}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight={500}>
+                                                                {employee.fullName}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {employee.employeeCode}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {employee.department || 'N/A'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ minWidth: 120 }}>
+                                                        <Typography variant="body2" fontWeight={500} gutterBottom>
+                                                            {totalUsed} / {totalEntitlement}
+                                                        </Typography>
+                                                        <LinearProgress 
+                                                            variant="determinate" 
+                                                            value={(totalUsed / totalEntitlement) * 100 || 0} 
+                                                            color={getProgressColor(totalUsed, totalEntitlement)} 
+                                                            sx={{ height: 6, borderRadius: 1 }} 
+                                                        />
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {((totalUsed / totalEntitlement) * 100 || 0).toFixed(0)}% used
+                                                        </Typography>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {used.sick} / {entitlements.sick}
+                                                    </Typography>
+                                                    <Typography variant="caption" color={balances.balances.sick > 0 ? 'success.main' : 'error.main'}>
+                                                        Bal: {balances.balances.sick}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {used.casual} / {entitlements.casual}
+                                                    </Typography>
+                                                    <Typography variant="caption" color={balances.balances.casual > 0 ? 'success.main' : 'error.main'}>
+                                                        Bal: {balances.balances.casual}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {used.paid} / {entitlements.paid}
+                                                    </Typography>
+                                                    <Typography variant="caption" color={balances.balances.paid > 0 ? 'success.main' : 'error.main'}>
+                                                        Bal: {balances.balances.paid}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" color="warning.main">
+                                                        {used.unpaid}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                    <Box display="flex" gap={0.5} justifyContent="center">
+                                                        <Tooltip title="Assign Leave">
+                                                            <IconButton 
+                                                                size="small" 
+                                                                onClick={() => { 
+                                                                    setAssignLeaveRequest({ employee: { _id: employee._id } }); 
+                                                                    setShowAssignDialog(true); 
+                                                                }}
+                                                            >
+                                                                <Add fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="View History">
+                                                            <IconButton 
+                                                                size="small" 
+                                                                onClick={() => {
+                                                                    setDialogEmployee(employee);
+                                                                    setSelectedRequest(null);
+                                                                    setShowEmployeeDialog(true);
+                                                                }}
+                                                            >
+                                                                <History fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Allocate">
+                                                            <IconButton 
+                                                                size="small" 
+                                                                onClick={() => { 
+                                                                    setAllocateForm({ ...allocateForm, employeeId: employee._id }); 
+                                                                    setShowAllocateDialog(true); 
+                                                                }}
+                                                            >
+                                                                <Assignment fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                        
+                        {/* UPGRADED: Pagination controls */}
+                        <TablePagination
+                            component="div"
+                            count={filteredLeaveData.length}
+                            page={page}
+                            onPageChange={(event, newPage) => setPage(newPage)}
+                            rowsPerPage={rowsPerPage}
+                            onRowsPerPageChange={(event) => {
+                                setRowsPerPage(parseInt(event.target.value, 10));
+                                setPage(0);
+                            }}
+                            rowsPerPageOptions={[10, 15, 25, 50]}
+                            sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+                        />
+                    </>
                 )}
-                </CardContent>
-            </Card>
+            </Paper>
         )}
-        {/* Leave Requests Tab */}
+        {/* UPGRADED: Leave Requests Tab */}
         {activeTab === 1 && (
-            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', mb: 3 }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, color: '#dc3545' }}>Leave Requests</Typography>
-                    <Grid container spacing={2} sx={{ mb: 2 }} alignItems="center">
-                        <Grid item xs={12} sm={4} md={3}>
+            <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
+                        Leave Requests
+                    </Typography>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Month</InputLabel>
                                 <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value)}>
@@ -1177,7 +1439,7 @@ const LeavesTrackerPage = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={4} md={3}>
+                        <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Week</InputLabel>
                                 <Select value={selectedWeek} label="Week" onChange={(e) => setSelectedWeek(e.target.value)}>
@@ -1186,96 +1448,128 @@ const LeavesTrackerPage = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={4} md={6}>
-                            <Typography variant="body2" color="text.secondary">Filters apply to the first date of the leave request. Use Search / Department / Employee selectors above for additional filtering.</Typography>
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="caption" color="text.secondary">
+                                Filters apply to first leave date. {filteredLeaveRequests.length} request{filteredLeaveRequests.length !== 1 ? 's' : ''} found.
+                            </Typography>
                         </Grid>
                     </Grid>
+                </Box>
 
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table>
-                            <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Employee</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Leave Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Dates</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Days</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Applied On</TableCell>
+                <TableContainer sx={{ maxHeight: { xs: '60vh', md: '70vh' } }}>
+                    <Table stickyHeader size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', py: 1.5 }}>Employee</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Department</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Type</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Leave Type</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Dates</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Days</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Status</TableCell>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Applied On</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {filteredLeaveRequests.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8}>
+                                        <Box textAlign="center" py={8}>
+                                            <Typography variant="h6" color="text.secondary" gutterBottom>
+                                                No leave requests found
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Try adjusting your filters
+                                            </Typography>
+                                        </Box>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {/** Rendered via memo below - show placeholder while loading */}
-                                {(() => {
-                                    const getWeekOfMonth = (d) => {
-                                        try {
-                                            const date = new Date(d);
-                                            if (isNaN(date)) return null;
-                                            return Math.ceil(date.getDate() / 7);
-                                        } catch (e) { return null; }
-                                    };
-
-                                    const filteredRequests = leaveRequests.filter(req => {
-                                        const emp = req.employee || {};
-                                        // year filter (use first leave date if available)
-                                        const firstDateStr = Array.isArray(req.leaveDates) && req.leaveDates.length ? req.leaveDates[0] : req.createdAt || null;
-                                        const firstDate = firstDateStr ? new Date(firstDateStr) : null;
-                                        if (selectedYear && firstDate && firstDate.getFullYear() !== Number(selectedYear)) return false;
-
-                                        if (selectedMonth !== '' && firstDate) {
-                                            if (firstDate.getMonth() !== Number(selectedMonth)) return false;
-                                        }
-                                        if (selectedWeek !== '' && firstDate) {
-                                            const wk = getWeekOfMonth(firstDate);
-                                            if (wk !== Number(selectedWeek)) return false;
-                                        }
-
-                                        if (selectedDepartment && emp.department !== selectedDepartment) return false;
-                                        if (selectedEmployee && emp._id !== selectedEmployee) return false;
-                                        if (searchTerm) {
-                                            const q = searchTerm.toLowerCase();
-                                            const name = (emp.fullName || '').toLowerCase();
-                                            const code = (emp.employeeCode || '').toLowerCase();
-                                            if (!name.includes(q) && !code.includes(q) && !(req.requestType || '').toLowerCase().includes(q)) return false;
-                                        }
-                                        return true;
-                                    });
-
-                                    if (filteredRequests.length === 0) {
-                                        return (<TableRow><TableCell colSpan={8}><Box textAlign="center" py={4}><Typography variant="h6" color="textSecondary">No leave requests found for the selected filters.</Typography></Box></TableCell></TableRow>);
-                                    }
-
-                                    return filteredRequests.map(req => {
-                                        const emp = req.employee || {};
-                                        const dates = Array.isArray(req.leaveDates) ? req.leaveDates : [];
-                                        const days = dates.length * (req.leaveType && req.leaveType.startsWith('Half Day') ? 0.5 : 1);
-                                        const appliedOn = req.createdAt ? new Date(req.createdAt).toLocaleDateString() : (dates[0] ? new Date(dates[0]).toLocaleDateString() : 'N/A');
-                                        return (
-                                            <TableRow key={req._id} hover sx={{ cursor: 'pointer' }} onClick={() => { setDialogEmployee(emp); setSelectedRequest(req); setShowEmployeeDialog(true); }}>
-                                                <TableCell><Box display="flex" alignItems="center" gap={1}><Avatar sx={{ width: 30, height: 30 }}>{(emp.fullName || '').charAt(0)}</Avatar><Box><Typography variant="body2" fontWeight="bold">{emp.fullName || 'Unknown'}</Typography><Typography variant="caption" color="textSecondary">{emp.employeeCode || ''}</Typography></Box></Box></TableCell>
-                                                <TableCell>{emp.department || 'N/A'}</TableCell>
-                                                <TableCell>{formatLeaveRequestType(req.requestType) || 'N/A'}</TableCell>
-                                                <TableCell>{req.leaveType || 'N/A'}</TableCell>
-                                                <TableCell>{dates.map(d => (new Date(d)).toLocaleDateString()).join(', ')}</TableCell>
-                                                <TableCell>{days}</TableCell>
-                                                <TableCell><Chip label={req.status || 'Pending'} color={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'} size="small" /></TableCell>
-                                                <TableCell>{appliedOn}</TableCell>
-                                            </TableRow>
-                                        );
-                                    });
-                                })()}
-                            </TableBody>
-                        </Table>
-                    </Box>
-                </CardContent>
-            </Card>
+                            ) : (
+                                filteredLeaveRequests.map(req => {
+                                    const emp = req.employee || {};
+                                    const dates = Array.isArray(req.leaveDates) ? req.leaveDates : [];
+                                    const days = dates.length * (req.leaveType && req.leaveType.startsWith('Half Day') ? 0.5 : 1);
+                                    const appliedOn = req.createdAt ? new Date(req.createdAt).toLocaleDateString() : (dates[0] ? new Date(dates[0]).toLocaleDateString() : 'N/A');
+                                    return (
+                                        <TableRow 
+                                            key={req._id} 
+                                            hover 
+                                            sx={{ 
+                                                cursor: 'pointer',
+                                                '&:hover': { bgcolor: 'action.hover' },
+                                                '& td': { py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
+                                            }} 
+                                            onClick={() => { setDialogEmployee(emp); setSelectedRequest(req); setShowEmployeeDialog(true); }}
+                                        >
+                                            <TableCell>
+                                                <Box display="flex" alignItems="center" gap={1.5}>
+                                                    <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem', bgcolor: 'primary.main' }}>
+                                                        {(emp.fullName || '').charAt(0)}
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight={500}>
+                                                            {emp.fullName || 'Unknown'}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {emp.employeeCode || ''}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {emp.department || 'N/A'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {formatLeaveRequestType(req.requestType) || 'N/A'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {req.leaveType || 'N/A'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {dates.slice(0, 2).map(d => (new Date(d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}
+                                                    {dates.length > 2 && ` +${dates.length - 2}`}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={500}>
+                                                    {days}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip 
+                                                    label={req.status || 'Pending'} 
+                                                    color={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'} 
+                                                    size="small" 
+                                                    sx={{ fontWeight: 500, height: 24 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {appliedOn}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
         )}
 
         {activeTab === 2 && (
             <SaturdayScheduleManager employees={employees} onUpdate={fetchAllData} />
         )}
         
+        {/* PART 2 FIX: Redesigned Employee Leave History Modal */}
         <Dialog
             open={showEmployeeDialog}
             onClose={() => {
@@ -1284,25 +1578,56 @@ const LeavesTrackerPage = () => {
                 setLeaveUsageData(null);
                 setDialogSelectedYear(new Date().getFullYear());
             }}
-            maxWidth="lg"
+            maxWidth="xl"
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: '#ffffff',
+                    bgcolor: '#fafafa',
                     borderRadius: 2,
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
-                    p: 0,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    maxHeight: '90vh',
                 }
             }}
         >
-            <DialogTitle sx={{ color: '#000000', fontWeight: 700, px: 3, pt: 3, pb: 2, borderBottom: '2px solid #D32F2F', bgcolor: '#FFFFFF' }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h5" component="span" sx={{ color: '#000000' }}>Employee Leave History</Typography>
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                        <InputLabel sx={{ color: '#000000' }}>Select Year</InputLabel>
+            {/* REDESIGNED: Cleaner sticky header */}
+            <DialogTitle 
+                sx={{ 
+                    bgcolor: 'white',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                    px: 3,
+                    py: 2
+                }}
+            >
+                <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
+                    <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
+                            Employee Leave History
+                        </Typography>
+                        {dialogEmployee && (
+                            <Box display="flex" alignItems="center" gap={1.5} mt={1}>
+                                <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
+                                    {(dialogEmployee.fullName || '').charAt(0)}
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {dialogEmployee.fullName || 'Unknown'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {dialogEmployee.employeeCode || 'N/A'} • {dialogEmployee.department || 'N/A'}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        )}
+                    </Box>
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                        <InputLabel>Year</InputLabel>
                         <Select
                             value={dialogSelectedYear}
-                            label="Select Year"
+                            label="Year"
                             onChange={(e) => {
                                 const newYear = e.target.value;
                                 setDialogSelectedYear(newYear);
@@ -1310,50 +1635,28 @@ const LeavesTrackerPage = () => {
                                     fetchLeaveUsageForYear(dialogEmployee._id, newYear, dialogEmployee);
                                 }
                             }}
-                            sx={{
-                                color: '#000000',
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#000000'
-                                },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#000000'
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#D32F2F'
-                                }
-                            }}
                         >
                             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <MenuItem key={year} value={year} sx={{ color: '#000000' }}>{year}</MenuItem>
+                                <MenuItem key={year} value={year}>{year}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
                 </Box>
             </DialogTitle>
-            <DialogContent sx={{ px: 3, pb: 2, maxHeight: '80vh', overflowY: 'auto' }}>
+
+            <DialogContent sx={{ px: 3, py: 3, bgcolor: '#fafafa' }}>
                 {dialogEmployee ? (
-                    <Box sx={{ color: '#000000' }}>
-                        {/* Employee Basic Info */}
-                        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 3 }}>
-                            <Avatar sx={{ width: 56, height: 56, bgcolor: '#D32F2F', color: '#FFFFFF' }}>
-                                {(dialogEmployee.fullName || '').charAt(0)}
-                            </Avatar>
-                            <Box flex={1}>
-                                <Typography variant="h6" sx={{ color: '#000000', fontWeight: 700 }}>
-                                    {dialogEmployee.fullName || 'Unknown'}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#000000' }}>
-                                    {dialogEmployee.employeeCode || 'N/A'} • {dialogEmployee.department || 'N/A'}
-                                </Typography>
-                            </Box>
-                        </Box>
+                    <Box>
 
                         {loadingLeaveUsage || loadingYearEndHistory ? (
-                            <Box display="flex" justifyContent="center" py={4}>
+                            <Box display="flex" flexDirection="column" alignItems="center" py={6}>
                                 <CircularProgress />
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                                    Loading leave data...
+                                </Typography>
                             </Box>
                         ) : !leaveUsageData ? (
-                            <Alert sx={{ bgcolor: '#FFFFFF', color: '#000000', border: '1px solid #E0E0E0' }}>
+                            <Alert severity="info" variant="outlined">
                                 Unable to load leave usage data.
                             </Alert>
                         ) : (
@@ -1376,292 +1679,298 @@ const LeavesTrackerPage = () => {
                                     
                                     return (
                                         <>
-                                            {/* TOP SUMMARY BANNER - BIG, BOLD, NON-NEGOTIABLE */}
+                                            {/* REDESIGNED: Clean Leave Summary Cards */}
                                             <Paper 
-                                                elevation={3} 
+                                                elevation={0} 
                                                 sx={{ 
                                                     p: 3, 
-                                                    mb: 3, 
-                                                    bgcolor: '#FFFFFF', 
+                                                    mb: 2, 
+                                                    bgcolor: 'white', 
                                                     borderRadius: 2,
-                                                    border: '2px solid #D32F2F'
+                                                    border: '1px solid',
+                                                    borderColor: 'divider'
                                                 }}
                                             >
                                                 <Typography 
-                                                    variant="h6" 
+                                                    variant="subtitle1" 
                                                     sx={{ 
-                                                        mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
-                                                        fontSize: '1.1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        borderBottom: '2px solid #D32F2F',
-                                                        pb: 1
+                                                        mb: 2.5, 
+                                                        fontWeight: 600,
+                                                        color: 'text.primary'
                                                     }}
                                                 >
-                                                    LEAVE SUMMARY ({leaveUsageData.previousYear} → {leaveUsageData.year})
+                                                    Leave Summary ({leaveUsageData.previousYear} → {leaveUsageData.year})
                                                 </Typography>
                                                 
-                                                <Grid container spacing={3}>
+                                                <Grid container spacing={2}>
                                                     <Grid item xs={12} sm={4}>
-                                                        <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
+                                                        <Paper 
+                                                            elevation={0}
+                                                            sx={{ 
+                                                                p: 2.5, 
+                                                                textAlign: 'center',
+                                                                bgcolor: '#f8f9fa',
+                                                                borderRadius: 1.5,
+                                                                border: '1px solid',
+                                                                borderColor: 'divider'
+                                                            }}
+                                                        >
+                                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                                                                 Previous Year Opening Balance
                                                             </Typography>
                                                             <Typography 
-                                                                variant="h3" 
+                                                                variant="h4" 
                                                                 sx={{ 
-                                                                    fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    fontWeight: 600, 
+                                                                    color: 'text.primary'
                                                                 }}
                                                             >
-                                                                {totalOpening.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalOpening.toFixed(1)}
                                                             </Typography>
-                                                        </Box>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                DAYS
+                                                            </Typography>
+                                                        </Paper>
                                                     </Grid>
                                                     <Grid item xs={12} sm={4}>
-                                                        <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
+                                                        <Paper 
+                                                            elevation={0}
+                                                            sx={{ 
+                                                                p: 2.5, 
+                                                                textAlign: 'center',
+                                                                bgcolor: '#f8f9fa',
+                                                                borderRadius: 1.5,
+                                                                border: '1px solid',
+                                                                borderColor: 'divider'
+                                                            }}
+                                                        >
+                                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                                                                 Leaves Used During Year
                                                             </Typography>
                                                             <Typography 
-                                                                variant="h3" 
+                                                                variant="h4" 
                                                                 sx={{ 
-                                                                    fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    fontWeight: 600, 
+                                                                    color: 'text.primary'
                                                                 }}
                                                             >
-                                                                {totalUtilized.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalUtilized.toFixed(1)}
                                                             </Typography>
-                                                        </Box>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                DAYS
+                                                            </Typography>
+                                                        </Paper>
                                                     </Grid>
                                                     <Grid item xs={12} sm={4}>
-                                                        <Box sx={{ textAlign: 'center' }}>
-                                                            <Typography variant="body2" sx={{ mb: 1, color: '#000000' }}>
+                                                        <Paper 
+                                                            elevation={0}
+                                                            sx={{ 
+                                                                p: 2.5, 
+                                                                textAlign: 'center',
+                                                                bgcolor: '#f8f9fa',
+                                                                borderRadius: 1.5,
+                                                                border: '1px solid',
+                                                                borderColor: 'divider'
+                                                            }}
+                                                        >
+                                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                                                                 Remaining at Year End
                                                             </Typography>
                                                             <Typography 
-                                                                variant="h3" 
+                                                                variant="h4" 
                                                                 sx={{ 
-                                                                    fontWeight: 700, 
-                                                                    color: '#000000',
-                                                                    fontSize: '2.5rem'
+                                                                    fontWeight: 600, 
+                                                                    color: 'text.primary'
                                                                 }}
                                                             >
-                                                                {totalRemaining.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 400 }}>DAYS</span>
+                                                                {totalRemaining.toFixed(1)}
                                                             </Typography>
-                                                        </Box>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                DAYS
+                                                            </Typography>
+                                                        </Paper>
                                                     </Grid>
                                                 </Grid>
                                             </Paper>
 
-                                            {/* YEAR-END DECISION - CENTER STAGE */}
+                                            {/* REDESIGNED: Year-End Action Section */}
                                             <Paper 
-                                                elevation={2} 
+                                                elevation={0} 
                                                 sx={{ 
-                                                    p: 3, 
-                                                    mb: 3, 
-                                                    bgcolor: '#FFFFFF',
+                                                    p: 2.5, 
+                                                    mb: 2, 
+                                                    bgcolor: 'white',
                                                     borderRadius: 2,
-                                                    border: '1px solid #E0E0E0'
+                                                    border: '1px solid',
+                                                    borderColor: 'divider'
                                                 }}
                                             >
                                                 <Typography 
-                                                    variant="h6" 
+                                                    variant="subtitle1" 
                                                     sx={{ 
                                                         mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
-                                                        fontSize: '1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        borderLeft: '4px solid #D32F2F',
-                                                        pl: 1.5
+                                                        fontWeight: 600,
+                                                        color: 'text.primary'
                                                     }}
                                                 >
-                                                    YEAR-END ACTION TAKEN
+                                                    Year-End Action Taken
                                                 </Typography>
                                                 
                                                 {primaryYearEndAction ? (
                                                     <Box>
-                                                        <Box sx={{ mb: 2 }}>
+                                                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                                                             {primaryYearEndAction.yearEndSubType === 'CARRY_FORWARD' ? (
-                                                                <Typography 
-                                                                    variant="h4" 
-                                                                    sx={{ 
-                                                                        fontWeight: 700, 
-                                                                        color: '#000000',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 1,
-                                                                        flexWrap: 'wrap'
-                                                                    }}
-                                                                >
-                                                                    <ArrowUpward sx={{ fontSize: 32, color: '#D32F2F' }} />
-                                                                    Carry Forward: <span style={{ fontSize: '2rem' }}>{primaryYearEndAction.yearEndDays || 0} DAYS</span>
+                                                                <>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                        <ArrowUpward color="primary" />
+                                                                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                                            Carry Forward:
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Typography 
+                                                                        variant="h5" 
+                                                                        sx={{ 
+                                                                            fontWeight: 600, 
+                                                                            color: 'primary.main'
+                                                                        }}
+                                                                    >
+                                                                        {primaryYearEndAction.yearEndDays || 0} days
+                                                                    </Typography>
                                                                     {primaryYearEndAction.yearEndLeaveType && (
                                                                         <Chip 
                                                                             label={primaryYearEndAction.yearEndLeaveType} 
                                                                             size="small" 
-                                                                            sx={{ 
-                                                                                ml: 1, 
-                                                                                fontSize: '0.875rem',
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #000000'
-                                                                            }}
+                                                                            variant="outlined"
+                                                                            color="primary"
                                                                         />
                                                                     )}
-                                                                </Typography>
+                                                                </>
                                                             ) : (
-                                                                <Typography 
-                                                                    variant="h4" 
-                                                                    sx={{ 
-                                                                        fontWeight: 700, 
-                                                                        color: '#000000',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 1,
-                                                                        flexWrap: 'wrap'
-                                                                    }}
-                                                                >
-                                                                    <AttachMoney sx={{ fontSize: 32, color: '#D32F2F' }} />
-                                                                    Encashed: <span style={{ fontSize: '2rem' }}>{primaryYearEndAction.yearEndDays || 0} DAYS</span>
+                                                                <>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                        <AttachMoney color="success" />
+                                                                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                                            Encashed:
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Typography 
+                                                                        variant="h5" 
+                                                                        sx={{ 
+                                                                            fontWeight: 600, 
+                                                                            color: 'success.main'
+                                                                        }}
+                                                                    >
+                                                                        {primaryYearEndAction.yearEndDays || 0} days
+                                                                    </Typography>
                                                                     {primaryYearEndAction.yearEndLeaveType && (
                                                                         <Chip 
                                                                             label={primaryYearEndAction.yearEndLeaveType} 
                                                                             size="small" 
-                                                                            sx={{ 
-                                                                                ml: 1, 
-                                                                                fontSize: '0.875rem',
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #000000'
-                                                                            }}
+                                                                            variant="outlined"
+                                                                            color="success"
                                                                         />
                                                                     )}
-                                                                </Typography>
+                                                                </>
                                                             )}
                                                         </Box>
                                                         
-                                                        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #E0E0E0' }}>
-                                                            <Grid container spacing={2}>
-                                                                <Grid item xs={12} sm={6}>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                        {primaryYearEndAction.status === 'Approved' && <CheckCircle sx={{ color: '#000000', fontSize: 20 }} />}
-                                                                        {primaryYearEndAction.status === 'Rejected' && <Cancel sx={{ color: '#D32F2F', fontSize: 20 }} />}
-                                                                        {primaryYearEndAction.status === 'Pending' && <Pending sx={{ color: '#000000', fontSize: 20 }} />}
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Status:</strong>{' '}
-                                                                            <Chip
-                                                                                label={primaryYearEndAction.status}
-                                                                                size="small"
-                                                                                sx={{ 
-                                                                                    ml: 1,
-                                                                                    bgcolor: '#FFFFFF',
-                                                                                    color: '#000000',
-                                                                                    border: primaryYearEndAction.status === 'Approved' 
-                                                                                        ? '1px solid #D32F2F' 
-                                                                                        : primaryYearEndAction.status === 'Rejected'
-                                                                                        ? '1px solid #D32F2F'
-                                                                                        : '1px dashed #000000'
-                                                                                }}
-                                                                            />
-                                                                        </Typography>
-                                                                    </Box>
-                                                                </Grid>
-                                                                {primaryYearEndAction.approvedBy && (
-                                                                    <Grid item xs={12} sm={6}>
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Approved By:</strong> {primaryYearEndAction.approvedBy?.fullName || 'N/A'}
-                                                                        </Typography>
-                                                                    </Grid>
-                                                                )}
-                                                                {primaryYearEndAction.approvedAt && (
-                                                                    <Grid item xs={12} sm={6}>
-                                                                        <Typography variant="body1" sx={{ color: '#000000' }}>
-                                                                            <strong>Approval Date:</strong> {new Date(primaryYearEndAction.approvedAt).toLocaleDateString()}
-                                                                        </Typography>
-                                                                    </Grid>
-                                                                )}
-                                                                {primaryYearEndAction.status === 'Rejected' && (
-                                                                    <Grid item xs={12}>
-                                                                        <Alert 
-                                                                            sx={{ 
-                                                                                mt: 1,
-                                                                                bgcolor: '#FFFFFF',
-                                                                                color: '#000000',
-                                                                                border: '1px solid #D32F2F'
-                                                                            }}
-                                                                        >
-                                                                            Year-End request rejected — no change in balance
-                                                                        </Alert>
-                                                                    </Grid>
-                                                                )}
+                                                        <Divider sx={{ my: 2 }} />
+                                                        <Grid container spacing={2}>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                    {primaryYearEndAction.status === 'Approved' && <CheckCircle color="success" fontSize="small" />}
+                                                                    {primaryYearEndAction.status === 'Rejected' && <Cancel color="error" fontSize="small" />}
+                                                                    {primaryYearEndAction.status === 'Pending' && <Pending color="warning" fontSize="small" />}
+                                                                    <Typography variant="body2" color="text.secondary">
+                                                                        Status:
+                                                                    </Typography>
+                                                                    <Chip
+                                                                        label={primaryYearEndAction.status}
+                                                                        size="small"
+                                                                        color={
+                                                                            primaryYearEndAction.status === 'Approved' ? 'success' :
+                                                                            primaryYearEndAction.status === 'Rejected' ? 'error' :
+                                                                            'warning'
+                                                                        }
+                                                                        variant="outlined"
+                                                                    />
+                                                                </Box>
                                                             </Grid>
-                                                        </Box>
+                                                            {primaryYearEndAction.approvedBy && (
+                                                                <Grid item xs={12} sm={6}>
+                                                                    <Typography variant="body2" color="text.secondary">
+                                                                        Approved By: <strong>{primaryYearEndAction.approvedBy?.fullName || 'N/A'}</strong>
+                                                                    </Typography>
+                                                                </Grid>
+                                                            )}
+                                                            {primaryYearEndAction.approvedAt && (
+                                                                <Grid item xs={12} sm={6}>
+                                                                    <Typography variant="body2" color="text.secondary">
+                                                                        Approval Date: <strong>{new Date(primaryYearEndAction.approvedAt).toLocaleDateString()}</strong>
+                                                                    </Typography>
+                                                                </Grid>
+                                                            )}
+                                                            {primaryYearEndAction.status === 'Rejected' && (
+                                                                <Grid item xs={12}>
+                                                                    <Alert severity="error" variant="outlined" sx={{ mt: 1 }}>
+                                                                        Year-End request rejected — no change in balance
+                                                                    </Alert>
+                                                                </Grid>
+                                                            )}
+                                                        </Grid>
                                                     </Box>
                                                 ) : totalRemaining <= 0 ? (
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#000000' }}>
+                                                    <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                                                         No leaves available to carry forward or encash
                                                     </Typography>
                                                 ) : (
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#000000' }}>
+                                                    <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                                                         No Year-End Action Taken
                                                     </Typography>
                                                 )}
                                             </Paper>
 
-                                            {/* CURRENT YEAR REALITY - MOST IMPORTANT */}
+                                            {/* REDESIGNED: Current Year Leave Availability */}
                                             <Paper 
-                                                elevation={4} 
+                                                elevation={0} 
                                                 sx={{ 
                                                     p: 3, 
-                                                    mb: 3, 
-                                                    bgcolor: '#FFFFFF',
+                                                    mb: 2, 
+                                                    bgcolor: 'primary.50',
                                                     borderRadius: 2,
-                                                    border: '2px solid #D32F2F'
+                                                    border: '1px solid',
+                                                    borderColor: 'primary.main'
                                                 }}
                                             >
-                                                <Typography 
-                                                    variant="h6" 
-                                                    sx={{ 
-                                                        mb: 2, 
-                                                        color: '#000000', 
-                                                        fontWeight: 700,
-                                                        fontSize: '1rem',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 1,
-                                                        borderLeft: '4px solid #D32F2F',
-                                                        pl: 1.5
-                                                    }}
-                                                >
-                                                    <CalendarToday sx={{ fontSize: 24, color: '#D32F2F' }} />
-                                                    LEAVES AVAILABLE FROM 1st JANUARY {leaveUsageData.year}
-                                                </Typography>
-                                                
-                                                <Box sx={{ textAlign: 'center', py: 2 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <CalendarToday color="primary" fontSize="small" />
                                                     <Typography 
-                                                        variant="h2" 
+                                                        variant="subtitle1" 
                                                         sx={{ 
-                                                            fontWeight: 700, 
-                                                            color: '#000000',
-                                                            mb: 1
+                                                            fontWeight: 600,
+                                                            color: 'primary.main'
                                                         }}
                                                     >
-                                                        {totalCurrentBalance.toFixed(1)} <span style={{ fontSize: '1.5rem', fontWeight: 400 }}>DAYS</span>
+                                                        Leaves Available from 1st January {leaveUsageData.year}
                                                     </Typography>
-                                                    <Typography variant="body1" sx={{ color: '#000000' }}>
+                                                </Box>
+                                                
+                                                <Box sx={{ textAlign: 'center', py: 1 }}>
+                                                    <Typography 
+                                                        variant="h3" 
+                                                        sx={{ 
+                                                            fontWeight: 600, 
+                                                            color: 'primary.main',
+                                                            mb: 0.5
+                                                        }}
+                                                    >
+                                                        {totalCurrentBalance.toFixed(1)} <Typography component="span" variant="body1">days</Typography>
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
                                                         Opening Balance (after carry forward / encash)
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{ mt: 1, color: '#000000' }}>
-                                                        Effective From: <strong>01 January {leaveUsageData.year}</strong>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                                        Effective From: 01 January {leaveUsageData.year}
                                                     </Typography>
                                                 </Box>
                                             </Paper>
@@ -2144,10 +2453,24 @@ const LeavesTrackerPage = () => {
                         )}
                     </Box>
                 ) : (
-                    <Typography variant="body2" sx={{ color: '#000000' }}>No employee data available.</Typography>
+                    <Alert severity="warning" variant="outlined">
+                        No employee data available.
+                    </Alert>
                 )}
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, borderTop: '1px solid #E0E0E0' }}>
+            {/* REDESIGNED: Clean sticky footer */}
+            <DialogActions 
+                sx={{ 
+                    px: 3, 
+                    py: 2, 
+                    bgcolor: 'white',
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 1
+                }}
+            >
                 <Button
                     onClick={() => {
                         setShowEmployeeDialog(false);
@@ -2156,12 +2479,7 @@ const LeavesTrackerPage = () => {
                         setDialogSelectedYear(new Date().getFullYear());
                     }}
                     variant="contained"
-                    sx={{ 
-                        backgroundColor: '#D32F2F', 
-                        '&:hover': { backgroundColor: '#B71C1C' }, 
-                        color: '#FFFFFF',
-                        border: 'none'
-                    }}
+                    color="primary"
                 >
                     Close
                 </Button>
@@ -2171,45 +2489,37 @@ const LeavesTrackerPage = () => {
         <Dialog 
             open={showAllocateDialog} 
             onClose={() => setShowAllocateDialog(false)} 
-            maxWidth="md" 
+            maxWidth="lg" 
             fullWidth
             PaperProps={{
                 sx: {
                     borderRadius: '16px',
                     overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    minHeight: '700px',
+                    backgroundColor: '#fafafa'
                 }
             }}
         >
-            {/* Header */}
+            {/* Header - Clean & Professional */}
             <DialogTitle sx={{ 
-                background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
-                color: '#ffffff', 
-                fontWeight: 'bold',
-                fontSize: '1.375rem',
-                py: 2.5,
-                px: 3,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                position: 'relative',
-                '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '3px',
-                    background: 'rgba(255,255,255,0.2)'
-                }
+                backgroundColor: '#ffffff',
+                color: '#1a1a1a', 
+                fontWeight: 600,
+                fontSize: '1.5rem',
+                py: 3,
+                px: 4,
+                borderBottom: '2px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
             }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Assignment sx={{ color: '#ffffff', fontSize: '1.5rem' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Assignment sx={{ color: '#dc3545', fontSize: '1.75rem' }} />
                     <Typography 
-                        variant="h6" 
+                        variant="h5" 
                         sx={{ 
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            fontSize: '1.375rem',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                            color: '#1a1a1a',
+                            fontWeight: 600,
+                            fontSize: '1.5rem'
                         }}
                     >
                         Allocate Leave Entitlements
@@ -2218,368 +2528,595 @@ const LeavesTrackerPage = () => {
             </DialogTitle>
 
             <DialogContent sx={{ 
-                backgroundColor: '#ffffff',
-                p: '20px',
+                backgroundColor: '#fafafa',
+                p: 4,
                 '&.MuiDialogContent-root': {
-                    paddingTop: '20px'
+                    paddingTop: '32px'
                 }
             }}>
-                <Stack spacing={2}>
-                    {/* Employee and Year Selection - Side by Side */}
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                            <Autocomplete
-                                options={employees}
-                                getOptionLabel={(option) => `${option.fullName} (${option.employeeCode})`}
-                                value={employees.find(emp => emp._id === allocateForm.employeeId) || null}
-                                onChange={(event, newValue) => {
-                                    setAllocateForm({ ...allocateForm, employeeId: newValue?._id || '' });
-                                }}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Employee"
-                                        required
-                                        aria-label="Select employee"
-                                        aria-required="true"
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
+                <Stack spacing={4}>
+                    {/* STEP 1: Employee Selection Section */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 3, 
+                                color: '#1a1a1a', 
+                                fontWeight: 600,
+                                fontSize: '1.125rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}>
+                                <Box sx={{ 
+                                    backgroundColor: '#dc3545', 
+                                    color: 'white', 
+                                    borderRadius: '50%', 
+                                    width: 24, 
+                                    height: 24, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 'bold'
+                                }}>
+                                    1
+                                </Box>
+                                Employee Selection
+                            </Typography>
+                            
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={6}>
+                                    <Autocomplete
+                                        options={employees}
+                                        getOptionLabel={(option) => `${option.fullName} (${option.employeeCode})`}
+                                        value={employees.find(emp => emp._id === allocateForm.employeeId) || null}
+                                        onChange={(event, newValue) => {
+                                            setAllocateForm({ ...allocateForm, employeeId: newValue?._id || '' });
+                                        }}
+                                        renderOption={(props, option) => (
+                                            <Box component="li" {...props} sx={{ p: 2 }}>
+                                                <Box>
+                                                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                        {option.fullName}
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                                                        ID: {option.employeeCode} • {option.department || 'No Department'} • {option.employmentType || 'Permanent'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        )}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Select Employee"
+                                                placeholder="Search by name or employee ID..."
+                                                required
+                                                helperText={!allocateForm.employeeId ? "Please select an employee to continue" : ""}
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        '& fieldset': {
+                                                            borderColor: allocateForm.employeeId ? '#10b981' : '#d1d5db',
+                                                            borderWidth: allocateForm.employeeId ? '2px' : '1px'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                        noOptionsText="No employees found"
+                                        sx={{ width: '100%' }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <FormControl fullWidth>
+                                        <InputLabel 
+                                            id="year-label"
+                                            sx={{ 
+                                                color: '#6b7280', 
+                                                '&.Mui-focused': { color: '#dc3545' } 
+                                            }}
+                                        >
+                                            Year *
+                                        </InputLabel>
+                                        <Select 
+                                            value={allocateForm.year} 
+                                            labelId="year-label"
+                                            label="Year *" 
+                                            onChange={(e) => setAllocateForm({ ...allocateForm, year: e.target.value })}
+                                            sx={{
                                                 borderRadius: '8px',
-                                                '& fieldset': {
-                                                    borderColor: allocateForm.employeeId ? '#dc3545' : '#d0d0d0',
-                                                    borderWidth: allocateForm.employeeId ? '2px' : '1px'
+                                                backgroundColor: '#ffffff',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#d1d5db'
                                                 },
-                                                '&:hover fieldset': {
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
                                                     borderColor: '#dc3545'
                                                 },
-                                                '&.Mui-focused fieldset': {
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                                                     borderColor: '#dc3545',
                                                     borderWidth: '2px'
                                                 }
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
-                                            }
-                                        }}
-                                    />
-                                )}
-                                sx={{
-                                    '& .MuiAutocomplete-inputRoot': {
-                                        paddingTop: '8px !important',
-                                        paddingBottom: '8px !important'
-                                    }
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel 
-                                    id="year-label"
-                                    sx={{ 
-                                        color: '#6c757d', 
-                                        '&.Mui-focused': { color: '#dc3545' } 
-                                    }}
-                                >
-                                    Year *
-                                </InputLabel>
-                                <Select 
-                                    value={allocateForm.year} 
-                                    labelId="year-label"
-                                    label="Year *" 
-                                    onChange={(e) => setAllocateForm({ ...allocateForm, year: e.target.value })}
-                                    aria-label="Select year"
-                                    aria-required="true"
-                                    sx={{
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#d0d0d0'
-                                        },
-                                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#dc3545',
-                                            borderWidth: '2px'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
-                                    }}
-                                >
-                                    {[2023, 2024, 2025, 2026, 2027].map((year) => (
-                                        <MenuItem key={year} value={year}>{year}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                    </Grid>
+                                            }}
+                                        >
+                                            {[2023, 2024, 2025, 2026, 2027].map((year) => (
+                                                <MenuItem key={year} value={year}>{year}</MenuItem>
+                                            ))}
+                                        </Select>
+                                        <Typography variant="caption" sx={{ color: '#6b7280', mt: 0.5 }}>
+                                            Select the year for leave entitlement allocation
+                                        </Typography>
+                                    </FormControl>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
 
-                    {/* Leave Entitlements Section */}
-                    <Box>
-                        <Typography variant="h6" sx={{ 
-                            mb: 2, 
-                            color: '#dc3545', 
-                            fontWeight: 'bold',
-                            fontSize: '1.1rem'
-                        }}>
-                            Leave Entitlements
-                        </Typography>
-                        
-                        <Grid container spacing={2} sx={{ mb: 2 }}>
-                            <Grid item xs={12} sm={4}>
-                                <TextField 
-                                    fullWidth 
-                                    label="Sick Leave Entitlement" 
-                                    type="number" 
-                                    value={allocateForm.sickLeaveEntitlement} 
-                                    onChange={(e) => setAllocateForm({ ...allocateForm, sickLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                    inputProps={{ min: 0, max: 365 }} 
-                                    aria-label="Sick leave entitlement"
-                                    sx={{
+                    {/* STEP 2: Leave Entitlement Allocation Section */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 3, 
+                                color: '#1a1a1a', 
+                                fontWeight: 600,
+                                fontSize: '1.125rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}>
+                                <Box sx={{ 
+                                    backgroundColor: '#dc3545', 
+                                    color: 'white', 
+                                    borderRadius: '50%', 
+                                    width: 24, 
+                                    height: 24, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 'bold'
+                                }}>
+                                    2
+                                </Box>
+                                Leave Entitlement Allocation
+                            </Typography>
+                            
+                            <Grid container spacing={3}>
+                                {/* Sick Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
                                         borderRadius: '8px',
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: '8px',
-                                            '& fieldset': {
-                                                borderColor: '#d0d0d0'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            }
-                                        },
-                                        '& .MuiInputLabel-root.Mui-focused': {
-                                            color: '#dc3545'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
                                         '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
-                                    }}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField 
-                                    fullWidth 
-                                    label="Casual Leave Entitlement" 
-                                    type="number" 
-                                    value={allocateForm.casualLeaveEntitlement} 
-                                    onChange={(e) => setAllocateForm({ ...allocateForm, casualLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                    inputProps={{ min: 0, max: 365 }} 
-                                    aria-label="Casual leave entitlement"
-                                    sx={{
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: '8px',
-                                            '& fieldset': {
-                                                borderColor: '#d0d0d0'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            }
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
                                         },
-                                        '& .MuiInputLabel-root.Mui-focused': {
-                                            color: '#dc3545'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
-                                    }}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField 
-                                    fullWidth 
-                                    label="Planned Leave Entitlement" 
-                                    type="number" 
-                                    value={allocateForm.paidLeaveEntitlement} 
-                                    onChange={(e) => setAllocateForm({ ...allocateForm, paidLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                    inputProps={{ min: 0, max: 365 }} 
-                                    aria-label="Planned leave entitlement"
-                                    sx={{
-                                        borderRadius: '8px',
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: '8px',
-                                            '& fieldset': {
-                                                borderColor: '#d0d0d0'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: '#dc3545',
-                                                borderWidth: '2px'
-                                            }
-                                        },
-                                        '& .MuiInputLabel-root.Mui-focused': {
-                                            color: '#dc3545'
-                                        },
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                        }
-                                    }}
-                                />
-                            </Grid>
-                        </Grid>
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#ef4444' 
+                                                }} />
+                                                Sick Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={allocateForm.sickLeaveEntitlement} 
+                                                onChange={(e) => setAllocateForm({ 
+                                                    ...allocateForm, 
+                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur() // Prevent scroll changes
+                                                }} 
+                                                helperText="Enter number of sick leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
 
-                        {/* Summary Box */}
-                        <Box sx={{ 
-                            p: 2.5, 
-                            background: 'linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%)',
+                                {/* Casual Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#f59e0b' 
+                                                }} />
+                                                Casual Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={allocateForm.casualLeaveEntitlement} 
+                                                onChange={(e) => setAllocateForm({ 
+                                                    ...allocateForm, 
+                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur() // Prevent scroll changes
+                                                }} 
+                                                helperText="Enter number of casual leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Planned Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#10b981' 
+                                                }} />
+                                                Planned Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={allocateForm.paidLeaveEntitlement} 
+                                                onChange={(e) => setAllocateForm({ 
+                                                    ...allocateForm, 
+                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur() // Prevent scroll changes
+                                                }} 
+                                                helperText="Enter number of planned leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+
+                    {/* STEP 3: Review Summary Section */}
+                    {allocateForm.employeeId && (
+                        <Card sx={{ 
+                            backgroundColor: '#ffffff',
                             borderRadius: '12px',
-                            border: '2px solid #dc3545',
-                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                            border: '2px solid #dc3545'
                         }}>
-                            <Box>
-                                <Typography variant="body2" sx={{ color: '#666', mb: 0.5, fontSize: '0.875rem', fontWeight: 500 }}>
-                                    Total Entitlement
+                            <CardContent sx={{ p: 3 }}>
+                                <Typography variant="h6" sx={{ 
+                                    mb: 3, 
+                                    color: '#1a1a1a', 
+                                    fontWeight: 600,
+                                    fontSize: '1.125rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                }}>
+                                    <Box sx={{ 
+                                        backgroundColor: '#dc3545', 
+                                        color: 'white', 
+                                        borderRadius: '50%', 
+                                        width: 24, 
+                                        height: 24, 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        fontSize: '0.875rem',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        3
+                                    </Box>
+                                    Review Summary
                                 </Typography>
-                                <Typography variant="h5" sx={{ color: '#dc3545', fontWeight: 'bold', fontSize: '1.5rem' }}>
-                                    {allocateForm.sickLeaveEntitlement + allocateForm.casualLeaveEntitlement + allocateForm.paidLeaveEntitlement} days
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Box>
+                                
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12} md={6}>
+                                        <Box sx={{ 
+                                            p: 2.5, 
+                                            backgroundColor: '#f9fafb',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e5e7eb'
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ color: '#6b7280', mb: 1 }}>
+                                                Employee Details
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                {employees.find(emp => emp._id === allocateForm.employeeId)?.fullName || 'Not Selected'}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                                Year: {allocateForm.year}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <Box sx={{ 
+                                            p: 2.5, 
+                                            backgroundColor: '#fef2f2',
+                                            borderRadius: '8px',
+                                            border: '1px solid #fecaca'
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ color: '#6b7280', mb: 1 }}>
+                                                Total Entitlement
+                                            </Typography>
+                                            <Typography variant="h4" sx={{ 
+                                                color: '#dc3545', 
+                                                fontWeight: 'bold',
+                                                display: 'flex',
+                                                alignItems: 'baseline',
+                                                gap: 1
+                                            }}>
+                                                {allocateForm.sickLeaveEntitlement + allocateForm.casualLeaveEntitlement + allocateForm.paidLeaveEntitlement}
+                                                <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                                                    days
+                                                </Typography>
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#6b7280', mt: 1 }}>
+                                                Sick: {allocateForm.sickLeaveEntitlement} • Casual: {allocateForm.casualLeaveEntitlement} • Planned: {allocateForm.paidLeaveEntitlement}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </CardContent>
+                        </Card>
+                    )}
                 </Stack>
             </DialogContent>
 
-            {/* Footer Actions */}
+            {/* STEP 4: Action Controls */}
             <DialogActions sx={{ 
-                p: '20px',
+                p: 4,
                 backgroundColor: '#ffffff',
-                borderTop: '1px solid #e0e0e0',
-                justifyContent: 'flex-end',
-                gap: 2,
-                flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                borderTop: '2px solid #e5e7eb',
+                justifyContent: 'space-between',
+                alignItems: 'center'
             }}>
-                <Button 
-                    onClick={() => setShowAllocateDialog(false)}
-                    variant="outlined"
-                    sx={{
-                        color: '#dc3545',
-                        borderColor: '#dc3545',
-                        borderWidth: '1.5px',
-                        px: 3,
-                        py: 1.25,
-                        minWidth: { xs: '100%', sm: '100px' },
-                        borderRadius: '8px',
-                        fontWeight: 500,
-                        textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                            backgroundColor: '#fff5f5',
-                            borderColor: '#dc3545',
-                            borderWidth: '1.5px',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.15)'
-                        }
-                    }}
-                >
-                    Cancel
-                </Button>
-                <Button 
-                    onClick={handleAllocateLeaves} 
-                    variant="contained"
-                    sx={{
-                        minWidth: { xs: '100%', sm: '150px' },
-                        backgroundColor: '#dc3545',
-                        color: '#ffffff',
-                        fontWeight: 600,
-                        px: 4,
-                        py: 1.25,
-                        borderRadius: '8px',
-                        textTransform: 'none',
-                        fontSize: '0.9375rem',
-                        boxShadow: '0 2px 8px rgba(220, 53, 69, 0.3)',
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                            backgroundColor: '#c82333',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.4)'
-                        },
-                        '&:active': {
-                            transform: 'translateY(0)',
-                            boxShadow: '0 2px 6px rgba(220, 53, 69, 0.3)'
-                        }
-                    }}
-                >
-                    Allocate Leaves
-                </Button>
+                <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                    {!allocateForm.employeeId ? 'Please select an employee to continue' : 
+                     'Review the details above before allocating entitlements'}
+                </Typography>
+                
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button 
+                        onClick={() => setShowAllocateDialog(false)}
+                        variant="outlined"
+                        sx={{
+                            color: '#6b7280',
+                            borderColor: '#d1d5db',
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: '8px',
+                            fontWeight: 500,
+                            textTransform: 'none',
+                            '&:hover': {
+                                backgroundColor: '#f9fafb',
+                                borderColor: '#9ca3af'
+                            }
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleAllocateLeaves} 
+                        variant="contained"
+                        disabled={!allocateForm.employeeId || !allocateForm.year}
+                        sx={{
+                            backgroundColor: '#dc3545',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            px: 6,
+                            py: 1.5,
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.3)',
+                            '&:hover': {
+                                backgroundColor: '#c82333',
+                                boxShadow: '0 6px 16px rgba(220, 53, 69, 0.4)'
+                            },
+                            '&.Mui-disabled': {
+                                backgroundColor: '#d1d5db',
+                                color: '#9ca3af',
+                                boxShadow: 'none'
+                            }
+                        }}
+                    >
+                        Allocate Entitlements
+                    </Button>
+                </Box>
             </DialogActions>
         </Dialog>
 
-        {/* Bulk Allocate Leaves Dialog */}
+        {/* Bulk Allocate Leaves Dialog - REFACTORED UI/UX */}
         <Dialog 
             open={showBulkAllocateDialog} 
             onClose={() => setShowBulkAllocateDialog(false)} 
-            maxWidth="lg" 
+            maxWidth="xl" 
             fullWidth
             PaperProps={{
                 sx: {
-                    borderRadius: '12px',
+                    borderRadius: '16px',
                     overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    minHeight: '800px',
+                    backgroundColor: '#fafafa'
                 }
             }}
         >
-            {/* Header */}
+            {/* Header - Clean & Professional */}
             <DialogTitle sx={{ 
-                backgroundColor: '#dc3545', 
-                color: '#ffffff', 
-                fontWeight: 'bold',
+                backgroundColor: '#ffffff',
+                color: '#1a1a1a', 
+                fontWeight: 600,
                 fontSize: '1.5rem',
-                py: 2.5,
-                px: 3,
+                py: 3,
+                px: 4,
+                borderBottom: '2px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
             }}>
-                <Box>Bulk Allocate Leave Entitlements</Box>
-                <FormControl sx={{ minWidth: 120, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Assignment sx={{ color: '#dc3545', fontSize: '1.75rem' }} />
+                    <Typography 
+                        variant="h5" 
+                        sx={{ 
+                            color: '#1a1a1a',
+                            fontWeight: 600,
+                            fontSize: '1.5rem'
+                        }}
+                    >
+                        Bulk Allocate Leave Entitlements
+                    </Typography>
+                </Box>
+                <FormControl sx={{ minWidth: 120 }}>
+                    <InputLabel sx={{ color: '#6b7280', '&.Mui-focused': { color: '#dc3545' } }}>
+                        Year
+                    </InputLabel>
                     <Select 
                         value={bulkAllocateForm.year} 
+                        label="Year"
                         onChange={(e) => setBulkAllocateForm({ ...bulkAllocateForm, year: e.target.value })}
                         sx={{
-                            color: '#ffffff',
+                            borderRadius: '8px',
+                            backgroundColor: '#ffffff',
                             '& .MuiOutlinedInput-notchedOutline': {
-                                borderColor: 'rgba(255,255,255,0.5)'
+                                borderColor: '#d1d5db'
                             },
                             '&:hover .MuiOutlinedInput-notchedOutline': {
-                                borderColor: 'rgba(255,255,255,0.8)'
+                                borderColor: '#dc3545'
                             },
                             '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                borderColor: '#ffffff'
-                            },
-                            '& .MuiSvgIcon-root': {
-                                color: '#ffffff'
-                            }
-                        }}
-                        MenuProps={{
-                            PaperProps: {
-                                sx: {
-                                    backgroundColor: '#ffffff',
-                                    '& .MuiMenuItem-root': {
-                                        color: '#333'
-                                    }
-                                }
+                                borderColor: '#dc3545',
+                                borderWidth: '2px'
                             }
                         }}
                     >
@@ -2591,336 +3128,610 @@ const LeavesTrackerPage = () => {
             </DialogTitle>
 
             <DialogContent sx={{ 
-                backgroundColor: '#f8f9fa',
-                px: 3,
-                py: 3
+                backgroundColor: '#fafafa',
+                p: 4,
+                '&.MuiDialogContent-root': {
+                    paddingTop: '32px'
+                }
             }}>
-                <Grid container spacing={3}>
-                    {/* Left Column - Employee Selection */}
-                    <Grid item xs={12} md={6}>
-                        <Card sx={{ 
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                        }}>
-                            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
-                                {/* Header with Count */}
+                <Stack spacing={4}>
+                    {/* STEP 1: Scope Selection Section */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 3, 
+                                color: '#1a1a1a', 
+                                fontWeight: 600,
+                                fontSize: '1.125rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}>
                                 <Box sx={{ 
+                                    backgroundColor: '#dc3545', 
+                                    color: 'white', 
+                                    borderRadius: '50%', 
+                                    width: 24, 
+                                    height: 24, 
                                     display: 'flex', 
-                                    justifyContent: 'space-between', 
                                     alignItems: 'center', 
-                                    mb: 2,
-                                    pb: 2,
-                                    borderBottom: '2px solid #e0e0e0'
+                                    justifyContent: 'center',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 'bold'
                                 }}>
-                                    <Typography variant="h6" sx={{ color: '#dc3545', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                        Select Employees
-                                    </Typography>
-                                    <Chip 
-                                        label={`${bulkAllocateForm.employeeIds?.length || 0} selected`}
-                                        sx={{
-                                            backgroundColor: '#dc3545',
-                                            color: '#ffffff',
-                                            fontWeight: 'bold',
-                                            fontSize: '0.875rem'
-                                        }}
-                                    />
+                                    1
                                 </Box>
-                                
-                                {/* Action Buttons */}
-                                <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-                                    <Button 
-                                        size="small" 
-                                        onClick={handleSelectAllEmployees} 
-                                        variant="outlined"
-                                        sx={{ 
-                                            flex: 1,
-                                            color: '#dc3545',
-                                            borderColor: '#dc3545',
-                                            fontSize: '0.8rem',
-                                            py: 0.75,
-                                            '&:hover': {
-                                                backgroundColor: '#dc3545',
-                                                color: '#ffffff',
-                                                borderColor: '#dc3545'
-                                            }
-                                        }}
-                                    >
-                                        Select All
-                                    </Button>
-                                    <Button 
-                                        size="small" 
-                                        onClick={handleDeselectAllEmployees}
-                                        variant="outlined"
-                                        sx={{
-                                            flex: 1,
-                                            color: '#dc3545',
-                                            borderColor: '#dc3545',
-                                            fontSize: '0.8rem',
-                                            py: 0.75,
-                                            '&:hover': {
-                                                backgroundColor: '#dc3545',
-                                                color: '#ffffff',
-                                                borderColor: '#dc3545'
-                                            }
-                                        }}
-                                    >
-                                        Deselect All
-                                    </Button>
-                                </Box>
-
-                                {/* Employee List */}
-                                <Paper sx={{ 
-                                    flex: 1,
-                                    maxHeight: 450, 
-                                    overflow: 'auto', 
-                                    border: '1px solid #e0e0e0',
-                                    borderRadius: '6px',
-                                    backgroundColor: '#ffffff'
-                                }}>
-                                    <List dense sx={{ p: 0 }}>
-                                        {employees.map((emp) => (
-                                            <ListItem 
-                                                key={emp._id} 
-                                                disablePadding
-                                                sx={{
-                                                    borderBottom: '1px solid #f0f0f0',
-                                                    '&:hover': {
-                                                        backgroundColor: '#fff5f5'
-                                                    },
-                                                    '&:last-child': {
-                                                        borderBottom: 'none'
-                                                    }
-                                                }}
-                                            >
-                                                <ListItemButton 
-                                                    onClick={() => handleToggleEmployeeSelection(emp._id)}
-                                                    sx={{
-                                                        py: 1.5,
+                                Scope Selection
+                            </Typography>
+                            
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={8}>
+                                    {/* Employee Selection List */}
+                                    <Box sx={{ mb: 2 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                                Select Employees
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Button 
+                                                    size="small" 
+                                                    onClick={handleSelectAllEmployees} 
+                                                    variant="outlined"
+                                                    sx={{ 
+                                                        color: '#dc3545',
+                                                        borderColor: '#dc3545',
+                                                        fontSize: '0.8rem',
+                                                        py: 0.5,
                                                         px: 2,
                                                         '&:hover': {
-                                                            backgroundColor: '#fff5f5'
+                                                            backgroundColor: '#dc3545',
+                                                            color: '#ffffff'
                                                         }
                                                     }}
                                                 >
-                                                    <ListItemIcon sx={{ minWidth: 45 }}>
-                                                        <Checkbox
-                                                            edge="start"
-                                                            checked={bulkAllocateForm.employeeIds?.includes(emp._id) || false}
-                                                            tabIndex={-1}
-                                                            disableRipple
-                                                            sx={{
-                                                                color: '#dc3545',
-                                                                '&.Mui-checked': {
-                                                                    color: '#dc3545'
+                                                    Select All
+                                                </Button>
+                                                <Button 
+                                                    size="small" 
+                                                    onClick={handleDeselectAllEmployees}
+                                                    variant="outlined"
+                                                    sx={{
+                                                        color: '#6b7280',
+                                                        borderColor: '#d1d5db',
+                                                        fontSize: '0.8rem',
+                                                        py: 0.5,
+                                                        px: 2,
+                                                        '&:hover': {
+                                                            backgroundColor: '#f9fafb',
+                                                            borderColor: '#9ca3af'
+                                                        }
+                                                    }}
+                                                >
+                                                    Clear All
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                        
+                                        <Paper sx={{ 
+                                            maxHeight: 300, 
+                                            overflow: 'auto', 
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px'
+                                        }}>
+                                            <List dense sx={{ p: 0 }}>
+                                                {employees.map((emp) => (
+                                                    <ListItem 
+                                                        key={emp._id} 
+                                                        disablePadding
+                                                        sx={{
+                                                            borderBottom: '1px solid #f3f4f6',
+                                                            '&:hover': {
+                                                                backgroundColor: '#f9fafb'
+                                                            },
+                                                            '&:last-child': {
+                                                                borderBottom: 'none'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <ListItemButton 
+                                                            onClick={() => handleToggleEmployeeSelection(emp._id)}
+                                                            sx={{ py: 1, px: 2 }}
+                                                        >
+                                                            <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                <Checkbox
+                                                                    edge="start"
+                                                                    checked={bulkAllocateForm.employeeIds?.includes(emp._id) || false}
+                                                                    tabIndex={-1}
+                                                                    disableRipple
+                                                                    sx={{
+                                                                        color: '#dc3545',
+                                                                        '&.Mui-checked': {
+                                                                            color: '#dc3545'
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </ListItemIcon>
+                                                            <ListItemText 
+                                                                primary={
+                                                                    <Typography sx={{ fontWeight: 500, color: '#1a1a1a', fontSize: '0.9rem' }}>
+                                                                        {emp.fullName}
+                                                                    </Typography>
                                                                 }
-                                                            }}
-                                                        />
-                                                    </ListItemIcon>
-                                                    <ListItemText 
-                                                        primary={
-                                                            <Typography sx={{ fontWeight: '500', color: '#333', fontSize: '0.95rem' }}>
-                                                                {emp.fullName}
-                                                            </Typography>
-                                                        }
-                                                        secondary={
-                                                            <Typography sx={{ fontSize: '0.8rem', color: '#666', mt: 0.5 }}>
-                                                                {emp.employeeCode + (emp.department ? ` • ${emp.department}` : '')}
-                                                            </Typography>
-                                                        }
-                                                    />
-                                                </ListItemButton>
-                                            </ListItem>
-                                        ))}
-                                    </List>
-                                </Paper>
-                            </CardContent>
-                        </Card>
-                    </Grid>
+                                                                secondary={
+                                                                    <Typography sx={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                                                                        {emp.employeeCode} • {emp.department || 'No Department'} • {emp.employmentType || 'Permanent'}
+                                                                    </Typography>
+                                                                }
+                                                            />
+                                                        </ListItemButton>
+                                                    </ListItem>
+                                                ))}
+                                            </List>
+                                        </Paper>
+                                    </Box>
+                                </Grid>
+                                
+                                <Grid item xs={12} md={4}>
+                                    {/* Scope Summary */}
+                                    <Box sx={{ 
+                                        p: 3, 
+                                        backgroundColor: bulkAllocateForm.employeeIds?.length > 0 ? '#fef2f2' : '#f9fafb',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${bulkAllocateForm.employeeIds?.length > 0 ? '#fecaca' : '#e5e7eb'}`,
+                                        textAlign: 'center'
+                                    }}>
+                                        <Typography variant="subtitle2" sx={{ color: '#6b7280', mb: 1 }}>
+                                            Selected Scope
+                                        </Typography>
+                                        <Typography variant="h3" sx={{ 
+                                            color: bulkAllocateForm.employeeIds?.length > 0 ? '#dc3545' : '#9ca3af', 
+                                            fontWeight: 'bold',
+                                            mb: 1
+                                        }}>
+                                            {bulkAllocateForm.employeeIds?.length || 0}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+                                            employee{(bulkAllocateForm.employeeIds?.length || 0) !== 1 ? 's' : ''} selected
+                                        </Typography>
+                                        {bulkAllocateForm.employeeIds?.length > 0 && (
+                                            <Typography variant="caption" sx={{ 
+                                                color: '#dc3545', 
+                                                fontWeight: 600,
+                                                display: 'block',
+                                                backgroundColor: '#ffffff',
+                                                p: 1,
+                                                borderRadius: '4px',
+                                                border: '1px solid #fecaca'
+                                            }}>
+                                                This allocation will apply to {bulkAllocateForm.employeeIds.length} employee{bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
 
-                    {/* Right Column - Leave Entitlements */}
-                    <Grid item xs={12} md={6}>
+                    {/* STEP 2: Leave Entitlement Inputs Section */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 3, 
+                                color: '#1a1a1a', 
+                                fontWeight: 600,
+                                fontSize: '1.125rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}>
+                                <Box sx={{ 
+                                    backgroundColor: '#dc3545', 
+                                    color: 'white', 
+                                    borderRadius: '50%', 
+                                    width: 24, 
+                                    height: 24, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 'bold'
+                                }}>
+                                    2
+                                </Box>
+                                Leave Entitlement Inputs
+                            </Typography>
+                            
+                            <Grid container spacing={3}>
+                                {/* Sick Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#ef4444' 
+                                                }} />
+                                                Sick Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={bulkAllocateForm.sickLeaveEntitlement} 
+                                                onChange={(e) => setBulkAllocateForm({ 
+                                                    ...bulkAllocateForm, 
+                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur()
+                                                }} 
+                                                helperText="Enter sick leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Casual Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#f59e0b' 
+                                                }} />
+                                                Casual Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={bulkAllocateForm.casualLeaveEntitlement} 
+                                                onChange={(e) => setBulkAllocateForm({ 
+                                                    ...bulkAllocateForm, 
+                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur()
+                                                }} 
+                                                helperText="Enter casual leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Planned Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#10b981' 
+                                                }} />
+                                                Planned Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={bulkAllocateForm.paidLeaveEntitlement} 
+                                                onChange={(e) => setBulkAllocateForm({ 
+                                                    ...bulkAllocateForm, 
+                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    onWheel: (e) => e.target.blur()
+                                                }} 
+                                                helperText="Enter planned leave days (0-365)"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+
+                    {/* STEP 3: Impact Preview Section */}
+                    {bulkAllocateForm.employeeIds?.length > 0 && (
                         <Card sx={{ 
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                            backgroundColor: '#ffffff',
+                            borderRadius: '12px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                            border: '2px solid #dc3545'
                         }}>
-                            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
+                            <CardContent sx={{ p: 3 }}>
                                 <Typography variant="h6" sx={{ 
                                     mb: 3, 
-                                    color: '#dc3545', 
-                                    fontWeight: 'bold',
-                                    fontSize: '1.1rem',
-                                    pb: 2,
-                                    borderBottom: '2px solid #e0e0e0'
+                                    color: '#1a1a1a', 
+                                    fontWeight: 600,
+                                    fontSize: '1.125rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
                                 }}>
-                                    Leave Entitlements
+                                    <Box sx={{ 
+                                        backgroundColor: '#dc3545', 
+                                        color: 'white', 
+                                        borderRadius: '50%', 
+                                        width: 24, 
+                                        height: 24, 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        fontSize: '0.875rem',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        3
+                                    </Box>
+                                    Impact Preview
                                 </Typography>
                                 
-                                {/* Leave Input Fields */}
-                                <Box sx={{ mb: 2, flex: 1 }}>
-                                    <TextField 
-                                        fullWidth 
-                                        label="Sick Leave Entitlement" 
-                                        type="number" 
-                                        value={bulkAllocateForm.sickLeaveEntitlement} 
-                                        onChange={(e) => setBulkAllocateForm({ ...bulkAllocateForm, sickLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                        inputProps={{ min: 0, max: 365 }} 
-                                        sx={{
-                                            mb: 2,
-                                            '& .MuiOutlinedInput-root': {
-                                                backgroundColor: '#ffffff',
-                                                '&:hover fieldset': {
-                                                    borderColor: '#dc3545'
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: '#dc3545'
-                                                }
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
-                                            }
-                                        }}
-                                    />
-                                    <TextField 
-                                        fullWidth 
-                                        label="Casual Leave Entitlement" 
-                                        type="number" 
-                                        value={bulkAllocateForm.casualLeaveEntitlement} 
-                                        onChange={(e) => setBulkAllocateForm({ ...bulkAllocateForm, casualLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                        inputProps={{ min: 0, max: 365 }} 
-                                        sx={{
-                                            mb: 2,
-                                            '& .MuiOutlinedInput-root': {
-                                                backgroundColor: '#ffffff',
-                                                '&:hover fieldset': {
-                                                    borderColor: '#dc3545'
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: '#dc3545'
-                                                }
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
-                                            }
-                                        }}
-                                    />
-                                    <TextField 
-                                        fullWidth 
-                                        label="Planned Leave Entitlement" 
-                                        type="number" 
-                                        value={bulkAllocateForm.paidLeaveEntitlement} 
-                                        onChange={(e) => setBulkAllocateForm({ ...bulkAllocateForm, paidLeaveEntitlement: parseInt(e.target.value) || 0 })} 
-                                        inputProps={{ min: 0, max: 365 }} 
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
-                                                backgroundColor: '#ffffff',
-                                                '&:hover fieldset': {
-                                                    borderColor: '#dc3545'
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: '#dc3545'
-                                                }
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': {
-                                                color: '#dc3545'
-                                            }
-                                        }}
-                                    />
-                                </Box>
-
-                                {/* Summary Box */}
-                                <Box sx={{ 
-                                    p: 2.5, 
-                                    backgroundColor: '#fff5f5', 
-                                    borderRadius: '8px',
-                                    border: '2px solid #dc3545',
-                                    mt: 'auto'
-                                }}>
-                                    <Box sx={{ mb: 1.5 }}>
-                                        <Typography variant="body2" sx={{ color: '#666', mb: 0.5, fontSize: '0.875rem' }}>
-                                            Total Entitlement per Employee
-                                        </Typography>
-                                        <Typography variant="h6" sx={{ color: '#dc3545', fontWeight: 'bold', fontSize: '1.25rem' }}>
-                                            {bulkAllocateForm.sickLeaveEntitlement + bulkAllocateForm.casualLeaveEntitlement + bulkAllocateForm.paidLeaveEntitlement} days
-                                        </Typography>
-                                    </Box>
-                                    {bulkAllocateForm.employeeIds?.length > 0 && (
-                                        <Box>
-                                            <Typography variant="body2" sx={{ color: '#666', mb: 0.5, fontSize: '0.875rem' }}>
-                                                Total Employees Selected
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12} md={6}>
+                                        <Box sx={{ 
+                                            p: 2.5, 
+                                            backgroundColor: '#f9fafb',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e5e7eb'
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ color: '#6b7280', mb: 1 }}>
+                                                Allocation Scope
                                             </Typography>
-                                            <Typography variant="h6" sx={{ color: '#dc3545', fontWeight: 'bold', fontSize: '1.25rem' }}>
-                                                {bulkAllocateForm.employeeIds.length} employee{bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}
+                                            <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                {bulkAllocateForm.employeeIds.length} Employee{bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                                Year: {bulkAllocateForm.year}
                                             </Typography>
                                         </Box>
-                                    )}
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <Box sx={{ 
+                                            p: 2.5, 
+                                            backgroundColor: '#fef2f2',
+                                            borderRadius: '8px',
+                                            border: '1px solid #fecaca'
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ color: '#6b7280', mb: 1 }}>
+                                                Total Entitlement per Employee
+                                            </Typography>
+                                            <Typography variant="h4" sx={{ 
+                                                color: '#dc3545', 
+                                                fontWeight: 'bold',
+                                                display: 'flex',
+                                                alignItems: 'baseline',
+                                                gap: 1
+                                            }}>
+                                                {bulkAllocateForm.sickLeaveEntitlement + bulkAllocateForm.casualLeaveEntitlement + bulkAllocateForm.paidLeaveEntitlement}
+                                                <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                                                    days
+                                                </Typography>
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#6b7280', mt: 1 }}>
+                                                Sick: {bulkAllocateForm.sickLeaveEntitlement} • Casual: {bulkAllocateForm.casualLeaveEntitlement} • Planned: {bulkAllocateForm.paidLeaveEntitlement}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                                
+                                {/* Warning Message */}
+                                <Box sx={{ 
+                                    mt: 3,
+                                    p: 2.5,
+                                    backgroundColor: '#fef3cd',
+                                    borderRadius: '8px',
+                                    border: '1px solid #fde68a',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 2
+                                }}>
+                                    <Box sx={{ 
+                                        backgroundColor: '#f59e0b',
+                                        color: 'white',
+                                        borderRadius: '50%',
+                                        width: 24,
+                                        height: 24,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.875rem',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        !
+                                    </Box>
+                                    <Typography variant="body2" sx={{ color: '#92400e', fontWeight: 500 }}>
+                                        <strong>Warning:</strong> This action will update entitlements for all {bulkAllocateForm.employeeIds.length} selected employee{bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}. This operation cannot be undone.
+                                    </Typography>
                                 </Box>
                             </CardContent>
                         </Card>
-                    </Grid>
-                </Grid>
+                    )}
+                </Stack>
             </DialogContent>
 
-            {/* Footer Actions */}
+            {/* STEP 4: Action Controls */}
             <DialogActions sx={{ 
-                px: 3, 
-                pb: 3,
-                pt: 2.5,
+                p: 4,
                 backgroundColor: '#ffffff',
-                borderTop: '2px solid #e0e0e0',
+                borderTop: '2px solid #e5e7eb',
                 justifyContent: 'space-between',
                 alignItems: 'center'
             }}>
-                <Box>
-                    {bulkAllocateForm.employeeIds?.length > 0 && (
-                        <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
-                            Ready to allocate to {bulkAllocateForm.employeeIds.length} employee{bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}
-                        </Typography>
-                    )}
-                </Box>
+                <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                    {!bulkAllocateForm.employeeIds?.length ? 'Please select employees to continue' : 
+                     `Ready to allocate entitlements to ${bulkAllocateForm.employeeIds.length} employee${bulkAllocateForm.employeeIds.length !== 1 ? 's' : ''}`}
+                </Typography>
+                
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button 
                         onClick={() => {
                             setShowBulkAllocateDialog(false);
                             setBulkAllocateForm({ ...bulkAllocateForm, employeeIds: [] });
                         }}
+                        variant="outlined"
                         sx={{
-                            color: '#dc3545',
-                            borderColor: '#dc3545',
-                            px: 3,
-                            minWidth: '100px',
+                            color: '#6b7280',
+                            borderColor: '#d1d5db',
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: '8px',
+                            fontWeight: 500,
+                            textTransform: 'none',
                             '&:hover': {
-                                backgroundColor: '#fff5f5',
-                                borderColor: '#dc3545'
+                                backgroundColor: '#f9fafb',
+                                borderColor: '#9ca3af'
                             }
                         }}
-                        variant="outlined"
                     >
                         Cancel
                     </Button>
                     <Button 
                         onClick={handleBulkAllocateLeaves} 
                         variant="contained"
-                        disabled={!bulkAllocateForm.employeeIds || bulkAllocateForm.employeeIds.length === 0}
+                        disabled={!bulkAllocateForm.employeeIds?.length || bulkAllocateForm.employeeIds.length === 0}
                         sx={{
                             backgroundColor: '#dc3545',
                             color: '#ffffff',
-                            fontWeight: 'bold',
-                            px: 4,
-                            minWidth: '200px',
+                            fontWeight: 600,
+                            px: 6,
+                            py: 1.5,
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.3)',
                             '&:hover': {
-                                backgroundColor: '#c82333'
+                                backgroundColor: '#c82333',
+                                boxShadow: '0 6px 16px rgba(220, 53, 69, 0.4)'
                             },
                             '&.Mui-disabled': {
-                                backgroundColor: '#cccccc',
-                                color: '#666666'
+                                backgroundColor: '#d1d5db',
+                                color: '#9ca3af',
+                                boxShadow: 'none'
                             }
                         }}
                     >
-                        Bulk Allocate ({bulkAllocateForm.employeeIds?.length || 0} employees)
+                        Bulk Allocate Entitlements
                     </Button>
                 </Box>
             </DialogActions>

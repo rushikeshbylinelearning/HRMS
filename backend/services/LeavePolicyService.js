@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Holiday = require('../models/Holiday');
 const LeaveRequest = require('../models/LeaveRequest');
 const { logAction } = require('./auditLogger');
-const { parseISTDate, getISTDateString, getISTNow } = require('../utils/istTime');
+const { parseISTDate, getISTDateString, getISTNow, getISTDateParts } = require('../utils/istTime');
 
 /**
  * Central Leave Policy Service
@@ -69,13 +69,21 @@ class LeavePolicyService {
                 return typeSpecificCheck;
             }
 
+            // NEW: Comp-Off monthly limit validation (2 per month)
+            if (requestType === 'Compensatory' || requestType === 'Comp-Off') {
+                const compOffLimitCheck = await this.validateCompOffMonthlyLimit(employee._id, leaveDates);
+                if (!compOffLimitCheck.allowed) {
+                    return compOffLimitCheck;
+                }
+            }
+
             // PRIORITY 2: Context-aware monthly caps validation (Planned Leave exempt from working days cap)
             const monthlyCheck = await this.validateMonthlyCapsIntelligent(employee._id, leaveDates, leaveType, requestType);
             if (!monthlyCheck.allowed) {
                 return monthlyCheck;
             }
 
-            // PRIORITY 3: Context-aware weekday validation (skip for valid advance notice)
+            // PRIORITY 3: Context-aware weekday validation (skip for Sick Leave and valid advance notice)
             const weekdayCheck = await this.validateWeekdayRestrictionsIntelligent(employee, leaveDates, requestType, leaveType);
             if (!weekdayCheck.allowed) {
                 return weekdayCheck;
@@ -166,17 +174,26 @@ class LeavePolicyService {
      */
     static async validateMonthlyCapsIntelligent(employeeId, leaveDates, leaveType, requestType) {
         const firstLeaveDate = parseISTDate(leaveDates[0]);
-        const month = firstLeaveDate.getMonth();
-        const year = firstLeaveDate.getFullYear();
+        // FIXED: Use IST-aware date extraction instead of getMonth/getFullYear
+        const dateParts = getISTDateParts(firstLeaveDate);
+        const month = dateParts.monthIndex; // 0-11
+        const year = dateParts.year;
         
         // Get month name for user-friendly messaging
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                            'July', 'August', 'September', 'October', 'November', 'December'];
         const monthName = monthNames[month];
         
-        // Month boundaries in IST
-        const monthStart = new Date(year, month, 1);
-        const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        // FIXED: Month boundaries in IST using IST utilities
+        const monthStartStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        const monthStart = parseISTDate(monthStartStr);
+        
+        // Calculate last day of month
+        const nextMonth = month === 11 ? 0 : month + 1;
+        const nextYear = month === 11 ? year + 1 : year;
+        const monthEndStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`;
+        const monthEndDate = parseISTDate(monthEndStr);
+        const monthEnd = new Date(monthEndDate.getTime() - 1); // One millisecond before next month
         
         // Count existing requests this month (PENDING + APPROVED)
         const existingRequests = await LeaveRequest.find({
@@ -348,8 +365,7 @@ class LeavePolicyService {
                 return { allowed: true };
                 
             case 'Compensatory':
-                // Validate worked Saturday via attendance
-                // TODO: Implement attendance validation
+                // FIXED: Validate worked Saturday via attendance
                 // Must be submitted by Thursday of same week
                 const dayOfWeek = today.getDay();
                 
@@ -361,6 +377,9 @@ class LeavePolicyService {
                         rule: 'COMPOFF_THURSDAY_DEADLINE'
                     };
                 }
+                
+                // Validate that employee actually worked on a Saturday (if alternateDate provided)
+                // Note: alternateDate validation happens in route handler with full request context
                 break;
                 
             case 'Loss of Pay':
@@ -390,18 +409,30 @@ class LeavePolicyService {
             }
         }
         
-        // PRIORITY 2: Casual Leave >10 days advance - SKIP ALL weekday restrictions
+        // PRIORITY 2: Sick Leave - BYPASS ALL weekday restrictions (can be applied on any day)
+        if (requestType === 'Sick') {
+            // Sick leave is exception-based and must remain flexible
+            return { allowed: true };
+        }
+        
+        // PRIORITY 3: Casual Leave >10 days advance - SKIP ALL weekday restrictions
         if (requestType === 'Casual' && daysDiff > 10) {
             return { allowed: true };
         }
         
-        // PRIORITY 3: LOP with >10 days advance - SKIP ALL weekday restrictions
+        // PRIORITY 4: LOP with >10 days advance - SKIP ALL weekday restrictions
         if (requestType === 'Loss of Pay' && daysDiff > 10) {
             return { allowed: true };
         }
         
-        // PRIORITY 4: Apply weekday restrictions for short-notice requests
+        // PRIORITY 4: Apply weekday restrictions AND anti-clubbing for short-notice requests
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // FIXED: Anti-clubbing detection - check for weekend bridging patterns
+        const antiClubbingCheck = this.detectAntiClubbingViolation(leaveDates, employee, requestType);
+        if (!antiClubbingCheck.allowed) {
+            return antiClubbingCheck;
+        }
         
         for (const dateStr of leaveDates) {
             const date = parseISTDate(dateStr);
@@ -440,15 +471,78 @@ class LeavePolicyService {
                     };
                 }
             }
+        }
+        
+        return { allowed: true };
+    }
+
+    /**
+     * FIXED: Detect anti-clubbing violations (weekend bridging)
+     * Check if leave dates create extended weekends by bridging working days
+     */
+    static detectAntiClubbingViolation(leaveDates, employee, requestType) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // Sort leave dates to check patterns
+        const sortedDates = leaveDates.map(d => parseISTDate(d)).sort((a, b) => a - b);
+        
+        for (let i = 0; i < sortedDates.length; i++) {
+            const currentDate = sortedDates[i];
+            const dayOfWeek = currentDate.getDay();
+            const dayName = dayNames[dayOfWeek];
             
-            // Intelligent Monday logic for short-notice requests
+            // Pattern 1: Friday leave when Saturday is off (already handled above)
+            // Pattern 2: Monday leave when previous Saturday was off (bridging Sunday)
             if (dayOfWeek === 1) { // Monday
-                const prevDay = new Date(date);
-                prevDay.setDate(prevDay.getDate() - 1);
+                // Check if Saturday before was off
+                const prevSaturday = new Date(currentDate);
+                prevSaturday.setDate(prevSaturday.getDate() - 2); // Go back to Saturday
                 
-                if (prevDay.getDay() === 0) { // Previous day is Sunday
-                    // For short-notice requests, be more restrictive about Monday bridging
-                    // TODO: Implement more sophisticated bridging detection
+                if (prevSaturday.getDay() === 6 && this.isSaturdayOff(prevSaturday, employee.alternateSaturdayPolicy)) {
+                    // Check if Friday was also leave
+                    const prevFriday = new Date(currentDate);
+                    prevFriday.setDate(prevFriday.getDate() - 3);
+                    
+                    const hasFridayLeave = sortedDates.some(d => 
+                        getISTDateString(d) === getISTDateString(prevFriday)
+                    );
+                    
+                    if (hasFridayLeave) {
+                        return {
+                            allowed: false,
+                            reason: `Cannot apply leave on Friday and Monday when Saturday is off - this creates a 4-day weekend (Friday + Saturday-off + Sunday + Monday). Apply at least 10 days in advance to bypass this restriction.`,
+                            rule: 'ANTI_CLUBBING_FRIDAY_MONDAY'
+                        };
+                    }
+                    
+                    // Even Monday alone after Saturday-off creates 3-day weekend
+                    return {
+                        allowed: false,
+                        reason: `Cannot apply leave on ${dayName} when previous Saturday was off - this creates a 3-day weekend. Apply at least 10 days in advance to bypass this restriction.`,
+                        rule: 'ANTI_CLUBBING_MONDAY_AFTER_SATURDAY_OFF'
+                    };
+                }
+            }
+            
+            // Pattern 3: Thursday + Friday combination (creates 4-day weekend if Saturday off)
+            if (dayOfWeek === 4) { // Thursday
+                const nextFriday = new Date(currentDate);
+                nextFriday.setDate(nextFriday.getDate() + 1);
+                
+                const nextSaturday = new Date(currentDate);
+                nextSaturday.setDate(nextSaturday.getDate() + 2);
+                
+                const hasFridayLeave = sortedDates.some(d => 
+                    getISTDateString(d) === getISTDateString(nextFriday)
+                );
+                
+                if (hasFridayLeave && nextSaturday.getDay() === 6 && 
+                    this.isSaturdayOff(nextSaturday, employee.alternateSaturdayPolicy)) {
+                    return {
+                        allowed: false,
+                        reason: `Cannot apply leave on Thursday and Friday when Saturday is off - this creates a 4-day weekend. Apply at least 10 days in advance to bypass this restriction.`,
+                        rule: 'ANTI_CLUBBING_THURSDAY_FRIDAY'
+                    };
                 }
             }
         }
@@ -504,6 +598,61 @@ class LeavePolicyService {
                 return (weekNum === 2 || weekNum === 4);
             default:
                 return false;
+        }
+    }
+
+    /**
+     * NEW: Validate Comp-Off monthly limit (maximum 2 per month)
+     * @param {String|ObjectId} employeeId - Employee ID
+     * @param {Array} leaveDates - Array of leave dates for current request
+     * @returns {Object} Validation result
+     */
+    static async validateCompOffMonthlyLimit(employeeId, leaveDates) {
+        try {
+            // Get the first leave date to determine the month
+            const firstLeaveDate = parseISTDate(leaveDates[0]);
+            const { year, month } = getISTDateParts(firstLeaveDate);
+            
+            // Calculate month boundaries in IST
+            const monthStart = parseISTDate(`${year}-${String(month).padStart(2, '0')}-01`);
+            const monthEnd = new Date(monthStart);
+            monthEnd.setMonth(monthEnd.getMonth() + 1);
+            monthEnd.setDate(0); // Last day of the month
+            monthEnd.setHours(23, 59, 59, 999);
+            
+            const monthName = firstLeaveDate.toLocaleDateString('en-US', { month: 'long', timeZone: 'Asia/Kolkata' });
+            
+            // Count existing Comp-Off requests in the same month (PENDING + APPROVED only)
+            const existingCompOffRequests = await LeaveRequest.find({
+                employee: employeeId,
+                requestType: { $in: ['Compensatory', 'Comp-Off'] },
+                status: { $in: ['Pending', 'Approved'] }, // Exclude Rejected and Cancelled
+                leaveDates: {
+                    $elemMatch: {
+                        $gte: monthStart,
+                        $lte: monthEnd
+                    }
+                }
+            });
+            
+            // Check if adding this request would exceed the limit
+            if (existingCompOffRequests.length >= 2) {
+                return {
+                    allowed: false,
+                    reason: `Maximum Comp-Off limit (2 per month) exceeded. You already have ${existingCompOffRequests.length} Comp-Off request${existingCompOffRequests.length !== 1 ? 's' : ''} for ${monthName} ${year}.`,
+                    rule: 'COMPOFF_MONTHLY_LIMIT'
+                };
+            }
+            
+            return { allowed: true };
+            
+        } catch (error) {
+            console.error('Error validating Comp-Off monthly limit:', error);
+            return {
+                allowed: false,
+                reason: 'Error validating Comp-Off monthly limit',
+                rule: 'COMPOFF_VALIDATION_ERROR'
+            };
         }
     }
 

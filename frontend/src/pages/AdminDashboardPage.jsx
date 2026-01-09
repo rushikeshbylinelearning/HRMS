@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { CircularProgress, Alert, Avatar, Button, Tooltip, Snackbar, Chip, Dialog, DialogTitle, DialogContent, Typography, Box, DialogActions, Stack } from '@mui/material';
+import { CircularProgress, Alert, Avatar, Button, Tooltip, Snackbar, Chip, Dialog, DialogTitle, DialogContent, Typography, Box, DialogActions, Stack, Skeleton } from '@mui/material';
 import {
     PeopleAlt as PeopleAltIcon,
     Work as WorkIcon,
@@ -209,13 +209,7 @@ const AdminDashboardPage = () => {
     // ProtectedRoute handles most cases, but this is a safety check
     // If user is null but we're authenticated, show skeleton (user data loading)
     const { authStatus } = useAuth();
-    if (authStatus === 'unknown' || !user) {
-        return (
-            <div className="empty-state" style={{ height: '80vh' }}>
-                <CircularProgress />
-            </div>
-        );
-    }
+    const authReady = authStatus !== 'unknown' && !!user;
     // =================================================================
 
     const fetchAllDataRef = useRef(null);
@@ -227,7 +221,13 @@ const AdminDashboardPage = () => {
         setError('');
         try {
             // AGGREGATE ENDPOINT: Single call replaces 2 separate calls
-            const dashboardRes = await api.get('/admin/dashboard-summary?includePendingLeaves=true');
+            const dashboardRes = await api.get('/admin/dashboard-summary', {
+                params: {
+                    includePendingLeaves: true,
+                    pendingPage: 1,
+                    pendingLimit: 20
+                }
+            });
             const { summary, pendingLeaveRequests } = dashboardRes.data;
             
             setSummary(summary);
@@ -277,23 +277,8 @@ const AdminDashboardPage = () => {
             if (fetchAllDataRef.current) {
                 await fetchAllDataRef.current(true);
             }
-            
-            if (mounted) {
-                // Force layout refresh to prevent CSS conflicts from other pages
-                const forceLayoutRefresh = () => {
-                    // Trigger a reflow to ensure proper layout calculation
-                    document.body.offsetHeight;
-                    // Force browser to recalculate styles
-                    window.dispatchEvent(new Event('resize'));
-                };
-                
-                // Run layout refresh after a short delay to ensure DOM is ready
-                setTimeout(forceLayoutRefresh, 100);
-                
-                // POLLING REMOVED: Socket events + mutation refetch provide real-time updates
-                // Admin dashboard receives attendance_log_updated events for all users
-                // Visibility change fallback added below for socket disconnect scenarios
-            }
+            // POLLING REMOVED: Socket events + mutation refetch provide real-time updates
+            // Visibility change fallback added below for socket disconnect scenarios
         };
         
         loadData();
@@ -317,24 +302,59 @@ const AdminDashboardPage = () => {
         };
     }, [user?.id, user?._id, authLoading]); // Depend on user IDs (stable) and loading to trigger when auth is ready
 
-    // Additional useEffect to handle navigation back to dashboard
+    // Real-time consistency: refetch dashboard summary on relevant socket events (throttled, no polling)
     useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                // Page became visible (user navigated back), force layout refresh
-                setTimeout(() => {
-                    document.body.offsetHeight;
-                    window.dispatchEvent(new Event('resize'));
-                }, 50);
+        if (!authReady) return;
+
+        const THROTTLE_MS = 1500;
+        let lastRun = 0;
+        let scheduledTimer = null;
+
+        const runRefetch = async () => {
+            if (!fetchAllDataRef.current) return;
+            lastRun = Date.now();
+            try {
+                await fetchAllDataRef.current(false);
+            } catch (e) {
+                // Swallow to avoid breaking socket handler; error UI is managed by fetchAllData
             }
         };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        const scheduleRefetch = () => {
+            const now = Date.now();
+            const elapsed = now - lastRun;
+            if (elapsed >= THROTTLE_MS) {
+                runRefetch();
+                return;
+            }
+            if (scheduledTimer) return;
+            scheduledTimer = setTimeout(() => {
+                scheduledTimer = null;
+                runRefetch();
+            }, THROTTLE_MS - elapsed);
         };
-    }, []);
+
+        const handleDashboardRelevantEvent = () => {
+            // Avoid unnecessary refresh when tab is hidden
+            if (document.hidden) return;
+            scheduleRefetch();
+        };
+
+        socket.on('attendance_log_updated', handleDashboardRelevantEvent);
+        socket.on('leave_request_updated', handleDashboardRelevantEvent);
+        // Safe subscription (may not be emitted yet in some deployments)
+        socket.on('leave_status_updated', handleDashboardRelevantEvent);
+
+        return () => {
+            socket.off('attendance_log_updated', handleDashboardRelevantEvent);
+            socket.off('leave_request_updated', handleDashboardRelevantEvent);
+            socket.off('leave_status_updated', handleDashboardRelevantEvent);
+            if (scheduledTimer) {
+                clearTimeout(scheduledTimer);
+                scheduledTimer = null;
+            }
+        };
+    }, [authReady]);
 
     const handleRequestStatusChange = async (requestId, status) => {
         const originalRequests = [...pendingRequests];
@@ -460,7 +480,7 @@ const AdminDashboardPage = () => {
     }, [summary]);
 
 
-    if (loading) return <div className="empty-state" style={{ height: '80vh' }}><CircularProgress /></div>;
+    const showSkeletons = !authReady || loading || !summary;
 
     return (
         <div className="dashboard-page-container">
@@ -475,9 +495,23 @@ const AdminDashboardPage = () => {
             
             {/* Top Row: 4 Small Summary Cards */}
             <div className="top-cards-grid">
-                {summaryCardsData.map((card, index) => (
-                    <SummaryCard key={card.key || index} {...card} />
-                ))}
+                {showSkeletons ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                        <div key={`summary-skel-${idx}`} className="card summary-card">
+                            <div className="summary-card-content">
+                                <div className="title"><Skeleton width="60%" /></div>
+                                <div className="value"><Skeleton width="40%" height={40} /></div>
+                            </div>
+                            <div className="summary-card-icon icon-bg-teal">
+                                <Skeleton variant="circular" width={32} height={32} />
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    summaryCardsData.map((card, index) => (
+                        <SummaryCard key={card.key || index} {...card} />
+                    ))
+                )}
             </div>
 
             {/* Bottom Row: 3 Large Cards */}
@@ -496,7 +530,22 @@ const AdminDashboardPage = () => {
                             <span>Actions</span>
                         </div>
                         <div className="requests-list">
-                            {pendingRequests.length > 0 ? (
+                            {showSkeletons ? (
+                                Array.from({ length: 4 }).map((_, idx) => (
+                                    <div key={`pending-skel-${idx}`} className="request-item">
+                                        <div className="request-info">
+                                            <strong><Skeleton width="60%" /></strong>
+                                            <span className="date"><Skeleton width="40%" /></span>
+                                        </div>
+                                        <div className="applied-date"><Skeleton width="60%" /></div>
+                                        <div><Skeleton width="60%" /></div>
+                                        <div className="request-actions" style={{ justifyContent: 'flex-end' }}>
+                                            <Skeleton variant="rectangular" width={70} height={32} sx={{ borderRadius: 1 }} />
+                                            <Skeleton variant="rectangular" width={70} height={32} sx={{ borderRadius: 1 }} />
+                                        </div>
+                                    </div>
+                                ))
+                            ) : pendingRequests.length > 0 ? (
                                 pendingRequests.map(req => (
                                     <RequestItem 
                                         key={req._id} 
@@ -518,7 +567,29 @@ const AdminDashboardPage = () => {
                         <h2 className="card-title">Who's In Today?</h2>
                     </div>
                     <div className="whos-in-list">
-                        {summary?.whosInList?.length > 0 ? (
+                        {showSkeletons ? (
+                            Array.from({ length: 5 }).map((_, idx) => (
+                                <div key={`whos-skel-${idx}`} className="whos-in-item">
+                                    <Avatar sx={{ bgcolor: 'var(--accent-teal)' }}>
+                                        <Skeleton variant="circular" width={24} height={24} />
+                                    </Avatar>
+                                    <div className="item-details">
+                                        <div className="name"><Skeleton width="50%" /></div>
+                                        <div className="role"><Skeleton width="35%" /></div>
+                                    </div>
+                                    <div className="item-times">
+                                        <div className="time-column">
+                                            <div className="time-label">Log In</div>
+                                            <div className="time-value"><Skeleton width={70} /></div>
+                                        </div>
+                                        <div className="time-column">
+                                            <div className="time-label">Required Log Out</div>
+                                            <div className="time-value logout-time"><Skeleton width={70} /></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : summary?.whosInList?.length > 0 ? (
                             summary.whosInList.map(emp => (
                                 <WhosInItem key={emp._id} employee={emp} />
                             ))
@@ -537,7 +608,20 @@ const AdminDashboardPage = () => {
                         <div className="activity-subsection">
                             <h3 className="subsection-title">Recent Activity</h3>
                             <div className="activity-list">
-                                {filteredRecentActivity.length > 0 ? (
+                                {showSkeletons ? (
+                                    Array.from({ length: 4 }).map((_, idx) => (
+                                        <div key={`activity-skel-${idx}`} className="activity-item">
+                                            <Avatar sx={{ bgcolor: 'var(--accent-blue)', width: 32, height: 32 }}>
+                                                <Skeleton variant="circular" width={20} height={20} />
+                                            </Avatar>
+                                            <div className="activity-details" style={{ flex: 1 }}>
+                                                <div className="name"><Skeleton width="55%" /></div>
+                                                <div className="activity-preview"><Skeleton width="80%" /></div>
+                                            </div>
+                                            <div className="activity-time"><Skeleton width={50} /></div>
+                                        </div>
+                                    ))
+                                ) : filteredRecentActivity.length > 0 ? (
                                     filteredRecentActivity.slice(0, 4).map(item => (
                                         <ActivityItem key={item.type + item._id} item={item} onClick={() => handleOpenActivityModal(item)} />
                                     ))

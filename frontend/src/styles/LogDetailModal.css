@@ -1,5 +1,21 @@
 /* src/styles/LogDetailModal.css */
 
+/**
+ * RECENT FIXES (2026-01-08):
+ * A. Fixed scroll issues at 100% zoom:
+ *    - Added max-height constraint on content (calc(90vh - 80px))
+ *    - Added min-height: 0 to prevent flex overflow
+ *    - Changed overflow-y: auto to overflow-y: scroll for consistency
+ * B. Added smooth modal animations:
+ *    - GPU-accelerated fade-in using opacity + transform
+ *    - 300ms enter, 200ms exit timing
+ * C. Enhanced break highlighting:
+ *    - Stronger orange styling for break cards (both admin and employee)
+ *    - Added box-shadows for visual distinction
+ *    - Enhanced break label visibility with background padding
+ * D. No logic/timezone/API changes - purely presentational fixes
+ */
+
 /* --- GENERAL DIALOG STYLING --- */
 .log-detail-dialog {
     border-radius: 8px;
@@ -7,6 +23,20 @@
     max-height: 90vh;
     display: flex;
     flex-direction: column;
+    /* Smooth modal animation - GPU accelerated */
+    animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Smooth modal open animation */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .log-detail-dialog .MuiDialogTitle-root {
@@ -33,6 +63,10 @@
     background-color: #f8f9fa;
     padding: 0 !important;
     overflow-y: auto;
+    /* CRITICAL FIX: Ensure scroll works at 100% zoom */
+    max-height: calc(90vh - 80px); /* Subtract header height */
+    flex: 1;
+    min-height: 0; /* Prevent flex item from overflowing */
 }
 
 .dialog-content {
@@ -672,8 +706,12 @@
     background-color: #fafafa;
     overflow-y: auto;
     flex: 1;
+    min-height: 0; /* Critical for scroll to work at all zoom levels */
     display: flex;
     flex-direction: column;
+    /* Ensure scrollbar is always visible and functional */
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 .audit-timeline-container {
@@ -814,13 +852,26 @@
 .timeline-entry-card.break-card {
     background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
     border-color: #E65100;
-    border-width: 2px;
+    border-width: 2.5px;
+    /* Enhanced visual distinction for breaks (applies to both admin and employee) */
+    box-shadow: 0 3px 8px rgba(230, 81, 0, 0.25) !important;
+}
+
+.timeline-entry-card.break-card:hover {
+    box-shadow: 0 5px 14px rgba(230, 81, 0, 0.35) !important;
+    border-color: #BF360C;
 }
 
 .timeline-entry-card.work-session-card {
     background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
     border-color: #4caf50;
-    border-width: 2px;
+    border-width: 2.5px;
+    box-shadow: 0 3px 8px rgba(76, 175, 80, 0.20) !important;
+}
+
+.timeline-entry-card.work-session-card:hover {
+    box-shadow: 0 5px 14px rgba(76, 175, 80, 0.30) !important;
+    border-color: #388E3C;
 }
 
 .timeline-entry-content {
@@ -873,10 +924,13 @@
 
 .icon-square-green {
     background-color: #4caf50;
+    box-shadow: 0 0 4px rgba(76, 175, 80, 0.4);
 }
 
 .icon-square-orange {
     background-color: #E65100;
+    /* Enhanced orange indicator for breaks (both admin and employee) */
+    box-shadow: 0 0 4px rgba(230, 81, 0, 0.5);
 }
 
 .timeline-time {
@@ -888,10 +942,14 @@
 
 .timeline-time-work {
     color: #2e7d32;
+    font-weight: 700;
 }
 
 .timeline-time-break {
     color: #E65100;
+    /* Ensure break times are visually distinct (admin + employee) */
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(230, 81, 0, 0.1);
 }
 
 /* Dotted Connector */
@@ -932,6 +990,10 @@
     letter-spacing: 0.8px;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    /* Ensure break label is highly visible (applies to admin and employee) */
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
 }
 
 /* Break Labels */

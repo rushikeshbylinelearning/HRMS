@@ -153,10 +153,21 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
             medicalCertificate
         );
 
+        // NEW: For Sick Leave, include certificate requirement information
+        let certificateRequirement = null;
+        if (requestType === 'Sick') {
+            const certificateCheck = LeaveValidationService.validateSickLeaveCertificate(leaveDatesArray, medicalCertificate);
+            certificateRequirement = {
+                required: certificateCheck.certificateRequired,
+                reason: certificateCheck.reason
+            };
+        }
+
         res.json({
             valid: validation.valid,
             errors: validation.errors,
             warnings: validation.warnings,
+            ...(certificateRequirement && { certificateRequirement }),
             ...(validation.halfYearPeriod && { halfYearPeriod: validation.halfYearPeriod }),
             ...(validation.availableDays !== undefined && { availableDays: validation.availableDays }),
             ...(validation.usedDays !== undefined && { usedDays: validation.usedDays })
@@ -182,6 +193,58 @@ router.post('/request', authenticateToken, async (req, res) => {
     try {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+        // FIXED: Validate Comp-Off alternate date
+        if (requestType === 'Compensatory' && alternateDate) {
+            const altDate = parseISTDate(alternateDate);
+            const altDayOfWeek = altDate.getDay();
+            
+            // Must be a Saturday
+            if (altDayOfWeek !== 6) {
+                return res.status(400).json({ 
+                    error: 'Comp-Off alternate date must be a Saturday.' 
+                });
+            }
+            
+            // Must be within last 4 weeks (28 days)
+            const { startOfISTDay } = require('../utils/istTime');
+            const today = startOfISTDay();
+            const daysDiff = Math.floor((today - altDate) / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff < 0) {
+                return res.status(400).json({ 
+                    error: 'Comp-Off alternate date cannot be in the future.' 
+                });
+            }
+            
+            if (daysDiff > 28) {
+                return res.status(400).json({ 
+                    error: 'Comp-Off can only be claimed for Saturdays worked within the last 4 weeks.' 
+                });
+            }
+            
+            // Validate employee actually worked on that Saturday
+            const AttendanceLog = require('../models/AttendanceLog');
+            const altDateStr = getISTDateString(altDate);
+            const attendanceRecord = await AttendanceLog.findOne({
+                user: userId,
+                attendanceDate: altDateStr
+            });
+            
+            if (!attendanceRecord || !attendanceRecord.clockInTime) {
+                return res.status(400).json({ 
+                    error: `No attendance record found for ${altDateStr}. You must have clocked in on that Saturday to claim Comp-Off.` 
+                });
+            }
+            
+            // Check if working hours meet minimum threshold (at least 4 hours)
+            const workedHours = attendanceRecord.totalWorkingHours || 0;
+            if (workedHours < 4) {
+                return res.status(400).json({ 
+                    error: `Insufficient working hours on ${altDateStr} (${workedHours.toFixed(1)}h). Minimum 4 hours required to claim Comp-Off.` 
+                });
+            }
+        }
 
         // Convert string dates to Date objects (parse as IST)
         const leaveDatesArray = leaveDates.map(date => parseISTDate(date));

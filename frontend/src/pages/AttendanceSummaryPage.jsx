@@ -41,6 +41,7 @@ const AttendanceSummaryPage = () => {
     const { user } = useAuth();
     const [logs, setLogs] = useState([]);
     const [holidays, setHolidays] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentDate, setCurrentDate] = useState(getISTNow());
@@ -82,17 +83,20 @@ const AttendanceSummaryPage = () => {
             const summaryRes = await api.get(`/attendance/summary?startDate=${startDate}&endDate=${endDate}&includeHolidays=true`);
             
             // Handle response format
-            let fetchedLogs, fetchedHolidays;
+            let fetchedLogs, fetchedHolidays, fetchedSummary;
             if (Array.isArray(summaryRes.data)) {
                 fetchedLogs = summaryRes.data;
                 fetchedHolidays = [];
+                fetchedSummary = null;
             } else {
                 fetchedLogs = Array.isArray(summaryRes.data.logs) ? summaryRes.data.logs : [];
                 fetchedHolidays = Array.isArray(summaryRes.data.holidays) ? summaryRes.data.holidays : [];
+                fetchedSummary = summaryRes.data.summary || null;
             }
             
             setLogs(fetchedLogs);
             setHolidays(fetchedHolidays);
+            setSummary(fetchedSummary);
             // Update freshness timestamp when fresh data is received
             setLastUpdatedAt(Date.now());
 
@@ -356,6 +360,7 @@ const AttendanceSummaryPage = () => {
                         saturdayPolicy={user?.alternateSaturdayPolicy || 'All Saturdays Working'}
                         shiftInfo={mappedShiftInfo}
                         holidays={holidays}
+                        summary={summary}
                     />
                 </div>
             </div>

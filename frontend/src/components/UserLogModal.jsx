@@ -66,7 +66,7 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                 }));
             
             // Process breaks
-            const breaks = Array.isArray(log.breaks) ? log.breaks : []
+            const breaks = (Array.isArray(log.breaks) ? log.breaks : [])
                 .filter(b => b && (b.startTime || b.start_time))
                 .map(b => ({
                     type: 'break',

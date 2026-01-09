@@ -75,7 +75,8 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
-        const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl';
+        // CRITICAL FIX: Added employmentStatus and probationStatus for Leave Tracker filtering
+        const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus';
 
         if (getAllEmployees) {
             const employees = await User.find({})

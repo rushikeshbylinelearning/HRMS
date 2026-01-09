@@ -2,13 +2,16 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Setting = require('../models/Setting');
-const LeaveRequest = require('../models/LeaveRequest'); // <-- NEW
+const LeaveRequest = require('../models/LeaveRequest'); 
 const { sendEmail } = require('./mailService');
 const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 // REMOVED: Legacy probation tracking service import
 // Reason: All probation calculations now use /api/analytics/probation-tracker endpoint
 const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
+const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
+const { batchFetchLeaves } = require('./leaveCache');
+const Holiday = require('../models/Holiday');
 
 // --- CONFIGURATION (from .env) ---
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
@@ -69,71 +72,118 @@ const checkProbationAndInternshipEndings = async () => {
                 const baseEndDate = new Date(probationStartDate);
                 baseEndDate.setMonth(baseEndDate.getMonth() + 6);
                 
-                // Calculate leave extensions (only approved leaves after joining date)
-                const probationStartIST = parseISTDate(probationStartDateStr);
-                const approvedLeaves = await LeaveRequest.find({
-                    employee: user._id,
-                    status: 'Approved',
-                    leaveDates: {
-                        $elemMatch: {
-                            $gte: probationStartIST
-                        }
-                    }
-                }).lean();
-                
+                const todayIST = getISTNow();
+                const todayStr = getISTDateString(todayIST);
+                const rangeStart = probationStartDateStr;
+                const rangeEnd = todayStr;
+                const saturdayPolicy = user?.alternateSaturdayPolicy || 'All Saturdays Working';
+
+                const dateRange = generateDateRange(rangeStart, rangeEnd);
+
+                const AttendanceLog = require('../models/AttendanceLog');
+                const [logs, holidays, leaveRequestsMap] = await Promise.all([
+                    AttendanceLog.aggregate([
+                        {
+                            $match: {
+                                user: user._id,
+                                attendanceDate: { $gte: rangeStart, $lte: rangeEnd }
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: 'attendancesessions',
+                                localField: '_id',
+                                foreignField: 'attendanceLog',
+                                as: 'sessions'
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                attendanceDate: 1,
+                                attendanceStatus: 1,
+                                isHalfDay: 1,
+                                halfDayReasonCode: 1,
+                                halfDayReasonText: 1,
+                                halfDaySource: 1,
+                                overriddenByAdmin: 1,
+                                lateMinutes: 1,
+                                totalWorkingHours: 1,
+                                logoutType: 1,
+                                autoLogoutReason: 1,
+                                overrideReason: 1,
+                                sessions: {
+                                    $map: {
+                                        input: '$sessions',
+                                        as: 's',
+                                        in: {
+                                            startTime: '$$s.startTime',
+                                            endTime: '$$s.endTime'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        { $sort: { attendanceDate: 1 } }
+                    ]),
+                    (async () => {
+                        const startDateIST = parseISTDate(rangeStart);
+                        const endDateIST = parseISTDate(rangeEnd);
+                        return Holiday.find({
+                            date: {
+                                $gte: startDateIST,
+                                $lte: endDateIST
+                            },
+                            isTentative: { $ne: true }
+                        }).sort({ date: 1 }).lean();
+                    })(),
+                    batchFetchLeaves(user._id, rangeStart, rangeEnd)
+                ]);
+
+                const logsMap = new Map();
+                logs.forEach(log => {
+                    logsMap.set(log.attendanceDate, log);
+                });
+
                 let leaveExtensionDays = 0;
-                const leaveDatesSet = new Set(); // Track leave dates to exclude from absent calculation
-                
-                approvedLeaves.forEach(leave => {
-                    leave.leaveDates.forEach(leaveDate => {
-                        const leaveDateStr = getISTDateString(leaveDate);
-                        if (leaveDateStr >= probationStartDateStr) {
-                            leaveDatesSet.add(leaveDateStr);
-                            if (leave.leaveType === 'Full Day') {
+                let absentExtensionDays = 0;
+                const countedLeaveDates = new Set();
+
+                dateRange.forEach(attendanceDate => {
+                    const log = logsMap.get(attendanceDate) || null;
+                    const leaveRequest = leaveRequestsMap.get(attendanceDate) || null;
+
+                    const statusInfo = resolveAttendanceStatus({
+                        attendanceDate,
+                        attendanceLog: log,
+                        holidays: holidays || [],
+                        leaveRequest,
+                        saturdayPolicy
+                    });
+
+                    if (statusInfo.isLeave) {
+                        if (!countedLeaveDates.has(attendanceDate)) {
+                            countedLeaveDates.add(attendanceDate);
+                            const leaveType = leaveRequest?.leaveType;
+                            if (leaveType === 'Full Day') {
                                 leaveExtensionDays += 1;
-                            } else if (leave.leaveType === 'Half Day - First Half' || leave.leaveType === 'Half Day - Second Half') {
+                            } else if (leaveType === 'Half Day - First Half' || leaveType === 'Half Day - Second Half') {
                                 leaveExtensionDays += 0.5;
                             }
                         }
-                    });
-                });
-                
-                // Calculate absence extensions (NEW - REQUIRED)
-                const AttendanceLog = require('../models/AttendanceLog');
-                const attendanceLogs = await AttendanceLog.find({
-                    user: user._id,
-                    attendanceDate: { $gte: probationStartDateStr }
-                }).lean();
-                
-                let absentExtensionDays = 0;
-                const absentDatesSet = new Set();
-                
-                attendanceLogs.forEach(log => {
-                    const logDateStr = log.attendanceDate;
-                    
-                    // Skip if this date is covered by an approved leave
-                    if (leaveDatesSet.has(logDateStr)) {
                         return;
                     }
-                    
-                    // Skip if already counted
-                    if (absentDatesSet.has(logDateStr)) {
+
+                    if (statusInfo.isHoliday || statusInfo.isWeeklyOff) {
                         return;
                     }
-                    
-                    // Determine if absent (full or half day)
-                    const status = log.attendanceStatus;
-                    const hasClockIn = !!log.clockInTime;
-                    const isHalfDayFlag = log.isHalfDay || false;
-                    
-                    // Full-day absent: No clock-in time OR status is 'Absent'
-                    if (!hasClockIn || status === 'Absent') {
-                        absentDatesSet.add(logDateStr);
+
+                    if (statusInfo.status === 'Absent') {
                         absentExtensionDays += 1;
+                        return;
                     }
-                    // Half-day absent: isHalfDay flag OR status is 'Half-day' (but no clock-in)
-                    else if (isHalfDayFlag || status === 'Half-day') {
-                        absentDatesSet.add(logDateStr);
+
+                    if (statusInfo.status === 'Half-day') {
                         absentExtensionDays += 0.5;
                     }
                 });
