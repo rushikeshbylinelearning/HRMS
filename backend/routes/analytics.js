@@ -448,10 +448,15 @@ const checkAndUpdateLateStatus = async (attendanceLog, user) => {
         </div>
       `;
       
-      await sendEmail({
+      sendEmail({
         to: user.email,
         subject,
-        html
+        html,
+        isHREmail: false,
+        mailType: 'EmployeeLateLogin',
+        recipientType: 'employee'
+      }).catch(err => {
+        console.error('Error sending late login notification:', err);
       });
       
       // Mark that notification has been sent
@@ -495,8 +500,8 @@ router.get('/monthly-overview', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: { $in: userIds },
         attendanceDate: { 
-          $gte: monthStart.toISOString().slice(0, 10),
-          $lte: monthEnd.toISOString().slice(0, 10)
+          $gte: getISTDateString(monthStart),
+          $lte: getISTDateString(monthEnd)
         }
       }).populate('user', 'fullName email department').lean();
       
@@ -766,6 +771,10 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
         leaveRequestsAllTime: 0
       };
     }
+
+    // Analytics-only derived data (must remain read-only): working hours computed in-memory
+    // for logs that do not already have totalWorkingHours.
+    let computedWorkingHoursByLogId = null;
     
     // Calculate actual working hours from attendance sessions if not available
     if (metrics.totalWorkingHours === 0 && metrics.totalDays > 0) {
@@ -774,6 +783,7 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       try {
         let totalCalculatedHours = 0;
         let daysWithSessions = 0;
+        computedWorkingHoursByLogId = new Map();
       
       for (const log of logs) {
         // Use sessions data if available, otherwise fall back to clockInTime/clockOutTime
@@ -814,11 +824,9 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
           
           totalCalculatedHours += netWorkingHours;
           daysWithSessions++;
-          
-          // Update the log with calculated working hours
-          await AttendanceLog.findByIdAndUpdate(log._id, {
-            totalWorkingHours: netWorkingHours
-          });
+
+          // Analytics must be read-only: compute in-memory only (do NOT persist)
+          computedWorkingHoursByLogId.set(String(log._id), netWorkingHours);
         }
       }
       
@@ -854,63 +862,88 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
     })));
 
     // Get detailed logs with sessions and breaks
-    const detailedLogs = await Promise.all(logs.map(async (log) => {
+    const sessionsByLogId = new Map();
+    const breaksByLogId = new Map();
+
+    const logsNeedingSessions = logs.filter(log => !log.sessions || log.sessions.length === 0).map(log => log._id);
+    const logsNeedingBreaks = logs.filter(log => !log.breaks || log.breaks.length === 0).map(log => log._id);
+
+    if (logsNeedingSessions.length > 0) {
+      const sessions = await AttendanceSession.find({ attendanceLog: { $in: logsNeedingSessions } })
+        .sort({ startTime: 1 })
+        .lean();
+      sessions.forEach(s => {
+        const key = String(s.attendanceLog);
+        const arr = sessionsByLogId.get(key);
+        if (arr) arr.push(s);
+        else sessionsByLogId.set(key, [s]);
+      });
+    }
+
+    if (logsNeedingBreaks.length > 0) {
+      const breaks = await BreakLog.find({ attendanceLog: { $in: logsNeedingBreaks } })
+        .sort({ startTime: 1 })
+        .lean();
+      breaks.forEach(b => {
+        const key = String(b.attendanceLog);
+        const arr = breaksByLogId.get(key);
+        if (arr) arr.push(b);
+        else breaksByLogId.set(key, [b]);
+      });
+    }
+
+    const detailedLogs = logs.map((log) => {
       // If log already has sessions and breaks from aggregation, use them
       // Otherwise, fetch them separately
-      let sessions = log.sessions || [];
-      let breaks = log.breaks || [];
-      
-      // If not populated by aggregation, fetch separately
-      if (!log.sessions || log.sessions.length === 0) {
-        sessions = await AttendanceSession.find({ attendanceLog: log._id }).sort({ startTime: 1 });
-      }
-      if (!log.breaks || log.breaks.length === 0) {
-        breaks = await BreakLog.find({ attendanceLog: log._id }).sort({ startTime: 1 });
-      }
-      
-      // Convert to plain object if it's a Mongoose document
       const logObject = log.toObject ? log.toObject() : { ...log };
-      
+      const logIdStr = String(logObject._id);
+
+      let sessions = logObject.sessions || [];
+      let breaks = logObject.breaks || [];
+
+      if (!logObject.sessions || logObject.sessions.length === 0) {
+        sessions = sessionsByLogId.get(logIdStr) || [];
+      }
+      if (!logObject.breaks || logObject.breaks.length === 0) {
+        breaks = breaksByLogId.get(logIdStr) || [];
+      }
+
+      // If we computed working hours in-memory earlier, reflect that in the response
+      // without writing back to the database.
+      if (logObject && (logObject.totalWorkingHours === 0 || logObject.totalWorkingHours == null)) {
+        const computed = computedWorkingHoursByLogId
+          ? computedWorkingHoursByLogId.get(String(logObject._id))
+          : undefined;
+        if (typeof computed === 'number' && !Number.isNaN(computed)) {
+          logObject.totalWorkingHours = computed;
+        }
+      }
+
       return {
         ...logObject,
         sessions,
         breaks
       };
-    }));
+    });
 
     // Calculate weekly and monthly trends for charts
     const weeklyData = [];
     const monthlyData = [];
-    
-    // Generate weekly data for the last 8 weeks
+
+    const weekRanges = [];
     for (let i = 7; i >= 0; i--) {
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + (i * 7)));
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
-      
-      const weekLogs = await AttendanceLog.find({
-        user: id,
-        attendanceDate: { 
-          $gte: getISTDateString(weekStart),
-          $lte: getISTDateString(weekEnd)
-        }
+      weekRanges.push({
+        label: `Week ${8-i}`,
+        start: getISTDateString(weekStart),
+        end: getISTDateString(weekEnd)
       });
-      
-      const weekMetrics = {
-        week: `Week ${8-i}`,
-        onTime: weekLogs.filter(log => log.attendanceStatus === 'On-time').length,
-        late: weekLogs.filter(log => log.attendanceStatus === 'Late').length,
-        halfDay: weekLogs.filter(log => log.attendanceStatus === 'Half-day').length,
-        absent: weekLogs.filter(log => log.attendanceStatus === 'Absent').length,
-        avgWorkingHours: weekLogs.length > 0 ? 
-          (weekLogs.reduce((sum, log) => sum + (log.totalWorkingHours || 0), 0) / weekLogs.length) : 0
-      };
-      
-      weeklyData.push(weekMetrics);
     }
-    
-    // Generate monthly data for the last 6 months
+
+    const monthRanges = [];
     for (let i = 5; i >= 0; i--) {
       const monthStart = new Date();
       monthStart.setMonth(monthStart.getMonth() - i);
@@ -918,26 +951,66 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const monthEnd = new Date(monthStart);
       monthEnd.setMonth(monthEnd.getMonth() + 1);
       monthEnd.setDate(0);
-      
-      const monthLogs = await AttendanceLog.find({
-        user: id,
-        attendanceDate: { 
-          $gte: monthStart.toISOString().slice(0, 10),
-          $lte: monthEnd.toISOString().slice(0, 10)
-        }
+      monthRanges.push({
+        startDateObj: monthStart,
+        start: getISTDateString(monthStart),
+        end: getISTDateString(monthEnd)
       });
-      
-      const monthMetrics = {
-        month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        onTime: monthLogs.filter(log => log.attendanceStatus === 'On-time').length,
-        late: monthLogs.filter(log => log.attendanceStatus === 'Late').length,
-        halfDay: monthLogs.filter(log => log.attendanceStatus === 'Half-day').length,
-        absent: monthLogs.filter(log => log.attendanceStatus === 'Absent').length,
-        avgWorkingHours: monthLogs.length > 0 ? 
-          (monthLogs.reduce((sum, log) => sum + (log.totalWorkingHours || 0), 0) / monthLogs.length) : 0
-      };
-      
-      monthlyData.push(monthMetrics);
+    }
+
+    const chartMinStart = weekRanges.length > 0 ? weekRanges[0].start : null;
+    const chartMaxEnd = weekRanges.length > 0 ? weekRanges[weekRanges.length - 1].end : null;
+    const monthMinStart = monthRanges.length > 0 ? monthRanges[0].start : null;
+    const monthMaxEnd = monthRanges.length > 0 ? monthRanges[monthRanges.length - 1].end : null;
+
+    const minStart = [chartMinStart, monthMinStart].filter(Boolean).sort()[0];
+    const maxEnd = [chartMaxEnd, monthMaxEnd].filter(Boolean).sort().slice(-1)[0];
+
+    let chartLogsAll = [];
+    if (minStart && maxEnd) {
+      chartLogsAll = await AttendanceLog.find({
+        user: id,
+        attendanceDate: { $gte: minStart, $lte: maxEnd }
+      }).lean();
+    }
+
+    const buildBucket = (bucketLogs) => {
+      const onTime = bucketLogs.filter(l => l.attendanceStatus === 'On-time').length;
+      const late = bucketLogs.filter(l => l.attendanceStatus === 'Late').length;
+      const halfDay = bucketLogs.filter(l => l.attendanceStatus === 'Half-day').length;
+      const absent = bucketLogs.filter(l => l.attendanceStatus === 'Absent').length;
+      const avgWorkingHours = bucketLogs.length > 0
+        ? (bucketLogs.reduce((sum, l) => sum + (l.totalWorkingHours || 0), 0) / bucketLogs.length)
+        : 0;
+      return { onTime, late, halfDay, absent, avgWorkingHours };
+    };
+    
+    // Generate weekly data for the last 8 weeks
+    for (const r of weekRanges) {
+      const weekLogs = chartLogsAll.filter(l => l.attendanceDate >= r.start && l.attendanceDate <= r.end);
+      const b = buildBucket(weekLogs);
+      weeklyData.push({
+        week: r.label,
+        onTime: b.onTime,
+        late: b.late,
+        halfDay: b.halfDay,
+        absent: b.absent,
+        avgWorkingHours: b.avgWorkingHours
+      });
+    }
+    
+    // Generate monthly data for the last 6 months
+    for (const r of monthRanges) {
+      const monthLogs = chartLogsAll.filter(l => l.attendanceDate >= r.start && l.attendanceDate <= r.end);
+      const b = buildBucket(monthLogs);
+      monthlyData.push({
+        month: r.startDateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        onTime: b.onTime,
+        late: b.late,
+        halfDay: b.halfDay,
+        absent: b.absent,
+        avgWorkingHours: b.avgWorkingHours
+      });
     }
 
     res.json({
@@ -982,10 +1055,11 @@ router.get('/all', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Default to current month if no dates provided
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    // Default to current month (IST) if no dates provided
+    const nowIST = getISTNow();
+    const dp = getISTDateParts(nowIST);
+    const defaultStartDate = getISTDateString(new Date(dp.year, dp.monthIndex, 1));
+    const defaultEndDate = getISTDateString(new Date(dp.year, dp.monthIndex + 1, 0));
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -1002,6 +1076,22 @@ router.get('/all', authenticateToken, async (req, res) => {
     if (employeeId) userQuery._id = employeeId;
 
     const users = await User.find(userQuery).populate('shiftGroup');
+
+    const userIds = users.map(u => u._id);
+    const logsAll = await AttendanceLog.find({
+      user: { $in: userIds },
+      attendanceDate: { $gte: start, $lte: end }
+    })
+      .sort({ attendanceDate: -1 })
+      .lean();
+
+    const logsByUserId = new Map();
+    logsAll.forEach(l => {
+      const key = String(l.user);
+      const arr = logsByUserId.get(key);
+      if (arr) arr.push(l);
+      else logsByUserId.set(key, [l]);
+    });
     
     // Get analytics for each user
     const employeeAnalytics = await Promise.all(users.map(async (user) => {
@@ -1012,11 +1102,8 @@ router.get('/all', authenticateToken, async (req, res) => {
       if (metrics.totalWorkingHours === 0 && metrics.totalDays > 0) {
         console.log(`Calculating working hours from attendance sessions for user: ${user.fullName}`);
         
-        // Get attendance logs for this user
-        const userLogs = await AttendanceLog.find({
-          user: user._id,
-          attendanceDate: { $gte: start, $lte: end }
-        }).sort({ attendanceDate: -1 });
+        // Use pre-fetched logs (analytics must remain read-only)
+        const userLogs = logsByUserId.get(String(user._id)) || [];
         
         let totalCalculatedHours = 0;
         let daysWithSessions = 0;
@@ -1033,11 +1120,6 @@ router.get('/all', authenticateToken, async (req, res) => {
             
             totalCalculatedHours += netWorkingHours;
             daysWithSessions++;
-            
-            // Update the log with calculated working hours
-            await AttendanceLog.findByIdAndUpdate(log._id, {
-              totalWorkingHours: netWorkingHours
-            });
           }
         }
         
@@ -1050,10 +1132,7 @@ router.get('/all', authenticateToken, async (req, res) => {
       }
       
       // Get recent logs for this user
-      const recentLogs = await AttendanceLog.find({
-        user: user._id,
-        attendanceDate: { $gte: start, $lte: end }
-      }).sort({ attendanceDate: -1 }).limit(5);
+      const recentLogs = (logsByUserId.get(String(user._id)) || []).slice(0, 5);
 
       return {
         employee: {

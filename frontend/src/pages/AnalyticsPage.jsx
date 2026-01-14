@@ -96,50 +96,14 @@ const formatHoursAsHrsDotMM = (hours) => {
   return `${wholeHours}.${mm}`;
 };
 
-// Helper function to adjust December metrics (Dec 1 to today): convert Late and Half Day to On Time
-const adjustDecemberMetrics = (metrics, startDate, endDate) => {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth(); // 0-11, where 11 = December
-  
-  // Only apply adjustment if we're currently in December or later
-  if (currentMonth < 11) {
-    return metrics; // Not in December yet, no adjustment needed
-  }
-  
-  // Check if the date range includes December of the current year
-  const rangeStart = new Date(startDate);
-  const rangeEnd = new Date(endDate);
-  
-  const rangeStartYear = rangeStart.getFullYear();
-  const rangeStartMonth = rangeStart.getMonth();
-  const rangeEndYear = rangeEnd.getFullYear();
-  const rangeEndMonth = rangeEnd.getMonth();
-  
-  // Check if the range includes December (month 11) of current year
-  // This covers cases where:
-  // - Range starts in December of current year
-  // - Range ends in December of current year
-  // - Range spans across December of current year
-  const includesDecember = 
-    (rangeStartYear === currentYear && rangeStartMonth === 11) || 
-    (rangeEndYear === currentYear && rangeEndMonth === 11) ||
-    (rangeStartYear < currentYear && rangeEndYear >= currentYear) ||
-    (rangeStartYear === currentYear && rangeStartMonth <= 11 && rangeEndMonth >= 11);
-  
-  // Only adjust if the range includes December and we're in December or later
-  if (includesDecember) {
-    // Convert late and halfDay to onTime for December period (Dec 1 to today)
-    const adjustedMetrics = {
-      ...metrics,
-      onTimeDays: (metrics.onTimeDays || 0) + (metrics.lateDays || 0) + (metrics.halfDays || 0),
-      lateDays: 0,
-      halfDays: 0
-    };
-    return adjustedMetrics;
-  }
-  
-  return metrics;
+const formatISTDateForAPI = (date) => {
+  const dtf = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return dtf.format(date);
 };
 
 // Transition utilities for smooth UI updates
@@ -524,10 +488,9 @@ const AnalyticsPage = () => {
         setLoading(true);
       }
       try {
-          // Use toLocaleDateString to avoid timezone issues
           const params = {
-              startDate: startDate.toLocaleDateString('en-CA'),
-              endDate: endDate.toLocaleDateString('en-CA')
+              startDate: formatISTDateForAPI(startDate),
+              endDate: formatISTDateForAPI(endDate)
           };
           if (selectedEmployee) params.employeeId = selectedEmployee;
           if (selectedDepartment) params.department = selectedDepartment;
@@ -557,10 +520,10 @@ const AnalyticsPage = () => {
               // Always use the analytics data from the API - no fallback to mock data
               let processedEmployees;
               if (analyticsData.employees && analyticsData.employees.length > 0) {
-                  // Use existing employee data from analytics and adjust for December
+                  // Use existing employee data from analytics
                   processedEmployees = analyticsData.employees.map(emp => ({
                       ...emp,
-                      metrics: adjustDecemberMetrics(emp.metrics || {}, startDate, endDate)
+                      metrics: emp.metrics || {}
                   }));
               } else {
                   // If no analytics data, create empty metrics for each employee
@@ -572,7 +535,7 @@ const AnalyticsPage = () => {
                           employeeCode: emp.employeeCode,
                           department: emp.department
                       },
-                      metrics: adjustDecemberMetrics({
+                      metrics: {
                           onTimeDays: 0,
                           lateDays: 0,
                           halfDays: 0,
@@ -582,11 +545,11 @@ const AnalyticsPage = () => {
                           leaveRequests: 0,
                           totalLeaveDays: 0,
                           monthlyContext: '0/30 days worked'
-                      }, startDate, endDate)
+                      }
                   }));
               }
               
-              // Calculate overall stats from real data (after December adjustment)
+              // Calculate overall stats from real data
               const overallStats = {
                   totalEmployees: employees.length,
                   totalOnTimeDays: processedEmployees.reduce((sum, emp) => sum + (emp.metrics?.onTimeDays || 0), 0),
@@ -606,36 +569,25 @@ const AnalyticsPage = () => {
               setAnalyticsData(enrichedAnalyticsData);
           } else {
               response = await axios.get(`/analytics/employee/${user.id}`, { params });
+
+              const backendLeaveRequests = Number(response.data?.metrics?.leaveRequests) || 0;
+              const backendLeaveDays = Number(response.data?.metrics?.totalLeaveDays) || 0;
               
-              // Fetch leave requests for the month to show real leave count
+              // Leaves API may be used only for listing, not KPI counting
               try {
                 const leavesRes = await axios.get('/leaves/my-requests', { params: { page: 1, limit: 200 } });
                 const requests = Array.isArray(leavesRes.data?.requests) ? leavesRes.data.requests : [];
-                const monthStart = startDate.toISOString().slice(0, 10);
-                const monthEnd = endDate.toISOString().slice(0, 10);
-                const isInMonth = (dateStr) => dateStr >= monthStart && dateStr <= monthEnd;
-                const filtered = requests
-                  .map(req => {
-                    const matchedDates = (req.leaveDates || []).filter(isInMonth);
-                    if (matchedDates.length === 0) return null;
-                    const dayMultiplier = req.leaveType && req.leaveType.toLowerCase().includes('half') ? 0.5 : 1;
-                    const dayCount = matchedDates.length * dayMultiplier;
-                    return {
-                      id: req._id || req.id,
-                      status: req.status || 'Pending',
-                      type: req.requestType || req.leaveType || 'Leave',
-                      dates: matchedDates,
-                      dayCount,
-                      reason: req.reason || ''
-                    };
-                  })
-                  .filter(Boolean);
-                const requestCount = filtered.length;
-                const dayCount = filtered.reduce((sum, r) => sum + (Number.isFinite(r.dayCount) ? r.dayCount : 0), 0);
-                setEmployeeLeaves({ items: filtered, requestCount, dayCount });
+                const items = requests.map(req => ({
+                  id: req._id || req.id,
+                  status: req.status || 'Pending',
+                  type: req.requestType || req.leaveType || 'Leave',
+                  dates: Array.isArray(req.leaveDates) ? req.leaveDates : [],
+                  reason: req.reason || ''
+                }));
+                setEmployeeLeaves({ items, requestCount: backendLeaveRequests, dayCount: backendLeaveDays });
               } catch (leaveErr) {
                 console.error('Error fetching leave requests for analytics view:', leaveErr);
-                setEmployeeLeaves({ items: [], requestCount: 0, dayCount: 0 });
+                setEmployeeLeaves({ items: [], requestCount: backendLeaveRequests, dayCount: backendLeaveDays });
               }
 
               setEmployeeData(response.data);
@@ -658,33 +610,14 @@ const AnalyticsPage = () => {
               startDate.setMonth(startDate.getMonth() - 4);
               
               const params = {
-                  startDate: startDate.toLocaleDateString('en-CA'),
-                  endDate: endDate.toLocaleDateString('en-CA')
+                  startDate: formatISTDateForAPI(startDate),
+                  endDate: formatISTDateForAPI(endDate)
               };
               
               const monthlyResponse = await axios.get('/analytics/monthly-overview', { params });
               
               // Use the monthly data from the response or generate realistic data
               let monthlyData = monthlyResponse.data?.monthlyData || [];
-              
-              // If no data from API, generate realistic monthly data
-              if (monthlyData.length === 0) {
-                  monthlyData = [];
-                  for (let i = 3; i >= 0; i--) {
-                      const monthDate = new Date();
-                      monthDate.setMonth(monthDate.getMonth() - i);
-                      const monthName = monthDate.toLocaleDateString('en-US', { month: 'short' });
-                      
-                      // Generate realistic monthly metrics
-                      monthlyData.push({
-                          month: monthName,
-                          onTime: Math.floor(Math.random() * 20) + 10,
-                          late: Math.floor(Math.random() * 5),
-                          halfDay: Math.floor(Math.random() * 3),
-                          absent: Math.floor(Math.random() * 3)
-                      });
-                  }
-              }
               
               console.log('Real monthly data:', monthlyData);
               setMonthlyOverviewData(monthlyData);
@@ -698,7 +631,7 @@ const AnalyticsPage = () => {
       try {
           if (user.role === 'Admin' || user.role === 'HR') {
               // Fetch real today's data
-              const today = new Date().toLocaleDateString('en-CA');
+              const today = formatISTDateForAPI(new Date());
               const params = {
                   date: today
               };
@@ -711,28 +644,7 @@ const AnalyticsPage = () => {
               const employees = employeesResponse.data;
               const overviewData = overviewResponse.data;
               
-              // Use data from overview response or generate realistic data
-              let realTodayData;
-              if (overviewData && overviewData.overview) {
-                  realTodayData = overviewData;
-              } else {
-                  // Generate realistic today's statistics
-                  const totalEmployees = employees.length;
-                  const presentEmployees = Math.floor(totalEmployees * 0.8); // 80% present
-                  const absentEmployees = Math.floor(totalEmployees * 0.15); // 15% absent
-                  const onLeaveEmployees = Math.floor(totalEmployees * 0.05); // 5% on leave
-                  
-                  realTodayData = {
-                      overview: {
-                          totalEmployees,
-                          presentEmployees,
-                          absentEmployees,
-                          onLeaveEmployees
-                      },
-                      employees: employees
-                  };
-              }
-              
+              const realTodayData = (overviewData && overviewData.overview) ? overviewData : null;
               console.log('Real today overview data:', realTodayData);
               setTodayOverviewData(realTodayData);
           }
@@ -770,8 +682,8 @@ const AnalyticsPage = () => {
     ];
 
     return {
-      attendance: dataType === 'performance' ? [] : mockAttendanceData,
-      performance: dataType === 'attendance' ? [] : mockPerformanceData
+      attendance: [],
+      performance: []
     };
   };
 
@@ -816,8 +728,8 @@ const AnalyticsPage = () => {
       
       // Use existing analytics endpoints instead of non-existent historical endpoints
       const params = {
-        startDate: startDate.toLocaleDateString('en-CA'),
-        endDate: endDate.toLocaleDateString('en-CA')
+        startDate: formatISTDateForAPI(startDate),
+        endDate: formatISTDateForAPI(endDate)
       };
       
       // Fetch data from existing endpoints
@@ -946,8 +858,8 @@ const AnalyticsPage = () => {
       const endDate = new Date(year, month + 1, 0);
       
       const params = {
-        startDate: startDate.toLocaleDateString('en-CA'),
-        endDate: endDate.toLocaleDateString('en-CA')
+        startDate: formatISTDateForAPI(startDate),
+        endDate: formatISTDateForAPI(endDate)
       };
       
       const [analyticsResponse, employeesResponse] = await Promise.all([
@@ -962,41 +874,33 @@ const AnalyticsPage = () => {
       let processedData = [];
       if (analyticsData.employees && analyticsData.employees.length > 0) {
         processedData = analyticsData.employees.map(emp => {
-          // Adjust metrics for December (Dec 1 to today)
-          const adjustedMetrics = adjustDecemberMetrics(emp.metrics || {}, startDate, endDate);
+          const metrics = emp.metrics || {};
           return {
             employeeId: emp.employee?._id || emp.employee?.id,
             employeeName: emp.employee?.name || emp.employee?.fullName || 'Unknown',
             employeeCode: emp.employee?.employeeCode || '',
             department: emp.employee?.department || '-',
-            onTime: adjustedMetrics.onTimeDays || 0,
-            late: adjustedMetrics.lateDays || 0,
-            halfDay: adjustedMetrics.halfDays || 0,
-            absent: adjustedMetrics.absentDays || 0,
-            totalDays: (adjustedMetrics.onTimeDays || 0) + (adjustedMetrics.lateDays || 0) + 
-                       (adjustedMetrics.halfDays || 0) + (adjustedMetrics.absentDays || 0)
+            onTime: metrics.onTimeDays || 0,
+            late: metrics.lateDays || 0,
+            halfDay: metrics.halfDays || 0,
+            absent: metrics.absentDays || 0,
+            totalDays: (metrics.onTimeDays || 0) + (metrics.lateDays || 0) + 
+                       (metrics.halfDays || 0) + (metrics.absentDays || 0)
           };
         });
       } else {
         // If no analytics data, create empty entries for all employees
         processedData = employees.map(emp => {
-          const adjustedMetrics = adjustDecemberMetrics({
-            onTimeDays: 0,
-            lateDays: 0,
-            halfDays: 0,
-            absentDays: 0
-          }, startDate, endDate);
           return {
             employeeId: emp._id || emp.id,
             employeeName: emp.name || emp.fullName || 'Unknown',
             employeeCode: emp.employeeCode || '',
             department: emp.department || '-',
-            onTime: adjustedMetrics.onTimeDays || 0,
-            late: adjustedMetrics.lateDays || 0,
-            halfDay: adjustedMetrics.halfDays || 0,
-            absent: adjustedMetrics.absentDays || 0,
-            totalDays: (adjustedMetrics.onTimeDays || 0) + (adjustedMetrics.lateDays || 0) + 
-                       (adjustedMetrics.halfDays || 0) + (adjustedMetrics.absentDays || 0)
+            onTime: 0,
+            late: 0,
+            halfDay: 0,
+            absent: 0,
+            totalDays: 0
           };
         });
       }
@@ -1146,10 +1050,9 @@ const AnalyticsPage = () => {
 
   const handleExport = async () => {
     try {
-      // Use toLocaleDateString to avoid timezone issues
       const params = {
-        startDate: startDate.toLocaleDateString('en-CA'),
-        endDate: endDate.toLocaleDateString('en-CA'),
+        startDate: formatISTDateForAPI(startDate),
+        endDate: formatISTDateForAPI(endDate),
         format: 'csv'
       };
       
@@ -1164,7 +1067,7 @@ const AnalyticsPage = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `analytics-${startDate.toISOString().slice(0, 10)}-to-${endDate.toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `analytics-${formatISTDateForAPI(startDate)}-to-${formatISTDateForAPI(endDate)}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1689,23 +1592,17 @@ const AnalyticsPage = () => {
           
           weeklyData.push({
             week,
-            onTime: Math.max(0, avgOnTime + Math.floor(Math.random() * 4) - 2),
-            late: Math.max(0, avgLate + Math.floor(Math.random() * 2) - 1),
-            halfDay: Math.max(0, avgHalfDay + Math.floor(Math.random() * 2) - 1),
-            absent: Math.max(0, avgAbsent + Math.floor(Math.random() * 2) - 1)
+            onTime: Math.max(0, avgOnTime),
+            late: Math.max(0, avgLate),
+            halfDay: Math.max(0, avgHalfDay),
+            absent: Math.max(0, avgAbsent)
           });
         });
         
         return weeklyData;
       }
       
-      // Fallback to default data
-      return [
-        { week: 'Week 1', onTime: 5, late: 1, halfDay: 0, absent: 1 },
-        { week: 'Week 2', onTime: 4, late: 2, halfDay: 1, absent: 0 },
-        { week: 'Week 3', onTime: 6, late: 0, halfDay: 0, absent: 1 },
-        { week: 'Week 4', onTime: 5, late: 1, halfDay: 0, absent: 1 }
-      ];
+      return [];
     };
     
     const sampleWeeklyData = generateRealWeeklyData();
@@ -1719,17 +1616,8 @@ const AnalyticsPage = () => {
     if (user.role === 'Admin' || user.role === 'HR') {
       if (!analyticsData) {
         return { 
-          pieData: [
-            { name: 'On-time', value: 15, color: COLORS.onTime },
-            { name: 'Late', value: 3, color: COLORS.late },
-            { name: 'Half-day', value: 1, color: COLORS.halfDay },
-            { name: 'Absent', value: 2, color: COLORS.absent }
-          ], 
-          barData: [
-            { name: 'Test', onTime: 15, late: 2, halfDay: 1, absent: 1 },
-            { name: 'RJ', onTime: 12, late: 3, halfDay: 0, absent: 2 },
-            { name: 'Shivam', onTime: 18, late: 1, halfDay: 0, absent: 1 }
-          ], 
+          pieData: [], 
+          barData: [], 
           lineData: [],
           weeklyData: sampleWeeklyData,
           monthlyData: realMonthlyData

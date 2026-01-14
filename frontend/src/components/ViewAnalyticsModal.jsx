@@ -192,6 +192,16 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
     }
   }, [counter, analyticsData]);
 
+  const formatISTDateForAPI = (date) => {
+    const dtf = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return dtf.format(date);
+  };
+
   const fetchEmployeeData = async () => {
     setLoading(true);
     setError(null);
@@ -209,7 +219,7 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
       // Format dates properly to avoid timezone issues
       const startYear = selectedYear;
       const startDate = `${startYear}-01-01`;
-      const endDate = todayISTDate.toISOString().slice(0, 10);
+      const endDate = formatISTDateForAPI(todayISTDate);
       
       console.log('Fetching analytics for:', `/analytics/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`);
       

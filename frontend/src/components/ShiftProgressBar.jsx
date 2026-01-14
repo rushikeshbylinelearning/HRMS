@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Stack, Tooltip } from '@mui/material';
 
-const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, status, breaks, sessions }) => {
+const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, status, breaks, sessions, activeBreakOverride = null }) => {
   const [now, setNow] = useState(new Date());
   const baseShiftMinutes = 540; // 9 hours = 540 minutes
 
@@ -18,12 +18,13 @@ const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, 
   
   // Calculate active unpaid break duration (if any)
   const activeUnpaidBreakMinutes = useMemo(() => {
-    if (!breaks || breaks.length === 0) return 0;
-    const activeBreak = breaks.find(b => !b.endTime && (b.breakType === 'Unpaid' || b.breakType === 'Extra'));
+    const activeBreak = activeBreakOverride || breaks?.find(b => !b.endTime);
     if (!activeBreak || !activeBreak.startTime) return 0;
+    const activeBreakType = (activeBreak.breakType || activeBreak.type || '').toString().trim();
+    if (activeBreakType !== 'Unpaid' && activeBreakType !== 'Extra') return 0;
     const breakStart = new Date(activeBreak.startTime);
     return Math.floor((now - breakStart) / 60000);
-  }, [breaks, now]);
+  }, [activeBreakOverride, breaks, now]);
   
   // The total required shift time, adjusted for unpaid breaks and paid break excess
   // This matches the logout calculation: 9 hours + unpaid breaks + paid break excess
@@ -31,14 +32,14 @@ const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, 
 
   // Effect to update the 'now' time every second when there's an active break or session
   useEffect(() => {
-    const hasActiveBreak = breaks?.some(b => !b.endTime);
+    const hasActiveBreak = !!activeBreakOverride || breaks?.some(b => !b.endTime);
     const hasActiveSession = sessions?.some(s => !s.endTime);
     
     if (hasActiveBreak || hasActiveSession) {
       const timerId = setInterval(() => setNow(new Date()), 1000);
       return () => clearInterval(timerId);
     }
-  }, [status, breaks, sessions]);
+  }, [status, breaks, sessions, activeBreakOverride]);
 
   // Calculate total break minutes (for progress calculation)
   const totalBreakMinutes = useMemo(() => {
@@ -102,7 +103,7 @@ const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, 
   const workProgress = adjustedTotalShiftMinutes > 0 
     ? Math.min((totalElapsedMinutes / adjustedTotalShiftMinutes) * 100, 100)
     : 0;
-  const activeBreak = breaks?.find(b => !b.endTime);
+  const activeBreak = activeBreakOverride || breaks?.find(b => !b.endTime);
   
   // For display, show total elapsed time but cap it at the adjusted total shift minutes
   // This ensures that when a shift is completed, it shows "9h 0m / 9h 0m" instead of "8h 30m / 9h 0m"

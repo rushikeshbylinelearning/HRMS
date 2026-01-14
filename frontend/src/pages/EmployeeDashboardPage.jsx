@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useBreakUI } from '../context/BreakUIContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { getCurrentLocation, getCachedLocationOnly } from '../services/locationService';
 import socket from '../socket';
@@ -69,16 +70,23 @@ const itemVariants = {
         } 
     }
 };
+// CRITICAL: Use IST timezone for date string to match backend
+// This ensures the frontend sends the same date as the backend expects
 const getLocalDateString = (date = new Date()) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // Use Intl.DateTimeFormat to get the date in IST (Asia/Kolkata)
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    return istFormatter.format(date);
 };
 
 
 const EmployeeDashboardPage = () => {
     const { user: contextUser, updateUserContext } = useAuth();
+    const { uiBreakState, startUiBreak, endUiBreak, setUiBreakState, reconcileFromBackend } = useBreakUI();
     const { canAccess, breakLimits, privilegeLevel } = usePermissions();
     const location = useLocation();
     const [dailyData, setDailyData] = useState(null);
@@ -99,7 +107,29 @@ const EmployeeDashboardPage = () => {
     const clockOutActionInFlightRef = useRef(false);
 
 
-    const isClockedInSession = dailyData?.status === 'Clocked In' || dailyData?.status === 'On Break';
+    const isOnBreakUI = !!uiBreakState;
+    // NOTE: Break UI is intentionally driven by uiBreakState (optimistic + single authority).
+    // The previous implementation rendered break UI from dailyData.status / dailyData.breaks,
+    // which could be overwritten by stale cached backend responses (status cache TTL) and delayed refetch/socket timing.
+    const displayStatus = isOnBreakUI ? 'On Break' : dailyData?.status;
+    const statusForUi = isOnBreakUI ? 'On Break' : dailyData?.status;
+    const breaksForUi = useMemo(() => {
+        const base = Array.isArray(dailyData?.breaks) ? dailyData.breaks : [];
+        if (!uiBreakState) return base;
+        const hasActive = base.some(b => b && !b.endTime);
+        if (hasActive) return base;
+        return [
+            ...base,
+            {
+                _id: uiBreakState.id,
+                breakType: uiBreakState.type,
+                startTime: uiBreakState.startTime,
+                endTime: null,
+            },
+        ];
+    }, [dailyData?.breaks, uiBreakState]);
+
+    const isClockedInSession = dailyData?.status === 'Clocked In' || isOnBreakUI;
 
     const fetchAllDataRef = useRef(null);
     
@@ -118,6 +148,7 @@ const EmployeeDashboardPage = () => {
             const { dailyStatus, weeklyLogs, leaveRequests } = dashboardRes.data;
             
             setDailyData(dailyStatus);
+            reconcileFromBackend(dailyStatus);
             setWeeklyLogs(Array.isArray(weeklyLogs) ? weeklyLogs : []);
             setMyRequests(Array.isArray(leaveRequests) ? leaveRequests : []);
             
@@ -240,9 +271,9 @@ const EmployeeDashboardPage = () => {
         if (!dailyData?.sessions?.[0]?.startTime) return 0;
         const now = new Date();
         const grossTimeMs = dailyData.sessions.reduce((total, s) => total + ((s.endTime ? new Date(s.endTime) : now) - new Date(s.startTime)), 0);
-        const breakTimeMs = (dailyData.breaks || []).reduce((total, b) => total + ((b.endTime ? new Date(b.endTime) : now) - new Date(b.startTime)), 0);
+        const breakTimeMs = (breaksForUi || []).reduce((total, b) => total + ((b.endTime ? new Date(b.endTime) : now) - new Date(b.startTime)), 0);
         return Math.floor(Math.max(0, grossTimeMs - breakTimeMs) / 60000);
-    }, [dailyData]);
+    }, [dailyData?.sessions, breaksForUi]);
     
     const serverCalculated = useMemo(() => {
         const paidMinutesTaken = dailyData?.attendanceLog?.paidBreakMinutesTaken || 0;
@@ -375,12 +406,20 @@ const EmployeeDashboardPage = () => {
         setIsBreakModalOpen(false);
         setError('');
         const previousDailyData = dailyData;
-        // Immediate optimistic update
-        setDailyData(prev => ({ ...prev, status: 'On Break', breaks: [...(prev.breaks || []), { breakType, startTime: new Date().toISOString(), endTime: null }] }));
+        startUiBreak(breakType);
         setSnackbar({ open: true, message: `Break started successfully!` });
         
         try {
-            await api.post('/breaks/start', { breakType });
+            const res = await api.post('/breaks/start', { breakType });
+            const createdBreak = res?.data?.break;
+            if (createdBreak && createdBreak.startTime) {
+                setUiBreakState({
+                    id: createdBreak._id || createdBreak.id || 'backend',
+                    type: createdBreak.breakType || createdBreak.type || breakType,
+                    startTime: createdBreak.startTime,
+                    source: 'backend',
+                });
+            }
             // Refresh data from server (non-blocking for UI)
             if (fetchAllDataRef.current) {
                 fetchAllDataRef.current(false).catch(err => {
@@ -390,6 +429,7 @@ const EmployeeDashboardPage = () => {
         } catch (err) {
             // Revert on error
             setDailyData(previousDailyData);
+            endUiBreak();
             setError(err.response?.data?.error || 'Failed to start break. Please try again.');
             setSnackbar({ open: true, message: 'Failed to start break. Please try again.' });
         } finally {
@@ -402,56 +442,35 @@ const EmployeeDashboardPage = () => {
         breakActionInFlightRef.current = true;
         setError('');
         const previousDailyData = dailyData;
+        const previousUiBreakState = uiBreakState;
         
-        // Find the active break and calculate final duration immediately
-        const activeBreak = dailyData?.breaks?.find(b => !b.endTime);
-        const breakEndTime = new Date().toISOString();
-        let finalDurationMinutes = 0;
-        
-        if (activeBreak && activeBreak.startTime) {
-            const startMs = new Date(activeBreak.startTime).getTime();
-            const endMs = new Date(breakEndTime).getTime();
-            finalDurationMinutes = Math.round((endMs - startMs) / (1000 * 60));
-        }
-        
-        // Immediate optimistic update - update status AND break endTime with final duration
-        setDailyData(prev => {
-            const updatedBreaks = (prev.breaks || []).map(b => {
-                // Match break by: same _id OR (no endTime and same startTime - for optimistic updates)
-                const isActiveBreak = !b.endTime && (
-                    (activeBreak?._id && b._id === activeBreak._id) ||
-                    (!activeBreak?._id && b.startTime === activeBreak?.startTime)
-                );
-                if (isActiveBreak) {
-                    return {
-                        ...b,
-                        endTime: breakEndTime,
-                        durationMinutes: finalDurationMinutes
-                    };
-                }
-                return b;
-            });
-            return { ...prev, status: 'Clocked In', breaks: updatedBreaks };
-        });
+        endUiBreak();
         setSnackbar({ open: true, message: 'Break ended successfully!' });
-        
-        // Backend sync happens in background - UI already updated
-        api.post('/breaks/end').catch(err => {
-            console.error('Failed to sync break end with backend:', err);
-            // Revert on error
+
+        const activeBreak = breaksForUi?.find(b => b && !b.endTime) || null;
+        const breakIdFromUi = previousUiBreakState?.id && previousUiBreakState.id !== 'local' ? previousUiBreakState.id : undefined;
+        const breakIdFromData = activeBreak?._id || activeBreak?.id;
+        const breakId = breakIdFromUi || breakIdFromData;
+
+        try {
+            if (breakId) {
+                await api.post('/breaks/end', { breakId });
+            } else {
+                await api.post('/breaks/end');
+            }
+            if (fetchAllDataRef.current) {
+                fetchAllDataRef.current(false).catch(err => {
+                    console.error('Failed to refresh data after break end:', err);
+                });
+            }
+        } catch (err) {
             setDailyData(previousDailyData);
-            setError(err.response?.data?.error || 'Failed to sync break end. Please refresh.');
-            setSnackbar({ open: true, message: 'Failed to sync break end. Please refresh.' });
-        });
-        
-        // Refresh data from server in background (non-blocking, for eventual consistency)
-        if (fetchAllDataRef.current) {
-            fetchAllDataRef.current(false).catch(err => {
-                console.error('Failed to refresh data after break end:', err);
-            });
+            setUiBreakState(previousUiBreakState);
+            setError(err.response?.data?.error || 'Failed to end break. Please try again.');
+            setSnackbar({ open: true, message: 'Failed to end break. Please try again.' });
+        } finally {
+            breakActionInFlightRef.current = false;
         }
-        
-        breakActionInFlightRef.current = false;
     };
     
     const handleRequestExtraBreak = async () => {
@@ -590,7 +609,7 @@ const EmployeeDashboardPage = () => {
                                 <Box>
                                     <Typography variant="h5" fontWeight="bold" className="theme-text-black">Time Tracking</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                        {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${dailyData.status}`}
+                                        {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
                                     </Typography>
                                 </Box>
                                 <Box 
@@ -601,18 +620,19 @@ const EmployeeDashboardPage = () => {
                                         workedMinutes={workedMinutes} 
                                         unpaidBreakMinutes={serverCalculated.unpaidBreakMinutesTaken}
                                         paidBreakExcess={serverCalculated.paidBreakExcess}
-                                        status={dailyData.status} 
-                                        breaks={dailyData.breaks} 
+                                        status={statusForUi} 
+                                        breaks={breaksForUi} 
                                         sessions={dailyData.sessions} 
+                                        activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}
                                     />
                                     <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
                                         <Grid item xs={12} md={6}>
                                             <Typography variant="overline" color="text.secondary">WORK DURATION</Typography>
-                                            <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={dailyData.breaks} status={dailyData.status}/>
+                                            <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={breaksForUi} status={statusForUi}/>
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <Typography variant="overline" color="text.secondary">BREAK TIMER</Typography>
-                                            <MemoizedBreakTimer breaks={dailyData.breaks} paidBreakAllowance={paidBreakAllowance}/>
+                                            <MemoizedBreakTimer breaks={breaksForUi} paidBreakAllowance={paidBreakAllowance} activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}/>
                                         </Grid>
                                     </Grid>
                                 </Box>
@@ -627,6 +647,8 @@ const EmployeeDashboardPage = () => {
                                         ) : (
                                             <Button fullWidth disabled className="theme-button-red">Check In (Disabled)</Button>
                                         )
+                                    ) : isOnBreakUI ? (
+                                        <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
                                     ) : dailyData.status === 'Clocked In' ? (
                                         <>
                                             <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
@@ -640,8 +662,6 @@ const EmployeeDashboardPage = () => {
                                                 <Button variant="outlined" disabled className="theme-button-checkout" startIcon={<LogoutIcon />} sx={{ ml: 'auto !important' }}>Check Out (Disabled)</Button>
                                             )}
                                         </>
-                                    ) : dailyData.status === 'On Break' ? (
-                                        <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
                                     ) : null}
                                 </Stack>
                             </Paper>

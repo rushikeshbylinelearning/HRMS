@@ -2,6 +2,7 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { BreakUIProvider } from './context/BreakUIContext';
 import { NewNotificationProvider } from './hooks/useNewNotifications.jsx'; // Corrected import path
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -163,133 +164,136 @@ function App() {
                 <CssBaseline />
                 <Router>
                     <AuthProvider>
-                        <NewNotificationProvider> {/* <-- CORRECT NESTING */}
-                            <IdleDetectionProvider>
-                                <Routes>
-                                {/* Public routes - accessible without authentication */}
-                                <Route path="/login" element={<LoginPage />} />
-                                <Route path="/sso-login" element={<SSOLoginPage />} />
-                                <Route path="/auth/sso-callback" element={
-                                    <Suspense fallback={<PageLoader />}>
-                                        <SSOCallbackPage />
-                                    </Suspense>
-                                } />
-                                
-                                {/* Root route - smart redirect based on authentication */}
-                                <Route path="/" element={<RootRoute />} />
-                                
-                                {/* Protected routes - require authentication */}
-                                <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-                                    <Route path="/dashboard" element={
-                                        <Suspense fallback={<PageLoader type="dashboard" />}>
-                                            <DashboardRouter />
-                                        </Suspense>
-                                    } />
-
-                                    <Route path="/leaves" element={
-                                        <Suspense fallback={<PageLoader type="list" />}>
-                                            <PermissionProtectedRoute requiredPermission="leaves">
-                                                <LeavesPage />
-                                            </PermissionProtectedRoute>
-                                        </Suspense>
-                                    } />
-                                    <Route path="/attendance-summary" element={
+                        <BreakUIProvider>
+                            <NewNotificationProvider> {/* <-- CORRECT NESTING */}
+                                <IdleDetectionProvider>
+                                    <Routes>
+                                    {/* Public routes - accessible without authentication */}
+                                    <Route path="/login" element={<LoginPage />} />
+                                    <Route path="/sso-login" element={<SSOLoginPage />} />
+                                    <Route path="/auth/sso-callback" element={
                                         <Suspense fallback={<PageLoader />}>
-                                            <AttendanceSummaryPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/profile" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <ProfilePage />
+                                            <SSOCallbackPage />
                                         </Suspense>
                                     } />
                                     
-                                    <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-                                    <Route path="/admin/dashboard" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <AdminDashboardPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/employees" element={
-                                        <Suspense fallback={<PageLoader type="table" />}>
-                                            <EmployeesPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/admin/leaves" element={
-                                        <Suspense fallback={<PageLoader type="table" />}>
-                                            <AdminLeavesPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/reports" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <PermissionProtectedRoute requiredPermission="viewReports">
-                                                <ReportsPage />
-                                            </PermissionProtectedRoute>
-                                        </Suspense>
-                                    } />
-                                    <Route path="/activity-log" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <NewActivityLogPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/admin/attendance-summary" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <AdminAttendanceSummaryPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/shifts" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <ShiftsPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/office-locations" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <OfficeLocationsPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/manage-section" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <ManageSectionPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/analytics" element={
-                                        <AnalyticsErrorBoundary>
-                                            <Suspense fallback={<PageLoader />}>
-                                                <PermissionProtectedRoute requiredPermission="viewAnalytics">
-                                                    <AnalyticsPage />
+                                    {/* Root route - smart redirect based on authentication */}
+                                    <Route path="/" element={<RootRoute />} />
+                                    
+                                    {/* Protected routes - require authentication */}
+                                    <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                                        <Route path="/dashboard" element={
+                                            <Suspense fallback={<PageLoader type="dashboard" />}>
+                                                <DashboardRouter />
+                                            </Suspense>
+                                        } />
+
+                                        <Route path="/leaves" element={
+                                            <Suspense fallback={<PageLoader type="list" />}>
+                                                <PermissionProtectedRoute requiredPermission="leaves">
+                                                    <LeavesPage />
                                                 </PermissionProtectedRoute>
                                             </Suspense>
-                                        </AnalyticsErrorBoundary>
-                                    } />
-                                    <Route path="/employee-muster-roll" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <EmployeeMusterRollPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/admin/leaves/more-options/leaves-tracker" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <LeavesTrackerPage />
-                                        </Suspense>
-                                    } />
-                                    <Route path="/analytics/payroll_management" element={
-                                        <Suspense fallback={<PageLoader />}>
-                                            <PermissionProtectedRoute requiredPermission="viewAnalytics">
-                                                <PayrollManagementPage />
-                                            </PermissionProtectedRoute>
-                                        </Suspense>
-                                    } />
-                                </Route>
+                                        } />
+                                        <Route path="/attendance-summary" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <AttendanceSummaryPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/profile" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <ProfilePage />
+                                            </Suspense>
+                                        } />
+                                        
+                                        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                                        <Route path="/admin/dashboard" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <AdminDashboardPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/employees" element={
+                                            <Suspense fallback={<PageLoader type="table" />}>
+                                                <EmployeesPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/leaves" element={
+                                            <Suspense fallback={<PageLoader type="table" />}>
+                                                <AdminLeavesPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/reports" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <PermissionProtectedRoute requiredPermission="viewReports">
+                                                    <ReportsPage />
+                                                </PermissionProtectedRoute>
+                                            </Suspense>
+                                        } />
+                                        <Route path="/activity-log" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <NewActivityLogPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/attendance-summary" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <AdminAttendanceSummaryPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/shifts" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <ShiftsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/office-locations" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <OfficeLocationsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/manage-section" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <ManageSectionPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/analytics" element={
+                                            <AnalyticsErrorBoundary>
+                                                <Suspense fallback={<PageLoader />}>
+                                                    <PermissionProtectedRoute requiredPermission="viewAnalytics">
+                                                        <AnalyticsPage />
+                                                    </PermissionProtectedRoute>
+                                                </Suspense>
+                                            </AnalyticsErrorBoundary>
+                                        } />
+                                        <Route path="/employee-muster-roll" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <EmployeeMusterRollPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/leaves/more-options/leaves-tracker" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <LeavesTrackerPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/analytics/payroll_management" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <PermissionProtectedRoute requiredPermission="viewAnalytics">
+                                                    <PayrollManagementPage />
+                                                </PermissionProtectedRoute>
+                                            </Suspense>
+                                        } />
+                                    </Route>
 
-                                {/* Catch-all route - redirect to login for unknown routes */}
-                                <Route path="*" element={<Navigate to="/login" replace />} />
-                            </Routes>
+                                    {/* Catch-all route - redirect to login for unknown routes */}
+                                    <Route path="*" element={<Navigate to="/login" replace />} />
+                                </Routes>
                             </IdleDetectionProvider>
                         </NewNotificationProvider>
-                    </AuthProvider>
-                </Router>
-            </ThemeProvider>
-        </LocalizationProvider>
-    );
+                    </BreakUIProvider>
+                </AuthProvider>
+            </Router>
+        </ThemeProvider>
+    </LocalizationProvider>
+);
+
 }
 
 export default App;

@@ -78,8 +78,18 @@ const EmployeeAnalyticsModalFull = ({ open, onClose, employeeId, employeeName })
     setLoading(true);
     setError(null);
     try {
-      const start = startDate.toISOString().slice(0, 10);
-      const end = endDate.toISOString().slice(0, 10);
+      const formatISTDateForAPI = (date) => {
+        const dtf = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        return dtf.format(date);
+      };
+
+      const start = formatISTDateForAPI(startDate);
+      const end = formatISTDateForAPI(endDate);
       
       console.log(`Fetching analytics for employee ${employeeId} from ${start} to ${end}`);
       

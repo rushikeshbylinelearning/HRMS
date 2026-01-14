@@ -238,10 +238,10 @@ const EmployeeAttendanceTrendChart = ({ user, employeeData, startDate, endDate, 
         setAttendanceData(processedData);
         setFilteredData(processedData);
       } else {
-        // Generate mock data if no real data available
-        const mockData = generateMockAttendanceData(start, end);
-        setAttendanceData(mockData);
-        setFilteredData(mockData);
+        // No data available
+        setAttendanceData([]);
+        setFilteredData([]);
+        setError('No data available for the selected period');
       }
 
       // Range already notified before fetch
@@ -249,13 +249,8 @@ const EmployeeAttendanceTrendChart = ({ user, employeeData, startDate, endDate, 
     } catch (err) {
       console.error('Error fetching attendance data:', err);
       setError('Failed to load attendance data');
-      // Fallback to mock data
-      const mockData = generateMockAttendanceData(
-        new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        new Date()
-      );
-      setAttendanceData(mockData);
-      setFilteredData(mockData);
+      setAttendanceData([]);
+      setFilteredData([]);
     } finally {
       setLoading(false);
     }
@@ -394,72 +389,6 @@ const EmployeeAttendanceTrendChart = ({ user, employeeData, startDate, endDate, 
 
     return Array.from(dataMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
   };
-
-  // Generate mock attendance data for demonstration
-  const generateMockAttendanceData = (startDate, endDate) => {
-    const data = [];
-    const current = new Date(startDate);
-    const end = new Date(endDate);
-    
-    // Get employee joining date to avoid showing data before joining
-    const joiningDate = user?.joiningDate ? new Date(user.joiningDate) : null;
-    if (joiningDate) {
-      joiningDate.setHours(0, 0, 0, 0);
-    }
-    
-    // Set time to avoid timezone issues
-    current.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    
-    while (current <= end) {
-      // Skip dates before employee joining date
-      if (joiningDate && current < joiningDate) {
-        current.setDate(current.getDate() + 1);
-        continue;
-      }
-      
-      // Check for holidays, leaves, and day-offs
-      const holiday = getHolidayForDate(current);
-      const leave = getLeaveForDate(current);
-      const isNonWorkingDay = isDayOff(current);
-      
-      // Use local date formatting to avoid timezone conversion
-      const year = current.getFullYear();
-      const month = String(current.getMonth() + 1).padStart(2, '0');
-      const day = String(current.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      
-      let status = { present: 0, late: 0, halfDay: 0, absent: 0, leave: 0, nonWorking: 0 };
-      
-      if (holiday || isNonWorkingDay) {
-        // Mark as non-working day
-        status.nonWorking = 1;
-      } else if (leave) {
-        // Mark as leave
-        status.leave = 1;
-      } else if (current.getDay() !== 0 && current.getDay() !== 6) {
-        // Generate random attendance status for working days only
-        const rand = Math.random();
-        
-        if (rand < 0.7) status.present = 1;        // 70% present
-        else if (rand < 0.8) status.late = 1;      // 10% late
-        else if (rand < 0.85) status.halfDay = 1;  // 5% half-day
-        else if (rand < 0.95) status.absent = 1;   // 10% absent
-        else status.leave = 1;                     // 5% leave
-      }
-      
-      data.push({
-        date: dateStr,
-        displayDate: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        ...status
-      });
-      
-      current.setDate(current.getDate() + 1);
-    }
-    
-    return data;
-  };
-
 
   // Update data and propagate range when filter changes
   useEffect(() => {

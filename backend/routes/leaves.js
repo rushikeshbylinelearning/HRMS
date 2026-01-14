@@ -61,7 +61,16 @@ const sendLeaveNotificationEmails = async (request, employee) => {
                         This is an automated notification from the AMS Portal.
                     </div>
                 </div>`;
-            await sendEmail({ to: recipients.join(','), subject: hrSubject, html: hrHtml, isHREmail: true });
+            sendEmail({
+                to: recipients.join(','),
+                subject: hrSubject,
+                html: hrHtml,
+                isHREmail: true,
+                mailType: 'HRLeaveRequestSubmitted',
+                recipientType: 'hr'
+            }).catch(err => {
+                console.error(`[Email Service] Failed to send HR leave notification for request ${request._id}:`, err);
+            });
         }
 
         const userSubject = `Your Leave Request for ${dateRange} has been submitted`;
@@ -84,7 +93,16 @@ const sendLeaveNotificationEmails = async (request, employee) => {
                     This is an automated notification. Please do not reply to this email.
                 </div>
             </div>`;
-        await sendEmail({ to: employee.email, subject: userSubject, html: userHtml });
+        sendEmail({
+            to: employee.email,
+            subject: userSubject,
+            html: userHtml,
+            isHREmail: false,
+            mailType: 'EmployeeLeaveRequestConfirmation',
+            recipientType: 'employee'
+        }).catch(err => {
+            console.error(`[Email Service] Failed to send employee leave confirmation for request ${request._id}:`, err);
+        });
     } catch (error) {
         console.error(`[Email Service] Failed to send emails for leave request ${request._id}:`, error);
     }

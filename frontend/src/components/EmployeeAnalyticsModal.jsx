@@ -221,14 +221,24 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
     setLoading(true);
     setError(null);
     try {
+      const formatISTDateForAPI = (date) => {
+        const dtf = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        return dtf.format(date);
+      };
+
       const nowDate = new Date();
       const year = typeof yearParam === 'number' ? yearParam : (selectedYear ?? nowDate.getFullYear());
       const month = typeof monthParam === 'number' ? monthParam : (selectedMonth ?? nowDate.getMonth());
 
       const startOfMonth = new Date(year, month, 1);
       const endOfMonth = new Date(year, month + 1, 0);
-      const startDate = startOfMonth.toISOString().slice(0, 10);
-      const endDate = endOfMonth.toISOString().slice(0, 10);
+      const startDate = formatISTDateForAPI(startOfMonth);
+      const endDate = formatISTDateForAPI(endOfMonth);
       
       console.log('Fetching analytics for date range:', { startDate, endDate });
       const response = await axios.get(`/analytics/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`);
