@@ -5,6 +5,7 @@ const Setting = require('../models/Setting');
 const LeaveRequest = require('../models/LeaveRequest'); 
 const { sendEmail } = require('./mailService');
 const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
+const cron = require('node-cron');
 // REMOVED: Legacy probation tracking service import
 // Reason: All probation calculations now use /api/analytics/probation-tracker endpoint
 const { checkAndAutoLogout } = require('./autoLogoutService');
@@ -17,6 +18,55 @@ const Holiday = require('../models/Holiday');
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
 // const INTERN_PERIOD_DAYS = parseInt(process.env.INTERN_PERIOD_DAYS, 10) || 180; // No longer needed
 const REMINDER_WINDOW_DAYS = 7;
+
+// --- Distributed lock to avoid multi-instance duplicate cron execution ---
+// Uses MongoDB collection "cron_locks" with TTL via expiresAt.
+const CronLock = mongoose.model(
+    'CronLock',
+    new mongoose.Schema(
+        {
+            key: { type: String, required: true, unique: true, index: true },
+            owner: { type: String, required: true },
+            expiresAt: { type: Date, required: true, index: true },
+        },
+        { timestamps: true, collection: 'cron_locks' }
+    )
+);
+
+const CRON_OWNER = `${process.pid}`;
+
+const withCronLock = async (key, ttlMs, fn) => {
+    if (mongoose.connection.readyState !== 1) {
+        console.log('[CRON] Database not connected, skipping locked job:', key);
+        return;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + ttlMs);
+
+    try {
+        const lock = await CronLock.findOneAndUpdate(
+            {
+                key,
+                $or: [
+                    { expiresAt: { $lte: now } },
+                    { owner: CRON_OWNER }
+                ]
+            },
+            { $set: { owner: CRON_OWNER, expiresAt } },
+            { upsert: true, new: true }
+        );
+
+        if (!lock || lock.owner !== CRON_OWNER) {
+            console.log('[CRON] Lock not acquired, skipping job:', key);
+            return;
+        }
+
+        await fn();
+    } catch (err) {
+        console.error('[CRON] Error running locked job:', key, err);
+    }
+};
 
 /**
  * A daily job to check for employees whose probation or internship is ending soon.
@@ -240,7 +290,14 @@ const checkProbationAndInternshipEndings = async () => {
                     </div>
                 `;
                 
-                sendEmail({ to: recipients, subject, html, isHREmail: true }).catch(err => {
+                sendEmail({
+                    to: recipients,
+                    subject,
+                    html,
+                    isHREmail: true,
+                    mailType: 'HRProbationInternshipEndingReminder',
+                    recipientType: 'hr'
+                }).catch(err => {
                     console.error(`[CRON] Failed to send reminder email for ${user.fullName}:`, err);
                 });
             }
@@ -311,22 +368,35 @@ const startAutoLogoutJob = () => {
  * Starts the scheduled jobs for the application.
  */
 const startScheduledJobs = () => {
-    // Daily jobs
-    checkProbationAndInternshipEndings();
-    setInterval(checkProbationAndInternshipEndings, 24 * 60 * 60 * 1000);
-    
-    // Daily probation completion check
-    checkProbationCompletions();
-    setInterval(checkProbationCompletions, 24 * 60 * 60 * 1000);
-    
-    // Weekly jobs (every Monday at 9 AM)
-    checkWeeklyLateWarnings();
-    setInterval(checkWeeklyLateWarnings, 7 * 24 * 60 * 60 * 1000);
-    
+    // NOTE: process.env.TZ is set to Asia/Kolkata in server.js before startup.
+    // node-cron will use process TZ; we also pass timezone explicitly for safety.
+    const tz = process.env.TZ || 'Asia/Kolkata';
+
+    // Daily job: probation/internship ending reminders at 09:00 IST
+    cron.schedule('0 9 * * *', () => {
+        withCronLock('daily:probation_internship_endings', 60 * 60 * 1000, async () => {
+            await checkProbationAndInternshipEndings();
+        });
+    }, { timezone: tz });
+
+    // Daily probation completion check at 09:10 IST (kept for compatibility; job currently logs only)
+    cron.schedule('10 9 * * *', () => {
+        withCronLock('daily:probation_completions', 60 * 60 * 1000, async () => {
+            await checkProbationCompletions();
+        });
+    }, { timezone: tz });
+
+    // Weekly late warnings every Monday at 09:00 IST
+    cron.schedule('0 9 * * 1', () => {
+        withCronLock('weekly:late_warnings', 2 * 60 * 60 * 1000, async () => {
+            await checkWeeklyLateWarnings();
+        });
+    }, { timezone: tz });
+
     // Auto-logout job (runs every 5 minutes)
     startAutoLogoutJob();
-    
-    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout) have been started.');
+
+    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout) have been started via node-cron.');
 };
 
 module.exports = { startScheduledJobs, checkProbationAndInternshipEndings };

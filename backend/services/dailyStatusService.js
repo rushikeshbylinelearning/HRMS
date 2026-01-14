@@ -445,16 +445,18 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     // PHASE 2 OPTIMIZATION: Parallelize independent queries
     // Batch 3: ExtraBreakRequests (independent, can run in parallel)
-    if (resolvedOptions.includeRequests) {
+    // CRITICAL FIX: ExtraBreakRequest model uses attendanceLog (ObjectId), NOT attendanceDate (string)
+    // Query by attendanceLog reference to correctly find extra break requests for today
+    if (resolvedOptions.includeRequests && attendanceLog) {
         const [pendingRequest, approvedRequest] = await Promise.all([
             ExtraBreakRequest.findOne({
                 user: userId,
-                attendanceDate: targetDate,
+                attendanceLog: attendanceLog._id,
                 status: 'Pending',
             }).lean(),
             ExtraBreakRequest.findOne({
                 user: userId,
-                attendanceDate: targetDate,
+                attendanceLog: attendanceLog._id,
                 status: 'Approved',
                 isUsed: false,
             }).lean()

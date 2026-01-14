@@ -832,3 +832,315 @@
   level: 'error',
   timestamp: '2025-12-16 16:28:20'
 }
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 17:24:31'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 17:24:43'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 17:58:42'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 17:58:50'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:09:03'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:09:03'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:09:03'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:09:03'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:09:03'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:23:48'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:23:52'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:26:21'
+}
+{
+  service: 'attendance-system',
+  message: "Application Error Cannot destructure property 'breakId' of 'req.body' as it is undefined.",
+  stack: "TypeError: Cannot destructure property 'breakId' of 'req.body' as it is undefined.\n" +
+    '    at D:\\Zip 4\\attendance-system\\backend\\routes\\breaks.js:122:13\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:111:13\n' +
+    '    at authenticateToken (D:\\Zip 4\\attendance-system\\backend\\middleware\\authenticateToken.js:137:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at Route.dispatch (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n' +
+    '    at handle (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:435:11)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)',
+  url: '/api/breaks/end',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  level: 'error',
+  timestamp: '2026-01-12 18:26:25'
+}

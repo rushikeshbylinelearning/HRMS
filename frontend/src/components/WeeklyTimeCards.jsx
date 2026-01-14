@@ -10,25 +10,45 @@ import {
 } from '@mui/icons-material';
 
 // --- HELPER FUNCTIONS FOR ACCURATE DATE HANDLING ---
+// CRITICAL: Use IST timezone for all date comparisons to match backend
 
-// Gets the local date string (YYYY-MM-DD) to avoid timezone issues.
+// Gets the IST date string (YYYY-MM-DD) to match backend timezone
 const getLocalDateString = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // Use Intl.DateTimeFormat to get the date in IST (Asia/Kolkata)
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    return istFormatter.format(date);
 };
 
-// Gets the days of the current week, starting from Sunday.
+// Gets the current IST day of week (0-6, Sunday = 0)
+const getISTDayOfWeek = (date) => {
+    const istFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'short'
+    });
+    const dayName = istFormatter.format(date);
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    return dayMap[dayName] ?? date.getDay();
+};
+
+// Gets the days of the current week (in IST), starting from Sunday.
 const getWeekDays = () => {
-    const today = new Date();
+    const now = new Date();
     const week = [];
-    // Go back to the last Sunday.
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+    const currentDayOfWeek = getISTDayOfWeek(now);
+    
+    // Calculate the Sunday of this week in IST
+    const firstDayOfWeek = new Date(now);
+    firstDayOfWeek.setDate(now.getDate() - currentDayOfWeek);
+    firstDayOfWeek.setHours(0, 0, 0, 0);
     
     for (let i = 0; i < 7; i++) {
         const day = new Date(firstDayOfWeek);
-        day.setDate(day.getDate() + i);
+        day.setDate(firstDayOfWeek.getDate() + i);
         week.push(day);
     }
     return week;
@@ -52,8 +72,8 @@ const WeeklyTimeCards = ({ logs, shift }) => {
             return { text: 'Absent', Icon: HighlightOffIcon, color: 'error.main' };
         }
         
-        // Handle weekends based on day of the week
-        const dayIndex = day.getDay();
+        // Handle weekends based on day of the week (using IST)
+        const dayIndex = getISTDayOfWeek(day);
         if (dayIndex === 0 || dayIndex === 6) { // Sunday or Saturday
             return { text: 'Weekend', Icon: WeekendIcon, color: 'text.secondary' };
         }

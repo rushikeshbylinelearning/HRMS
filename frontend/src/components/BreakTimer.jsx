@@ -1,5 +1,5 @@
 // frontend/src/components/BreakTimer.jsx
-import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, memo, useRef, useCallback } from 'react';
 import { Typography, Box } from '@mui/material';
 
 const formatCountdown = (totalSeconds) => {
@@ -11,13 +11,18 @@ const formatCountdown = (totalSeconds) => {
 
 const UNPAID_BREAK_ALLOWANCE_MINUTES = 10;
 
-const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
+const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = null }) => {
     const [countdown, setCountdown] = useState(0);
     const [overtime, setOvertime] = useState(0);
     const intervalRef = useRef(null);
+    const rafRef = useRef(null);
     const lastValuesRef = useRef({ countdown: 0, overtime: 0 });
+    const activeBreakIdRef = useRef(null);
 
-    const activeBreak = useMemo(() => breaks?.find(b => !b.endTime), [breaks]);
+    const activeBreak = useMemo(
+        () => activeBreakOverride || breaks?.find(b => !b.endTime),
+        [breaks, activeBreakOverride]
+    );
 
     const paidMinutesAlreadyTaken = useMemo(() => {
         if (!activeBreak || activeBreak.breakType !== 'Paid') return 0;
@@ -35,14 +40,18 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
         return UNPAID_BREAK_ALLOWANCE_MINUTES * 60;
     }, [activeBreak, paidBreakAllowance, paidMinutesAlreadyTaken]);
 
-    useEffect(() => {
-        const clearTimer = () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-        };
+    const clearTimer = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+    }, []);
 
+    useEffect(() => {
         clearTimer();
 
         if (!activeBreak || allowanceSeconds === null) {
@@ -51,11 +60,18 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
                 setOvertime(0);
                 lastValuesRef.current = { countdown: 0, overtime: 0 };
             }
+            activeBreakIdRef.current = null;
             return;
         }
 
+        // Reset cached values whenever the active break changes (prevents stale UI)
+        const currentBreakId = activeBreak._id || activeBreak.id;
+        if (currentBreakId !== activeBreakIdRef.current) {
+            lastValuesRef.current = { countdown: 0, overtime: 0 };
+            activeBreakIdRef.current = currentBreakId;
+        }
+
         const startMs = new Date(activeBreak.startTime).getTime();
-        let rafId = null;
 
         const tick = () => {
             const elapsedSeconds = Math.floor((Date.now() - startMs) / 1000);
@@ -77,21 +93,13 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30 }) => {
         // Run immediately so UI updates without waiting a tick
         tick();
         
-        // Use requestAnimationFrame for smoother updates
+        // Use requestAnimationFrame for smoother updates and store the id for cleanup
         intervalRef.current = setInterval(() => {
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-            }
-            rafId = requestAnimationFrame(tick);
+            rafRef.current = requestAnimationFrame(tick);
         }, 1000);
 
-        return () => {
-            clearTimer();
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-            }
-        };
-    }, [activeBreak, allowanceSeconds]);
+        return clearTimer;
+    }, [activeBreak, allowanceSeconds, clearTimer]);
 
     if (!activeBreak) {
         return null;

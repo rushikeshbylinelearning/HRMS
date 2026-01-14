@@ -61,8 +61,17 @@ const sendEmploymentStatusChangeNotification = async (employee, oldStatus, newSt
             </div>
         `;
         
-        await sendEmail({ to: recipients, subject, html, isHREmail: true });
-        console.log(`[Employment Status] Notification sent for ${employee.fullName}'s status change from ${oldStatus} to ${newStatus}`);
+        sendEmail({
+            to: recipients,
+            subject,
+            html,
+            isHREmail: true,
+            mailType: 'HREmploymentStatusChange',
+            recipientType: 'hr'
+        }).catch(err => {
+            console.error(`[Employment Status] Failed to send notification for ${employee.fullName}:`, err);
+        });
+        console.log(`[Employment Status] Notification queued for ${employee.fullName}'s status change from ${oldStatus} to ${newStatus}`);
     } catch (error) {
         console.error(`[Employment Status] Failed to send notification for ${employee.fullName}:`, error);
     }
@@ -376,7 +385,16 @@ router.post('/:id/probation-settings', [authenticateToken, isAdminOrHr], async (
                     </div>
                 `;
                 
-                await sendEmail({ to: recipients, subject, html, isHREmail: true });
+                sendEmail({
+                    to: recipients,
+                    subject,
+                    html,
+                    isHREmail: true,
+                    mailType: 'HRProbationSettingsUpdated',
+                    recipientType: 'hr'
+                }).catch(err => {
+                    console.error('Failed to send probation settings notification email:', err);
+                });
             }
         } catch (emailError) {
             console.error('Failed to send probation settings notification email:', emailError);

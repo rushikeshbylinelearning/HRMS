@@ -18,6 +18,7 @@ const BreakLog = require('../models/BreakLog');
 const User = require('../models/User');
 const Setting = require('../models/Setting');
 const { getUserDailyStatus } = require('./dailyStatusService');
+const { getISTNow, getISTDateString } = require('../utils/istTime');
 const NewNotificationService = require('./NewNotificationService');
 const logAction = require('./logAction');
 
@@ -193,9 +194,9 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
         // For today, use current time
         // CRITICAL: Use IST timezone for date comparison to ensure accuracy
         const attendanceDateStr = attendanceLog.attendanceDate; // YYYY-MM-DD format
-        // Get today's date in IST timezone
-        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-        const todayDateStr = nowIST.toISOString().slice(0, 10); // Get YYYY-MM-DD
+        // Get today's date in IST timezone using canonical utility
+        const nowIST = getISTNow();
+        const todayDateStr = getISTDateString(nowIST);
         const isPastDate = attendanceDateStr < todayDateStr;
 
         // Calculate expected logout time once (used for both past date handling and overrun calculation)
@@ -523,6 +524,48 @@ const checkAndAutoLogout = async () => {
         return;
     }
 
+    // INTELLIGENT CRON OPTIMIZATION: Fast pre-check to avoid unnecessary work
+    // Only run full auto-logout logic after 7:00 PM IST or if active users need immediate attention
+    const nowIST = getISTNow();
+    const currentHour = nowIST.getHours();
+    const currentMinute = nowIST.getMinutes();
+    const isAfter7PM = currentHour >= 19;
+
+    // Fast pre-check: Query only active attendance logs to see if we need to do work
+    let hasUrgentActiveLogs = false;
+    if (!isAfter7PM) {
+        try {
+            const activeLogs = await AttendanceLog.find({
+                clockOutTime: null,
+                isLegacySession: { $ne: true }
+            }).populate('user').lean();
+
+            if (activeLogs && activeLogs.length > 0) {
+                // Check if any active log has logout time within next 60 minutes
+                const sixtyMinutesFromNow = new Date(nowIST.getTime() + 60 * 60 * 1000);
+
+                for (const log of activeLogs) {
+                    if (log.user && log.user._id) {
+                        const expectedLogout = await calculateExpectedLogoutTime(log.user._id, log.attendanceDate);
+                        if (expectedLogout && expectedLogout <= sixtyMinutesFromNow) {
+                            hasUrgentActiveLogs = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If it's before 7 PM and no urgent logs, skip the heavy work
+            if (!hasUrgentActiveLogs) {
+                console.log(`[autoLogoutService] 🕒 Skipping auto-logout check (${currentHour}:${String(currentMinute).padStart(2, '0')} IST) - no active sessions requiring attention before 7:00 PM`);
+                return;
+            }
+        } catch (preCheckError) {
+            console.warn('[autoLogoutService] ⚠️ Pre-check failed, proceeding with full check:', preCheckError.message);
+            // Continue with full check if pre-check fails
+        }
+    }
+
     // CRITICAL: Clean up legacy sessions first (one-time cleanup)
     await cleanupLegacySessions();
 
@@ -640,6 +683,21 @@ const checkAndAutoLogout = async () => {
 
                 // Populate user with shift group
                 const user = await User.findById(attendanceLog.user._id || attendanceLog.user).populate('shiftGroup');
+
+                // EXCLUDE AFTERNOON SHIFT: Auto logout should not apply to afternoon shift
+                if (user && user.shiftGroup) {
+                    const shiftName = (user.shiftGroup.shiftName || '').toLowerCase();
+                    const isAfternoonShift = shiftName.includes('afternoon') ||
+                                           (user.shiftGroup.shiftType === 'Flexible' &&
+                                            shiftName.includes('afternoon'));
+
+                    if (isAfternoonShift) {
+                        console.log(`[autoLogoutService] ⏰ Skipping auto-logout for ${user.email} - assigned to afternoon shift (${user.shiftGroup.shiftName})`);
+                        skippedCount++;
+                        continue;
+                    }
+                }
+
                 if (!user || !user.shiftGroup) {
                     // User exists but has no shift - this might be a legacy case
                     // Check if session is very old (> 24 hours)
@@ -689,9 +747,9 @@ const checkAndAutoLogout = async () => {
                 // Log attendance date for debugging
                 // CRITICAL: Use IST timezone for accurate date comparison
                 const attendanceDateStr = attendanceLog.attendanceDate; // YYYY-MM-DD format
-                // Get today's date in IST timezone
-                const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-                const todayDateStr = nowIST.toISOString().slice(0, 10); // Get YYYY-MM-DD
+                // Get today's date in IST timezone using canonical utility
+                const nowIST = getISTNow();
+                const todayDateStr = getISTDateString(nowIST);
                 
                 // Calculate days difference using date strings (timezone-safe)
                 const attendanceDateObj = new Date(attendanceDateStr + 'T00:00:00+05:30'); // IST
@@ -733,8 +791,8 @@ const checkAndAutoLogout = async () => {
                 // For overnight shifts, the logout time might be on the next day
                 // Check if the expected logout time is actually on the next day compared to attendance date
                 // Use IST timezone for accurate comparison
-                const expectedLogoutIST = new Date(new Date(expectedLogoutTime).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-                const expectedLogoutDateStr = expectedLogoutIST.toISOString().slice(0, 10);
+                const expectedLogoutIST = new Date(expectedLogoutTime);
+                const expectedLogoutDateStr = getISTDateString(expectedLogoutIST);
                 const isOvernightShift = expectedLogoutDateStr > attendanceDateStr;
                 
                 if (isOvernightShift) {
