@@ -76,7 +76,7 @@ const RecentActivityCard = ({ dailyData }) => {
 
     return (
         <Paper elevation={3} sx={{ p: 2.5, borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
-            <Typography variant="h6" gutterBottom>Recent Activity</Typography>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Recent Activity</Typography>
             {activities.length > 0 ? (
                 <Timeline
                     sx={{
@@ -107,15 +107,15 @@ const RecentActivityCard = ({ dailyData }) => {
                                     {index < activities.length - 1 && <TimelineConnector />}
                                 </TimelineSeparator>
                                 <TimelineContent sx={{ py: '12px', px: 2 }}>
-                                    <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>
+                                    <Typography variant="body2" component="span" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>
                                         {activity.type}
                                     </Typography>
                                     {activity.details && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5, fontWeight: 400, letterSpacing: '0.025em' }}>
                                             {activity.details}
                                         </Typography>
                                     )}
-                                    <Typography variant="caption" display="block" color="text.secondary">
+                                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
                                         at {formatTime(activity.timestamp) || ''}
                                     </Typography>
                                 </TimelineContent>
@@ -124,7 +124,7 @@ const RecentActivityCard = ({ dailyData }) => {
                     })}
                 </Timeline>
             ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', p: 2, mt: 1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', p: 2, mt: 1, fontWeight: 400, letterSpacing: '0.025em' }}>
                     No activity recorded for today.
                 </Typography>
             )}

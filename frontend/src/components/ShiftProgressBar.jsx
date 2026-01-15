@@ -110,7 +110,7 @@ const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, 
   const displayElapsedMinutes = Math.min(totalElapsedMinutes, adjustedTotalShiftMinutes);
 
   return (
-    <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
+    <Box sx={{ width: '100%', mt: 2, mb: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
           Shift Progress
@@ -153,11 +153,11 @@ const ShiftProgressBar = ({ workedMinutes, unpaidBreakMinutes, paidBreakExcess, 
         ) : (unpaidBreakMinutes > 0 || paidBreakExcess > 0) ? (
             <Typography variant="caption" color="error">
                 {unpaidBreakMinutes > 0 && paidBreakExcess > 0 ? (
-                    `Your shift has been extended by ${unpaidBreakMinutes} minute${unpaidBreakMinutes !== 1 ? 's' : ''} (unpaid break) and ${paidBreakExcess} minute${paidBreakExcess !== 1 ? 's' : ''} (paid break excess).`
+                    `Shift extended by ${unpaidBreakMinutes + paidBreakExcess} minutes due to break.`
                 ) : unpaidBreakMinutes > 0 ? (
-                    `You have taken ${unpaidBreakMinutes} minute${unpaidBreakMinutes !== 1 ? 's' : ''} unpaid break, therefore your shift has been extended by ${unpaidBreakMinutes} minute${unpaidBreakMinutes !== 1 ? 's' : ''}.`
+                    `Shift extended by ${unpaidBreakMinutes} minute${unpaidBreakMinutes !== 1 ? 's' : ''} due to break.`
                 ) : (
-                    `You have taken ${paidBreakExcess} minute${paidBreakExcess !== 1 ? 's' : ''} excess paid break, therefore your shift has been extended by ${paidBreakExcess} minute${paidBreakExcess !== 1 ? 's' : ''}.`
+                    `Shift extended by ${paidBreakExcess} minute${paidBreakExcess !== 1 ? 's' : ''} due to break.`
                 )}
             </Typography>
         ) : null}

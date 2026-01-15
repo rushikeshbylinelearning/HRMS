@@ -11,7 +11,7 @@ const formatCountdown = (totalSeconds) => {
 
 const UNPAID_BREAK_ALLOWANCE_MINUTES = 10;
 
-const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = null }) => {
+const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = null, unifiedDisplay = false }) => {
     const [countdown, setCountdown] = useState(0);
     const [overtime, setOvertime] = useState(0);
     const intervalRef = useRef(null);
@@ -109,16 +109,51 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = nul
         ? 'Extra time taken:' 
         : `Time Remaining (${activeBreak.breakType})`;
 
+    if (unifiedDisplay) {
+        // Unified display mode - show HH:MM:SS format like WorkTimeTracker
+        const totalSeconds = overtime > 0 ? overtime : countdown;
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        const TimeBlock = ({ value, label }) => (
+            <Box sx={{
+                textAlign: 'center',
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                borderRadius: 1,
+                px: 1.5,
+                py: 0.5
+            }}>
+                <Typography variant="h4" component="div" sx={{ fontWeight: 500, color: overtime > 0 ? 'error.main' : 'success.main' }}>
+                    {String(value).padStart(2, '0')}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
+                    {label}
+                </Typography>
+            </Box>
+        );
+
+        return (
+            <Box component="div" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
+                <TimeBlock value={hours} label="Hours" />
+                <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
+                <TimeBlock value={minutes} label="Minutes" />
+                <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
+                <TimeBlock value={seconds} label="Seconds" />
+            </Box>
+        );
+    }
+
     return (
         <Box sx={{ textAlign: 'center', width: '100%' }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
                 {titleText}
             </Typography>
-            <Typography 
-                variant="h5" 
-                sx={{ 
-                    color: overtime > 0 ? 'error.main' : 'success.main', 
-                    fontWeight: 'bold' 
+            <Typography
+                variant="h5"
+                sx={{
+                    color: overtime > 0 ? 'error.main' : 'success.main',
+                    fontWeight: 'bold'
                 }}
             >
                 {overtime > 0 ? `+${formatCountdown(overtime)}` : formatCountdown(countdown)}

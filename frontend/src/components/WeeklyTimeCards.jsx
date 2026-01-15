@@ -85,7 +85,7 @@ const WeeklyTimeCards = ({ logs, shift }) => {
     return (
         <Box sx={{ mt: 2 }}>
             <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 2, letterSpacing: '0.025em' }}>
                     Your Week
                 </Typography>
                 <Grid container spacing={1}>
@@ -107,14 +107,14 @@ const WeeklyTimeCards = ({ logs, shift }) => {
                                         backgroundColor: isToday ? '#eff6ff' : '#ffffff',
                                     }}
                                 >
-                                    <Typography variant="caption" color="text.secondary">
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
                                         {day.toLocaleDateString('en-US', { weekday: 'short' })}
                                     </Typography>
-                                    <Typography variant="h6" fontWeight="bold" sx={{ my: 0.5 }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 500, my: 0.5, letterSpacing: '0.025em' }}>
                                         {day.getDate()}
                                     </Typography>
                                     <status.Icon sx={{ color: status.color, fontSize: '1.25rem' }} />
-                                    <Typography variant="caption" display="block" color="text.secondary">
+                                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
                                         {status.text}
                                     </Typography>
                                 </Paper>

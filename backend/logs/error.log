@@ -1144,3 +1144,35 @@
   level: 'error',
   timestamp: '2026-01-12 18:26:25'
 }
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  attempt: 1,
+  maxAttempts: 3,
+  transient: false,
+  code: 'EAUTH',
+  message: '[MAIL FAILED] Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n' +
+    '535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-819c52fd904sm22178729b3a.33 - gsmtp',
+  level: 'error',
+  timestamp: '2026-01-14 12:25:54'
+}
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  attempt: 1,
+  maxAttempts: 3,
+  transient: false,
+  code: 'EAUTH',
+  message: '[MAIL FAILED] Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n' +
+    '535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-81f87aa4f97sm162411b3a.69 - gsmtp',
+  level: 'error',
+  timestamp: '2026-01-14 12:28:50'
+}
