@@ -64,8 +64,8 @@ const SaturdaySchedule = ({ policy, requests = [], count = 4 }) => {
                     <Box key={date.toISOString()} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Avatar sx={{ bgcolor: avatarBg, color: iconColor }}><Icon fontSize="small" /></Avatar>
                         <Box>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</Typography>
-                            <Typography variant="body2" color="text.secondary">{text}</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{text}</Typography>
                         </Box>
                     </Box>
                 );

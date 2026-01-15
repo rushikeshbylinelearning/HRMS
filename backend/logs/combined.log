@@ -164440,3 +164440,3860 @@
   message: 'Response',
   timestamp: '2026-01-13 19:19:44'
 }
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768372116443',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 11:58:36',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768372116443',
+  statusCode: 200,
+  duration: '29ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 11:58:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768372116523',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 11:58:36',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768372116523',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 11:58:36',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768372116523',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 11:58:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768372116523',
+  statusCode: 200,
+  duration: '24ms',
+  contentLength: '22797',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 11:58:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372116902',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 11:58:36',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372116902',
+  statusCode: 200,
+  duration: '13ms',
+  contentLength: '2592',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 11:58:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372116902',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 11:58:36',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372116902',
+  statusCode: 304,
+  duration: '13ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 11:58:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768372333985',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768372333985',
+  statusCode: 200,
+  duration: '5ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768372334040',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:14',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768372334040',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:14',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768372334040',
+  statusCode: 200,
+  duration: '90ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768372334040',
+  statusCode: 200,
+  duration: '35ms',
+  contentLength: '22797',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372334148',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:14',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372334148',
+  statusCode: 200,
+  duration: '37ms',
+  contentLength: '2592',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372334148',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:14',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372334148',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:14'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/auth/login',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:20',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 200,
+  duration: '91ms',
+  contentLength: '1734',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:20'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768372340784',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:20',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768372340784',
+  statusCode: 200,
+  duration: '14ms',
+  contentLength: '1145',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:20'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768372340811',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:20',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768372340811',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:20',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768372340811',
+  statusCode: 200,
+  duration: '33ms',
+  contentLength: '102',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:20'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768372340811',
+  statusCode: 200,
+  duration: '38ms',
+  contentLength: '26407',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:20'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372341193',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:21',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372341193',
+  statusCode: 200,
+  duration: '128ms',
+  contentLength: '21681',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:21'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372341193',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:21',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372341193',
+  statusCode: 304,
+  duration: '5ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:21'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-employees/late?page=1&limit=50&_t=1768372343712',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:02:23',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-employees/late?page=1&limit=50&_t=1768372343712',
+  statusCode: 200,
+  duration: '23ms',
+  contentLength: '544',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:02:23'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/year-end-requests?_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/settings/year-end-feature?_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10&_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/year-end-feature?_t=1768372863347',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '17',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/year-end-requests?_t=1768372863347',
+  statusCode: 200,
+  duration: '25ms',
+  contentLength: '61',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/settings/year-end-feature?_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/year-end-requests?_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863347',
+  statusCode: 200,
+  duration: '36ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/year-end-feature?_t=1768372863347',
+  statusCode: 304,
+  duration: '19ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10&_t=1768372863347',
+  statusCode: 200,
+  duration: '48ms',
+  contentLength: '7332',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/year-end-requests?_t=1768372863347',
+  statusCode: 304,
+  duration: '19ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10&_t=1768372863347',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863347',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10&_t=1768372863347',
+  statusCode: 304,
+  duration: '19ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863522',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372863522',
+  statusCode: 200,
+  duration: '19ms',
+  contentLength: '11',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372863522',
+  statusCode: 304,
+  duration: '8ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863522',
+  statusCode: 304,
+  duration: '23ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Employee&_t=1768372863568',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372863522',
+  statusCode: 304,
+  duration: '16ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Intern&_t=1768372863579',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Employee&_t=1768372863568',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '16853',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863522',
+  statusCode: 304,
+  duration: '21ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Intern&_t=1768372863579',
+  statusCode: 200,
+  duration: '17ms',
+  contentLength: '14126',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372863522',
+  statusCode: 304,
+  duration: '9ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372863522',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Employee&_t=1768372863610',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372863522',
+  statusCode: 304,
+  duration: '18ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Employee&_t=1768372863610',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '16853',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372863686',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Intern&_t=1768372863689',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Intern&_t=1768372863689',
+  statusCode: 200,
+  duration: '42ms',
+  contentLength: '14126',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372863792',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:11:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372863792',
+  statusCode: 200,
+  duration: '766ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372863686',
+  statusCode: 200,
+  duration: '1217ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:11:04'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/admin/leaves',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/leaves',
+  statusCode: 201,
+  duration: '49ms',
+  contentLength: '685',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=10&_t=1768372920754',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372920754',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=10&_t=1768372920754',
+  statusCode: 200,
+  duration: '29ms',
+  contentLength: '7298',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372920754',
+  statusCode: 200,
+  duration: '27ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372920873',
+  statusCode: 200,
+  duration: '9ms',
+  contentLength: '11',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372920873',
+  statusCode: 200,
+  duration: '18ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372920873',
+  statusCode: 304,
+  duration: '11ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Employee&_t=1768372920903',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372920873',
+  statusCode: 304,
+  duration: '9ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Employee&_t=1768372920903',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '16853',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372920873',
+  statusCode: 304,
+  duration: '24ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/analytics/monthly-context-settings?_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Intern&_t=1768372920931',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/monthly-context-settings?_t=1768372920873',
+  statusCode: 304,
+  duration: '14ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Intern&_t=1768372920931',
+  statusCode: 200,
+  duration: '25ms',
+  contentLength: '14726',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372920970',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372920873',
+  statusCode: 304,
+  duration: '54ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:00'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768372920873',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:00',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372921064',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:01',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Employee&_t=1768372921081',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:01',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372921158',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:01',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768372920873',
+  statusCode: 304,
+  duration: '309ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/leaves/all?page=1&limit=1000&role=Intern&_t=1768372921306',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:01',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Employee&_t=1768372921081',
+  statusCode: 200,
+  duration: '233ms',
+  contentLength: '16853',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/actual-work-days?month=1&year=2026&_t=1768372921404',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:01',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372920970',
+  statusCode: 200,
+  duration: '779ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/leaves/all?page=1&limit=1000&role=Intern&_t=1768372921306',
+  statusCode: 200,
+  duration: '630ms',
+  contentLength: '14726',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372921064',
+  statusCode: 200,
+  duration: '1676ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:02'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372921158',
+  statusCode: 200,
+  duration: '1629ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:02'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/actual-work-days?month=1&year=2026&_t=1768372921404',
+  statusCode: 200,
+  duration: '2596ms',
+  contentLength: '7655',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372927449',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:07',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372927449',
+  statusCode: 200,
+  duration: '105ms',
+  contentLength: '22242',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:07'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372927449',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:12:07',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768372927449',
+  statusCode: 304,
+  duration: '4ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:07'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/start',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:12:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/start',
+  statusCode: 201,
+  duration: '50ms',
+  contentLength: '365',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372957946',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:12:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768372957948',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:12:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372957946',
+  statusCode: 200,
+  duration: '40ms',
+  contentLength: '3096',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768372957948',
+  statusCode: 200,
+  duration: '34ms',
+  contentLength: '3096',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:12:37'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/end',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/end',
+  statusCode: 200,
+  duration: '111ms',
+  contentLength: '401',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373703701',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373703705',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373703701',
+  statusCode: 200,
+  duration: '57ms',
+  contentLength: '3101',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373703705',
+  statusCode: 200,
+  duration: '32ms',
+  contentLength: '3101',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373713183',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373713183',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373713257',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373713257',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373713257',
+  statusCode: 200,
+  duration: '23ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373713257',
+  statusCode: 200,
+  duration: '24ms',
+  contentLength: '22701',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373713315',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373713315',
+  statusCode: 200,
+  duration: '11ms',
+  contentLength: '3101',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373713315',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373713315',
+  statusCode: 304,
+  duration: '13ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768373717197',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768373717197',
+  statusCode: 200,
+  duration: '23ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768373717197',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768373717197',
+  statusCode: 304,
+  duration: '33ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373720692',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:20',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373720692',
+  statusCode: 200,
+  duration: '21ms',
+  contentLength: '5711',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:20'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/attendance/log/696723198eb3100740d6f764',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/attendance/log/696723198eb3100740d6f764',
+  statusCode: 200,
+  duration: '71ms',
+  contentLength: '54',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:24'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373724624',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373724625',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373724649',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373724624',
+  statusCode: 200,
+  duration: '35ms',
+  contentLength: '5605',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:24'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373724649',
+  statusCode: 200,
+  duration: '57ms',
+  contentLength: '5605',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:24'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373724625',
+  statusCode: 200,
+  duration: '213ms',
+  contentLength: '2642',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:24'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/start',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:28',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/start',
+  statusCode: 201,
+  duration: '39ms',
+  contentLength: '365',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:28'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373728529',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:28',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373728532',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:28',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373728533',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:28',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373728533',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '5686',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:28'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373728529',
+  statusCode: 200,
+  duration: '54ms',
+  contentLength: '3146',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:28'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373728532',
+  statusCode: 200,
+  duration: '50ms',
+  contentLength: '3146',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:28'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/end',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/end',
+  statusCode: 200,
+  duration: '49ms',
+  contentLength: '400',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373735760',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373735761',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373735763',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373735761',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: '5723',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373735760',
+  statusCode: 200,
+  duration: '58ms',
+  contentLength: '3145',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373735763',
+  statusCode: 200,
+  duration: '48ms',
+  contentLength: '3145',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:35'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/attendance/log/696723198eb3100740d6f764',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/attendance/log/696723198eb3100740d6f764',
+  statusCode: 200,
+  duration: '57ms',
+  contentLength: '54',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373744897',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373744897',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373744897',
+  statusCode: 200,
+  duration: '26ms',
+  contentLength: '5605',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373744920',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373744920',
+  statusCode: 200,
+  duration: '22ms',
+  contentLength: '5605',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373744897',
+  statusCode: 200,
+  duration: '55ms',
+  contentLength: '2642',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:44'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/attendance/clock-out',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/clock-out',
+  statusCode: 200,
+  duration: '62ms',
+  contentLength: '374',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373752190',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373752193',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373752191',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373752191',
+  statusCode: 200,
+  duration: '27ms',
+  contentLength: '5839',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373752190',
+  statusCode: 200,
+  duration: '68ms',
+  contentLength: '2876',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373752193',
+  statusCode: 200,
+  duration: '61ms',
+  contentLength: '2876',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:52'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/attendance/clock-in',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  verifiedAt: null,
+  level: 'info',
+  message: '[MAIL ATTEMPT]',
+  timestamp: '2026-01-14 12:25:53'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/clock-in',
+  statusCode: 201,
+  duration: '153ms',
+  contentLength: '390',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373753473',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373753475',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373753505',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:53',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373753505',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: '5872',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373753473',
+  statusCode: 200,
+  duration: '84ms',
+  contentLength: '3153',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373753475',
+  statusCode: 200,
+  duration: '74ms',
+  contentLength: '3153',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:53'
+}
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  attempt: 1,
+  maxAttempts: 3,
+  transient: false,
+  code: 'EAUTH',
+  message: '[MAIL FAILED] Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n' +
+    '535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-819c52fd904sm22178729b3a.33 - gsmtp',
+  level: 'error',
+  timestamp: '2026-01-14 12:25:54'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/start',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/start',
+  statusCode: 201,
+  duration: '38ms',
+  contentLength: '365',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373757859',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373757861',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373757865',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:57',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373757865',
+  statusCode: 200,
+  duration: '21ms',
+  contentLength: '5953',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373757859',
+  statusCode: 200,
+  duration: '66ms',
+  contentLength: '3657',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373757861',
+  statusCode: 200,
+  duration: '55ms',
+  contentLength: '3657',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:57'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/end',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/end',
+  statusCode: 200,
+  duration: '35ms',
+  contentLength: '400',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373759579',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373759581',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:25:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373759582',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:25:59',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373759582',
+  statusCode: 200,
+  duration: '24ms',
+  contentLength: '5990',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373759579',
+  statusCode: 200,
+  duration: '61ms',
+  contentLength: '3656',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:59'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373759581',
+  statusCode: 200,
+  duration: '62ms',
+  contentLength: '3656',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:25:59'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/request-extra',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:07',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/request-extra',
+  statusCode: 201,
+  duration: '36ms',
+  contentLength: '312',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:07'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373767737',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:07',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373767737',
+  statusCode: 200,
+  duration: '12ms',
+  contentLength: '3656',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:07'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373773716',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373773716',
+  statusCode: 200,
+  duration: '146ms',
+  contentLength: '22917',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373773716',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:13',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373773716',
+  statusCode: 304,
+  duration: '5ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:13'
+}
+{
+  service: 'attendance-system',
+  method: 'PATCH',
+  url: '/api/admin/breaks/extra/69673e078652890ccc3acf6b/status',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PATCH',
+  url: '/breaks/extra/69673e078652890ccc3acf6b/status',
+  statusCode: 200,
+  duration: '32ms',
+  contentLength: '46',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373777126',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:17',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true&pendingPage=1&pendingLimit=20&_t=1768373777126',
+  statusCode: 200,
+  duration: '144ms',
+  contentLength: '22709',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:17'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/start',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:21',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/start',
+  statusCode: 201,
+  duration: '54ms',
+  contentLength: '363',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:21'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373781930',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:21',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'DELETE',
+  url: '/api/new-notifications/notif_1768373777122_l9fc23ei9',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:21',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'DELETE',
+  url: '/notif_1768373777122_l9fc23ei9',
+  statusCode: 200,
+  duration: '14ms',
+  contentLength: '48',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:21'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373781930',
+  statusCode: 200,
+  duration: '45ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:21'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373782088',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373782088',
+  statusCode: 200,
+  duration: '14ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:22'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373787050',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373787050',
+  statusCode: 200,
+  duration: '5ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373787091',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373787091',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373787091',
+  statusCode: 200,
+  duration: '45ms',
+  contentLength: '147',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373787138',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373787091',
+  statusCode: 200,
+  duration: '56ms',
+  contentLength: '22487',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373787138',
+  statusCode: 200,
+  duration: '32ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373787138',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373787138',
+  statusCode: 304,
+  duration: '10ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:27'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/end',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:34',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/end',
+  statusCode: 200,
+  duration: '84ms',
+  contentLength: '398',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:34'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373794624',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:34',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373794626',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:26:34',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373794624',
+  statusCode: 200,
+  duration: '43ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:34'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373794626',
+  statusCode: 200,
+  duration: '35ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:34'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768373808921',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:48',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768373808921',
+  statusCode: 200,
+  duration: '21ms',
+  contentLength: '25156',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:48'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/admin/employees?all=true&_t=1768373808921',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:48',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?all=true&_t=1768373808921',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:48'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373812401',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:26:52',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373812401',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '6108',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:26:52'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373830334',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373830334',
+  statusCode: 200,
+  duration: '4ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373830374',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373830374',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373830374',
+  statusCode: 200,
+  duration: '39ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373830374',
+  statusCode: 200,
+  duration: '37ms',
+  contentLength: '22453',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373830416',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373830416',
+  statusCode: 200,
+  duration: '15ms',
+  contentLength: '4158',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373830416',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:10',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373830416',
+  statusCode: 304,
+  duration: '11ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/attendance/log/696723198eb3100740d6f764',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:18',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/attendance/log/696723198eb3100740d6f764',
+  statusCode: 200,
+  duration: '54ms',
+  contentLength: '54',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373838572',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:18',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373838572',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:18',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373838572',
+  statusCode: 200,
+  duration: '19ms',
+  contentLength: '6035',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373838600',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:18',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373838600',
+  statusCode: 200,
+  duration: '19ms',
+  contentLength: '6035',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373838572',
+  statusCode: 200,
+  duration: '58ms',
+  contentLength: '3736',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373842177',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373842177',
+  statusCode: 200,
+  duration: '4ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:22'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373842213',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373842213',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373842213',
+  statusCode: 200,
+  duration: '28ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:22'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373842213',
+  statusCode: 200,
+  duration: '22ms',
+  contentLength: '22453',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:22'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373842256',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373842256',
+  statusCode: 200,
+  duration: '11ms',
+  contentLength: '3736',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:22'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373842256',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:22',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373842256',
+  statusCode: 304,
+  duration: '10ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:22'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/attendance/log/696723198eb3100740d6f764',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/attendance/log/696723198eb3100740d6f764',
+  statusCode: 200,
+  duration: '41ms',
+  contentLength: '54',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373847629',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373847629',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373847629',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '5863',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373847654',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:27',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373847654',
+  statusCode: 200,
+  duration: '18ms',
+  contentLength: '5863',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373847629',
+  statusCode: 200,
+  duration: '45ms',
+  contentLength: '3161',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:27'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373849723',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:29',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373849723',
+  statusCode: 200,
+  duration: '5ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:29'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373849762',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:29',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373849762',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:29',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373849790',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:29',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373849790',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '3161',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:29'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373849762',
+  statusCode: 200,
+  duration: '47ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:29'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373849762',
+  statusCode: 200,
+  duration: '41ms',
+  contentLength: '22453',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:29'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373849790',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:29',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373849790',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:29'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/start',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:32',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/start',
+  statusCode: 201,
+  duration: '37ms',
+  contentLength: '365',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:32'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373852277',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:32',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373852280',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:32',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373852279',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:32',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373852279',
+  statusCode: 200,
+  duration: '20ms',
+  contentLength: '5944',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:32'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373852277',
+  statusCode: 200,
+  duration: '56ms',
+  contentLength: '3665',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:32'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373852280',
+  statusCode: 200,
+  duration: '52ms',
+  contentLength: '3665',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:32'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/breaks/end',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/end',
+  statusCode: 200,
+  duration: '39ms',
+  contentLength: '400',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373855804',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373855805',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:27:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373855808',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:35',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373855805',
+  statusCode: 200,
+  duration: '25ms',
+  contentLength: '5981',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373855804',
+  statusCode: 200,
+  duration: '59ms',
+  contentLength: '3664',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373855808',
+  statusCode: 200,
+  duration: '43ms',
+  contentLength: '3664',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:35'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/auth/me?_t=1768373863387',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:43',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/me?_t=1768373863387',
+  statusCode: 200,
+  duration: '3ms',
+  contentLength: '1229',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/current-status?_t=1768373863460',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:43',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/new-notifications?_t=1768373863461',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:43',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1768373863460',
+  statusCode: 200,
+  duration: '23ms',
+  contentLength: '123',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/?_t=1768373863461',
+  statusCode: 200,
+  duration: '22ms',
+  contentLength: '22453',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373863534',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:43',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373863534',
+  statusCode: 200,
+  duration: '14ms',
+  contentLength: '3664',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373863534',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:27:43',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373863534',
+  statusCode: 304,
+  duration: '25ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:27:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373888170',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:08',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373888170',
+  statusCode: 200,
+  duration: '25ms',
+  contentLength: '5981',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373888170',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:08',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373888170',
+  statusCode: 304,
+  duration: '20ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373904613',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373904613',
+  statusCode: 200,
+  duration: '12ms',
+  contentLength: '3664',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:24'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373904613',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:24',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373904613',
+  statusCode: 304,
+  duration: '12ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:24'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/api/admin/attendance/log/696723198eb3100740d6f764',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:28:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'PUT',
+  url: '/attendance/log/696723198eb3100740d6f764',
+  statusCode: 200,
+  duration: '62ms',
+  contentLength: '54',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373917191',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:28:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373917192',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373917191',
+  statusCode: 200,
+  duration: '25ms',
+  contentLength: '5863',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373917218',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:28:37',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373917218',
+  statusCode: 200,
+  duration: '15ms',
+  contentLength: '5863',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373917192',
+  statusCode: 200,
+  duration: '47ms',
+  contentLength: '3161',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:37'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/attendance/clock-out',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/clock-out',
+  statusCode: 200,
+  duration: '56ms',
+  contentLength: '374',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373924576',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373924579',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373924578',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:28:44',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373924578',
+  statusCode: 200,
+  duration: '39ms',
+  contentLength: '5909',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373924576',
+  statusCode: 200,
+  duration: '79ms',
+  contentLength: '3228',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:44'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373924579',
+  statusCode: 200,
+  duration: '76ms',
+  contentLength: '3228',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:44'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/api/attendance/clock-in',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:49',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  verifiedAt: null,
+  level: 'info',
+  message: '[MAIL ATTEMPT]',
+  timestamp: '2026-01-14 12:28:49'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/clock-in',
+  statusCode: 201,
+  duration: '57ms',
+  contentLength: '390',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:49'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373929494',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:49',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/dashboard/employee?date=2026-01-14&_t=1768373929496',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:28:49',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373929494',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+  timestamp: '2026-01-14 12:28:49',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&userId=687f797fcac0a473f5b46e07&includeHolidays=true&_t=1768373929494',
+  statusCode: 200,
+  duration: '36ms',
+  contentLength: '5950',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:49'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373929494',
+  statusCode: 200,
+  duration: '84ms',
+  contentLength: '3517',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:49'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-01-14&_t=1768373929496',
+  statusCode: 200,
+  duration: '86ms',
+  contentLength: '3517',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:28:49'
+}
+{
+  service: 'attendance-system',
+  mailType: 'EmployeeLateLogin',
+  recipientType: 'employee',
+  to: 'ru***@gmail.com',
+  subject: 'Late Login Notification - AMS Portal',
+  requestId: null,
+  attempt: 1,
+  maxAttempts: 3,
+  transient: false,
+  code: 'EAUTH',
+  message: '[MAIL FAILED] Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n' +
+    '535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-81f87aa4f97sm162411b3a.69 - gsmtp',
+  level: 'error',
+  timestamp: '2026-01-14 12:28:50'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373943004',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:29:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373943004',
+  statusCode: 200,
+  duration: '16ms',
+  contentLength: '5950',
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:29:03'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/api/attendance/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373943004',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  timestamp: '2026-01-14 12:29:03',
+  level: 'info',
+  message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/summary?startDate=2026-01-11&endDate=2026-01-17&includeHolidays=true&_t=1768373943004',
+  statusCode: 304,
+  duration: '22ms',
+  contentLength: 0,
+  level: 'info',
+  message: 'Response',
+  timestamp: '2026-01-14 12:29:03'
+}

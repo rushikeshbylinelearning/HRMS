@@ -596,8 +596,8 @@ const EmployeeDashboardPage = () => {
                 {hasPendingExtraBreak && (
                     <Alert severity="info" icon={<HourglassTopIcon />} sx={{ mb: 3, '.MuiAlert-message': { width: '100%' } }}>
                         <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography variant="body2">Your request for an extra break is pending approval.</Typography>
-                            <Chip label="Pending" size="small" />
+                            <Typography variant="body2" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>Your request for an extra break is pending approval.</Typography>
+                            <Chip label="Pending" size="small" sx={{ fontWeight: 500, letterSpacing: '0.025em' }} />
                         </Box>
                     </Alert>
                 )}
@@ -607,8 +607,8 @@ const EmployeeDashboardPage = () => {
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base action-card">
                                 <Box>
-                                    <Typography variant="h5" fontWeight="bold" className="theme-text-black">Time Tracking</Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 500, letterSpacing: '0.025em' }} className="theme-text-black">Time Tracking</Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3, fontWeight: 400, letterSpacing: '0.025em' }}>
                                         {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
                                     </Typography>
                                 </Box>
@@ -625,16 +625,30 @@ const EmployeeDashboardPage = () => {
                                         sessions={dailyData.sessions} 
                                         activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}
                                     />
-                                    <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                                        <Grid item xs={12} md={6}>
-                                            <Typography variant="overline" color="text.secondary">WORK DURATION</Typography>
+                                    <Box sx={{ mb: 2, textAlign: 'center' }}>
+                                        {isOnBreakUI ? (
+                                            <MemoizedBreakTimer
+                                                breaks={breaksForUi}
+                                                paidBreakAllowance={paidBreakAllowance}
+                                                activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}
+                                                unifiedDisplay={true}
+                                            />
+                                        ) : (
                                             <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={breaksForUi} status={statusForUi}/>
-                                        </Grid>
-                                        <Grid item xs={12} md={6}>
-                                            <Typography variant="overline" color="text.secondary">BREAK TIMER</Typography>
-                                            <MemoizedBreakTimer breaks={breaksForUi} paidBreakAllowance={paidBreakAllowance} activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}/>
-                                        </Grid>
-                                    </Grid>
+                                        )}
+                                        <Typography
+                                            variant="overline"
+                                            sx={{
+                                                mt: 1,
+                                                color: 'var(--theme-black)',
+                                                fontWeight: 500,
+                                                fontSize: '0.75rem',
+                                                letterSpacing: '0.025em'
+                                            }}
+                                        >
+                                            {isOnBreakUI ? 'BREAK TIME' : 'WORK DURATION'}
+                                        </Typography>
+                                    </Box>
                                 </Box>
                                 <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
                                     {actionLoading ? ( 
@@ -684,14 +698,14 @@ const EmployeeDashboardPage = () => {
                                         {contextUser.name?.charAt(0) || contextUser.fullName?.charAt(0) || 'U'}
                                     </Typography>
                                 </Avatar>
-                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 'bold', mb: 0.5 }}>{contextUser.fullName || contextUser.name}</Typography>
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
+                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 500, mb: 0.5, letterSpacing: '0.025em' }}>{contextUser.fullName || contextUser.name}</Typography>
+                                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
                                 <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />
-                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 'bold' }} />
-                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
+                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, letterSpacing: '0.025em' }} />
+                                <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary', letterSpacing: '0.025em' }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
                             </Paper>
                             <Paper className="dashboard-card-base shift-info-card">
-                                <Typography variant="h6" gutterBottom className="theme-text-black">Today's Shift</Typography>
+                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Today's Shift</Typography>
                                 <Divider sx={{ mb: 2 }} />
                                 <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1 }}>
                                     {loading ? (
@@ -716,7 +730,7 @@ const EmployeeDashboardPage = () => {
                                 </Box>
                             </Paper>
                             <Paper className="dashboard-card-base saturday-schedule-card" sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" gutterBottom className="theme-text-black">Upcoming Saturdays</Typography>
+                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Upcoming Saturdays</Typography>
                                 <Divider sx={{ mb: 2.5 }} />
                                 <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
                                     {loading ? (
@@ -747,19 +761,19 @@ const EmployeeDashboardPage = () => {
                         >
                             <Tooltip title={!paidBreakCheck.allowed ? paidBreakCheck.message : (hasExhaustedPaidBreak ? 'You have used all your paid break time' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6">Paid Break</Typography><Typography variant="body2" color="text.secondary">{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Paid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
                             
                             <Tooltip title={!unpaidBreakCheck.allowed ? unpaidBreakCheck.message : (hasTakenUnpaidBreak ? 'You have already taken an unpaid break today' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6">Unpaid Break</Typography><Typography variant="body2" color="text.secondary">10 minute break</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Unpaid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>10 minute break</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
 
                             <Tooltip title={!extraBreakCheck.allowed ? extraBreakCheck.message : (hasPendingExtraBreak ? 'Your request is pending' : hasTakenExtraBreak ? 'You have already used an extra break' : '')} arrow placement="left">
                                 <Box component={motion.div} variants={itemVariants}>
-                                    <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6">{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary">{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
                         </Stack>
@@ -767,22 +781,22 @@ const EmployeeDashboardPage = () => {
                 </Dialog>
 
                 <Dialog open={isReasonModalOpen} onClose={handleCloseReasonModal} TransitionComponent={DialogTransition} fullWidth maxWidth="xs">
-                    <DialogTitle>Request Extra Break</DialogTitle>
-                    <DialogContent><Typography variant="body2" sx={{ mb: 2 }}>Please provide a reason for your request. An admin will review it shortly.</Typography><TextField autoFocus margin="dense" id="reason" label="Reason for Break" type="text" fullWidth variant="outlined" multiline rows={3} value={breakReason} onChange={(e) => setBreakReason(e.target.value)} /></DialogContent>
+                    <DialogTitle sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Request Extra Break</DialogTitle>
+                    <DialogContent><Typography variant="body2" sx={{ mb: 2, fontWeight: 400, letterSpacing: '0.025em' }}>Please provide a reason for your request. An admin will review it shortly.</Typography><TextField autoFocus margin="dense" id="reason" label="Reason for Break" type="text" fullWidth variant="outlined" multiline rows={3} value={breakReason} onChange={(e) => setBreakReason(e.target.value)} /></DialogContent>
                     <DialogActions sx={{ p: '16px 24px' }}><Button onClick={handleCloseReasonModal} className="theme-button-checkout">Cancel</Button><Button onClick={handleRequestExtraBreak} variant="contained" className="theme-button-red" disabled={isSubmittingReason}>{isSubmittingReason ? <CircularProgress size={24} /> : "Send Request"}</Button></DialogActions>
                 </Dialog>
 
                 {/* Weekly late warning dialog (informational only) */}
                 <Dialog open={weeklyLateDialog.open} onClose={() => setWeeklyLateDialog({ ...weeklyLateDialog, open: false })} TransitionComponent={DialogTransition} fullWidth maxWidth="xs">
-                    <DialogTitle>Attendance Notice</DialogTitle>
+                    <DialogTitle sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Attendance Notice</DialogTitle>
                     <DialogContent>
-                        <Typography variant="body1" sx={{ mb: 1 }}>You have been late <strong>{weeklyLateDialog.lateCount}</strong> time(s) this week.</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>This is an informational notice. Your account will not be locked automatically.</Typography>
+                        <Typography variant="body1" sx={{ mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>You have been late <strong>{weeklyLateDialog.lateCount}</strong> time(s) this week.</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontWeight: 400, letterSpacing: '0.025em' }}>This is an informational notice. Your account will not be locked automatically.</Typography>
                         {weeklyLateDialog.lateDates && weeklyLateDialog.lateDates.length > 0 && (
                             <Box>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Dates:</Typography>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500, letterSpacing: '0.025em' }}>Dates:</Typography>
                                 <ul>
-                                    {weeklyLateDialog.lateDates.map(d => (<li key={d}><Typography variant="body2">{d}</Typography></li>))}
+                                    {weeklyLateDialog.lateDates.map(d => (<li key={d}><Typography variant="body2" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{d}</Typography></li>))}
                                 </ul>
                             </Box>
                         )}

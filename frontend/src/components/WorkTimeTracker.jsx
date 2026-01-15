@@ -91,11 +91,17 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
     }, [status, calculateWorkTime]);
 
     const TimeBlock = ({ value, label }) => (
-        <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" component="div" sx={{ fontWeight: 600, color: 'var(--theme-black)' }}>
+        <Box sx={{
+            textAlign: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            borderRadius: 1,
+            px: 1.5,
+            py: 0.5
+        }}>
+            <Typography variant="h4" component="div" sx={{ fontWeight: 500, color: 'var(--theme-black)' }}>
                 {formatTimeUnit(value)}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
                 {label}
             </Typography>
         </Box>
@@ -104,9 +110,9 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
     return (
         <Stack direction="row" justifyContent="center" alignItems="center" spacing={1}>
             <TimeBlock value={time.hours} label="Hours" />
-            <Typography variant="h4" sx={{ color: 'text.secondary' }}>:</Typography>
+            <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
             <TimeBlock value={time.minutes} label="Minutes" />
-            <Typography variant="h4" sx={{ color: 'text.secondary' }}>:</Typography>
+            <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
             <TimeBlock value={time.seconds} label="Seconds" />
         </Stack>
     );
