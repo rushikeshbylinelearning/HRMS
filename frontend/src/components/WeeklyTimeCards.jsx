@@ -1,7 +1,7 @@
 // frontend/src/components/WeeklyTimeCards.jsx
 
 import React, { memo } from 'react';
-import { Box, Typography, Paper, Grid } from '@mui/material';
+import { Box, Typography, Paper, Grid, Stack } from '@mui/material';
 import {
   CheckCircleOutline as CheckCircleIcon,
   HighlightOff as HighlightOffIcon,
@@ -84,39 +84,41 @@ const WeeklyTimeCards = ({ logs, shift }) => {
 
     return (
         <Box sx={{ mt: 2 }}>
-            <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
+            <Paper elevation={0} className="weekly-week-card">
                 <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 2, letterSpacing: '0.025em' }}>
                     Your Week
                 </Typography>
-                <Grid container spacing={1}>
+                <Grid container spacing={1.25}>
                     {weekDays.map((day, index) => {
                         const dayString = getLocalDateString(day);
                         const isToday = dayString === todayDateString;
                         const status = getStatusForDay(day);
 
                         return (
-                            <Grid item xs key={index} sx={{ minWidth: '80px' }}>
-                                <Paper 
+                            <Grid item xs key={index}>
+                                <Paper
                                     elevation={isToday ? 3 : 0}
+                                    className="week-day-tile"
                                     sx={{
-                                        p: 1.5,
-                                        textAlign: 'center',
-                                        borderRadius: '10px',
-                                        border: isToday ? '2px solid #3b82f6' : '2px solid transparent',
-                                        transition: 'all 0.2s ease-in-out',
+                                        border: isToday ? '1.5px solid #3b82f6' : '1px solid rgba(148, 163, 184, 0.3)',
                                         backgroundColor: isToday ? '#eff6ff' : '#ffffff',
+                                        boxShadow: isToday ? '0 10px 20px rgba(59, 130, 246, 0.12)' : 'none'
                                     }}
                                 >
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
-                                        {day.toLocaleDateString('en-US', { weekday: 'short' })}
-                                    </Typography>
-                                    <Typography variant="h6" sx={{ fontWeight: 500, my: 0.5, letterSpacing: '0.025em' }}>
-                                        {day.getDate()}
-                                    </Typography>
-                                    <status.Icon sx={{ color: status.color, fontSize: '1.25rem' }} />
-                                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
-                                        {status.text}
-                                    </Typography>
+                                    <Stack spacing={0.35} alignItems="center">
+                                        <Typography className="week-day-name">
+                                            {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                                        </Typography>
+                                        <Typography className="week-day-date">
+                                            {day.getDate()}
+                                        </Typography>
+                                    </Stack>
+                                    <Stack spacing={0.25} alignItems="center" sx={{ mt: 1 }}>
+                                        <status.Icon className="week-day-status-icon" sx={{ color: status.color }} />
+                                        <Typography className="week-day-status-label">
+                                            {status.text}
+                                        </Typography>
+                                    </Stack>
                                 </Paper>
                             </Grid>
                         );
@@ -127,4 +129,4 @@ const WeeklyTimeCards = ({ logs, shift }) => {
     );
 };
 
-export default WeeklyTimeCards;
+export default memo(WeeklyTimeCards);

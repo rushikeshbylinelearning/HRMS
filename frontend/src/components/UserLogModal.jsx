@@ -10,29 +10,27 @@ import WorkIcon from '@mui/icons-material/Work';
 import TimerIcon from '@mui/icons-material/Timer';
 import WatchLaterIcon from '@mui/icons-material/WatchLater';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
+import { formatISTTime, formatISTDate } from '../utils/istTime';
 import '../styles/UserLogModal.css';
 
 // Helper functions
 const formatTimeForDisplay = (dateTime) => {
     if (!dateTime) return '--:--';
-    return new Date(dateTime).toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
+    return formatISTTime(dateTime, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
     });
 };
 
 const formatDateForDisplay = (dateTime) => {
     if (!dateTime) return 'N/A';
-    const date = dateTime instanceof Date ? dateTime : new Date(dateTime);
-    if (isNaN(date.getTime())) return 'N/A';
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayName = dayNames[date.getDay()];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-    return `${dayName}, ${day} ${month} ${year}`;
+    return formatISTDate(dateTime, {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
 };
 
 const formatDuration = (totalMins) => {

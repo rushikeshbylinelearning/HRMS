@@ -1,5 +1,6 @@
 // src/pages/LeavesPage.jsx
 import React, { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -32,6 +33,7 @@ import '../styles/LeavesPage.css';
 
 const LeavesPage = () => {
     const { user } = useAuth();
+    const location = useLocation();
     const employeeType = normalizeEmploymentType(user?.employmentStatus);
     const isPermanentEmployee = employeeType === 'PERMANENT';
     const [myRequests, setMyRequests] = useState([]);
@@ -87,6 +89,14 @@ const LeavesPage = () => {
         { key: 'casual', label: 'Casual Leave', value: Number(leaveBalances.casual ?? 0), icon: <WorkOutlineIcon />, variant: 'casual' },
         { key: 'planned', label: 'Planned Leave', value: Number(leaveBalances.paid ?? 0), icon: <BeachAccessIcon />, variant: 'planned' }
     ], [leaveBalances]);
+
+    const holidayEntries = useMemo(() => {
+        if (!Array.isArray(holidays)) return [];
+        return holidays.filter(holiday => {
+            const name = holiday?.name;
+            return typeof name === 'string' && name.trim().length > 0;
+        });
+    }, [holidays]);
     
 
     const fetchPageDataRef = useRef(null);
@@ -135,7 +145,9 @@ const LeavesPage = () => {
         );
     }, [myRequests]);
 
-    useEffect(() => { fetchPageData(); }, [fetchPageData]);
+    useEffect(() => {
+        fetchPageData();
+    }, [fetchPageData, location.pathname]);
     
     // POLLING REMOVED: Socket events + visibility change provide real-time updates
     useEffect(() => {
@@ -668,16 +680,17 @@ const LeavesPage = () => {
                     <div className="leave-card-title">Company Holidays</div>
                     <div className="leave-card-body">
                         <ul className="holiday-list">
-                            {holidays && holidays.length > 0 ? (
-                                holidays.map((holiday, idx) => {
+                            {holidayEntries.length > 0 ? (
+                                holidayEntries.map((holiday, idx) => {
                                     const isTentative = !holiday.date || holiday.isTentative;
+                                    const holidayLabel = ((holiday.name || holiday.day) ?? 'Holiday').trim();
                                     return (
                                         <li key={holiday._id || idx} className="holiday-item">
                                             <span className="holiday-icon">
                                                 {holidayIconFor(holiday)}
                                             </span>
                                             <span className="holiday-content">
-                                                <span className="holiday-name">{holiday.name}</span>
+                                                <span className="holiday-name">{holidayLabel}</span>
                                                 <span className="holiday-date">
                                                     {formatPrettyDate(holiday.date, isTentative)}
                                                 </span>
@@ -686,6 +699,13 @@ const LeavesPage = () => {
                                         </li>
                                     );
                                 })
+                            ) : loading ? (
+                                <li className="holiday-item empty-byte">
+                                    <span className="holiday-content">
+                                        <Skeleton variant="text" width={140} height={24} />
+                                        <Skeleton variant="text" width={100} height={18} sx={{ mt: 0.5 }} />
+                                    </span>
+                                </li>
                             ) : (
                                 <li className="holiday-item empty-byte">
                                     <span className="holiday-content">

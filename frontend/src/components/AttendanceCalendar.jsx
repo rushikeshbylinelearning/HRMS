@@ -33,7 +33,7 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
             : 'Leave';
 
     const lateMinutes = Number(day.log?.lateMinutes || 0);
-    const isLateHalfDay = day.status === 'half-day' && lateMinutes > 0;
+    const isLateHalfDay = day.status === 'half-day' && day.log?.halfDayReasonCode === 'LATE_LOGIN';
 
     const dayData = {
         log: day.log,

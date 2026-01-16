@@ -8,6 +8,7 @@ const { parseISTDate } = require('../utils/istTime');
 const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
 const { countWorkingDaysInDateRange } = require('../utils/dateUtils');
 const { getApprovedLeaveMapBulk } = require('./leaveSummaryCoreService');
+const { getGracePeriod } = require('./gracePeriodCache');
 
 const VALID_SATURDAY_POLICIES = ['Week 1 & 3 Off', 'Week 2 & 4 Off', 'All Saturdays Working', 'All Saturdays Off'];
 
@@ -135,7 +136,7 @@ async function fetchAttendanceInputsBulk({ employeeIds, startDate, endDate, incl
   };
 }
 
-function buildResolvedAttendanceLogs({ startDate, endDate, saturdayPolicy, logsMap, holidays, leaveMap }) {
+function buildResolvedAttendanceLogs({ startDate, endDate, saturdayPolicy, logsMap, holidays, leaveMap, gracePeriodMinutes = 30 }) {
   const dateRange = generateDateRange(startDate, endDate);
 
   return dateRange.map(attendanceDate => {
@@ -147,7 +148,8 @@ function buildResolvedAttendanceLogs({ startDate, endDate, saturdayPolicy, logsM
       attendanceLog: log,
       holidays: holidays || [],
       leaveRequest,
-      saturdayPolicy
+      saturdayPolicy,
+      gracePeriodMinutes
     });
 
     const result = {
@@ -218,6 +220,7 @@ function buildResolvedAttendanceLogs({ startDate, endDate, saturdayPolicy, logsM
         const lastSession = sessionsWithEnd[sessionsWithEnd.length - 1];
         result.lastOut = lastSession.endTime;
       }
+      result.sessions = sortedSessions;
     }
 
     return result;
@@ -234,6 +237,16 @@ async function computeAttendanceSummaryBulk({ employeeIds, startDate, endDate, i
   const ids = (employeeIds || []).filter(Boolean).map(id => id.toString());
   const result = new Map();
   if (ids.length === 0) return result;
+
+  let gracePeriodMinutes = 30;
+  try {
+    const graceValue = await getGracePeriod();
+    if (typeof graceValue === 'number' && !isNaN(graceValue) && graceValue >= 0) {
+      gracePeriodMinutes = graceValue;
+    }
+  } catch (graceError) {
+    console.error('[Summary] Failed to load grace period setting, defaulting to 30 minutes', graceError);
+  }
 
   const perEmployeeStart = startDateByEmployeeId && typeof startDateByEmployeeId === 'object'
     ? new Map(Object.entries(startDateByEmployeeId).map(([k, v]) => [k.toString(), v]))
@@ -264,7 +277,8 @@ async function computeAttendanceSummaryBulk({ employeeIds, startDate, endDate, i
         saturdayPolicy,
         logsMap,
         holidays,
-        leaveMap
+        leaveMap,
+        gracePeriodMinutes
       });
 
       const userStartDate = perEmployeeStart?.get(userId) || startDate;

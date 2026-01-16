@@ -13,6 +13,7 @@ const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDatePart
 const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
 const { batchFetchLeaves } = require('./leaveCache');
 const Holiday = require('../models/Holiday');
+const { getGracePeriod } = require('./gracePeriodCache');
 
 // --- CONFIGURATION (from .env) ---
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
@@ -101,6 +102,15 @@ const checkProbationAndInternshipEndings = async () => {
         }
 
         const today = startOfISTDay();
+        let gracePeriodMinutes = 30;
+        try {
+            const graceValue = await getGracePeriod();
+            if (typeof graceValue === 'number' && !isNaN(graceValue) && graceValue >= 0) {
+                gracePeriodMinutes = graceValue;
+            }
+        } catch (graceError) {
+            console.error('[CRON] Failed to load late grace setting, defaulting to 30 minutes', graceError);
+        }
 
         const targetUsers = await User.find({
             isActive: true,
@@ -208,7 +218,8 @@ const checkProbationAndInternshipEndings = async () => {
                         attendanceLog: log,
                         holidays: holidays || [],
                         leaveRequest,
-                        saturdayPolicy
+                        saturdayPolicy,
+                        gracePeriodMinutes
                     });
 
                     if (statusInfo.isLeave) {

@@ -691,18 +691,34 @@ const EmployeeDashboardPage = () => {
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base profile-card">
-                                <Avatar 
-                                    className="profile-avatar"
-                                >
-                                    <Typography className="profile-avatar-letter">
-                                        {contextUser.name?.charAt(0) || contextUser.fullName?.charAt(0) || 'U'}
-                                    </Typography>
-                                </Avatar>
-                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 500, mb: 0.5, letterSpacing: '0.025em' }}>{contextUser.fullName || contextUser.name}</Typography>
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
-                                <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />
-                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, letterSpacing: '0.025em' }} />
-                                <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary', letterSpacing: '0.025em' }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
+                                <Box className="profile-card-inner">
+                                    <Avatar className="profile-avatar">
+                                        <Typography className="profile-avatar-letter">
+                                            {contextUser.name?.charAt(0) || contextUser.fullName?.charAt(0) || 'U'}
+                                        </Typography>
+                                    </Avatar>
+                                    <Stack spacing={1} alignItems="center" className="profile-details-stack">
+                                        <Typography variant="h6" className="profile-card-name theme-text-black">
+                                            {contextUser.fullName || contextUser.name}
+                                        </Typography>
+                                        <Typography variant="body2" className="profile-card-code">
+                                            Employee Code: {contextUser.employeeCode || 'N/A'}
+                                        </Typography>
+                                        <Divider className="profile-card-divider" />
+                                        <Chip
+                                            label={contextUser.designation || contextUser.role || 'Employee'}
+                                            size="small"
+                                            className="profile-card-role-badge"
+                                        />
+                                        <Typography variant="body2" className="profile-card-date">
+                                            {new Date().toLocaleDateString('en-US', {
+                                                month: 'long',
+                                                day: 'numeric',
+                                                year: 'numeric'
+                                            })}
+                                        </Typography>
+                                    </Stack>
+                                </Box>
                             </Paper>
                             <Paper className="dashboard-card-base shift-info-card">
                                 <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Today's Shift</Typography>

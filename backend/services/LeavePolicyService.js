@@ -419,7 +419,7 @@ class LeavePolicyService {
         if (requestType === 'Loss of Pay') {
             return { allowed: true };
         }
-
+        
         // PRIORITY 3: Casual Leave >10 days advance - SKIP ALL weekday restrictions
         if (requestType === 'Casual' && daysDiff > 10) {
             return { allowed: true };

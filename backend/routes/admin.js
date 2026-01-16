@@ -1472,10 +1472,10 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                         localField: 'attendanceLog',
                         foreignField: '_id',
                         as: 'attendanceLogInfo',
-                        pipeline: [
-                            { $match: { attendanceDate: today } },
-                            { $project: { user: 1, attendanceDate: 1 } }
-                        ]
+                pipeline: [
+                    { $match: { attendanceDate: today } },
+                    { $project: { user: 1, attendanceDate: 1, clockInTime: 1 } }
+                ]
                     }
                 },
                 { $unwind: '$attendanceLogInfo' },
@@ -1483,7 +1483,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 {
                     $group: {
                         _id: '$attendanceLogInfo.user',
-                        startTime: { $first: '$startTime' }
+                startTime: { $first: '$attendanceLogInfo.clockInTime' }
                     }
                 },
                 {

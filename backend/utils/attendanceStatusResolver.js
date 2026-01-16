@@ -17,6 +17,7 @@
 
 const { parseISTDate, getISTDateString, getISTDateParts } = require('./istTime');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
+const DEFAULT_GRACE_PERIOD_MINUTES = 30;
 
 /**
  * Check if a date is a holiday
@@ -95,7 +96,8 @@ function resolveAttendanceStatus({
     attendanceLog = null,
     holidays = [],
     leaveRequest = null,
-    saturdayPolicy = 'All Saturdays Working'
+    saturdayPolicy = 'All Saturdays Working',
+    gracePeriodMinutes = DEFAULT_GRACE_PERIOD_MINUTES
 }) {
     // Defensive validation
     if (!attendanceDate) {
@@ -112,6 +114,12 @@ function resolveAttendanceStatus({
     const date = parseISTDate(attendanceDate);
     const dateStr = getISTDateString(date);
     
+    const effectiveGraceMinutes = (
+        typeof gracePeriodMinutes === 'number' &&
+        !isNaN(gracePeriodMinutes) &&
+        gracePeriodMinutes >= 0
+    ) ? gracePeriodMinutes : DEFAULT_GRACE_PERIOD_MINUTES;
+
     // Initialize flags
     let status = 'Absent'; // Default
     let isWorkingDay = true;
@@ -273,7 +281,7 @@ function resolveAttendanceStatus({
                         halfDayReasonCode = attendanceLog.halfDayReasonCode || null;
                     } else {
                         // Fallback: Calculate reason if not persisted (legacy records)
-                        if (attendanceLog.lateMinutes > 0) {
+                        if (attendanceLog.lateMinutes > effectiveGraceMinutes) {
                             halfDayReason = `Late arrival (${Math.round(attendanceLog.lateMinutes)} minutes late)`;
                             halfDayReasonCode = 'LATE_LOGIN';
                         } else if (attendanceLog.autoLogoutReason) {

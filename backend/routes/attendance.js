@@ -86,10 +86,11 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         
         let attendanceLog = todayLog;
         if (!attendanceLog) {
+            const clockInTime = getISTNow();
             attendanceLog = await AttendanceLog.create({
                 user: userId,
                 attendanceDate: todayStr,
-                clockInTime: getISTNow(),
+                clockInTime,
                 shiftDurationMinutes: user.shiftGroup.durationHours * 60,
                 penaltyMinutes: 0,
                 paidBreakMinutesTaken: 0,
@@ -97,122 +98,129 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             });
         }
         
+        const currentTime = getISTNow();
         const activeSession = await AttendanceSession.findOne({ attendanceLog: attendanceLog._id, endTime: null });
         if (activeSession) { return res.status(400).json({ error: 'You are already clocked in.' }); }
         
         const newSession = await AttendanceSession.create({ 
             attendanceLog: attendanceLog._id, 
-            startTime: getISTNow() 
+            startTime: currentTime 
         });
 
-        // --- ANALYTICS: Check for late login and update status ---
-        const clockInTime = getISTNow();
-        
-        // Use the proper timezone-aware function to get shift start time
-        const shiftStartTime = getShiftDateTimeIST(clockInTime, user.shiftGroup.startTime);
-        
-        const lateMinutes = Math.max(0, Math.floor((clockInTime - shiftStartTime) / (1000 * 60)));
-        
-        let isLate = false;
-        let isHalfDay = false;
-        let attendanceStatus = 'On-time';
-
-        // Grace period: configurable via cached setting (1-hour TTL)
-        let GRACE_PERIOD_MINUTES = 30;
-        try {
-            GRACE_PERIOD_MINUTES = await getGracePeriod();
-        } catch (err) {
-            console.error('Failed to fetch grace period from cache, using default 30', err);
-        }
-        console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes})`);
-
-        // Consistent rules:
-        // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
-        // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day AND Late (for tracking/notifications)
-        // Grace period allows employees to arrive late without penalty
-        let halfDayReasonCode = null;
-        let halfDayReasonText = '';
-        let halfDaySource = null;
-        
-        if (lateMinutes <= GRACE_PERIOD_MINUTES) {
-            isLate = false;
-            isHalfDay = false;
-            attendanceStatus = 'On-time';
-            // Clear half-day reason if not half-day
-            halfDayReasonCode = null;
-            halfDayReasonText = '';
-            halfDaySource = null;
-        } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
-            isHalfDay = true;
-            isLate = true; // FIX: Set isLate=true for tracking and notifications
-            attendanceStatus = 'Half-day';
-            // Set half-day reason for late login
-            halfDayReasonCode = 'LATE_LOGIN';
-            const clockInTimeStr = formatISTTime(clockInTime, { hour12: true, hour: '2-digit', minute: '2-digit' });
-            halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
-            halfDaySource = 'AUTO';
-        }
-
-        // Update the attendance log with analytics data and half-day reason
-        const updateData = {
-            isLate,
-            isHalfDay,
-            lateMinutes,
-            attendanceStatus
+        const isFirstCheckInEvent = !todayLog || !todayLog.clockInTime;
+        let computedAnalytics = {
+            isLate: attendanceLog.isLate || false,
+            isHalfDay: attendanceLog.isHalfDay || false,
+            lateMinutes: attendanceLog.lateMinutes || 0,
+            attendanceStatus: attendanceLog.attendanceStatus || 'On-time'
         };
-        
-        // Only update half-day reason fields if half-day is true
-        if (isHalfDay) {
-            updateData.halfDayReasonCode = halfDayReasonCode;
-            updateData.halfDayReasonText = halfDayReasonText;
-            updateData.halfDaySource = halfDaySource;
-            // Clear override fields if auto-marking as half-day (new auto determination)
-            if (!attendanceLog.overriddenByAdmin) {
-                updateData.overriddenByAdmin = false;
-                updateData.overriddenAt = null;
-                updateData.overriddenBy = null;
-            }
-        } else {
-            // Clear half-day reason if not half-day (unless admin overridden)
-            if (!attendanceLog.overriddenByAdmin) {
-                updateData.halfDayReasonCode = null;
-                updateData.halfDayReasonText = '';
-                updateData.halfDaySource = null;
-            }
-        }
-        
-        await AttendanceLog.findByIdAndUpdate(attendanceLog._id, updateData);
-
-        // Track late login for weekly monitoring
-        // PHASE 2 OPTIMIZATION: Parallelize late tracking queries
         let weeklyLateInfo = null;
-        if (isLate) {
+        let halfDayReasonMessage = attendanceLog.halfDayReasonText || null;
+
+        if (isFirstCheckInEvent) {
+            const clockInTime = attendanceLog.clockInTime || currentTime;
+            const shiftStartTime = getShiftDateTimeIST(clockInTime, user.shiftGroup.startTime);
+            const lateMinutes = Math.max(0, Math.floor((clockInTime - shiftStartTime) / (1000 * 60)));
+
+            let isLate = false;
+            let isHalfDay = false;
+            let attendanceStatus = 'On-time';
+
+            let GRACE_PERIOD_MINUTES = 30;
             try {
-                const { trackLateLogin, getWeeklyLateStats } = require('../services/weeklyLateTrackingService');
-                // Parallelize tracking and stats fetch
-                const [trackingRecord, stats] = await Promise.all([
-                    trackLateLogin(userId, todayStr),
-                    getWeeklyLateStats(userId)
-                ]);
-                weeklyLateInfo = {
-                    currentWeekLateCount: stats.currentWeekLateCount,
-                    lateDates: stats.lateDates
-                };
-            } catch (error) {
-                console.error('Error tracking late login:', error);
-                // Don't fail the clock-in if tracking fails
+                GRACE_PERIOD_MINUTES = await getGracePeriod();
+            } catch (err) {
+                console.error('Failed to fetch grace period from cache, using default 30', err);
+            }
+            console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes})`);
+
+            let halfDayReasonCode = null;
+            let halfDayReasonText = '';
+            let halfDaySource = null;
+            
+            if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+                isLate = false;
+                isHalfDay = false;
+                attendanceStatus = 'On-time';
+                halfDayReasonCode = null;
+                halfDayReasonText = '';
+                halfDaySource = null;
+            } else {
+                isHalfDay = true;
+                isLate = true;
+                attendanceStatus = 'Half-day';
+                halfDayReasonCode = 'LATE_LOGIN';
+                const clockInTimeStr = formatISTTime(clockInTime, { hour12: true, hour: '2-digit', minute: '2-digit' });
+                halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
+                halfDaySource = 'AUTO';
+            }
+
+            const updateData = {
+                isLate,
+                isHalfDay,
+                lateMinutes,
+                attendanceStatus
+            };
+
+            if (!attendanceLog.clockInTime) {
+                updateData.clockInTime = currentTime;
+            }
+
+            if (isHalfDay) {
+                updateData.halfDayReasonCode = halfDayReasonCode;
+                updateData.halfDayReasonText = halfDayReasonText;
+                updateData.halfDaySource = halfDaySource;
+                if (!attendanceLog.overriddenByAdmin) {
+                    updateData.overriddenByAdmin = false;
+                    updateData.overriddenAt = null;
+                    updateData.overriddenBy = null;
+                }
+            } else {
+                if (!attendanceLog.overriddenByAdmin) {
+                    updateData.halfDayReasonCode = null;
+                    updateData.halfDayReasonText = '';
+                    updateData.halfDaySource = null;
+                }
+            }
+
+            await AttendanceLog.findByIdAndUpdate(attendanceLog._id, updateData);
+
+            computedAnalytics = {
+                isLate,
+                isHalfDay,
+                lateMinutes,
+                attendanceStatus
+            };
+            halfDayReasonMessage = isHalfDay ? halfDayReasonText : (attendanceLog.halfDayReasonText || null);
+
+            if (isLate) {
+                try {
+                    const { trackLateLogin, getWeeklyLateStats } = require('../services/weeklyLateTrackingService');
+                    const [trackingRecord, stats] = await Promise.all([
+                        trackLateLogin(userId, todayStr),
+                        getWeeklyLateStats(userId)
+                    ]);
+                    weeklyLateInfo = {
+                        currentWeekLateCount: stats.currentWeekLateCount,
+                        lateDates: stats.lateDates
+                    };
+                } catch (error) {
+                    console.error('Error tracking late login:', error);
+                }
             }
         }
 
-        // Send email notification if late
-        if (isLate) {
+        const finalClockInTime = attendanceLog.clockInTime || currentTime;
+        const responseAnalytics = computedAnalytics;
+
+        if (responseAnalytics.isLate) {
             try {
                 const { sendLateLoginNotification } = require('../services/analyticsEmailService');
                 sendLateLoginNotification(user, {
                     attendanceDate: todayStr,
-                    clockInTime: clockInTime,
-                    lateMinutes: lateMinutes,
-                    isHalfDay: isHalfDay
+                    clockInTime: finalClockInTime,
+                    lateMinutes: responseAnalytics.lateMinutes,
+                    isHalfDay: responseAnalytics.isHalfDay
                 }).catch(err => {
                     console.error('Error sending late login notification:', err);
                 });
@@ -220,36 +228,17 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
                 console.error('Error sending late login notification:', error);
             }
         }
-        
-        // --- NOTIFICATION ---
-        // Notify admins about user clock-in using the new service
-        NewNotificationService.notifyCheckIn(userId, user.fullName)
-            .catch(err => console.error('Error sending clock-in notification to admins:', err));
-        
-        // Send confirmation notification to the user
-        NewNotificationService.createAndEmitNotification({
-            message: `You have successfully clocked in at ${formatISTTime(clockInTime, { hour12: true })}.`,
-            type: 'success',
-            userId,
-            userName: user.fullName,
-            recipientType: 'user',
-            category: 'attendance',
-            priority: 'medium',
-        }).catch(err => console.error('Error sending clock-in confirmation to user:', err));
-        
+
+        if (!responseAnalytics.isLate) {
+            weeklyLateInfo = null;
+        }
+
         const responsePayload = { 
             message: 'Clocked in successfully!', 
             session: newSession,
-            analytics: {
-                isLate,
-                isHalfDay,
-                lateMinutes,
-                attendanceStatus
-            }
+            analytics: responseAnalytics
         };
 
-        // If weeklyLateInfo indicates user has been late 3 or more times this week,
-        // include a flag so frontend can show a warning popup (do NOT lock the account).
         if (weeklyLateInfo && weeklyLateInfo.currentWeekLateCount >= 3) {
             responsePayload.weeklyLateWarning = {
                 showPopup: true,
@@ -258,31 +247,39 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             };
         }
 
+        // --- NOTIFICATION ---
+        NewNotificationService.notifyCheckIn(userId, user.fullName)
+            .catch(err => console.error('Error sending clock-in notification to admins:', err));
+        
+        NewNotificationService.createAndEmitNotification({
+            message: `You have successfully clocked in at ${formatISTTime(finalClockInTime, { hour12: true })}.`,
+            type: 'success',
+            userId,
+            userName: user.fullName,
+            recipientType: 'user',
+            category: 'attendance',
+            priority: 'medium',
+        }).catch(err => console.error('Error sending clock-in confirmation to user:', err));
+        
         // PHASE 4 OPTIMIZATION: Cache invalidation on mutation
-        // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${todayStr}`;
         cache.delete(cacheKey);
-        // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
-        // PERFORMANCE OPTIMIZATION: Invalidate status cache
         invalidateStatus(userId, todayStr);
-        // Ensure Admin Dashboard cache refreshes after clock-in
         cacheService.invalidateDashboard(todayStr);
 
-        // Emit Socket.IO event for real-time updates (replaces polling)
         try {
             const { getIO } = require('../socketManager');
             const io = getIO();
             if (io) {
-                // PERFORMANCE OPTIMIZATION: Minimal payload for real-time updates
                 io.emit('attendance_log_updated', {
                     logId: attendanceLog._id,
                     userId: userId,
                     attendanceDate: todayStr,
-                    attendanceStatus: attendanceStatus,
-                    isHalfDay: isHalfDay,
-                    isLate: isLate,
-                    halfDayReasonText: halfDayReasonText,
+                    attendanceStatus: responseAnalytics.attendanceStatus,
+                    isHalfDay: responseAnalytics.isHalfDay,
+                    isLate: responseAnalytics.isLate,
+                    halfDayReasonText: halfDayReasonMessage,
                     timestamp: getISTNow().toISOString(),
                     message: `${user.fullName} clocked in`
                 });
@@ -290,7 +287,6 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
-            // Don't fail the main request if Socket.IO fails
         }
 
         res.status(201).json(responsePayload);

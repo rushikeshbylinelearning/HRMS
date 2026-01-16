@@ -29,20 +29,26 @@ import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { normalizeSession, validateSessionDuration, createNormalizedDateTime } from '../utils/timeNormalization';
+import { formatISTTime, formatISTDate, getISTDateString, parseISTDate } from '../utils/istTime';
 import '../styles/LogDetailModal.css';
 
 // --- SHARED HELPER FUNCTIONS ---
 const formatTimeForDisplay = (dateTime) => {
     if (!dateTime) return '--:--';
-    return new Date(dateTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return formatISTTime(dateTime, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
 };
 
 const formatTimeToHHMM = (dateTime) => {
     if (!dateTime) return '';
-    const dateObj = new Date(dateTime);
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+    return formatISTTime(dateTime, {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 };
 
 const formatDuration = (totalMins) => {
@@ -60,14 +66,12 @@ const formatDurationShort = (totalMins) => {
 
 const formatDateForDisplay = (dateTime) => {
     if (!dateTime) return 'N/A';
-    const date = new Date(dateTime);
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayName = dayNames[date.getDay()];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-    return `${dayName}, ${day} ${month} ${year}`;
+    return formatISTDate(dateTime, {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
 };
 
 const calculateEventDuration = (startTime, endTime, now = null) => {
@@ -121,8 +125,20 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     if (!log && !holiday && !leave) return null;
     if (log && !editableLog) return null;
 
-    const fullDateStr = date.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
-    const dateForApi = log ? date.toLocaleDateString('en-CA') : null;
+    const dateObj = date instanceof Date ? date : (date ? new Date(date) : null);
+    const fullDateStr = dateObj ? formatDateForDisplay(dateObj) : 'Log Details';
+    const dateForApi = dateObj ? getISTDateString(dateObj) : null;
+
+    const buildISTDateTime = (timeStr) => {
+        if (!dateForApi || !timeStr) return null;
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+        return dayjs(parseISTDate(dateForApi))
+            .hour(hours)
+            .minute(minutes)
+            .second(0)
+            .millisecond(0);
+    };
 
     const handleSessionChange = (id, field, value) => {
         const updatedSessions = editableLog.sessions.map(s => {
@@ -132,8 +148,11 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         return { ...s, [field]: null };
                     }
 
-                    // Create datetime from base date and time
-                    let newDateTime = dayjs(`${dateForApi}T${value}`);
+                    const buildTime = buildISTDateTime(value);
+                    if (!buildTime) {
+                        return { ...s, [field]: null };
+                    }
+                    let newDateTime = buildTime;
 
                     // If updating endTime, check if it should be next day
                     if (field === 'endTime' && s.startTime) {
@@ -173,8 +192,11 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         return { ...b, [field]: null };
                     }
 
-                    // Create datetime from base date and time
-                    let newDateTime = dayjs(`${dateForApi}T${value}`);
+                    const buildTime = buildISTDateTime(value);
+                    if (!buildTime) {
+                        return { ...b, [field]: null };
+                    }
+                    let newDateTime = buildTime;
 
                     // If updating endTime, check if it should be next day
                     if (field === 'endTime' && b.startTime) {
@@ -201,20 +223,24 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     };
 
     const addSession = () => {
+        const start = buildISTDateTime('09:00');
+        const end = buildISTDateTime('17:00');
         const newSession = {
             _id: uuidv4(),
-            startTime: new Date(`${dateForApi}T09:00:00`).toISOString(),
-            endTime: new Date(`${dateForApi}T17:00:00`).toISOString()
+            startTime: start ? start.toISOString() : null,
+            endTime: end ? end.toISOString() : null
         };
         setEditableLog(prev => ({ ...prev, sessions: [...prev.sessions, newSession] }));
     };
     
     const addBreak = () => {
+        const start = buildISTDateTime('12:00');
+        const end = buildISTDateTime('13:00');
         const newBreak = {
             _id: uuidv4(),
             breakType: 'Paid',
-            startTime: new Date(`${dateForApi}T12:00:00`).toISOString(),
-            endTime: new Date(`${dateForApi}T13:00:00`).toISOString()
+            startTime: start ? start.toISOString() : null,
+            endTime: end ? end.toISOString() : null
         };
         setEditableLog(prev => ({ ...prev, breaks: [...(Array.isArray(prev.breaks) ? prev.breaks : []), newBreak] }));
     };
