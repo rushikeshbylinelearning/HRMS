@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" /> <!-- Changed to .ico as used in the component -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- OPTIMIZATION: Pre-connect to Google Fonts servers to speed up font loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- OPTIMIZATION: Preload the main background image only if it will be used immediately -->
+    <!-- Removed preload to avoid unused resource warning -->
+    
+    <!-- Original Google Fonts link with display=swap to prevent text blocking -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <title>Byline People</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
