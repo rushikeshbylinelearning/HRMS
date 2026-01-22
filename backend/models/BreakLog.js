@@ -13,10 +13,4 @@ const breakLogSchema = new mongoose.Schema({
   isAutoBreak: { type: Boolean, default: false },
 }, { timestamps: true });
 
-// Admin Dashboard query alignment: join by attendanceLog and active-break lookup
-breakLogSchema.index({ attendanceLog: 1 }, { background: true });
-breakLogSchema.index({ endTime: 1 }, { background: true });
-// Fast, deterministic lookup for "most recent active break for a user"
-breakLogSchema.index({ userId: 1, endTime: 1, startTime: -1 }, { background: true });
-
 module.exports = mongoose.model('BreakLog', breakLogSchema);

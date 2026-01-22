@@ -1,57 +1,19 @@
 // src/pages/LeavesPage.jsx
 import React, { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
-import { Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
+import { Typography, Button, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
+import { ArrowForward as ForwardIcon, CalendarToday, AccessTime, DateRange, Info, Cancel, Description, WorkOutline, BeachAccess, AttachMoney, Sick, CheckCircle, Pending, Close } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
-import CelebrationIcon from '@mui/icons-material/Celebration';
-import FestivalIcon from '@mui/icons-material/Festival';
-import TempleHinduIcon from '@mui/icons-material/TempleHindu';
-import MosqueIcon from '@mui/icons-material/Mosque';
-import ChurchIcon from '@mui/icons-material/Church';
-import EventIcon from '@mui/icons-material/Event';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import SickIcon from '@mui/icons-material/Sick';
-import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
-import BeachAccessIcon from '@mui/icons-material/BeachAccess';
-import InfoIcon from '@mui/icons-material/Info';
-import DateRangeIcon from '@mui/icons-material/DateRange';
-import DescriptionIcon from '@mui/icons-material/Description';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PendingIcon from '@mui/icons-material/Pending';
-import CloseIcon from '@mui/icons-material/Close';
-import ForwardIcon from '@mui/icons-material/Forward';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { Calendar, Plus, FileText, Heart, Umbrella, Calendar as CalendarIcon, XCircle, Clock } from 'lucide-react';
 import LeaveRequestForm from '../components/LeaveRequestForm';
+import SaturdaySchedule from '../components/SaturdaySchedule';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { normalizeEmploymentType } from '../utils/leaveTypePolicy';
 import socket from '../socket';
 import '../styles/LeavesPage.css';
-import { CardSkeleton, TableSkeleton } from '../components/SkeletonLoaders';
+import { CardSkeletonLoader, TableSkeleton, LeavesPageSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
+import PageHeroHeader from '../components/PageHeroHeader';
 
-// Reusable component for the small rounded balance boxes
-const BalanceBox = ({ title, balance, icon }) => (
-    <Paper elevation={3} className="balance-box">
-        <Box className="balance-icon-wrapper">
-            {icon}
-        </Box>
-        <Typography className="balance-value">{balance}</Typography>
-        <Typography className="balance-title">{title}</Typography>
-    </Paper>
-);
-
-// Reusable component for the large rectangular content cards
-const ContentCard = ({ title, children }) => (
-    <Paper elevation={3} className="content-card">
-        <Typography variant="h6" className="content-card-title">{title}</Typography>
-        <Box className="scrollable-content">
-            {children}
-        </Box>
-    </Paper>
-);
 
 const LeavesPage = () => {
     const { user } = useAuth();
@@ -363,144 +325,81 @@ const LeavesPage = () => {
         Pending: 'status-chip-pending',
     };
 
-    // Holiday icon chooser based on type/category/name
-    const holidayIconFor = (holiday) => {
-        const key = String(holiday?.type || holiday?.category || holiday?.name || '').toLowerCase();
-        if (key.includes('diwali') || key.includes('navratri') || key.includes('hindu')) return <TempleHinduIcon />;
-        if (key.includes('eid') || key.includes('ramzan') || key.includes('islam')) return <MosqueIcon />;
-        if (key.includes('christmas') || key.includes('good friday') || key.includes('church')) return <ChurchIcon />;
-        if (key.includes('new year') || key.includes('celebration')) return <CelebrationIcon />;
-        if (key.includes('festival')) return <FestivalIcon />;
-        return <EventIcon />;
-    };
 
-    // Helpers mirroring SaturdaySchedule.jsx logic
-    const getNthDayOfMonth = (date, dayOfWeek, n) => {
-        const newDate = new Date(date.getTime());
-        newDate.setDate(1);
-        const firstDay = newDate.getDay();
-        let day = dayOfWeek - firstDay + 1;
-        if (day <= 0) day += 7;
-        const nthDate = day + (n - 1) * 7;
-        const lastDay = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate();
-        if (nthDate > lastDay) return null;
-        newDate.setDate(nthDate);
-        return newDate;
-    };
-
-    const saturdaySchedule = useMemo(() => {
-        const approvedRequestsMap = new Map();
-        if (myRequests) {
-            myRequests.forEach(req => {
-                if (req.status === 'Approved' && req.leaveDates && req.leaveDates[0]) {
-                    // Fix: Use the date directly if it's already in YYYY-MM-DD format
-                    // to avoid timezone conversion issues
-                    const dateKey = typeof req.leaveDates[0] === 'string' && req.leaveDates[0].includes('-') 
-                        ? req.leaveDates[0] 
-                        : new Date(req.leaveDates[0]).toISOString().split('T')[0];
-                    approvedRequestsMap.set(dateKey, req);
-                }
-            });
-        }
-        const schedule = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        let monthOffset = 0;
-        const count = 6;
-        const policy = user?.alternateSaturdayPolicy;
-        while (schedule.length < count) {
-            const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-            for (let n = 1; n <= 5; n++) {
-                const sat = getNthDayOfMonth(targetDate, 6, n);
-                if (sat && sat >= today && schedule.length < count) {
-                    const dateString = sat.toISOString().split('T')[0];
-                    const weekNum = n;
-                    let finalStatus;
-                    const approvedRequest = approvedRequestsMap.get(dateString);
-                    if (approvedRequest) {
-                        finalStatus = `${formatLeaveRequestType(approvedRequest.requestType) || 'Leave'} Approved`;
-                    } else {
-                        let isWorkingDay = true;
-                        if (policy === 'All Saturdays Off') {
-                            isWorkingDay = false;
-                        } else if (policy === 'Week 1 & 3 Off' && (weekNum === 1 || weekNum === 3)) {
-                            isWorkingDay = false;
-                        } else if (policy === 'Week 2 & 4 Off' && (weekNum === 2 || weekNum === 4)) {
-                            isWorkingDay = false;
-                        }
-                        finalStatus = isWorkingDay ? 'Working' : 'Off';
-                    }
-                    schedule.push({ date: sat, status: finalStatus });
-                }
-            }
-            monthOffset++;
-            if (monthOffset > 12) break;
-        }
-        return schedule;
-    }, [user?.alternateSaturdayPolicy, myRequests]);
 
     if (loading) {
-        return (
-            <div className="leaves-page-redesigned">
-                <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    {[1, 2, 3].map((i) => (
-                        <Paper key={i} elevation={3} sx={{ p: 3, flex: '1 1 200px', minWidth: 200, maxWidth: 300 }}>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                <Skeleton variant="circular" width={40} height={40} sx={{ mb: 1 }} />
-                                <Skeleton variant="text" width={60} height={32} sx={{ mb: 0.5 }} />
-                                <Skeleton variant="text" width={100} height={20} />
-                            </Box>
-                        </Paper>
-                    ))}
-                </Box>
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={8}>
-                        <Paper elevation={3} sx={{ p: 2 }}>
-                            <Skeleton variant="text" width="40%" height={32} sx={{ mb: 2 }} />
-                            <TableSkeleton rows={5} columns={5} minHeight="400px" />
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <CardSkeleton count={2} minHeight="400px" />
-                    </Grid>
-                </Grid>
-            </div>
-        );
+        return <LeavesPageSkeleton />;
     }
 
     return (
         <div className="leaves-page-redesigned">
             {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
 
-            {/* Header Bar */}
-            <Box className="leaves-header-bar">
-                <Box className="header-title-wrapper">
-                    <CalendarTodayIcon className="header-icon" />
-                    <Typography variant="h6" className="page-title">Leave Management</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Button className="apply-leave-button" onClick={handleOpenModal} startIcon={<AddCircleOutlineIcon />}>
+            {/* Page Hero Header */}
+            <PageHeroHeader
+                eyebrow="Employee Portal"
+                title="Leave Management"
+                description="Manage your leave requests and view your leave balance"
+                icon={<Calendar size={32} />}
+                actionArea={
+                    <Button 
+                        variant="contained" 
+                        startIcon={<Plus size={18} />}
+                        onClick={handleOpenModal}
+                        sx={{
+                            backgroundColor: '#FF4757',
+                            color: 'white',
+                            fontWeight: 600,
+                            padding: '10px 24px',
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            boxShadow: '0 4px 12px rgba(255, 71, 87, 0.3)',
+                            '&:hover': {
+                                backgroundColor: '#EE5A6F',
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 6px 20px rgba(255, 71, 87, 0.4)',
+                            },
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
                         Apply Leave
                     </Button>
-                    {yearEndFeatureEnabled && isPermanentEmployee && (
-                        <IconButton
-                            onClick={(e) => {
-                                setYearEndMenuAnchor(e.currentTarget);
-                            }}
-                            sx={{
-                                color: 'white',
-                                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
-                                cursor: 'pointer'
-                            }}
-                            title="Year-End Leave Options"
-                        >
-                            <MoreVertIcon />
-                        </IconButton>
-                    )}
+                }
+            />
+
+            {/* KPI Cards Section - Only show for Permanent employees */}
+            {isPermanentEmployee && (
+                <Box className="leave-kpi-cards">
+                    <Paper className="leave-kpi-card sick-leave">
+                        <Box className="kpi-icon-wrapper">
+                            <Heart className="kpi-icon" size={28} />
+                        </Box>
+                        <Box className="kpi-content">
+                            <Typography className="kpi-value">{leaveBalances.sick || 0}</Typography>
+                            <Typography className="kpi-label">Sick Leave</Typography>
+                        </Box>
+                    </Paper>
+                    <Paper className="leave-kpi-card casual-leave">
+                        <Box className="kpi-icon-wrapper">
+                            <Umbrella className="kpi-icon" size={28} />
+                        </Box>
+                        <Box className="kpi-content">
+                            <Typography className="kpi-value">{leaveBalances.casual || 0}</Typography>
+                            <Typography className="kpi-label">Casual Leave</Typography>
+                        </Box>
+                    </Paper>
+                    <Paper className="leave-kpi-card planned-leave">
+                        <Box className="kpi-icon-wrapper">
+                            <CalendarIcon className="kpi-icon" size={28} />
+                        </Box>
+                        <Box className="kpi-content">
+                            <Typography className="kpi-value">{leaveBalances.paid || 0}</Typography>
+                            <Typography className="kpi-label">Planned Leave</Typography>
+                        </Box>
+                    </Paper>
                 </Box>
-            </Box>
-            
+            )}
+
             {/* Year-End Menu */}
             <Menu
                 anchorEl={yearEndMenuAnchor}
@@ -523,27 +422,6 @@ const LeavesPage = () => {
                     />
                 </MenuItem>
             </Menu>
-
-            {/* Balance Boxes - Small Rounded Boxes */}
-            {isPermanentEmployee && (
-                <Box className="balance-grid">
-                    <BalanceBox 
-                        title="Sick Leave" 
-                        balance={leaveBalances.sick} 
-                        icon={<SickIcon className="balance-icon" />}
-                    />
-                    <BalanceBox 
-                        title="Casual Leave" 
-                        balance={leaveBalances.casual} 
-                        icon={<WorkOutlineIcon className="balance-icon" />}
-                    />
-                    <BalanceBox 
-                        title="Planned Leave" 
-                        balance={leaveBalances.paid} 
-                        icon={<BeachAccessIcon className="balance-icon" />}
-                    />
-                </Box>
-            )}
 
             {/* Carryforward/Encashment Section */}
             {carryforwardStatus && carryforwardStatus.hasPendingDecision && (
@@ -613,19 +491,29 @@ const LeavesPage = () => {
                 </Paper>
             )}
 
-            {/* Content Grid - 3 Large Rectangles */}
+            {/* Main Content Grid - 3 Columns */}
             <Box className="content-grid">
-                <ContentCard title="Application Requests">
+                {/* Application Requests Column */}
+                <Paper className="content-card">
+                    <Typography className="content-card-title">Application Requests</Typography>
                     {myRequests.length === 0 ? (
                         <Box className="empty-state">
-                            <CalendarTodayIcon className="empty-state-icon" />
+                            <FileText className="empty-state-icon" size={48} />
                             <Typography variant="h6" className="empty-state-title">No Leave Requests</Typography>
                             <Typography variant="body2" className="empty-state-subtitle">
                                 You haven't submitted any leave requests yet. Click "Apply Leave" to get started.
                             </Typography>
+                            <Button
+                                className="apply-leave-link"
+                                onClick={handleOpenModal}
+                                startIcon={<Plus size={14} />}
+                            >
+                                Apply Leave
+                            </Button>
                         </Box>
                     ) : (
-                        <>
+                        <Box className="scrollable-content">
+                            {/* Render actual requests here - keeping the existing table logic */}
                             <TableContainer className="table-container">
                                 <Table stickyHeader aria-label="leave requests table">
                                     <TableHead>
@@ -639,9 +527,9 @@ const LeavesPage = () => {
                                     </TableHead>
                                     <TableBody>
                                         {myRequests.map((row, index) => (
-                                            <TableRow 
-                                                key={row._id} 
-                                                hover 
+                                            <TableRow
+                                                key={row._id}
+                                                hover
                                                 onClick={() => handleViewDetails(row)}
                                                 className="table-row-clickable"
                                             >
@@ -666,7 +554,7 @@ const LeavesPage = () => {
                                     </TableBody>
                                 </Table>
                             </TableContainer>
-                            
+
                             <TablePagination
                                 rowsPerPageOptions={[5, 10, 25, 50]}
                                 component="div"
@@ -677,80 +565,75 @@ const LeavesPage = () => {
                                 onRowsPerPageChange={handleRowsPerPageChange}
                                 className="table-pagination"
                             />
-                        </>
-                    )}
-                </ContentCard>
-
-                <ContentCard title="Company Holidays">
-                    <ul className="vector-list">
-                        {holidays && holidays.length > 0 ? (
-                            holidays.map((holiday, idx) => {
-                                const isTentative = !holiday.date || holiday.isTentative;
-                                return (
-                                    <li key={holiday._id || idx} className="vector-item">
-                                        <span className="vector-icon" aria-hidden="true">
-                                            {holidayIconFor(holiday)}
-                                        </span>
-                                        <span className="vector-text">
-                                            <span className="vector-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {holiday.name}
-                                                {isTentative && (
-                                                    <Chip 
-                                                        label="Tentative" 
-                                                        size="small" 
-                                                        color="warning"
-                                                        sx={{ height: '20px', fontSize: '0.7rem' }}
-                                                    />
-                                                )}
-                                            </span>
-                                            <span className="vector-subtitle">
-                                                {formatPrettyDate(holiday.date, isTentative)}
-                                            </span>
-                                        </span>
-                                    </li>
-                                );
-                            })
-                        ) : (
-                            <li className="vector-item" style={{ justifyContent: 'center' }}>
-                                <span className="vector-text">
-                                    <span className="vector-title">No holidays scheduled</span>
-                                </span>
-                            </li>
-                        )}
-                    </ul>
-                </ContentCard>
-
-                <ContentCard title="Saturday Schedule">
-                    {saturdaySchedule.length === 0 ? (
-                        <Box className="empty-state">
-                            <AccessTimeIcon className="empty-state-icon" />
-                            <Typography variant="h6" className="empty-state-title">No Schedule Available</Typography>
-                            <Typography variant="body2" className="empty-state-subtitle">
-                                Saturday schedule information will appear here.
-                            </Typography>
                         </Box>
-                    ) : (
-                        <ul className="vector-list">
-                            {saturdaySchedule.map(({ date, status }, idx) => {
-                                const isWorking = status === 'Working';
-                                const isLeave = status.includes('Approved');
-                                const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                                return (
-                                    <li key={`${date.toISOString()}-${idx}`} className="vector-item">
-                                        <span className="vector-icon" aria-hidden="true">
-                                            <AccessTimeIcon />
-                                        </span>
-                                        <span className="vector-text">
-                                            <span className="vector-title">{dayLabel}</span>
-                                            <span className="vector-subtitle">{isLeave ? status : (isWorking ? 'Working Day' : 'Holiday')}</span>
-                                        </span>
-                                        <span className={`badge ${isLeave ? 'off' : (isWorking ? 'working' : 'off')}`}>{isLeave ? 'On Leave' : (isWorking ? 'Working' : 'Off')}</span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
                     )}
-                </ContentCard>
+                </Paper>
+
+                {/* Company Holidays Column */}
+                <Paper className="content-card">
+                    <Typography className="content-card-title">Company Holidays</Typography>
+                    <Box className="scrollable-content">
+                        <ul className="vector-list">
+                        <li className="vector-item">
+                            <div className="vector-icon">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="vector-text">
+                                <Typography className="vector-title">Christmas</Typography>
+                                <Typography className="vector-subtitle">Thu, Dec 25, 2025</Typography>
+                            </div>
+                        </li>
+                        <li className="vector-item">
+                            <div className="vector-icon">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="vector-text">
+                                <Typography className="vector-title">Republic Day</Typography>
+                                <Typography className="vector-subtitle">Mon, Jan 26, 2026</Typography>
+                            </div>
+                        </li>
+                        <li className="vector-item">
+                            <div className="vector-icon">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="vector-text">
+                                <Typography className="vector-title">Holi</Typography>
+                                <Typography className="vector-subtitle">Tue, Mar 3, 2026</Typography>
+                            </div>
+                        </li>
+                        <li className="vector-item">
+                            <div className="vector-icon">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="vector-text">
+                                <Typography className="vector-title">Maharashtra Din</Typography>
+                                <Typography className="vector-subtitle">Fri, May 1, 2026</Typography>
+                            </div>
+                        </li>
+                        <li className="vector-item">
+                            <div className="vector-icon">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="vector-text">
+                                <Typography className="vector-title">Independence Day</Typography>
+                                <Typography className="vector-subtitle">Sat, Aug 15, 2026</Typography>
+                            </div>
+                        </li>
+                        </ul>
+                    </Box>
+                </Paper>
+
+                {/* Saturday Schedule Column */}
+                <Paper className="content-card">
+                    <Typography className="content-card-title">Saturday Schedule</Typography>
+                    <Box className="scrollable-content">
+                        <SaturdaySchedule 
+                            policy={user?.alternateSaturdayPolicy || 'All Saturdays Working'} 
+                            requests={myRequests} 
+                            count={4}
+                        />
+                    </Box>
+                </Paper>
             </Box>
 
             {/* Keep form mounted; visibility controlled by open state */}
@@ -777,7 +660,7 @@ const LeavesPage = () => {
             >
                 <Box className="leave-details-modal-header">
                     <Box className="leave-details-header-content">
-                        <CalendarTodayIcon className="leave-details-header-icon" />
+                        <CalendarToday className="leave-details-header-icon" />
                         <Typography variant="h5" className="leave-details-title">Leave Request Details</Typography>
                     </Box>
                     <IconButton 
@@ -785,7 +668,7 @@ const LeavesPage = () => {
                         className="leave-details-close-button"
                         size="small"
                     >
-                        <CloseIcon />
+                        <Close />
                     </IconButton>
                 </Box>
                 
@@ -798,9 +681,9 @@ const LeavesPage = () => {
                                 className={`leave-details-status-banner ${viewDialog.request.status.toLowerCase()}`}
                             >
                                 <Box className="status-banner-content">
-                                    {viewDialog.request.status === 'Approved' && <CheckCircleIcon className="status-icon" />}
-                                    {viewDialog.request.status === 'Rejected' && <CancelIcon className="status-icon" />}
-                                    {viewDialog.request.status === 'Pending' && <PendingIcon className="status-icon" />}
+                                    {viewDialog.request.status === 'Approved' && <CheckCircle className="status-icon" />}
+                                    {viewDialog.request.status === 'Rejected' && <Cancel className="status-icon" />}
+                                    {viewDialog.request.status === 'Pending' && <Pending className="status-icon" />}
                                     <Box>
                                         <Typography variant="caption" className="status-banner-label">Status</Typography>
                                         <Typography variant="h6" className="status-banner-value">
@@ -817,7 +700,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12} sm={6}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <InfoIcon className="detail-field-icon" />
+                                            <Info className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Request Type</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value">
@@ -831,7 +714,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12} sm={6}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <WorkOutlineIcon className="detail-field-icon" />
+                                            <WorkOutline className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Leave Type</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value">
@@ -845,7 +728,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12} sm={6}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <CalendarTodayIcon className="detail-field-icon" />
+                                            <CalendarToday className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Submitted Date</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value">
@@ -859,7 +742,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12} sm={6}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <AccessTimeIcon className="detail-field-icon" />
+                                            <AccessTime className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Total Days</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value">
@@ -873,7 +756,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <DateRangeIcon className="detail-field-icon" />
+                                            <DateRange className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Date(s)</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value dates-field">
@@ -911,7 +794,7 @@ const LeavesPage = () => {
                                 <Grid item xs={12}>
                                     <Box className="detail-field">
                                         <Box className="detail-field-header">
-                                            <DescriptionIcon className="detail-field-icon" />
+                                            <Description className="detail-field-icon" />
                                             <Typography variant="subtitle2" className="detail-field-label">Reason</Typography>
                                         </Box>
                                         <Paper elevation={0} className="detail-field-value reason-field">
@@ -926,7 +809,7 @@ const LeavesPage = () => {
                                     <Grid item xs={12}>
                                         <Box className="detail-field">
                                             <Box className="detail-field-header">
-                                                <CancelIcon className="detail-field-icon rejection-icon" />
+                                                <Cancel className="detail-field-icon rejection-icon" />
                                                 <Typography variant="subtitle2" className="detail-field-label">Rejection Notes</Typography>
                                             </Box>
                                             <Paper elevation={0} className="detail-field-value rejection-notes-field">
@@ -946,7 +829,7 @@ const LeavesPage = () => {
                         onClick={() => setViewDialog({ open: false, request: null })}
                         variant="contained"
                         className="leave-details-close-btn"
-                        startIcon={<CloseIcon />}
+                        startIcon={<Close />}
                     >
                         Close
                     </Button>
@@ -967,10 +850,11 @@ const LeavesPage = () => {
                     }
                 }}
             >
-                <DialogTitle sx={{ 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    pb: 2
+                <DialogTitle sx={{
+                    background: '#ffffff',
+                    color: '#2c3e50',
+                    pb: 2,
+                    borderBottom: '3px solid #ff4757'
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <ForwardIcon />
@@ -995,7 +879,7 @@ const LeavesPage = () => {
                                     {carryforwardStatus.previousYearBalances.sick > 0 && (
                                         <Grid item xs={12} sm={4}>
                                             <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                                                <SickIcon sx={{ color: '#d32f2f', mb: 0.5 }} />
+                                                <Sick sx={{ color: '#d32f2f', mb: 0.5 }} />
                                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                                     {carryforwardStatus.previousYearBalances.sick}
                                                 </Typography>
@@ -1008,7 +892,7 @@ const LeavesPage = () => {
                                     {carryforwardStatus.previousYearBalances.casual > 0 && (
                                         <Grid item xs={12} sm={4}>
                                             <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                                                <WorkOutlineIcon sx={{ color: '#1976d2', mb: 0.5 }} />
+                                                <WorkOutline sx={{ color: '#1976d2', mb: 0.5 }} />
                                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                                     {carryforwardStatus.previousYearBalances.casual}
                                                 </Typography>
@@ -1021,7 +905,7 @@ const LeavesPage = () => {
                                     {carryforwardStatus.previousYearBalances.paid > 0 && (
                                         <Grid item xs={12} sm={4}>
                                             <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                                                <BeachAccessIcon sx={{ color: '#2e7d32', mb: 0.5 }} />
+                                                <BeachAccess sx={{ color: '#2e7d32', mb: 0.5 }} />
                                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                                     {carryforwardStatus.previousYearBalances.paid}
                                                 </Typography>
@@ -1065,7 +949,7 @@ const LeavesPage = () => {
                                         control={<Radio />} 
                                         label={
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <AttachMoneyIcon sx={{ color: '#2e7d32' }} />
+                                                <AttachMoney sx={{ color: '#2e7d32' }} />
                                                 <Box>
                                                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
                                                         Encashment
@@ -1176,7 +1060,7 @@ const LeavesPage = () => {
                         onClick={handleSubmitCarryforwardDecision}
                         variant="contained"
                         disabled={processingCarryforward}
-                        startIcon={processingCarryforward ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                        startIcon={processingCarryforward ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <CheckCircle />}
                         sx={{
                             bgcolor: '#667eea',
                             '&:hover': { bgcolor: '#5568d3' }
@@ -1200,28 +1084,30 @@ const LeavesPage = () => {
                     sx: {
                         borderRadius: '24px',
                         overflow: 'hidden',
-                        boxShadow: '0 20px 60px rgba(211, 47, 47, 0.25)',
-                        border: '1px solid rgba(211, 47, 47, 0.1)',
+                        boxShadow: '0 20px 60px rgba(255, 71, 87, 0.25)',
+                        border: '1px solid rgba(255, 71, 87, 0.1)',
                     }
                 }}
             >
-                <DialogTitle sx={{ 
-                    background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)',
-                    color: 'white',
+                <DialogTitle sx={{
+                    background: '#ffffff',
+                    color: '#2c3e50',
                     pb: 3,
                     pt: 3,
-                    px: 3
+                    px: 3,
+                    borderBottom: '3px solid #ff4757'
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ 
-                            bgcolor: 'rgba(255, 255, 255, 0.2)', 
-                            borderRadius: '12px', 
+                        <Box sx={{
+                            bgcolor: '#fff5f5',
+                            borderRadius: '12px',
                             p: 1.5,
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            border: '1px solid rgba(255, 71, 87, 0.2)'
                         }}>
-                            <ForwardIcon sx={{ fontSize: 28 }} />
+                            <ForwardIcon sx={{ fontSize: 28, color: '#ff4757' }} />
                         </Box>
                         <Box>
                             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -1343,7 +1229,7 @@ const LeavesPage = () => {
                                             transition: 'all 0.3s ease',
                                             '&:hover': {
                                                 borderColor: '#d32f2f',
-                                                boxShadow: '0 4px 12px rgba(211, 47, 47, 0.1)'
+                                                boxShadow: '0 4px 12px rgba(255, 71, 87, 0.1)'
                                             }
                                         }}
                                     >
@@ -1440,7 +1326,7 @@ const LeavesPage = () => {
                                                                 sx={{
                                                                     color: '#d32f2f',
                                                                     '&.Mui-checked': { color: '#d32f2f' },
-                                                                    '&:hover': { bgcolor: 'rgba(211, 47, 47, 0.04)' }
+                                                                    '&:hover': { bgcolor: 'rgba(255, 71, 87, 0.04)' }
                                                                 }}
                                                             />
                                                         }
@@ -1475,7 +1361,7 @@ const LeavesPage = () => {
                                                                 sx={{
                                                                     color: '#d32f2f',
                                                                     '&.Mui-checked': { color: '#d32f2f' },
-                                                                    '&:hover': { bgcolor: 'rgba(211, 47, 47, 0.04)' }
+                                                                    '&:hover': { bgcolor: 'rgba(255, 71, 87, 0.04)' }
                                                                 }}
                                                             />
                                                         }
@@ -1543,23 +1429,23 @@ const LeavesPage = () => {
                             onClick={handleSubmitYearEndRequests}
                             variant="contained"
                             disabled={processingYearEnd}
-                            startIcon={processingYearEnd ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <CheckCircleIcon />}
+                            startIcon={processingYearEnd ? <SkeletonBox width="16px" height="16px" borderRadius="50%" sx={{ bgcolor: 'rgba(255, 255, 255, 0.8)' }} /> : <CheckCircle />}
                             sx={{
-                                bgcolor: '#d32f2f',
+                                bgcolor: '#ff4757',
                                 color: 'white',
                                 fontWeight: 700,
                                 px: 4,
                                 py: 1,
                                 borderRadius: '12px',
                                 textTransform: 'none',
-                                boxShadow: '0 4px 12px rgba(211, 47, 47, 0.3)',
+                                boxShadow: '0 4px 12px rgba(255, 71, 87, 0.3)',
                                 '&:hover': { 
-                                    bgcolor: '#c62828',
-                                    boxShadow: '0 6px 16px rgba(211, 47, 47, 0.4)',
+                                    bgcolor: '#ee5a6f',
+                                    boxShadow: '0 6px 16px rgba(255, 71, 87, 0.4)',
                                     transform: 'translateY(-1px)'
                                 },
                                 '&.Mui-disabled': {
-                                    bgcolor: 'rgba(211, 47, 47, 0.3)',
+                                    bgcolor: 'rgba(255, 71, 87, 0.3)',
                                     color: 'rgba(255, 255, 255, 0.5)',
                                     boxShadow: 'none'
                                 },

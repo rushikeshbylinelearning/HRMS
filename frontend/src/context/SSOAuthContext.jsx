@@ -2,9 +2,10 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../api/axios';
-import { CircularProgress, Box, Alert, Typography, Button } from '@mui/material';
+import { Box, Alert, Typography, Button } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const SSOAuthContext = createContext(null);
 
 export const SSOAuthProvider = ({ children }) => {
@@ -189,7 +190,7 @@ export const SSOAuthProvider = ({ children }) => {
                 flexDirection: 'column',
                 gap: 2
             }}>
-                <CircularProgress size={60} />
+                <SkeletonBox width="60px" height="60px" borderRadius="50%" />
                 <Typography variant="h6" color="primary">
                     Initializing Authentication...
                 </Typography>

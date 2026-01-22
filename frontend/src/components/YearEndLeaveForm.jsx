@@ -1,11 +1,9 @@
 // src/components/YearEndLeaveForm.jsx
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Stack, Box, Typography
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Box, Typography } from '@mui/material';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const initialFormState = {
     employeeId: '',
     leaveType: 'Sick',
@@ -381,7 +379,7 @@ const YearEndLeaveForm = ({ open, onClose, onSave, action, employees, isSaving }
                         }
                     }}
                 >
-                    {isSaving ? <CircularProgress size={24} sx={{ color: '#ffffff' }} /> : 'Save'}
+                    {isSaving ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

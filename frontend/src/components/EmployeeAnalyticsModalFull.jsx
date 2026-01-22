@@ -1,39 +1,6 @@
 // frontend/src/components/EmployeeAnalyticsModalFull.jsx
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  Card,
-  CardContent,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  ToggleButton,
-  ToggleButtonGroup,
-  Divider,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  Stack
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, Alert, Card, CardContent, Grid, FormControl, InputLabel, Select, MenuItem, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, ToggleButton, ToggleButtonGroup, Divider, Avatar, List, ListItem, ListItemText, Stack } from '@mui/material';
 import {
   LineChart,
   Line,
@@ -64,6 +31,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeAnalyticsModalFull = ({ open, onClose, employeeId, employeeName }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -307,7 +275,7 @@ const EmployeeAnalyticsModalFull = ({ open, onClose, employeeId, employeeName })
             height="500px"
             gap={3}
           >
-            <CircularProgress sx={{ color: '#dc3545' }} size={70} thickness={4} />
+            <SkeletonBox width="70px" height="70px" borderRadius="50%" />
             <Typography variant="h6" sx={{ color: '#666', fontWeight: 500 }}>
               Loading Analytics Data...
             </Typography>

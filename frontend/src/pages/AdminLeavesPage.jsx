@@ -2,13 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
-import {
-    Typography, Button, CircularProgress, Alert, Chip, Box, Snackbar, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody,
-    TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination,
-    Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton,
-    Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse
-} from '@mui/material';
+import { Typography, Button, Alert, Chip, Box, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination, Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton, Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -44,6 +38,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // --- Shared DatePicker SlotProps for Microsoft Calendar Style ---
 const datePickerSlotProps = {
     textField: {
@@ -991,7 +986,7 @@ const LeaveCountSummaryTab = memo(() => {
                             {filteredData.length} employee{filteredData.length !== 1 ? 's' : ''} found
                         </Typography>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflowX: 'hidden' }}>
+                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
@@ -1976,7 +1971,7 @@ const InternLeaveCountSummaryTab = memo(() => {
                             {filteredData.length} intern{filteredData.length !== 1 ? 's' : ''} found
                         </Typography>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflowX: 'hidden' }}>
+                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
@@ -2309,7 +2304,7 @@ const HrEmailManagerModal = memo(({ open, onClose }) => {
                 <Typography variant="body2" sx={{ color: '#6B7280', mb: 3 }}>
                     Add or remove email addresses that receive leave request notifications.
                 </Typography>
-                {loading ? <CircularProgress size={24} /> : (
+                {loading ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : (
                     <>
                         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
                         <Grid container spacing={2} alignItems="center">
@@ -2497,7 +2492,7 @@ const HolidayManagerModal = memo(({ open, onClose }) => {
                 </Grid>
                 <Divider sx={{ my: 3 }} />
                 <div className="recipients-box">
-                    {loading ? <CircularProgress size={20} /> : holidays.length > 0 ? (
+                    {loading ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : holidays.length > 0 ? (
                         holidays.map(h => {
                             const isTentative = !h.date || h.isTentative;
                             const dateDisplay = isTentative ? 'Tentative' : new Date(h.date).toLocaleDateString();
@@ -3182,7 +3177,7 @@ const AdminLeavesPage = () => {
                     }}
                 >
                     <div className="requests-card">
-                        <TableContainer component={Paper} elevation={0} className="table-container">
+                        <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
                             <Table stickyHeader aria-label="leave requests table">
                                 <TableHead className="requests-table-head">
                                     <TableRow>
@@ -3267,10 +3262,10 @@ const AdminLeavesPage = () => {
                     
                     {yearEndLoading ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                            <CircularProgress />
+                            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                         </Box>
                     ) : (
-                        <TableContainer component={Paper} elevation={0}>
+                        <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
                             <Table stickyHeader>
                                 <TableHead>
                                     <TableRow>

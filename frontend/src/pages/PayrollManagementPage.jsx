@@ -1,18 +1,7 @@
 // frontend/src/pages/PayrollManagementPage.jsx
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import {
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-  IconButton,
-  Alert,
-  Paper,
-  Card,
-  CardContent,
-  CircularProgress
-} from '@mui/material';
+import { Box, Typography, Tabs, Tab, IconButton, Alert, Paper, Card, CardContent } from '@mui/material';
 import { ArrowBack, Dashboard, People, Settings, Calculate } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +13,7 @@ const PayrollSettings = lazy(() => import('../components/payroll/PayrollSettings
 const PayrollCalculator = lazy(() => import('../components/payroll/PayrollCalculator'));
 const PayrollTable = lazy(() => import('../components/payroll/PayrollTable'));
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const PayrollManagementPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -227,7 +217,7 @@ const PayrollManagementPage = () => {
             flexDirection: 'column',
             gap: 2
           }}>
-            <CircularProgress size={48} sx={{ color: '#2C3E50' }} />
+            <SkeletonBox width="48px" height="48px" borderRadius="50%" />
             <Typography variant="body1" sx={{ color: '#6c757d' }}>
               Loading component...
             </Typography>

@@ -3,11 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
-import { 
-    Typography, Button, CircularProgress, Alert, Chip, Snackbar, Dialog, DialogTitle, 
-    DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton,
-    TextField, TablePagination, Switch, Stack // Table components removed, Pagination retained
-} from '@mui/material';
+import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField, TablePagination, Switch, Stack } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -19,6 +15,7 @@ import PageHeroHeader from '../components/PageHeroHeader';
 import socket from '../socket';
 import '../styles/EmployeesPage.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // --- HELPER FUNCTIONS ---
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -386,7 +383,7 @@ const EmployeesPage = () => {
         return sorted;
     }, [filteredEmployees, order, orderBy, page, rowsPerPage, searchTerm]);
 
-    if (loading) return <div className="flex-center"><CircularProgress /></div>;
+    if (loading) return <div className="flex-center"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></div>;
 
     return (
         <div className="employees-page">
@@ -413,7 +410,7 @@ const EmployeesPage = () => {
                             className="search-field"
                         />
                         {isRefreshing && (
-                            <CircularProgress size={22} thickness={5} style={{ marginLeft: '0.75rem' }} />
+                            <SkeletonBox width="22px" height="22px" borderRadius="50%" />
                         )}
                         <Button variant="contained" onClick={() => handleOpenForm()} startIcon={<AddIcon />} className="add-button">
                             Add Employee
@@ -466,7 +463,7 @@ const EmployeesPage = () => {
                                             inputProps={{ 'aria-label': `Toggle active for ${employee.fullName}` }}
                                         />
                                         {updatingStatus[employee._id] ? (
-                                            <CircularProgress size={16} />
+                                            <SkeletonBox width="16px" height="16px" borderRadius="50%" />
                                         ) : (
                                             <Chip label={employee.isActive ? 'Active' : 'Inactive'} color={employee.isActive ? 'success' : 'error'} size="small" variant="outlined" />
                                         )}

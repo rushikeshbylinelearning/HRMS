@@ -1,28 +1,7 @@
 // frontend/src/components/AnalyticsDashboard.jsx
 
 import React, { useState, useEffect, Fragment } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Button,
-  CircularProgress,
-  Alert,
-  Chip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  Divider
-} from '@mui/material';
+import { Box, Card, CardContent, Typography, Grid, Button, Alert, Chip, Avatar, List, ListItem, ListItemAvatar, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Divider } from '@mui/material';
 import { ResizableBox } from 'react-resizable';
 import 'react-resizable/css/styles.css';
 import '../styles/resizable.css';
@@ -41,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import socket from '../socket';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const AnalyticsDashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -204,7 +184,7 @@ const AnalyticsDashboard = () => {
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
-        <CircularProgress />
+        <SkeletonBox width="24px" height="24px" borderRadius="50%" />
       </Box>
     );
   }

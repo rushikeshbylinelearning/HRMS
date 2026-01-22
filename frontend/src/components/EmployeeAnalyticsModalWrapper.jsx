@@ -1,10 +1,11 @@
 // Wrapper component to isolate React error
 import React, { Suspense, ErrorBoundary } from 'react';
-import { CircularProgress, Alert } from '@mui/material';
+import { Alert } from '@mui/material';
 
 // Lazy load the actual component
 const EmployeeAnalyticsModal = React.lazy(() => import('./EmployeeAnalyticsModal'));
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeAnalyticsModalWrapper = (props) => {
   return (
     <ErrorBoundary
@@ -14,7 +15,7 @@ const EmployeeAnalyticsModalWrapper = (props) => {
         </Alert>
       }
     >
-      <Suspense fallback={<CircularProgress />}>
+      <Suspense fallback={<SkeletonBox width="24px" height="24px" borderRadius="50%" />}>
         <EmployeeAnalyticsModal {...props} />
       </Suspense>
     </ErrorBoundary>

@@ -3,7 +3,8 @@
 
 const pendingRequests = new Map();
 const responseCache = new Map();
-const CACHE_TTL = 5000; // 5 seconds default cache
+const CACHE_TTL = 15000; // 15 seconds default cache (increased for performance)
+const STALE_WHILE_REVALIDATE_TTL = 30000; // 30 seconds for stale-while-revalidate
 
 /**
  * Creates a cache key from request config
@@ -25,13 +26,27 @@ const isCacheValid = (cached) => {
 };
 
 /**
- * Deduplicates and caches API requests
+ * Checks if cached response can be served stale while revalidating
+ */
+const canServeStale = (cached) => {
+  if (!cached) return false;
+  const age = Date.now() - cached.timestamp;
+  return age < cached.staleTtl;
+};
+
+/**
+ * Deduplicates and caches API requests with stale-while-revalidate
  * @param {Function} apiCall - The actual API call function
  * @param {Object} config - Request config
- * @param {Object} options - { cache: boolean, ttl: number, skipCache: boolean }
+ * @param {Object} options - { cache: boolean, ttl: number, skipCache: boolean, staleWhileRevalidate: boolean }
  */
 export const cachedApiCall = async (apiCall, config, options = {}) => {
-  const { cache = true, ttl = CACHE_TTL, skipCache = false } = options;
+  const {
+    cache = true,
+    ttl = CACHE_TTL,
+    skipCache = false,
+    staleWhileRevalidate = true
+  } = options;
   const cacheKey = getCacheKey(config);
 
   // Skip cache for POST/PUT/DELETE/PATCH (mutations)
@@ -40,12 +55,36 @@ export const cachedApiCall = async (apiCall, config, options = {}) => {
     return apiCall();
   }
 
-  // Check cache first
-  if (cache) {
-    const cached = responseCache.get(cacheKey);
-    if (isCacheValid(cached)) {
-      return Promise.resolve(cached.response);
-    }
+  const cached = cache ? responseCache.get(cacheKey) : null;
+
+  // Check for fresh cache first
+  if (cached && isCacheValid(cached)) {
+    return Promise.resolve(cached.response);
+  }
+
+  // Stale-while-revalidate: serve stale data immediately and refresh in background
+  if (staleWhileRevalidate && cached && canServeStale(cached)) {
+    // Serve stale data immediately
+    const staleResponse = Promise.resolve(cached.response);
+
+    // Revalidate in background (don't await)
+    apiCall()
+      .then((freshResponse) => {
+        // Update cache with fresh data
+        if (cache && config.method?.toUpperCase() === 'GET') {
+          responseCache.set(cacheKey, {
+            response: freshResponse,
+            timestamp: Date.now(),
+            ttl,
+            staleTtl: STALE_WHILE_REVALIDATE_TTL,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('[Cache] Background revalidation failed:', error);
+      });
+
+    return staleResponse;
   }
 
   // Check if request is already in flight (deduplication)
@@ -62,6 +101,7 @@ export const cachedApiCall = async (apiCall, config, options = {}) => {
           response,
           timestamp: Date.now(),
           ttl,
+          staleTtl: STALE_WHILE_REVALIDATE_TTL,
         });
       }
       return response;

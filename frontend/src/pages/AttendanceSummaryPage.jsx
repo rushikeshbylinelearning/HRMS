@@ -1,11 +1,6 @@
 // src/pages/AttendanceSummaryPage.jsx - IST-ENFORCED, BACKEND-DRIVEN
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-    Typography, CircularProgress, Alert, 
-    IconButton, Tooltip, Snackbar, Dialog, 
-    DialogTitle, DialogContent, DialogActions, 
-    Button, TextField
-} from '@mui/material';
+import { Typography, Alert, IconButton, Tooltip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
 import {
     ChevronLeft as ChevronLeftIcon,
     ChevronRight as ChevronRightIcon,
@@ -37,6 +32,7 @@ import {
 import socket from '../socket';
 import '../styles/AdminAttendanceSummaryPage.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const AttendanceSummaryPage = () => {
     const { user } = useAuth();
     const [logs, setLogs] = useState([]);
@@ -348,7 +344,7 @@ const AttendanceSummaryPage = () => {
             <div className="timeline-container">
                 {loading && (
                     <div className="loading-overlay">
-                        <CircularProgress />
+                        <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                     </div>
                 )}
                 <div className={`timeline-wrapper ${loading ? 'loading' : ''}`}>

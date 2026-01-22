@@ -1,15 +1,12 @@
 // src/components/AdminLeaveForm.jsx
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Stack, Divider, Box, Typography,
-    Autocomplete, IconButton, Avatar
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Divider, Box, Typography, Autocomplete, IconButton, Avatar } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 import CloseIcon from '@mui/icons-material/Close'; // UI unified with Employee Leave Modal
 
 const initialFormState = {
@@ -50,6 +47,22 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleEmployeeChange = (event, newValue) => {
+        const employeeId = newValue?._id || '';
+        setFormData(prev => {
+            // Reset requestType when employee changes to ensure valid selection
+            const allowedTypes = getAllowedLeaveTypesForEmployee(newValue);
+            const currentType = prev.requestType;
+            const newRequestType = allowedTypes.includes(currentType) ? currentType : allowedTypes[0] || 'Loss of Pay';
+            
+            return {
+                ...prev,
+                employee: employeeId,
+                requestType: newRequestType
+            };
+        });
+    };
+
     const handleDateChange = (date) => {
         setFormData(prev => ({ ...prev, leaveDates: [date] }));
     };
@@ -68,6 +81,39 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
 
     // Get selected employee object for Autocomplete
     const selectedEmployee = employees.find(emp => emp._id === formData.employee) || null;
+
+    // Get allowed leave types based on employee status
+    const getAllowedLeaveTypesForEmployee = (employee) => {
+        if (!employee) return ['Loss of Pay']; // Default fallback
+        
+        const status = employee.employmentStatus || employee.status;
+        
+        if (status === 'Permanent') {
+            return ['Planned', 'Sick', 'Casual', 'Loss of Pay', 'Compensatory', 'Backdated Leave'];
+        }
+        
+        if (status === 'Probation' || status === 'Intern') {
+            return ['Loss of Pay', 'Compensatory'];
+        }
+        
+        // Default fallback
+        return ['Loss of Pay'];
+    };
+
+    const allowedLeaveTypes = getAllowedLeaveTypesForEmployee(selectedEmployee);
+
+    // Map leave types to display names
+    const getLeaveTypeDisplayName = (type) => {
+        switch (type) {
+            case 'Planned': return 'Planned Leave';
+            case 'Sick': return 'Sick Leave';
+            case 'Casual': return 'Casual Leave';
+            case 'Loss of Pay': return 'LOP Loss of Pay';
+            case 'Compensatory': return 'Compensatory';
+            case 'Backdated Leave': return 'Backdated Leave';
+            default: return type;
+        }
+    };
 
     return (
         <Dialog 
@@ -133,9 +179,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         options={employees}
                         getOptionLabel={(option) => `${option.fullName} (${option.employeeCode})`}
                         value={selectedEmployee}
-                        onChange={(event, newValue) => {
-                            setFormData(prev => ({ ...prev, employee: newValue?._id || '' }));
-                        }}
+                        onChange={handleEmployeeChange}
                         disabled={!employees.length}
                         loading={!employees.length}
                         aria-label="Select employee"
@@ -198,6 +242,33 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         )}
                     />
 
+                    {/* Employee Status Indicator */}
+                    {selectedEmployee && (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1, 
+                            padding: '8px 12px',
+                            backgroundColor: '#F9FAFB',
+                            borderRadius: '8px',
+                            border: '1px solid #E5E7EB'
+                        }}>
+                            <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 500 }}>
+                                Employee Status:
+                            </Typography>
+                            <Typography variant="body2" sx={{ 
+                                color: '#111827', 
+                                fontWeight: 600,
+                                textTransform: 'capitalize'
+                            }}>
+                                {selectedEmployee.employmentStatus || selectedEmployee.status || 'Unknown'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#9CA3AF', ml: 1 }}>
+                                ({allowedLeaveTypes.length} leave type{allowedLeaveTypes.length !== 1 ? 's' : ''} available)
+                            </Typography>
+                        </Box>
+                    )}
+
                     {/* Leave Category & Leave Type - Side by Side */}
                     <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
@@ -246,11 +317,11 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                         },
                                     }}
                                 >
-                                    <MenuItem value="Planned">Planned Leave</MenuItem>
-                                    <MenuItem value="Sick">Sick Leave</MenuItem>
-                                    <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
-                                    <MenuItem value="Compensatory">Compensatory</MenuItem>
-                                    <MenuItem value="Backdated Leave">Backdated Leave</MenuItem>
+                                    {allowedLeaveTypes.map(type => (
+                                        <MenuItem key={type} value={type}>
+                                            {getLeaveTypeDisplayName(type)}
+                                        </MenuItem>
+                                    ))}
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -654,7 +725,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                         }
                     }}
                 >
-                    {isSaving ? <CircularProgress size={24} sx={{ color: '#FFFFFF' }} /> : 'Save'}
+                    {isSaving ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

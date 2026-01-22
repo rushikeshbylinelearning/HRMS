@@ -43,9 +43,25 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [uploadingCertificate, setUploadingCertificate] = useState(false);
     const [plannedLeaveHistory, setPlannedLeaveHistory] = useState([]);
+    const [allowedLeaveTypes, setAllowedLeaveTypes] = useState(['Loss of Pay']); // Default fallback
 
-    const employeeType = normalizeEmploymentType(user?.employmentStatus);
-    const allowedLeaveTypes = useMemo(() => getAllowedLeaveTypes(employeeType), [employeeType]);
+    // Fetch allowed leave types from backend
+    useEffect(() => {
+        const fetchAllowedLeaveTypes = async () => {
+            try {
+                const response = await api.get('/leaves/allowed-types');
+                setAllowedLeaveTypes(response.data.allowedLeaveTypes || ['Loss of Pay']);
+            } catch (error) {
+                console.error('Error fetching allowed leave types:', error);
+                // Keep default fallback
+                setAllowedLeaveTypes(['Loss of Pay']);
+            }
+        };
+
+        if (open && user) {
+            fetchAllowedLeaveTypes();
+        }
+    }, [open, user]);
 
     // Remove planned leave history fetching - validation is server-side only
     useEffect(() => {
@@ -297,27 +313,15 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess }) => {
                             label="Leave Category"
                             onChange={handleChange}
                         >
-                            {allowedLeaveTypes.includes('Casual') && (
-                                <MenuItem value="Casual">Casual Leave</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Planned') && (
-                                <MenuItem value="Planned">Planned Leave (Earned)</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Sick') && (
-                                <MenuItem value="Sick">Sick Leave</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Loss of Pay') && (
-                                <MenuItem value="Loss of Pay">LOP Loss of Pay</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Compensatory') && (
-                                <MenuItem value="Compensatory">Comp-Off</MenuItem>
-                            )}
-                            {allowedLeaveTypes.includes('Backdated Leave') && (
-                                <>
-                                    <Divider />
-                                    <MenuItem value="Backdated Leave">Backdate Leave</MenuItem>
-                                </>
-                            )}
+                            {allowedLeaveTypes.map(type => (
+                                <MenuItem key={type} value={type}>
+                                    {type === 'Planned' ? 'Planned Leave (Earned)' :
+                                     type === 'Loss of Pay' ? 'LOP Loss of Pay' :
+                                     type === 'Compensatory' ? 'Comp-Off' :
+                                     type === 'Backdated Leave' ? 'Backdate Leave' :
+                                     `${type} Leave`}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
 

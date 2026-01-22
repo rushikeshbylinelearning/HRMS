@@ -14,8 +14,4 @@ const attendanceSessionSchema = new mongoose.Schema({
   isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
 }, { timestamps: true });
 
-// Admin Dashboard query alignment: joins and active-session lookup
-attendanceSessionSchema.index({ attendanceLog: 1 }, { background: true });
-attendanceSessionSchema.index({ endTime: 1 }, { background: true });
-
 module.exports = mongoose.model('AttendanceSession', attendanceSessionSchema);

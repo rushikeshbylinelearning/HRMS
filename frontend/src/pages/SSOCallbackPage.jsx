@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Box, CircularProgress, Typography, Alert, Link } from '@mui/material';
+import { Box, Typography, Alert, Link } from '@mui/material';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const SSOCallbackPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -59,7 +60,7 @@ const SSOCallbackPage = () => {
                     gap: 2
                 }}
             >
-                <CircularProgress size={60} />
+                <SkeletonBox width="60px" height="60px" borderRadius="50%" />
                 <Typography variant="h6" color="primary">
                     Completing SSO Authentication...
                 </Typography>

@@ -93,13 +93,12 @@
   border: 1px solid #e0e0e0;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   overflow: hidden; /* Important for border-radius on children */
-  overflow-x: hidden; /* Prevent horizontal scrollbar */
   margin-top: 24px; /* Space between manager cards and table */
 }
 
 .admin-leaves-page .table-container {
   max-height: calc(100vh - 450px); /* Adjust based on your layout */
-  overflow-x: hidden; /* Prevent horizontal scrollbar */
+  overflow: auto; /* Enable scrollbars when needed */
 }
 
 .admin-leaves-page .requests-table-head .MuiTableCell-root {

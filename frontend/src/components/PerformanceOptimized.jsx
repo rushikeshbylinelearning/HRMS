@@ -1,16 +1,17 @@
 // Performance-optimized components for better loading times
 import React, { memo, useMemo, useCallback, lazy, Suspense, useRef, useState } from 'react';
-import { CircularProgress, Box, Skeleton } from '@mui/material';
+import { Box, Skeleton } from '@mui/material';
 
 // Lazy load heavy components
 export const LazyDataGrid = lazy(() => import('@mui/x-data-grid').then(module => ({ default: module.DataGrid })));
 export const LazyDatePicker = lazy(() => import('@mui/x-date-pickers').then(module => ({ default: module.DatePicker })));
 export const LazyCharts = lazy(() => import('recharts').then(module => ({ default: module.ResponsiveContainer })));
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // Memoized loading components
 export const PageLoader = memo(() => (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-    <CircularProgress />
+    <SkeletonBox width="24px" height="24px" borderRadius="50%" />
   </Box>
 ));
 

@@ -1,55 +1,6 @@
 // frontend/src/pages/LeavesTrackerPage.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  IconButton,
-  Table,
-  TableContainer,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  Avatar,
-  Chip,
-  CircularProgress,
-  Alert,
-  LinearProgress,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Snackbar,
-  Menu,
-  ListItemIcon,
-  ListItemText,
-  Tabs,
-  Tab,
-  Switch,
-  Paper,
-  Divider,
-  Checkbox,
-  List,
-  ListItem,
-  ListItemButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Autocomplete,
-  Stack,
-  TablePagination,
-  Skeleton
-} from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Button, IconButton, Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Avatar, Chip, Alert, LinearProgress, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Menu, ListItemIcon, ListItemText, Tabs, Tab, Switch, Paper, Divider, Checkbox, List, ListItem, ListItemButton, Accordion, AccordionSummary, AccordionDetails, Autocomplete, Stack, TablePagination, Skeleton } from '@mui/material';
 import {
   ArrowBack,
   Search,
@@ -79,6 +30,7 @@ import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import AdminLeaveForm from '../components/AdminLeaveForm';
 import '../styles/LeavesTrackerPage.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // --- Enhanced Saturday Schedule Manager Component with Drag & Drop ---
 const SaturdayScheduleManager = ({ employees, onUpdate }) => {
     const [localEmployees, setLocalEmployees] = useState(employees);
@@ -292,7 +244,7 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
                     <Typography variant="caption" sx={{ color: '#666' }}>{emp.employeeCode} • {emp.department || 'N/A'}</Typography>
                 </Box>
             }
-            deleteIcon={loadingMap[emp._id] ? <CircularProgress size={18} /> : <SwapHorizIcon />}
+            deleteIcon={loadingMap[emp._id] ? <SkeletonBox width="18px" height="18px" borderRadius="50%" /> : <SwapHorizIcon />}
             onDelete={() => handleSwapPolicy(emp)}
             draggable
             onDragStart={(e) => handleDragStart(e, emp)}
@@ -1115,7 +1067,7 @@ const LeavesTrackerPage = () => {
   };
 
   if (loading) {
-    return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><CircularProgress /></Box>;
+    return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></Box>;
   }
 
   return (
@@ -1650,7 +1602,7 @@ const LeavesTrackerPage = () => {
 
                         {loadingLeaveUsage || loadingYearEndHistory ? (
                             <Box display="flex" flexDirection="column" alignItems="center" py={6}>
-                                <CircularProgress />
+                                <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                                     Loading leave data...
                                 </Typography>
@@ -2737,14 +2689,15 @@ const LeavesTrackerPage = () => {
                                                 value={allocateForm.sickLeaveEntitlement} 
                                                 onChange={(e) => setAllocateForm({ 
                                                     ...allocateForm, 
-                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur() // Prevent scroll changes
                                                 }} 
-                                                helperText="Enter number of sick leave days (0-365)"
+                                                helperText="Enter number of sick leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',
@@ -2803,14 +2756,15 @@ const LeavesTrackerPage = () => {
                                                 value={allocateForm.casualLeaveEntitlement} 
                                                 onChange={(e) => setAllocateForm({ 
                                                     ...allocateForm, 
-                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur() // Prevent scroll changes
                                                 }} 
-                                                helperText="Enter number of casual leave days (0-365)"
+                                                helperText="Enter number of casual leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',
@@ -2869,14 +2823,15 @@ const LeavesTrackerPage = () => {
                                                 value={allocateForm.paidLeaveEntitlement} 
                                                 onChange={(e) => setAllocateForm({ 
                                                     ...allocateForm, 
-                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur() // Prevent scroll changes
                                                 }} 
-                                                helperText="Enter number of planned leave days (0-365)"
+                                                helperText="Enter number of planned leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',
@@ -3387,14 +3342,15 @@ const LeavesTrackerPage = () => {
                                                 value={bulkAllocateForm.sickLeaveEntitlement} 
                                                 onChange={(e) => setBulkAllocateForm({ 
                                                     ...bulkAllocateForm, 
-                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur()
                                                 }} 
-                                                helperText="Enter sick leave days (0-365)"
+                                                helperText="Enter sick leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',
@@ -3453,14 +3409,15 @@ const LeavesTrackerPage = () => {
                                                 value={bulkAllocateForm.casualLeaveEntitlement} 
                                                 onChange={(e) => setBulkAllocateForm({ 
                                                     ...bulkAllocateForm, 
-                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur()
                                                 }} 
-                                                helperText="Enter casual leave days (0-365)"
+                                                helperText="Enter casual leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',
@@ -3519,14 +3476,15 @@ const LeavesTrackerPage = () => {
                                                 value={bulkAllocateForm.paidLeaveEntitlement} 
                                                 onChange={(e) => setBulkAllocateForm({ 
                                                     ...bulkAllocateForm, 
-                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
                                                 })} 
                                                 inputProps={{ 
                                                     min: 0, 
                                                     max: 365,
+                                                    step: 0.5,
                                                     onWheel: (e) => e.target.blur()
                                                 }} 
-                                                helperText="Enter planned leave days (0-365)"
+                                                helperText="Enter planned leave days (0-365, decimals allowed)"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: '6px',

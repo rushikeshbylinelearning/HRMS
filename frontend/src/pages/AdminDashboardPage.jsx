@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { CircularProgress, Alert, Avatar, Button, Tooltip, Snackbar, Chip, Dialog, DialogTitle, DialogContent, Typography, Box, DialogActions, Stack, Skeleton } from '@mui/material';
+import { Alert, Avatar, Button, Tooltip, Snackbar, Chip, Dialog, DialogTitle, DialogContent, Typography, Box, DialogActions, Stack, Skeleton } from '@mui/material';
 import {
     PeopleAlt as PeopleAltIcon,
     Work as WorkIcon,
@@ -20,6 +20,7 @@ import PageHeroHeader from '../components/PageHeroHeader';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import socket from '../socket';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 
 import '../styles/AdminDashboardPage.css';
 
@@ -704,7 +705,7 @@ const AdminDashboardPage = () => {
                             <Stack direction="row" spacing={2} sx={{width: '100%', justifyContent: 'flex-end'}}>
                                 <Button onClick={() => handleActivityResponse(selectedActivity._id, 'Rejected', selectedActivity.type)} color="error" disabled={actionLoading}>Reject</Button>
                                 <Button onClick={() => handleActivityResponse(selectedActivity._id, 'Approved', selectedActivity.type)} variant="contained" color="success" disabled={actionLoading}>
-                                    {actionLoading ? <CircularProgress size={24} color="inherit" /> : 'Approve'}
+                                    {actionLoading ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : 'Approve'}
                                 </Button>
                             </Stack>
                         </DialogActions>

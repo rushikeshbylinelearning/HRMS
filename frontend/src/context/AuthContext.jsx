@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../api/axios';
-import { CircularProgress, Box, Snackbar, Alert } from '@mui/material';
+import { Box, Snackbar, Alert } from '@mui/material';
 import socket from '../socket';
 
 const AuthContext = createContext(null);

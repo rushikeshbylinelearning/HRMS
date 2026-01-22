@@ -1,9 +1,6 @@
 // src/components/UserLogModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, 
-    CircularProgress, Paper, Stack, Chip, Divider, Alert, Grid
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, Paper, Stack, Chip, Divider, Alert, Grid } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import WorkIcon from '@mui/icons-material/Work';
@@ -12,6 +9,7 @@ import WatchLaterIcon from '@mui/icons-material/WatchLater';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import '../styles/UserLogModal.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // Helper functions
 const formatTimeForDisplay = (dateTime) => {
     if (!dateTime) return '--:--';
@@ -305,7 +303,7 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
             <DialogContent className="dialog-content">
                 {loading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                        <CircularProgress />
+                        <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                     </Box>
                 ) : !log && !holiday && !leave ? (
                     <Alert severity="info">No attendance data available for this date.</Alert>

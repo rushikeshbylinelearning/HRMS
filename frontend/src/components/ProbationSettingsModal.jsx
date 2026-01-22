@@ -1,11 +1,7 @@
 // frontend/src/components/ProbationSettingsModal.jsx
 
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Box, Stack, Divider, 
-    Typography, Paper, Alert, Chip, Tooltip, FormControlLabel, Switch
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Box, Stack, Divider, Typography, Paper, Alert, Chip, Tooltip, FormControlLabel, Switch } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -13,6 +9,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const formSectionStyles = {
     p: 2.5,
     borderRadius: '16px',
@@ -159,7 +156,7 @@ const ProbationSettingsModal = ({ open, onClose, employee, onSave }) => {
 
                     {loading && !probationData ? (
                         <Box display="flex" justifyContent="center" py={4}>
-                            <CircularProgress />
+                            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                         </Box>
                     ) : (
                         <>
@@ -399,7 +396,7 @@ const ProbationSettingsModal = ({ open, onClose, employee, onSave }) => {
                     disabled={loading}
                     sx={{ borderRadius: '12px', minWidth: '120px' }}
                 >
-                    {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Settings'}
+                    {loading ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : 'Save Settings'}
                 </Button>
             </DialogActions>
         </Dialog>

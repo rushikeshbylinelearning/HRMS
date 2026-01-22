@@ -1,24 +1,6 @@
 // frontend/src/components/EmployeeListModal.jsx
 import React, { useState, useEffect, Fragment } from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    List,
-    ListItem,
-    ListItemAvatar,
-    ListItemText,
-    Avatar,
-    Typography,
-    Box,
-    Chip,
-    CircularProgress,
-    Alert,
-    Divider,
-    Stack
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemAvatar, ListItemText, Avatar, Typography, Box, Chip, Alert, Divider, Stack } from '@mui/material';
 import {
     Person as PersonIcon,
     AccessTime as AccessTimeIcon,
@@ -28,6 +10,7 @@ import {
 } from '@mui/icons-material';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -558,7 +541,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                         backgroundColor: '#FAFAFA'
                     }}>
                         <Box sx={{ textAlign: 'center' }}>
-                            <CircularProgress sx={{ color: '#D32F2F', mb: 2 }} />
+                            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                             <Typography variant="body2" sx={{ color: '#757575' }}>
                                 Loading employee details...
                             </Typography>
@@ -684,7 +667,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                                                 }
                                             }}
                                         >
-                                            {loadingMore ? <CircularProgress size={20} sx={{ color: '#D32F2F' }} /> : 'Load more'}
+                                            {loadingMore ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : 'Load more'}
                                         </Button>
                                     </Box>
                                 )}

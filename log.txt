@@ -1,0 +1,1 @@
+2026-01-21T13:57:13.382Z - ACTION: LEAVE_POLICY_ADMIN_OVERRIDE - User: 687f797fcac0a473f5b46e07 - Details: {"employeeCode":"#BYL202505-E71","employeeName":"RJ","requestType":"Casual","leaveType":"Full Day","leaveDates":["2026-02-04"],"overrideReason":"Admin approval by user ID: 687e227897b3fb2f8e690e99","timestamp":"2026-01-21T13:57:13.382Z"}

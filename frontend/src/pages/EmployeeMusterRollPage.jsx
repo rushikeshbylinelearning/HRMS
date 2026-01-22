@@ -1,28 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  IconButton,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  Avatar,
-  Chip,
-  CircularProgress,
-  Alert,
-  Divider
-} from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Button, IconButton, Table, TableHead, TableBody, TableRow, TableCell, Avatar, Chip, Alert, Divider } from '@mui/material';
 import {
   ArrowBack,
   ArrowLeft,
@@ -40,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAttendanceStatus } from '../utils/saturdayUtils';
 import axios from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeMusterRollPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -465,7 +443,7 @@ const EmployeeMusterRollPage = () => {
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
-        <CircularProgress />
+        <SkeletonBox width="24px" height="24px" borderRadius="50%" />
       </Box>
     );
   }

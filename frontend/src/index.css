@@ -173,11 +173,49 @@ body {
   animation: spin-fast 0.5s linear infinite;
 }
 
-/* Material-UI CircularProgress override for faster animation */
-.MuiCircularProgress-root {
-  animation-duration: 0.5s !important;
+/* Performance optimizations for 300ms budget */
+
+/* GPU acceleration for animated elements */
+.skeleton-shimmer,
+.shimmer-animation {
+  transform: translateZ(0);
+  will-change: background-position;
 }
 
-.MuiCircularProgress-svg {
-  animation-duration: 0.5s !important;
+/* Content visibility for below-fold content */
+.below-fold {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-animation {
+    animation-duration: 2s;
+  }
+
+  .skeleton-shimmer {
+    animation: none;
+    background: #E5E7EB;
+  }
+}
+
+/* Optimize font loading */
+@font-face {
+  font-display: swap;
+}
+
+/* Optimize images */
+img {
+  loading: lazy;
+}
+
+/* Optimize scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Performance hints for browser */
+.skeleton-container {
+  contain: layout style paint;
 }

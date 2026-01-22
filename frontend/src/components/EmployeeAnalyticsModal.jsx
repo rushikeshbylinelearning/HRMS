@@ -1,34 +1,7 @@
 // frontend/src/components/EmployeeAnalyticsModal.jsx
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Card,
-  CardContent,
-  CircularProgress,
-  Alert,
-  Chip,
-  Avatar,
-  IconButton,
-  Tabs,
-  Tab,
-  Divider,
-  LinearProgress,
-  Paper,
-  Stack,
-  Tooltip
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem, Card, CardContent, Alert, Chip, Avatar, IconButton, Tabs, Tab, Divider, LinearProgress, Paper, Stack, Tooltip } from '@mui/material';
 import {
   Close,
   TrendingUp,
@@ -139,6 +112,7 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
       ? 'http://localhost:3001' 
       : (import.meta.env.VITE_SOCKET_URL || 'https://attendance.bylinelms.com');
     
+import { SkeletonBox } from '../components/SkeletonLoaders';
     // A2 Hosting: Polling first for better compatibility
     const socket = io(socketUrl, {
       auth: { token },
@@ -386,7 +360,7 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
       <DialogContent sx={{ p: 0 }}>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="400px">
-            <CircularProgress />
+            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
           </Box>
         ) : error ? (
           <Box p={3}>
@@ -1383,7 +1357,7 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
                                   }}
                                 >
                                   {updatingHalfDay === log._id ? (
-                                    <CircularProgress size={20} />
+                                    <SkeletonBox width="20px" height="20px" borderRadius="50%" />
                                   ) : log.isHalfDay ? (
                                     <ToggleOn fontSize="medium" />
                                   ) : (

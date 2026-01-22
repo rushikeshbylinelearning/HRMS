@@ -1,20 +1,24 @@
 // frontend/src/components/DashboardSkeletons.jsx
+// YouTube-style skeleton components for dashboard elements
+// Replaces old MUI Skeleton with custom shimmer implementation
+
 import React from 'react';
-import { Box, Skeleton, Stack, Paper } from '@mui/material';
+import { Box, Stack } from '@mui/material';
+import { SkeletonText, SkeletonCircle, SkeletonBox } from './SkeletonLoaders';
 
 export const ShiftInfoSkeleton = () => (
-    <Stack spacing={2}>
+    <Stack spacing={3}>
         <Box>
-            <Skeleton variant="text" width="60%" height={24} />
-            <Skeleton variant="text" width="40%" height={20} sx={{ mt: 1 }} />
+            <SkeletonText width="60%" height="24px" />
+            <SkeletonText width="40%" height="20px" sx={{ mt: 1 }} />
         </Box>
         <Box>
-            <Skeleton variant="text" width="70%" height={24} />
-            <Skeleton variant="text" width="50%" height={20} sx={{ mt: 1 }} />
+            <SkeletonText width="70%" height="24px" />
+            <SkeletonText width="50%" height="20px" sx={{ mt: 1 }} />
         </Box>
         <Box>
-            <Skeleton variant="text" width="65%" height={24} />
-            <Skeleton variant="text" width="45%" height={20} sx={{ mt: 1 }} />
+            <SkeletonText width="65%" height="24px" />
+            <SkeletonText width="45%" height="20px" sx={{ mt: 1 }} />
         </Box>
     </Stack>
 );
@@ -23,12 +27,12 @@ export const RecentActivitySkeleton = () => (
     <Stack spacing={2}>
         {[1, 2, 3, 4].map((i) => (
             <Box key={i} sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Skeleton variant="circular" width={40} height={40} />
+                <SkeletonCircle size={40} />
                 <Box sx={{ flex: 1 }}>
-                    <Skeleton variant="text" width="80%" height={20} />
-                    <Skeleton variant="text" width="60%" height={16} sx={{ mt: 0.5 }} />
+                    <SkeletonText width="80%" height="20px" />
+                    <SkeletonText width="60%" height="16px" sx={{ mt: 0.5 }} />
                 </Box>
-                <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                <SkeletonBox width="60px" height="24px" borderRadius="12px" />
             </Box>
         ))}
     </Stack>
@@ -38,8 +42,8 @@ export const SaturdayScheduleSkeleton = () => (
     <Stack spacing={2}>
         {[1, 2, 3].map((i) => (
             <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Skeleton variant="text" width="40%" height={20} />
-                <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+                <SkeletonText width="40%" height="20px" />
+                <SkeletonBox width="80px" height="24px" borderRadius="12px" />
             </Box>
         ))}
     </Stack>
@@ -47,9 +51,9 @@ export const SaturdayScheduleSkeleton = () => (
 
 export const WeeklyTimeCardsSkeleton = () => (
     <Stack spacing={2}>
-        <Skeleton variant="rectangular" width="100%" height={80} sx={{ borderRadius: 2 }} />
-        <Skeleton variant="rectangular" width="100%" height={80} sx={{ borderRadius: 2 }} />
-        <Skeleton variant="rectangular" width="100%" height={80} sx={{ borderRadius: 2 }} />
+        <SkeletonBox width="100%" height="80px" borderRadius="8px" />
+        <SkeletonBox width="100%" height="80px" borderRadius="8px" />
+        <SkeletonBox width="100%" height="80px" borderRadius="8px" />
     </Stack>
 );
 
