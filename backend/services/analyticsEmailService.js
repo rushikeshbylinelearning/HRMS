@@ -52,15 +52,11 @@ const sendLateLoginNotification = async (user, attendanceLog) => {
       </div>
     `;
     
-    sendEmail({
-      isHREmail: false,
+    await sendEmail({
+        isHREmail: true,
       to: user.email,
       subject,
-      html,
-      mailType: 'EmployeeLateLogin',
-      recipientType: 'employee'
-    }).catch(err => {
-      console.error('Error sending late login notification:', err);
+      html
     });
     
     console.log(`Late login notification sent to ${user.email}`);
@@ -106,15 +102,11 @@ const sendWeeklyLateWarning = async (user, lateCount) => {
       </div>
     `;
     
-    sendEmail({
-      isHREmail: false,
+    await sendEmail({
+        isHREmail: true,
       to: user.email,
       subject,
-      html,
-      mailType: 'EmployeeWeeklyLateWarning',
-      recipientType: 'employee'
-    }).catch(err => {
-      console.error('Error sending weekly late warning:', err);
+      html
     });
     
     console.log(`Weekly late warning sent to ${user.email}`);
@@ -172,15 +164,11 @@ const sendHRWeeklyLateNotification = async (user, lateCount) => {
       </div>
     `;
     
-    sendEmail({
+    await sendEmail({
         isHREmail: true,
       to: hrEmails,
       subject,
-      html,
-      mailType: 'HRWeeklyLateSummary',
-      recipientType: 'hr'
-    }).catch(err => {
-      console.error('Error sending HR notification:', err);
+      html
     });
     
     console.log(`HR notification sent for ${user.fullName}'s late attendance`);

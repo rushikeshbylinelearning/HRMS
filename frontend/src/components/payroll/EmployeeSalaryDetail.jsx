@@ -1,31 +1,7 @@
 // frontend/src/components/payroll/EmployeeSalaryDetail.jsx
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  Chip,
-  IconButton,
-  Divider,
-  Alert,
-  CircularProgress,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Card,
-  CardContent,
-  CardHeader,
-  Avatar,
-  LinearProgress
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Grid, Paper, Chip, IconButton, Divider, Alert, Select, MenuItem, FormControl, InputLabel, Card, CardContent, CardHeader, Avatar, LinearProgress } from '@mui/material';
 import {
   Close,
   CalendarToday,
@@ -44,6 +20,7 @@ import axios from '../../api/axios';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+import { SkeletonBox } from '../SkeletonLoaders';
 const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
@@ -507,7 +484,7 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
       <DialogContent sx={{ p: 0 }}>
         {loading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-            <CircularProgress size={60} sx={{ color: '#e53935', mb: 2 }} />
+            <SkeletonBox width="60px" height="60px" borderRadius="50%" />
             <Typography variant="h6" sx={{ color: '#666' }}>Loading attendance data...</Typography>
             <LinearProgress sx={{ width: '200px', mt: 2, borderRadius: '4px' }} />
           </Box>

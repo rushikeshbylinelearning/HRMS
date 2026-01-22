@@ -134,7 +134,5 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Admin Dashboard query alignment: active-employee counts/lists
-userSchema.index({ isActive: 1 }, { background: true });
 
 module.exports = mongoose.model('User', userSchema);

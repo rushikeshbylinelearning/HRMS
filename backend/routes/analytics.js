@@ -13,18 +13,6 @@ const Holiday = require('../models/Holiday');
 const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
 const { sendEmail } = require('../services/mailService');
 const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime, getISTDateParts } = require('../utils/istTime');
-const { invalidateGracePeriod } = require('../services/gracePeriodCache');
-const { batchFetchLeaves } = require('../services/leaveCache');
-const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
-const { getAttendanceSummaryForEmployees } = require('../services/attendanceSummaryBulkService');
-const { getLeaveSummaryForEmployees } = require('../services/leaveSummaryService');
-const {
-  computeLeaveSummary,
-  countLeaveRequestsInRangeAllStatuses,
-  countLeaveRequestsInRangeAllStatuses: countLeaveRequestsYTDAllStatuses,
-  countLeaveRequestsAllTime,
-  getOldestLeaveDateStr
-} = require('../services/leaveSummaryCoreService');
 
 const router = express.Router();
 
@@ -208,33 +196,31 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   const endDateObj = new Date(normalizedEndDate);
   
   // Get leave requests for the period (all statuses to show applied leaves count)
-  /**
-   * @deprecated
-   * Inline leave calculations have been extracted to
-   * backend/services/leaveSummaryCoreService.js.
-   * Routes must not implement leave-day counting.
-   */
-
-  let leaveRequestsCount = 0;
+  let leaveRequests = [];
   try {
-    // Preserve existing behavior: "applied leaves count" includes all statuses.
-    leaveRequestsCount = await countLeaveRequestsInRangeAllStatuses({
-      employeeId: userId,
-      startDate: normalizedStartDate,
-      endDate: normalizedEndDate
+    leaveRequests = await LeaveRequest.find({
+      employee: userId,
+      leaveDates: {
+        $elemMatch: {
+          $gte: startDateObj,
+          $lte: endDateObj
+        }
+      }
     });
   } catch (leaveError) {
     console.error('Error fetching leave requests:', leaveError);
-    leaveRequestsCount = 0;
+    leaveRequests = [];
   }
 
-  // Preserve existing semantics: totalLeaveDays counts each leave date as 1 day
-  const leaveSummaryPeriod = await computeLeaveSummary({
-    employeeId: userId,
-    startDate: normalizedStartDate,
-    endDate: normalizedEndDate
+  // Calculate total leave days for the requested period
+  let totalLeaveDays = 0;
+  leaveRequests.forEach(leave => {
+    const leaveDaysInPeriod = leave.leaveDates.filter(date => {
+      const leaveDate = new Date(date);
+      return leaveDate >= startDateObj && leaveDate <= endDateObj;
+    }).length;
+    totalLeaveDays += leaveDaysInPeriod;
   });
-  const totalLeaveDays = (leaveSummaryPeriod.fullDayLeaveCount || 0) + (leaveSummaryPeriod.halfDayLeaveCount || 0);
 
   // Additionally compute Year-To-Date and All-Time leave aggregates so UI can show
   // leaves even when current table period is a different month
@@ -243,50 +229,45 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
   const ytdStart = new Date(dateParts.year, 0, 1);
   const todayDate = nowIST;
 
-  const ytdStartStr = `${dateParts.year}-01-01`;
-  const todayStr = getISTDateString(todayDate);
-
-  let leaveRequestsYTDCount = 0;
+  let leaveRequestsYTD = [];
   try {
-    leaveRequestsYTDCount = await countLeaveRequestsYTDAllStatuses({
-      employeeId: userId,
-      startDate: ytdStartStr,
-      endDate: todayStr
-    });
+    leaveRequestsYTD = await LeaveRequest.find({
+      employee: userId,
+      leaveDates: { $elemMatch: { $gte: ytdStart, $lte: todayDate } }
+    }).lean();
   } catch (leaveYTDError) {
     console.error('Error fetching YTD leave requests:', leaveYTDError);
-    leaveRequestsYTDCount = 0;
+    leaveRequestsYTD = [];
   }
 
-  const leaveSummaryYTD = await computeLeaveSummary({
-    employeeId: userId,
-    startDate: ytdStartStr,
-    endDate: todayStr
+  let totalLeaveDaysYTD = 0;
+  leaveRequestsYTD.forEach(leave => {
+    totalLeaveDaysYTD += leave.leaveDates.filter(d => {
+      const ld = new Date(d);
+      return ld >= ytdStart && ld <= todayDate;
+    }).length;
   });
-  const totalLeaveDaysYTD = (leaveSummaryYTD.fullDayLeaveCount || 0) + (leaveSummaryYTD.halfDayLeaveCount || 0);
 
   // All-time aggregates (no date filter)
-  // Preserve existing semantics: all-time totalLeaveDays counts each leave date as 1 day
-  const allTimeStartStr = (await getOldestLeaveDateStr({ employeeId: userId })) || todayStr;
-  const leaveSummaryAllTime = await computeLeaveSummary({
-    employeeId: userId,
-    startDate: allTimeStartStr,
-    endDate: todayStr
-  });
-  const totalLeaveDaysAllTime = (leaveSummaryAllTime.fullDayLeaveCount || 0) + (leaveSummaryAllTime.halfDayLeaveCount || 0);
-
-  const leaveRequestsAllTimeCount = await countLeaveRequestsAllTime({ employeeId: userId });
+  let leaveRequestsAllTime = [];
+  try {
+    leaveRequestsAllTime = await LeaveRequest.find({ employee: userId }).lean();
+  } catch (leaveAllTimeError) {
+    console.error('Error fetching all-time leave requests:', leaveAllTimeError);
+    leaveRequestsAllTime = [];
+  }
+  const totalLeaveDaysAllTime = leaveRequestsAllTime.reduce((sum, leave) => sum + (leave.leaveDates?.length || 0), 0);
 
   // --- START OF FIX ---
   // Use the monthlyContextDays from settings for the denominator.
   metrics.totalDaysInPeriod = monthlyContextDays;
   metrics.workingDaysRatio = monthlyContextDays > 0 ? (metrics.totalDays / monthlyContextDays) : 0;
   metrics.totalLeaveDays = totalLeaveDays;
-  metrics.leaveRequests = leaveRequestsCount;
+  metrics.leaveRequests = leaveRequests.length;
   metrics.totalLeaveDaysYTD = totalLeaveDaysYTD;
-  metrics.leaveRequestsYTD = leaveRequestsYTDCount;
+  metrics.leaveRequestsYTD = leaveRequestsYTD.length;
   metrics.totalLeaveDaysAllTime = totalLeaveDaysAllTime;
-  metrics.leaveRequestsAllTime = leaveRequestsAllTimeCount;
+  metrics.leaveRequestsAllTime = leaveRequestsAllTime.length;
   metrics.monthlyContext = `${metrics.totalDays}/${monthlyContextDays} days worked`;
   // --- END OF FIX ---
 
@@ -448,15 +429,10 @@ const checkAndUpdateLateStatus = async (attendanceLog, user) => {
         </div>
       `;
       
-      sendEmail({
+      await sendEmail({
         to: user.email,
         subject,
-        html,
-        isHREmail: false,
-        mailType: 'EmployeeLateLogin',
-        recipientType: 'employee'
-      }).catch(err => {
-        console.error('Error sending late login notification:', err);
+        html
       });
       
       // Mark that notification has been sent
@@ -500,8 +476,8 @@ router.get('/monthly-overview', authenticateToken, async (req, res) => {
       const monthLogs = await AttendanceLog.find({
         user: { $in: userIds },
         attendanceDate: { 
-          $gte: getISTDateString(monthStart),
-          $lte: getISTDateString(monthEnd)
+          $gte: monthStart.toISOString().slice(0, 10),
+          $lte: monthEnd.toISOString().slice(0, 10)
         }
       }).populate('user', 'fullName email department').lean();
       
@@ -771,10 +747,6 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
         leaveRequestsAllTime: 0
       };
     }
-
-    // Analytics-only derived data (must remain read-only): working hours computed in-memory
-    // for logs that do not already have totalWorkingHours.
-    let computedWorkingHoursByLogId = null;
     
     // Calculate actual working hours from attendance sessions if not available
     if (metrics.totalWorkingHours === 0 && metrics.totalDays > 0) {
@@ -783,7 +755,6 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       try {
         let totalCalculatedHours = 0;
         let daysWithSessions = 0;
-        computedWorkingHoursByLogId = new Map();
       
       for (const log of logs) {
         // Use sessions data if available, otherwise fall back to clockInTime/clockOutTime
@@ -824,9 +795,11 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
           
           totalCalculatedHours += netWorkingHours;
           daysWithSessions++;
-
-          // Analytics must be read-only: compute in-memory only (do NOT persist)
-          computedWorkingHoursByLogId.set(String(log._id), netWorkingHours);
+          
+          // Update the log with calculated working hours
+          await AttendanceLog.findByIdAndUpdate(log._id, {
+            totalWorkingHours: netWorkingHours
+          });
         }
       }
       
@@ -862,88 +835,63 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
     })));
 
     // Get detailed logs with sessions and breaks
-    const sessionsByLogId = new Map();
-    const breaksByLogId = new Map();
-
-    const logsNeedingSessions = logs.filter(log => !log.sessions || log.sessions.length === 0).map(log => log._id);
-    const logsNeedingBreaks = logs.filter(log => !log.breaks || log.breaks.length === 0).map(log => log._id);
-
-    if (logsNeedingSessions.length > 0) {
-      const sessions = await AttendanceSession.find({ attendanceLog: { $in: logsNeedingSessions } })
-        .sort({ startTime: 1 })
-        .lean();
-      sessions.forEach(s => {
-        const key = String(s.attendanceLog);
-        const arr = sessionsByLogId.get(key);
-        if (arr) arr.push(s);
-        else sessionsByLogId.set(key, [s]);
-      });
-    }
-
-    if (logsNeedingBreaks.length > 0) {
-      const breaks = await BreakLog.find({ attendanceLog: { $in: logsNeedingBreaks } })
-        .sort({ startTime: 1 })
-        .lean();
-      breaks.forEach(b => {
-        const key = String(b.attendanceLog);
-        const arr = breaksByLogId.get(key);
-        if (arr) arr.push(b);
-        else breaksByLogId.set(key, [b]);
-      });
-    }
-
-    const detailedLogs = logs.map((log) => {
+    const detailedLogs = await Promise.all(logs.map(async (log) => {
       // If log already has sessions and breaks from aggregation, use them
       // Otherwise, fetch them separately
+      let sessions = log.sessions || [];
+      let breaks = log.breaks || [];
+      
+      // If not populated by aggregation, fetch separately
+      if (!log.sessions || log.sessions.length === 0) {
+        sessions = await AttendanceSession.find({ attendanceLog: log._id }).sort({ startTime: 1 });
+      }
+      if (!log.breaks || log.breaks.length === 0) {
+        breaks = await BreakLog.find({ attendanceLog: log._id }).sort({ startTime: 1 });
+      }
+      
+      // Convert to plain object if it's a Mongoose document
       const logObject = log.toObject ? log.toObject() : { ...log };
-      const logIdStr = String(logObject._id);
-
-      let sessions = logObject.sessions || [];
-      let breaks = logObject.breaks || [];
-
-      if (!logObject.sessions || logObject.sessions.length === 0) {
-        sessions = sessionsByLogId.get(logIdStr) || [];
-      }
-      if (!logObject.breaks || logObject.breaks.length === 0) {
-        breaks = breaksByLogId.get(logIdStr) || [];
-      }
-
-      // If we computed working hours in-memory earlier, reflect that in the response
-      // without writing back to the database.
-      if (logObject && (logObject.totalWorkingHours === 0 || logObject.totalWorkingHours == null)) {
-        const computed = computedWorkingHoursByLogId
-          ? computedWorkingHoursByLogId.get(String(logObject._id))
-          : undefined;
-        if (typeof computed === 'number' && !Number.isNaN(computed)) {
-          logObject.totalWorkingHours = computed;
-        }
-      }
-
+      
       return {
         ...logObject,
         sessions,
         breaks
       };
-    });
+    }));
 
     // Calculate weekly and monthly trends for charts
     const weeklyData = [];
     const monthlyData = [];
-
-    const weekRanges = [];
+    
+    // Generate weekly data for the last 8 weeks
     for (let i = 7; i >= 0; i--) {
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + (i * 7)));
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
-      weekRanges.push({
-        label: `Week ${8-i}`,
-        start: getISTDateString(weekStart),
-        end: getISTDateString(weekEnd)
+      
+      const weekLogs = await AttendanceLog.find({
+        user: id,
+        attendanceDate: { 
+          $gte: getISTDateString(weekStart),
+          $lte: getISTDateString(weekEnd)
+        }
       });
+      
+      const weekMetrics = {
+        week: `Week ${8-i}`,
+        onTime: weekLogs.filter(log => log.attendanceStatus === 'On-time').length,
+        late: weekLogs.filter(log => log.attendanceStatus === 'Late').length,
+        halfDay: weekLogs.filter(log => log.attendanceStatus === 'Half-day').length,
+        absent: weekLogs.filter(log => log.attendanceStatus === 'Absent').length,
+        avgWorkingHours: weekLogs.length > 0 ? 
+          (weekLogs.reduce((sum, log) => sum + (log.totalWorkingHours || 0), 0) / weekLogs.length) : 0
+      };
+      
+      weeklyData.push(weekMetrics);
     }
-
-    const monthRanges = [];
+    
+    // Generate monthly data for the last 6 months
     for (let i = 5; i >= 0; i--) {
       const monthStart = new Date();
       monthStart.setMonth(monthStart.getMonth() - i);
@@ -951,66 +899,26 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
       const monthEnd = new Date(monthStart);
       monthEnd.setMonth(monthEnd.getMonth() + 1);
       monthEnd.setDate(0);
-      monthRanges.push({
-        startDateObj: monthStart,
-        start: getISTDateString(monthStart),
-        end: getISTDateString(monthEnd)
-      });
-    }
-
-    const chartMinStart = weekRanges.length > 0 ? weekRanges[0].start : null;
-    const chartMaxEnd = weekRanges.length > 0 ? weekRanges[weekRanges.length - 1].end : null;
-    const monthMinStart = monthRanges.length > 0 ? monthRanges[0].start : null;
-    const monthMaxEnd = monthRanges.length > 0 ? monthRanges[monthRanges.length - 1].end : null;
-
-    const minStart = [chartMinStart, monthMinStart].filter(Boolean).sort()[0];
-    const maxEnd = [chartMaxEnd, monthMaxEnd].filter(Boolean).sort().slice(-1)[0];
-
-    let chartLogsAll = [];
-    if (minStart && maxEnd) {
-      chartLogsAll = await AttendanceLog.find({
+      
+      const monthLogs = await AttendanceLog.find({
         user: id,
-        attendanceDate: { $gte: minStart, $lte: maxEnd }
-      }).lean();
-    }
-
-    const buildBucket = (bucketLogs) => {
-      const onTime = bucketLogs.filter(l => l.attendanceStatus === 'On-time').length;
-      const late = bucketLogs.filter(l => l.attendanceStatus === 'Late').length;
-      const halfDay = bucketLogs.filter(l => l.attendanceStatus === 'Half-day').length;
-      const absent = bucketLogs.filter(l => l.attendanceStatus === 'Absent').length;
-      const avgWorkingHours = bucketLogs.length > 0
-        ? (bucketLogs.reduce((sum, l) => sum + (l.totalWorkingHours || 0), 0) / bucketLogs.length)
-        : 0;
-      return { onTime, late, halfDay, absent, avgWorkingHours };
-    };
-    
-    // Generate weekly data for the last 8 weeks
-    for (const r of weekRanges) {
-      const weekLogs = chartLogsAll.filter(l => l.attendanceDate >= r.start && l.attendanceDate <= r.end);
-      const b = buildBucket(weekLogs);
-      weeklyData.push({
-        week: r.label,
-        onTime: b.onTime,
-        late: b.late,
-        halfDay: b.halfDay,
-        absent: b.absent,
-        avgWorkingHours: b.avgWorkingHours
+        attendanceDate: { 
+          $gte: monthStart.toISOString().slice(0, 10),
+          $lte: monthEnd.toISOString().slice(0, 10)
+        }
       });
-    }
-    
-    // Generate monthly data for the last 6 months
-    for (const r of monthRanges) {
-      const monthLogs = chartLogsAll.filter(l => l.attendanceDate >= r.start && l.attendanceDate <= r.end);
-      const b = buildBucket(monthLogs);
-      monthlyData.push({
-        month: r.startDateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        onTime: b.onTime,
-        late: b.late,
-        halfDay: b.halfDay,
-        absent: b.absent,
-        avgWorkingHours: b.avgWorkingHours
-      });
+      
+      const monthMetrics = {
+        month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        onTime: monthLogs.filter(log => log.attendanceStatus === 'On-time').length,
+        late: monthLogs.filter(log => log.attendanceStatus === 'Late').length,
+        halfDay: monthLogs.filter(log => log.attendanceStatus === 'Half-day').length,
+        absent: monthLogs.filter(log => log.attendanceStatus === 'Absent').length,
+        avgWorkingHours: monthLogs.length > 0 ? 
+          (monthLogs.reduce((sum, log) => sum + (log.totalWorkingHours || 0), 0) / monthLogs.length) : 0
+      };
+      
+      monthlyData.push(monthMetrics);
     }
 
     res.json({
@@ -1055,11 +963,10 @@ router.get('/all', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Default to current month (IST) if no dates provided
-    const nowIST = getISTNow();
-    const dp = getISTDateParts(nowIST);
-    const defaultStartDate = getISTDateString(new Date(dp.year, dp.monthIndex, 1));
-    const defaultEndDate = getISTDateString(new Date(dp.year, dp.monthIndex + 1, 0));
+    // Default to current month if no dates provided
+    const now = new Date();
+    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const defaultEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
     
     const start = startDate || defaultStartDate;
     const end = endDate || defaultEndDate;
@@ -1076,22 +983,6 @@ router.get('/all', authenticateToken, async (req, res) => {
     if (employeeId) userQuery._id = employeeId;
 
     const users = await User.find(userQuery).populate('shiftGroup');
-
-    const userIds = users.map(u => u._id);
-    const logsAll = await AttendanceLog.find({
-      user: { $in: userIds },
-      attendanceDate: { $gte: start, $lte: end }
-    })
-      .sort({ attendanceDate: -1 })
-      .lean();
-
-    const logsByUserId = new Map();
-    logsAll.forEach(l => {
-      const key = String(l.user);
-      const arr = logsByUserId.get(key);
-      if (arr) arr.push(l);
-      else logsByUserId.set(key, [l]);
-    });
     
     // Get analytics for each user
     const employeeAnalytics = await Promise.all(users.map(async (user) => {
@@ -1102,8 +993,11 @@ router.get('/all', authenticateToken, async (req, res) => {
       if (metrics.totalWorkingHours === 0 && metrics.totalDays > 0) {
         console.log(`Calculating working hours from attendance sessions for user: ${user.fullName}`);
         
-        // Use pre-fetched logs (analytics must remain read-only)
-        const userLogs = logsByUserId.get(String(user._id)) || [];
+        // Get attendance logs for this user
+        const userLogs = await AttendanceLog.find({
+          user: user._id,
+          attendanceDate: { $gte: start, $lte: end }
+        }).sort({ attendanceDate: -1 });
         
         let totalCalculatedHours = 0;
         let daysWithSessions = 0;
@@ -1120,6 +1014,11 @@ router.get('/all', authenticateToken, async (req, res) => {
             
             totalCalculatedHours += netWorkingHours;
             daysWithSessions++;
+            
+            // Update the log with calculated working hours
+            await AttendanceLog.findByIdAndUpdate(log._id, {
+              totalWorkingHours: netWorkingHours
+            });
           }
         }
         
@@ -1132,7 +1031,10 @@ router.get('/all', authenticateToken, async (req, res) => {
       }
       
       // Get recent logs for this user
-      const recentLogs = (logsByUserId.get(String(user._id)) || []).slice(0, 5);
+      const recentLogs = await AttendanceLog.find({
+        user: user._id,
+        attendanceDate: { $gte: start, $lte: end }
+      }).sort({ attendanceDate: -1 }).limit(5);
 
       return {
         employee: {
@@ -1330,9 +1232,6 @@ router.put('/late-grace-settings', authenticateToken, async (req, res) => {
       { value: numeric }, // Store as number
       { upsert: true, new: true }
     );
-
-    // PERFORMANCE OPTIMIZATION: Invalidate grace period cache
-    invalidateGracePeriod();
 
     // FIX: Ensure response value is always a number
     const responseValue = Number(setting.value);
@@ -1684,89 +1583,109 @@ router.get('/probation-tracker', authenticateToken, async (req, res) => {
       employmentStatus: 'Probation',
       isActive: true,
       role: { $ne: 'Intern' } // Explicitly exclude Interns
-    }).select('_id fullName employeeCode joiningDate email department designation alternateSaturdayPolicy').lean();
-
-    /**
-     * ⚠️ DEPRECATED:
-     * Probation calculation must NOT directly read AttendanceLog,
-     * LeaveRequest, or Holiday collections.
-     * Data must come from Attendance Summary & Leave Summary endpoints only.
-     */
-
-    const todayIST = getISTNow();
-    const todayStr = getISTDateString(todayIST);
-
-    const employeeIds = probationEmployees.map(e => e._id.toString());
-    const startDateByEmployeeId = {};
-    let globalStartDate = todayStr;
-
-    probationEmployees.forEach(employee => {
-      const joiningDate = new Date(employee.joiningDate);
-      const joiningDateIST = new Date(joiningDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const probationStartDate = new Date(
-        joiningDateIST.getFullYear(),
-        joiningDateIST.getMonth(),
-        joiningDateIST.getDate(),
-        0, 0, 0, 0
-      );
-      const probationStartDateStr = `${probationStartDate.getFullYear()}-${String(probationStartDate.getMonth() + 1).padStart(2, '0')}-${String(probationStartDate.getDate()).padStart(2, '0')}`;
-      startDateByEmployeeId[employee._id.toString()] = probationStartDateStr;
-      if (probationStartDateStr < globalStartDate) {
-        globalStartDate = probationStartDateStr;
-      }
-    });
-
-    const [attendanceSummaries, leaveSummaries] = await Promise.all([
-      getAttendanceSummaryForEmployees({
-        employeeIds,
-        startDate: globalStartDate,
-        endDate: todayStr,
-        startDateByEmployeeId
-      }),
-      getLeaveSummaryForEmployees({
-        employeeIds,
-        startDate: globalStartDate,
-        endDate: todayStr
-      })
-    ]);
+    }).select('_id fullName employeeCode joiningDate email department designation').lean();
 
     // Process each employee
     const employeesWithAnalytics = await Promise.all(
       probationEmployees.map(async (employee) => {
         try {
-          const probationStartDateStr = startDateByEmployeeId[employee._id.toString()];
+          // STEP 1: Normalize Dates (IST ONLY)
+          // Treat all YYYY-MM-DD as IST midnight
+          const joiningDate = new Date(employee.joiningDate);
+          const joiningDateIST = new Date(joiningDate.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+          const probationStartDate = new Date(
+            joiningDateIST.getFullYear(),
+            joiningDateIST.getMonth(),
+            joiningDateIST.getDate(),
+            0, 0, 0, 0
+          );
+          const probationStartDateStr = `${probationStartDate.getFullYear()}-${String(probationStartDate.getMonth() + 1).padStart(2, '0')}-${String(probationStartDate.getDate()).padStart(2, '0')}`;
 
           // STEP 2: Base Probation End Date = Joining Date + 6 calendar months (month-aware)
-          const probationStartDate = parseISTDate(probationStartDateStr);
           const baseProbationEndDate = new Date(probationStartDate);
           baseProbationEndDate.setMonth(baseProbationEndDate.getMonth() + 6);
           const baseProbationEndDateStr = `${baseProbationEndDate.getFullYear()}-${String(baseProbationEndDate.getMonth() + 1).padStart(2, '0')}-${String(baseProbationEndDate.getDate()).padStart(2, '0')}`;
 
-          const attendanceSummary = attendanceSummaries.get(employee._id.toString());
-          const leaveSummary = leaveSummaries.get(employee._id.toString());
+          // STEP 3: Calculate Leave Extensions (only approved leaves after joining date)
+          const leaveRequests = await LeaveRequest.find({
+            employee: employee._id,
+            status: 'Approved',
+            leaveDates: {
+              $elemMatch: {
+                $gte: new Date(probationStartDateStr + 'T00:00:00+05:30') // IST midnight
+              }
+            }
+          }).lean();
 
-          if (!attendanceSummary || !leaveSummary) {
-            console.error('[PROBATION] Missing summary data', {
-              employeeId: employee._id.toString(),
-              hasAttendanceSummary: !!attendanceSummary,
-              hasLeaveSummary: !!leaveSummary
+          let fullDayLeaves = 0;
+          let halfDayLeaves = 0;
+          let leaveExtensionDays = 0;
+          const leaveDatesSet = new Set(); // Track leave dates to exclude from absent calculation
+
+          leaveRequests.forEach(leave => {
+            leave.leaveDates.forEach(leaveDate => {
+              const leaveDateObj = new Date(leaveDate);
+              const leaveDateIST = new Date(leaveDateObj.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+              const leaveDateStr = `${leaveDateIST.getFullYear()}-${String(leaveDateIST.getMonth() + 1).padStart(2, '0')}-${String(leaveDateIST.getDate()).padStart(2, '0')}`;
+              
+              // Only count leaves after joining date
+              if (leaveDateStr >= probationStartDateStr) {
+                leaveDatesSet.add(leaveDateStr); // Track for absent exclusion
+                if (leave.leaveType === 'Full Day') {
+                  fullDayLeaves++;
+                  leaveExtensionDays += 1;
+                } else if (leave.leaveType === 'Half Day - First Half' || leave.leaveType === 'Half Day - Second Half') {
+                  halfDayLeaves++;
+                  leaveExtensionDays += 0.5;
+                }
+              }
             });
-          }
+          });
 
-          const attendance = attendanceSummary || { fullDayAbsentCount: 0, halfDayAbsentCount: 0 };
-          const leave = leaveSummary || { fullDayLeaveCount: 0, halfDayLeaveCount: 0 };
+          // STEP 4: Calculate Absence Extensions (NEW - REQUIRED)
+          // Fetch attendance logs from joining date
+          const attendanceLogs = await AttendanceLog.find({
+            user: employee._id,
+            attendanceDate: { $gte: probationStartDateStr }
+          }).lean();
 
-          const fullDayLeaves = leave.fullDayLeaveCount || 0;
-          const halfDayLeaves = leave.halfDayLeaveCount || 0;
-          const leaveExtensionDays = fullDayLeaves + (halfDayLeaves * 0.5);
+          let fullDayAbsents = 0;
+          let halfDayAbsents = 0;
+          let absentExtensionDays = 0;
+          const absentDatesSet = new Set(); // Track to avoid double-counting
 
-          const fullDayAbsents = attendance.fullDayAbsentCount || 0;
-          const halfDayAbsents = attendance.halfDayAbsentCount || 0;
-          const absentExtensionDays = fullDayAbsents + (halfDayAbsents * 0.5);
+          attendanceLogs.forEach(log => {
+            const logDateStr = log.attendanceDate; // Already in YYYY-MM-DD format
+            
+            // Skip if this date is covered by an approved leave
+            if (leaveDatesSet.has(logDateStr)) {
+              return; // Leave takes precedence, don't count as absent
+            }
 
-          console.log(
-            `[PROBATION] employee=${employee.employeeCode || employee._id.toString()} range=${probationStartDateStr}..${todayStr} absent=${absentExtensionDays} (full=${fullDayAbsents}, half=${halfDayAbsents})`
-          );
+            // Skip if already counted
+            if (absentDatesSet.has(logDateStr)) {
+              return;
+            }
+
+            // Determine if absent (full or half day)
+            const status = log.attendanceStatus;
+            const hasClockIn = !!log.clockInTime;
+            const isHalfDayFlag = log.isHalfDay || false;
+
+            // Full-day absent: No clock-in time OR status is 'Absent'
+            if (!hasClockIn || status === 'Absent') {
+              absentDatesSet.add(logDateStr);
+              fullDayAbsents++;
+              absentExtensionDays += 1;
+            }
+            // Half-day absent: isHalfDay flag OR status is 'Half-day' (but no clock-in)
+            else if (isHalfDayFlag || status === 'Half-day') {
+              absentDatesSet.add(logDateStr);
+              halfDayAbsents++;
+              absentExtensionDays += 0.5;
+            }
+            // Note: If clockInTime exists and status is not Absent/Half-day, employee was present
+          });
 
           // STEP 5: Final Probation End Date = Base End Date + Leave Extension Days + Absent Extension Days
           const finalProbationEndDate = new Date(baseProbationEndDate);
@@ -1775,6 +1694,7 @@ router.get('/probation-tracker', authenticateToken, async (req, res) => {
           const finalProbationEndDateStr = `${finalProbationEndDate.getFullYear()}-${String(finalProbationEndDate.getMonth() + 1).padStart(2, '0')}-${String(finalProbationEndDate.getDate()).padStart(2, '0')}`;
 
           // STEP 6: Calculate Days Left (calendar days from today to final end date)
+          const todayIST = getISTNow();
           const today = new Date(
             todayIST.getFullYear(),
             todayIST.getMonth(),
@@ -1805,21 +1725,35 @@ router.get('/probation-tracker', authenticateToken, async (req, res) => {
           };
         } catch (error) {
           console.error(`Error calculating probation analytics for ${employee.fullName}:`, error);
-          const probationStartDateStr = startDateByEmployeeId[employee._id.toString()] || null;
+          // Return default values on error
+          const joiningDate = new Date(employee.joiningDate);
+          const joiningDateIST = new Date(joiningDate.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+          const probationStartDate = new Date(
+            joiningDateIST.getFullYear(),
+            joiningDateIST.getMonth(),
+            joiningDateIST.getDate(),
+            0, 0, 0, 0
+          );
+          const probationStartDateStr = `${probationStartDate.getFullYear()}-${String(probationStartDate.getMonth() + 1).padStart(2, '0')}-${String(probationStartDate.getDate()).padStart(2, '0')}`;
+          
+          const baseEndDate = new Date(probationStartDate);
+          baseEndDate.setMonth(baseEndDate.getMonth() + 6);
+          const baseEndDateStr = `${baseEndDate.getFullYear()}-${String(baseEndDate.getMonth() + 1).padStart(2, '0')}-${String(baseEndDate.getDate()).padStart(2, '0')}`;
+
           return {
             employeeId: employee._id.toString(),
             employeeName: employee.fullName,
             employeeCode: employee.employeeCode,
             joiningDate: probationStartDateStr,
             probationStartDate: probationStartDateStr,
-            baseProbationEndDate: null,
+            baseProbationEndDate: baseEndDateStr,
             fullDayLeaves: 0,
             halfDayLeaves: 0,
             leaveExtensionDays: 0,
             fullDayAbsents: 0,
             halfDayAbsents: 0,
             absentExtensionDays: 0,
-            finalProbationEndDate: null,
+            finalProbationEndDate: baseEndDateStr,
             daysLeft: 0,
             error: 'Failed to calculate analytics'
           };

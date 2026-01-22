@@ -1,28 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Box,
-    Typography,
-    Grid,
-    Stack,
-    Avatar,
-    Chip,
-    TextField,
-    Button,
-    CircularProgress,
-    Snackbar,
-    Alert,
-    IconButton,
-    MenuItem,
-    Autocomplete
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid, Stack, Avatar, Chip, TextField, Button, Snackbar, Alert, IconButton, MenuItem, Autocomplete } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CountryCodeSelector from './CountryCodeSelector';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const roles = ['Admin', 'HR', 'Employee', 'Intern'];
 const statusOptions = ['Active', 'Inactive'];
 
@@ -413,7 +395,7 @@ const AdminEmployeeProfileDialog = ({
                                                     ...params.InputProps,
                                                     endAdornment: (
                                                         <>
-                                                            {reportingOptionsLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                            {reportingOptionsLoading ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : null}
                                                             {params.InputProps.endAdornment}
                                                         </>
                                                     )
@@ -505,7 +487,7 @@ const AdminEmployeeProfileDialog = ({
                                     '&:hover': { backgroundColor: '#d32f2f' }
                                 }}
                             >
-                                {saving ? <CircularProgress size={22} color="inherit" /> : 'Save'}
+                                {saving ? <SkeletonBox width="22px" height="22px" borderRadius="50%" /> : 'Save'}
                             </Button>
                         </>
                     ) : (

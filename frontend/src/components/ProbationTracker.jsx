@@ -1,34 +1,7 @@
 // frontend/src/components/ProbationTracker.jsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Paper,
-  CircularProgress,
-  Alert,
-  Chip,
-  Tooltip,
-  IconButton,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
-  Skeleton,
-  Collapse
-} from '@mui/material';
+import { Box, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Alert, Chip, Tooltip, IconButton, TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem, Grid, Skeleton, Collapse } from '@mui/material';
 import {
   Refresh,
   Warning,

@@ -11,8 +11,6 @@ const {
     PAID_BREAK_ALLOWANCE_MINUTES,
     calculateRequiredLogoutTime 
 } = require('../config/shiftPolicy');
-const { getGracePeriod } = require('./gracePeriodCache');
-const { getStatus, setStatus } = require('./statusCache');
 
 const DEFAULT_OPTIONS = {
     includeSessions: true,
@@ -44,14 +42,25 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
     const shiftStartTime = getShiftDateTimeIST(clockIn, shift.startTime);
     const lateMinutes = Math.max(0, Math.floor((clockIn - shiftStartTime) / (1000 * 60)));
 
-    // Get grace period from cache if not provided
+    // Get grace period from settings if not provided
     let GRACE_PERIOD_MINUTES = gracePeriodMinutes;
     if (GRACE_PERIOD_MINUTES === null || GRACE_PERIOD_MINUTES === undefined) {
         try {
-            // Use cached grace period (1-hour TTL, safe fallback)
-            GRACE_PERIOD_MINUTES = await getGracePeriod();
+            const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
+            if (graceSetting) {
+                // FIX: Explicitly convert to integer to ensure type consistency
+                const graceValue = parseInt(Number(graceSetting.value), 10);
+                if (!isNaN(graceValue) && graceValue >= 0) {
+                    GRACE_PERIOD_MINUTES = graceValue;
+                } else {
+                    console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
+                    GRACE_PERIOD_MINUTES = 30; // Default
+                }
+            } else {
+                GRACE_PERIOD_MINUTES = 30; // Default
+            }
         } catch (err) {
-            console.error('Failed to fetch grace period from cache, falling back to 30 minutes', err);
+            console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
             GRACE_PERIOD_MINUTES = 30;
         }
     }
@@ -294,13 +303,6 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
 
 const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     const resolvedOptions = { ...DEFAULT_OPTIONS, ...options };
-    
-    // PERFORMANCE OPTIMIZATION: Check cache first (60-second TTL)
-    const cachedStatus = getStatus(userId, targetDate);
-    if (cachedStatus) {
-        return cachedStatus;
-    }
-    
     const response = buildBaseResponse(resolvedOptions);
 
     // PHASE 2 OPTIMIZATION: Parallelize independent queries
@@ -445,18 +447,16 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     // PHASE 2 OPTIMIZATION: Parallelize independent queries
     // Batch 3: ExtraBreakRequests (independent, can run in parallel)
-    // CRITICAL FIX: ExtraBreakRequest model uses attendanceLog (ObjectId), NOT attendanceDate (string)
-    // Query by attendanceLog reference to correctly find extra break requests for today
-    if (resolvedOptions.includeRequests && attendanceLog) {
+    if (resolvedOptions.includeRequests) {
         const [pendingRequest, approvedRequest] = await Promise.all([
             ExtraBreakRequest.findOne({
                 user: userId,
-                attendanceLog: attendanceLog._id,
+                attendanceDate: targetDate,
                 status: 'Pending',
             }).lean(),
             ExtraBreakRequest.findOne({
                 user: userId,
-                attendanceLog: attendanceLog._id,
+                attendanceDate: targetDate,
                 status: 'Approved',
                 isUsed: false,
             }).lean()
@@ -491,138 +491,12 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
         response.logoutBreakdown = null;
     }
 
-    // PERFORMANCE OPTIMIZATION: Cache the response (60-second TTL)
-    // Don't cache if admin override exists - these should always be fresh
-    if (!response.attendanceLog?.overriddenByAdmin) {
-        setStatus(userId, targetDate, response);
-    }
-
     return response;
-};
-
-/**
- * BATCHED daily status computation for multiple users (Admin Dashboard only).
- *
- * Safety rules:
- * - Does NOT change getUserDailyStatus() behavior
- * - Does NOT perform any per-user DB queries
- * - Returns ONLY the fields needed by Admin Dashboard "Who's In Today" enrichment:
- *   { calculatedLogoutTime, logoutBreakdown, activeBreak }
- *
- * @param {Array<string|ObjectId>} userIds
- * @param {string} targetDate - YYYY-MM-DD (IST business date)
- * @returns {Promise<Map<string, { calculatedLogoutTime: string|null, logoutBreakdown: any|null, activeBreak: any|null }>>}
- */
-const getUsersDailyStatusBatch = async (userIds, targetDate) => {
-    const result = new Map();
-    const ids = Array.isArray(userIds) ? userIds.filter(Boolean) : [];
-    if (ids.length === 0 || !targetDate) return result;
-
-    // Normalize user IDs to strings for stable mapping
-    const userIdStrings = ids.map(id => id.toString());
-
-    // Batch 1: Users (shiftGroup) + AttendanceLogs
-    const [users, logs] = await Promise.all([
-        User.find({ _id: { $in: userIdStrings } })
-            .select('_id shiftGroup')
-            .populate('shiftGroup')
-            .lean(),
-        AttendanceLog.find({ user: { $in: userIdStrings }, attendanceDate: targetDate })
-            .select('_id user paidBreakMinutesTaken unpaidBreakMinutesTaken logoutType autoLogoutReason')
-            .lean()
-    ]);
-
-    const userById = new Map(users.map(u => [u._id.toString(), u]));
-    const logByUserId = new Map(logs.map(l => [l.user.toString(), l]));
-    const logIds = logs.map(l => l._id);
-
-    // If no logs exist, return empty map (dashboard should handle nulls)
-    if (logIds.length === 0) {
-        userIdStrings.forEach(uid => {
-            result.set(uid, { calculatedLogoutTime: null, logoutBreakdown: null, activeBreak: null });
-        });
-        return result;
-    }
-
-    // Batch 2: Sessions + Breaks
-    const [sessionsAll, breaksAll] = await Promise.all([
-        AttendanceSession.find({ attendanceLog: { $in: logIds } }).sort({ startTime: 1 }).lean(),
-        BreakLog.find({ attendanceLog: { $in: logIds } }).sort({ startTime: 1 }).lean()
-    ]);
-
-    const sessionsByLogId = new Map();
-    for (const s of sessionsAll) {
-        const key = s.attendanceLog.toString();
-        const arr = sessionsByLogId.get(key) || [];
-        arr.push(s);
-        sessionsByLogId.set(key, arr);
-    }
-
-    const breaksByLogId = new Map();
-    for (const b of breaksAll) {
-        const key = b.attendanceLog.toString();
-        const arr = breaksByLogId.get(key) || [];
-        arr.push(b);
-        breaksByLogId.set(key, arr);
-    }
-
-    const mapActiveBreakLikeGetUserDailyStatus = (breakDoc) => breakDoc ? ({
-        startTime: breakDoc.startTime,
-        breakType: breakDoc.breakType || breakDoc.type,
-        durationMinutes: Math.floor((Date.now() - new Date(breakDoc.startTime)) / (1000 * 60))
-    }) : null;
-
-    for (const uid of userIdStrings) {
-        const user = userById.get(uid);
-        const log = logByUserId.get(uid);
-
-        if (!user || !log) {
-            result.set(uid, { calculatedLogoutTime: null, logoutBreakdown: null, activeBreak: null });
-            continue;
-        }
-
-        const logId = log._id.toString();
-        const sessions = sessionsByLogId.get(logId) || [];
-        const breaks = breaksByLogId.get(logId) || [];
-
-        const activeBreakDoc = breaks.find(b => !b.endTime);
-        const activeBreak = mapActiveBreakLikeGetUserDailyStatus(activeBreakDoc);
-
-        // Provide minimal attendanceLog shape needed by computeCalculatedLogoutTime
-        const attendanceLogForCalc = {
-            paidBreakMinutesTaken: log.paidBreakMinutesTaken || 0,
-            unpaidBreakMinutesTaken: log.unpaidBreakMinutesTaken || 0,
-            logoutType: log.logoutType || 'MANUAL',
-            autoLogoutReason: log.autoLogoutReason || null
-        };
-
-        const shift = user.shiftGroup || null;
-        const logoutCalculation = computeCalculatedLogoutTime(
-            sessions,
-            breaks,
-            attendanceLogForCalc,
-            shift,
-            activeBreak
-        );
-
-        if (logoutCalculation) {
-            result.set(uid, {
-                calculatedLogoutTime: logoutCalculation.requiredLogoutTime,
-                logoutBreakdown: logoutCalculation.breakdown,
-                activeBreak
-            });
-        } else {
-            result.set(uid, { calculatedLogoutTime: null, logoutBreakdown: null, activeBreak });
-        }
-    }
-
-    return result;
 };
 
 module.exports = {
     getUserDailyStatus,
     computeCalculatedLogoutTime, // Export for testing
     recalculateLateStatus, // Export for use in admin routes
-    getUsersDailyStatusBatch,
 };
 

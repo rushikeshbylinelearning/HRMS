@@ -13,7 +13,6 @@ import {
   CardHeader,
   Checkbox,
   Chip,
-  CircularProgress,
   Container,
   Dialog,
   DialogActions,
@@ -223,17 +222,6 @@ const optimizedTheme = createTheme({
         },
       },
     },
-    // Optimize CircularProgress for faster, consistent loading animation
-    MuiCircularProgress: {
-      styleOverrides: {
-        root: {
-          animationDuration: '0.5s',
-        },
-        svg: {
-          animationDuration: '0.5s',
-        },
-      },
-    },
     // Optimize DataGrid
     MuiDataGrid: {
       styleOverrides: {
@@ -266,7 +254,6 @@ export {
   CardHeader,
   Checkbox,
   Chip,
-  CircularProgress,
   Container,
   Dialog,
   DialogActions,

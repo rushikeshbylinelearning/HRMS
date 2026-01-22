@@ -2,8 +2,9 @@
 // Enhanced button component with loading states and immediate feedback
 
 import React, { useState, useCallback } from 'react';
-import { Button, CircularProgress } from '@mui/material';
+import { Button } from '@mui/material';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 /**
  * Enhanced Button Component
  * Provides:
@@ -76,17 +77,7 @@ const EnhancedButton = ({
             {...props}
         >
             {isLoading && (
-                <CircularProgress
-                    size={size === 'small' ? 16 : size === 'large' ? 24 : 20}
-                    sx={{
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        marginLeft: size === 'small' ? '-8px' : size === 'large' ? '-12px' : '-10px',
-                        marginTop: size === 'small' ? '-8px' : size === 'large' ? '-12px' : '-10px',
-                        color: variant === 'contained' ? 'inherit' : 'primary.main',
-                    }}
-                />
+                <SkeletonBox width="24px" height="24px" borderRadius="50%" />
             )}
             <span style={{ opacity: isLoading ? 0 : 1 }}>
                 {children}

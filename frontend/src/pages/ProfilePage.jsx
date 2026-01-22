@@ -1,20 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
-import {
-    Box,
-    Container,
-    Typography,
-    Avatar,
-    Grid,
-    Stack,
-    TextField,
-    Button,
-    Snackbar,
-    Alert,
-    CircularProgress,
-    Chip,
-    IconButton,
-} from '@mui/material';
+import { Box, Container, Typography, Avatar, Grid, Stack, TextField, Button, Snackbar, Alert, Chip, IconButton,  } from '@mui/material';
 import PageHeroHeader from '../components/PageHeroHeader';
 import SoundSettings from '../components/SoundSettings';
 import CountryCodeSelector from '../components/CountryCodeSelector';
@@ -22,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import '../styles/ProfilePage.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const defaultFormState = {
     bloodGroup: '',
     phoneNumber: '',
@@ -601,7 +588,7 @@ const ProfilePage = () => {
                                     }
                                 }}
                             >
-                                {saving ? <CircularProgress color="inherit" size={26} thickness={4} /> : 'Save Details'}
+                                {saving ? <SkeletonBox width="26px" height="26px" borderRadius="50%" /> : 'Save Details'}
                             </Button>
                         </Stack>
                 </Stack>
@@ -625,7 +612,7 @@ const ProfilePage = () => {
 
             {loading && (
                 <Box className="profile-loading-overlay">
-                    <CircularProgress />
+                    <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                 </Box>
             )}
         </Box>

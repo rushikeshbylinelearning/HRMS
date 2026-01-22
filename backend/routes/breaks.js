@@ -9,8 +9,6 @@ const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const NewNotificationService = require('../services/NewNotificationService');
 const cache = require('../utils/cache');
-const cacheService = require('../services/cacheService');
-const { invalidateStatus } = require('../services/statusCache');
 const { getISTNow, getISTDateString } = require('../utils/istTime');
 const { 
     UNPAID_BREAK_ALLOWANCE_MINUTES, 
@@ -75,11 +73,8 @@ router.post('/start', authenticateToken, async (req, res) => {
         // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${today}`;
         cache.delete(cacheKey);
-        invalidateStatus(userId, today);
         // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
-        // Ensure Admin Dashboard cache refreshes after break start
-        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -107,68 +102,20 @@ router.post('/start', authenticateToken, async (req, res) => {
     }
 });
 
-// =================================================================
-// CRITICAL FIX: Explicit break ending with breakId parameter
-// =================================================================
-//
-// PREVIOUS BUG: Frontend sent empty payload to /breaks/end
-// Backend tried to infer active break, causing 400 errors when inference failed
-//
-// NEW FIX: Backend accepts optional breakId parameter for explicit break ending
-// Frontend now validates and sends { breakId: activeBreak._id }
-// This eliminates ambiguity and prevents 400 errors
-// =================================================================
-
 router.post('/end', authenticateToken, async (req, res) => {
     const { userId } = req.user;
-    // NOTE: Frontend may send no body at all. Never destructure req.body directly.
-    const body = req.body || {};
-    const breakId = typeof body.breakId === 'string' && body.breakId.trim().length > 0
-        ? body.breakId.trim()
-        : undefined;
+    const today = getISTDateString();
 
     try {
-        let activeBreak;
-        if (breakId) {
-            // CASE 1: Explicit break end
-            const breakDoc = await BreakLog.findById(breakId);
-            if (!breakDoc) {
-                return res.status(404).json({ error: 'Break not found.', code: 'BREAK_NOT_FOUND' });
-            }
-            if (String(breakDoc.userId) !== String(userId)) {
-                return res.status(403).json({ error: 'Unauthorized break access.', code: 'UNAUTHORIZED_BREAK_ACCESS' });
-            }
-            if (breakDoc.endTime) {
-                return res.status(400).json({ error: 'Break is already ended.', code: 'BREAK_ALREADY_ENDED' });
-            }
-            activeBreak = breakDoc;
-        } else {
-            // CASE 2: Implicit break end (default) - find most recent ACTIVE break for this user
-            activeBreak = await BreakLog
-                .findOne({ userId: userId, endTime: null })
-                .sort({ startTime: -1, _id: -1 });
-            if (!activeBreak) {
-                return res.status(400).json({ error: 'No active break to end.', code: 'NO_ACTIVE_BREAK' });
-            }
-        }
+        const log = await AttendanceLog.findOne({ user: userId, attendanceDate: today });
+        if (!log) return res.status(400).json({ error: 'Cannot find attendance log for today.' });
 
-        // Breaks are tied to an attendance log; update the correct log for this break
-        const log = activeBreak.attendanceLog
-            ? await AttendanceLog.findById(activeBreak.attendanceLog)
-            : null;
-        if (!log) {
-            return res.status(500).json({ error: 'Attendance log not found for break.', code: 'ATTENDANCE_LOG_MISSING' });
-        }
-
-        const businessDate = log.attendanceDate || getISTDateString();
+        const activeBreak = await BreakLog.findOne({ attendanceLog: log._id, endTime: null }).sort({ startTime: -1 });
+        if (!activeBreak) return res.status(400).json({ error: 'You are not currently on a break.' });
         
         // ... (rest of the break ending logic is fine)
         const breakEndTime = getISTNow();
-        const startTime = new Date(activeBreak.startTime);
-        if (Number.isNaN(startTime.getTime())) {
-            return res.status(500).json({ error: 'Invalid break startTime.', code: 'INVALID_BREAK_START_TIME' });
-        }
-        const currentBreakDuration = Math.max(0, Math.round((breakEndTime - startTime) / (1000 * 60)));
+        const currentBreakDuration = Math.round((breakEndTime - new Date(activeBreak.startTime)) / (1000 * 60));
         let penalty = 0, paidBreakToAdd = 0, unpaidBreakToAdd = 0;
         if (activeBreak.breakType === 'Paid') {
             const user = await User.findById(userId).populate('shiftGroup');
@@ -193,15 +140,7 @@ router.post('/end', authenticateToken, async (req, res) => {
                 penalty = currentBreakDuration - allowance;
             }
         }
-        // Atomic end: ensures we never overwrite a previously-ended break (race-safe, deterministic)
-        const updatedBreak = await BreakLog.findOneAndUpdate(
-            { _id: activeBreak._id, endTime: null },
-            { $set: { endTime: breakEndTime, durationMinutes: currentBreakDuration } },
-            { new: true }
-        );
-        if (!updatedBreak) {
-            return res.status(400).json({ error: 'Break is already ended.', code: 'BREAK_ALREADY_ENDED' });
-        }
+        const updatedBreak = await BreakLog.findByIdAndUpdate(activeBreak._id, { $set: { endTime: breakEndTime, durationMinutes: currentBreakDuration } }, { new: true });
         const updatePayload = { $inc: {} };
         if (penalty > 0) updatePayload.$inc.penaltyMinutes = penalty;
         if (paidBreakToAdd > 0) updatePayload.$inc.paidBreakMinutesTaken = paidBreakToAdd;
@@ -230,13 +169,13 @@ router.post('/end', authenticateToken, async (req, res) => {
 
         // PHASE 4 OPTIMIZATION: Cache invalidation on mutation
         // Invalidate status cache for this user and date
-        const cacheKey = `status:${userId}:${businessDate}`;
+        const cacheKey = `status:${userId}:${today}`;
         cache.delete(cacheKey);
-        invalidateStatus(userId, businessDate);
         // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
         // Also invalidate existing cacheService dashboard cache
-        cacheService.invalidateDashboard(businessDate);
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -246,9 +185,9 @@ router.post('/end', authenticateToken, async (req, res) => {
                 io.emit('attendance_log_updated', {
                     logId: log._id,
                     userId: userId,
-                    attendanceDate: businessDate,
+                    attendanceDate: today,
                     timestamp: getISTNow().toISOString(),
-                    message: `${user?.fullName || 'User'} ended ${activeBreak.breakType} break`
+                    message: `${user.fullName} ended ${activeBreak.breakType} break`
                 });
                 console.log(`📡 Emitted attendance_log_updated event for break end ${log._id}`);
             }

@@ -1,36 +1,6 @@
 // frontend/src/pages/ManageSectionPage.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Switch,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Button,
-  Chip,
-  Grid,
-  Paper,
-  Divider,
-  Alert,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  Tooltip,
-  Avatar,
-  Stack,
-  InputAdornment,
-  FormControlLabel,
-  Checkbox,
-  Menu
-} from '@mui/material';
+import { Box, Typography, Card, CardContent, Switch, FormControl, InputLabel, Select, MenuItem, TextField, Button, Chip, Grid, Paper, Divider, Alert, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Avatar, Stack, InputAdornment, FormControlLabel, Checkbox, Menu } from '@mui/material';
 import {
   Save as SaveIcon,
   Refresh as RefreshIcon,
@@ -54,6 +24,7 @@ import api from '../api/axios';
 import '../styles/ManageSectionPage.css';
 import PageHeroHeader from '../components/PageHeroHeader';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const SECTION_CARD_BASE = {
   p: 3,
   borderRadius: '18px',
@@ -1028,7 +999,7 @@ const privilegeOptions = useMemo(() => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
+        <SkeletonBox width="24px" height="24px" borderRadius="50%" />
       </Box>
     );
   }
@@ -1287,7 +1258,7 @@ const privilegeOptions = useMemo(() => {
                 <Typography variant="body2" color="text.secondary">
                   Click to manage permissions
                 </Typography>
-                {saving[user._id] && <CircularProgress size={16} />}
+                {saving[user._id] && <SkeletonBox width="16px" height="16px" borderRadius="50%" />}
               </Box>
             </CardContent>
           </Card>

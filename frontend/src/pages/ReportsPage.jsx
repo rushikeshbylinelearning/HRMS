@@ -1,7 +1,7 @@
 // src/pages/ReportsPage.jsx
 
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { Typography, Button, Paper, Grid, CircularProgress, Alert, Autocomplete, TextField, FormControl, InputLabel, Select, MenuItem, Chip, Stack, ListItemText, Card, CardContent, CardActions, Box, IconButton, Tooltip, Divider, Avatar } from '@mui/material';
+import { Typography, Button, Paper, Grid, Alert, Autocomplete, TextField, FormControl, InputLabel, Select, MenuItem, Chip, Stack, ListItemText, Card, CardContent, CardActions, Box, IconButton, Tooltip, Divider, Avatar } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -19,6 +19,7 @@ import EventNoteIcon from '@mui/icons-material/EventNote';
 import HistoryIcon from '@mui/icons-material/History';
 import { formatLeaveRequestType, isWorkingSaturday } from '../utils/saturdayUtils';
 import PageHeroHeader from '../components/PageHeroHeader';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 import '../styles/ReportsPage.css'; // Import the new stylesheet
 
 // --- HELPER FUNCTIONS ---
@@ -596,7 +597,7 @@ const ReportsPage = () => {
                 description="Export attendance, leave, notes, and activity insights with curated presets for leadership-ready summaries."
             />
             
-            {loading && <div className="loading-overlay"><CircularProgress /></div>}
+            {loading && <div className="loading-overlay"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></div>}
             {error && <Alert severity="error" onClose={() => setError('')} className="error-alert">{error}</Alert>}
 
             <Paper className="filter-card" elevation={0}>

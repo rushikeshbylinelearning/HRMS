@@ -112,10 +112,4 @@ leaveRequestSchema.index(
     }
 );
 
-// Admin Dashboard query alignment: pending queue ordering
-leaveRequestSchema.index({ status: 1, createdAt: -1 }, { background: true });
-// Admin Dashboard query alignment: "on leave today" ($elemMatch) and other status/date filters
-// Note: leaveDates is an array => this is a multikey index.
-leaveRequestSchema.index({ status: 1, leaveDates: 1 }, { background: true });
-
 module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);

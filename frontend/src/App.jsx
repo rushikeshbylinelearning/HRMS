@@ -20,7 +20,7 @@ import IdleDetectionProvider from './components/IdleDetectionProvider';
 
 // Lazy load pages for better performance
 import React, { lazy, Suspense, useEffect, useRef } from 'react';
-import { CircularProgress, Box } from '@mui/material';
+import { Box } from '@mui/material';
 
 // Import error boundary
 import AnalyticsErrorBoundary from './components/AnalyticsErrorBoundary';
@@ -47,6 +47,12 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
+
+// Import prefetch utilities
+import { setupPrefetchListeners, routePrefetchMap } from './utils/prefetch';
+
+// Import resource preloading utilities
+import { preloadCriticalResources, preloadAssets } from './utils/resourcePreloader';
 
 // Enhanced loading component for Suspense - uses skeleton loaders
 const PageLoader = ({ type = 'default' }) => (
@@ -156,6 +162,31 @@ function App() {
         
         // Mark as processed if no tokens found (to prevent re-checking)
         ssoTokenProcessedRef.current = true;
+    }, []);
+
+    // Setup route prefetching for performance optimization
+    useEffect(() => {
+        setupPrefetchListeners(routePrefetchMap);
+    }, []);
+
+    // Preload critical resources for performance
+    useEffect(() => {
+        preloadAssets();
+        preloadCriticalResources();
+    }, []);
+
+    // Register service worker for caching
+    useEffect(() => {
+        if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+            navigator.serviceWorker
+                .register('/sw.js')
+                .then((registration) => {
+                    console.log('[SW] Service worker registered:', registration);
+                })
+                .catch((error) => {
+                    console.error('[SW] Service worker registration failed:', error);
+                });
+        }
     }, []);
 
     return (

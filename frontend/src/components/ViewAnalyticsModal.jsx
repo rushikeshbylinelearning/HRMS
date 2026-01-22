@@ -1,42 +1,7 @@
 // frontend/src/components/ViewAnalyticsModal.jsx
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CircularProgress,
-  Alert,
-  Chip,
-  IconButton,
-  Divider,
-  LinearProgress,
-  Paper,
-  Stack,
-  Tooltip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  ToggleButtonGroup,
-  ToggleButton,
-  Tab,
-  Tabs,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Switch,
-  Snackbar
-} from '@mui/material';
+import { Dialog, DialogContent, DialogActions, Button, Box, Typography, Grid, Card, CardContent, Alert, Chip, IconButton, Divider, LinearProgress, Paper, Stack, Tooltip, FormControl, InputLabel, Select, MenuItem, ToggleButtonGroup, ToggleButton, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Snackbar } from '@mui/material';
 import {
   Close,
   TrendingUp,
@@ -87,6 +52,7 @@ import axios from '../api/axios';
 import socket from '../socket';
 import './ViewAnalyticsModal.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -664,7 +630,7 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
       <DialogContent sx={{ p: 0, overflow: 'auto' }}>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="400px">
-            <CircularProgress sx={{ color: THEME.primary }} />
+            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
           </Box>
         ) : error ? (
           <Box p={3}>
@@ -1438,7 +1404,7 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
                 
                 {loadingResolution ? (
                   <Box display="flex" justifyContent="center" p={4}>
-                    <CircularProgress sx={{ color: THEME.primary }} />
+                    <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                   </Box>
                 ) : attendanceResolutionData ? (
                   <>

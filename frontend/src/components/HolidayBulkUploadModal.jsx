@@ -1,10 +1,6 @@
 // src/components/HolidayBulkUploadModal.jsx
 import React, { useState, memo } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
-    Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Paper, Chip, CircularProgress, Snackbar
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Snackbar } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -12,6 +8,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import * as XLSX from 'xlsx';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const HolidayBulkUploadModal = memo(({ open, onClose, onSuccess }) => {
     const [file, setFile] = useState(null);
     const [previewData, setPreviewData] = useState([]);
@@ -483,7 +480,7 @@ const HolidayBulkUploadModal = memo(({ open, onClose, onSuccess }) => {
                         variant="contained"
                         onClick={handleUpload}
                         disabled={uploading || previewData.length === 0 || errors.length > 0}
-                        startIcon={uploading ? <CircularProgress size={16} /> : <UploadFileIcon />}
+                        startIcon={uploading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <UploadFileIcon />}
                     >
                         {uploading ? 'Uploading...' : 'Upload Holidays'}
                     </Button>

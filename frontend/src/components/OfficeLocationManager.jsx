@@ -1,29 +1,10 @@
 // frontend/src/components/OfficeLocationManager.jsx
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import {
-    Box,
-    Typography,
-    Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    IconButton,
-    Alert,
-    CircularProgress,
-    Chip
-} from '@mui/material';
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Alert, Chip } from '@mui/material';
 import { Add, Edit, Delete, LocationOn } from '@mui/icons-material';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const OfficeLocationManager = forwardRef((props, ref) => {
     const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -165,7 +146,7 @@ const OfficeLocationManager = forwardRef((props, ref) => {
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-                <CircularProgress />
+                <SkeletonBox width="24px" height="24px" borderRadius="50%" />
             </Box>
         );
     }

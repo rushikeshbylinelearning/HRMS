@@ -1,13 +1,7 @@
 // frontend/src/pages/NewActivityLogPage.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
-import {
-    Typography, Button, CircularProgress, Alert, Chip, Snackbar, Dialog, DialogTitle,
-    DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField,
-    TablePagination, FormControl, InputLabel, Select, MenuItem, Grid, Card,
-    CardContent, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, Divider, Paper, Stack, LinearProgress
-} from '@mui/material';
+import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField, TablePagination, FormControl, InputLabel, Select, MenuItem, Grid, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider, Paper, Stack, LinearProgress } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -22,6 +16,7 @@ import '../styles/ActivityLogsPage.css';
 import PageHeroHeader from '../components/PageHeroHeader';
 import socket from '../socket';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString('en-US', {
@@ -243,7 +238,7 @@ const NewActivityLogPage = () => {
                             <CardContent>
                                 <Typography variant="caption" className="summary-label">{stat.label}</Typography>
                                 <Typography variant="h4" className="summary-value" sx={{ color: stat.color }}>
-                                    {loading ? <CircularProgress size={24} /> : stat.value}
+                                    {loading ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : stat.value}
                                 </Typography>
                                 <Typography variant="body2" className="summary-sublabel">
                                     {stat.sublabel}
@@ -302,7 +297,7 @@ const NewActivityLogPage = () => {
                         <TableHead><TableRow><TableCell>Timestamp</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Message</TableCell><TableCell>Category</TableCell><TableCell>Status</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={7} align="center" sx={{p:4}}><CircularProgress /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} align="center" sx={{p:4}}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></TableCell></TableRow>
                             ) : logs.map((log) => (
                                 <TableRow key={log.id || log._id} hover className={!log.read ? 'activity-row-unread' : ''}>
                                     <TableCell><Typography variant="body2">{formatDate(log.createdAt)}</Typography></TableCell>

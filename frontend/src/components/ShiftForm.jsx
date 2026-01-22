@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, FormControl,
-    InputLabel, Select, MenuItem, Stack, Box, Typography, Divider, CircularProgress
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, FormControl, InputLabel, Select, MenuItem, Stack, Box, Typography, Divider } from '@mui/material';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const getInitialState = () => ({
     shiftName: '',
     shiftType: 'Fixed',
@@ -82,7 +80,7 @@ const ShiftForm = ({ open, onClose, onSave, shift, isSaving }) => {
             <DialogActions sx={{ p: 3 }}>
                 <Button onClick={onClose} color="inherit">Cancel</Button>
                 <Button onClick={handleSave} variant="contained" disabled={isSaving} sx={{ minWidth: '80px' }}>
-                    {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Save'}
+                    {isSaving ? <SkeletonBox width="24px" height="24px" borderRadius="50%" /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

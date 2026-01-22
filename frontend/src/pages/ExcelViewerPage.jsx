@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import socket from '../socket'; // <-- NEW
-import { CircularProgress, Alert, Select, MenuItem, FormControl, InputLabel, Box, Typography } from '@mui/material';
+import { Alert, Select, MenuItem, FormControl, InputLabel, Box, Typography } from '@mui/material';
 import '../styles/ExcelViewerPage.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const ExcelViewerPage = () => {
     const [sheets, setSheets] = useState([]);
     const [selectedSheet, setSelectedSheet] = useState('');
@@ -124,7 +125,7 @@ const ExcelViewerPage = () => {
 
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                    <CircularProgress />
+                    <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                 </Box>
             ) : sheetData && (
                 <div className="table-wrapper">

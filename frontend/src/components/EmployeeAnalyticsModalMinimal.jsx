@@ -1,19 +1,10 @@
 // Minimal version of EmployeeAnalyticsModal to isolate React error
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  CircularProgress,
-  Alert
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeAnalyticsModalMinimal = ({ open, onClose, employeeId, employeeName }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -70,7 +61,7 @@ const EmployeeAnalyticsModalMinimal = ({ open, onClose, employeeId, employeeName
       <DialogContent>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="200px">
-            <CircularProgress />
+            <SkeletonBox width="24px" height="24px" borderRadius="50%" />
           </Box>
         ) : error ? (
           <Alert severity="error">{error}</Alert>

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef, forwardRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    Typography, Button, CircularProgress, Alert, Stack, Box, Grid, Paper, 
-    Avatar, Divider, Chip, IconButton, Dialog, DialogTitle, DialogContent, 
+import {
+    Typography, Button, Alert, Stack, Box, Grid, Paper,
+    Avatar, Divider, Chip, IconButton, Dialog, DialogTitle, DialogContent,
     DialogActions, Slide, Fade, TextField, Snackbar, Tooltip, Skeleton
 } from '@mui/material';
 import api from '../api/axios';
@@ -22,6 +22,7 @@ import SaturdaySchedule from '../components/SaturdaySchedule';
 import RecentActivityCard from '../components/RecentActivityCard';
 import ShiftProgressBar from '../components/ShiftProgressBar';
 import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, WeeklyTimeCardsSkeleton } from '../components/DashboardSkeletons';
+import { EmployeeDashboardSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
 import '../styles/EmployeeDashboardPage.css';
 
 // Icons
@@ -501,92 +502,14 @@ const EmployeeDashboardPage = () => {
     // If user is null but we're authenticated, show skeleton (user data loading)
     const { authStatus } = useAuth();
     if (authStatus === 'unknown' || !contextUser) {
-        return (
-            <Box className="employee-dashboard-container">
-                <Grid container spacing={3}>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base action-card">
-                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                                    <CircularProgress />
-                                </Box>
-                            </Paper>
-                            <Paper className="dashboard-card-base weekly-view-card">
-                                <WeeklyTimeCardsSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base profile-card">
-                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                                    <CircularProgress />
-                                </Box>
-                            </Paper>
-                            <Paper className="dashboard-card-base shift-info-card">
-                                <ShiftInfoSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base recent-activity-card">
-                                <RecentActivitySkeleton />
-                            </Paper>
-                            <Paper className="dashboard-card-base saturday-schedule-card">
-                                <SaturdayScheduleSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                </Grid>
-            </Box>
-        );
+        return <EmployeeDashboardSkeleton />;
     }
     // =================================================================
     
     // Show skeleton/loading state if critical data not yet loaded, but don't block render
     if (loading || !dailyData) {
         // Render dashboard shell with skeletons - allows progressive loading
-        return (
-            <Box className="employee-dashboard-container">
-                <Grid container spacing={3}>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base action-card">
-                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                                    <CircularProgress />
-                                </Box>
-                            </Paper>
-                            <Paper className="dashboard-card-base weekly-view-card">
-                                <WeeklyTimeCardsSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base profile-card">
-                                <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                                    <CircularProgress />
-                                </Box>
-                            </Paper>
-                            <Paper className="dashboard-card-base shift-info-card">
-                                <ShiftInfoSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                    <Grid item xs={12} lg={4}>
-                        <Stack spacing={3}>
-                            <Paper className="dashboard-card-base recent-activity-card">
-                                <RecentActivitySkeleton />
-                            </Paper>
-                            <Paper className="dashboard-card-base saturday-schedule-card">
-                                <SaturdayScheduleSkeleton />
-                            </Paper>
-                        </Stack>
-                    </Grid>
-                </Grid>
-            </Box>
-        );
+        return <EmployeeDashboardSkeleton />;
     }
 
     return (
@@ -651,9 +574,9 @@ const EmployeeDashboardPage = () => {
                                     </Box>
                                 </Box>
                                 <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
-                                    {actionLoading ? ( 
+                                    {actionLoading ? (
                                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', py: 1 }}>
-                                            <CircularProgress size={24} />
+                                            <SkeletonBox width="100%" height="36px" borderRadius="8px" />
                                         </Box>
                                     ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
                                         canAccess.checkIn() ? (
@@ -783,7 +706,7 @@ const EmployeeDashboardPage = () => {
                 <Dialog open={isReasonModalOpen} onClose={handleCloseReasonModal} TransitionComponent={DialogTransition} fullWidth maxWidth="xs">
                     <DialogTitle sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Request Extra Break</DialogTitle>
                     <DialogContent><Typography variant="body2" sx={{ mb: 2, fontWeight: 400, letterSpacing: '0.025em' }}>Please provide a reason for your request. An admin will review it shortly.</Typography><TextField autoFocus margin="dense" id="reason" label="Reason for Break" type="text" fullWidth variant="outlined" multiline rows={3} value={breakReason} onChange={(e) => setBreakReason(e.target.value)} /></DialogContent>
-                    <DialogActions sx={{ p: '16px 24px' }}><Button onClick={handleCloseReasonModal} className="theme-button-checkout">Cancel</Button><Button onClick={handleRequestExtraBreak} variant="contained" className="theme-button-red" disabled={isSubmittingReason}>{isSubmittingReason ? <CircularProgress size={24} /> : "Send Request"}</Button></DialogActions>
+                    <DialogActions sx={{ p: '16px 24px' }}><Button onClick={handleCloseReasonModal} className="theme-button-checkout">Cancel</Button><Button onClick={handleRequestExtraBreak} variant="contained" className="theme-button-red" disabled={isSubmittingReason}>{isSubmittingReason ? <SkeletonBox width="100px" height="24px" borderRadius="4px" /> : "Send Request"}</Button></DialogActions>
                 </Dialog>
 
                 {/* Weekly late warning dialog (informational only) */}

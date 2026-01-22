@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
-import { TextField, Button, Typography, Alert, Box, IconButton, InputAdornment, CircularProgress, Link } from '@mui/material';
+import { TextField, Button, Typography, Alert, Box, IconButton, InputAdornment, Link } from '@mui/material';
 import { Visibility, VisibilityOff, LocationOn, LocationOff } from '@mui/icons-material';
 import { getCurrentLocation, isGeolocationSupported, formatDistance, getCachedLocationOnly, isLocationCacheValid } from '../services/locationService';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 import '../styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -395,7 +396,7 @@ const LoginPage = () => {
             console.log('[SSO Debug] Processing SSO token...');
             console.log('[SSO Debug] API Base URL:', import.meta.env.VITE_API_BASE_URL);
             console.log('[SSO Debug] DEV mode:', import.meta.env.DEV);
-            
+
             console.log('[SSO Debug] Using axios instance with baseURL:', api.defaults.baseURL);
             console.log('[SSO Debug] Calling POST /api/auth/validate-sso (single call only)...');
             
@@ -641,7 +642,7 @@ const LoginPage = () => {
                         {/* Show loading state for SSO authentication */}
                         {(loading || isProcessing) && (searchParams.get('sso_token') || searchParams.get('token')) && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-                                <CircularProgress size={40} sx={{ mb: 2 }} />
+                                <SkeletonBox width="40px" height="40px" borderRadius="50%" />
                                 <Typography variant="body2" color="text.secondary">
                                     Authenticating with SSO...
                                 </Typography>
@@ -667,7 +668,7 @@ const LoginPage = () => {
                                         size="small"
                                         onClick={getLocation}
                                         disabled={locationLoading}
-                                        startIcon={locationLoading ? <CircularProgress size={16} /> : <LocationOn />}
+                                        startIcon={locationLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <LocationOn />}
                                     >
                                         {locationLoading ? 'Getting...' : 'Enable Location'}
                                     </Button>

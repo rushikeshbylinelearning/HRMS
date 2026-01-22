@@ -45,7 +45,6 @@ require('./models/ExtraBreakRequest');
 require('./models/NewNotification'); // <-- THIS IS THE FIX
 require('./models/Holiday');
 require('./models/OfficeLocation');
-require('./models/ProbationAuditLog'); // <-- PROBATION AUDIT LOG MODEL
 // TODO: Uncomment when these models are implemented
 // require('./models/LeaveYearEndAction');
 // require('./models/LeaveEncashment');
@@ -750,18 +749,6 @@ const startServer = async () => {
       console.log('✅ Database indexes created successfully');
     } catch (error) {
       console.error('Failed to create database indexes:', error);
-    }
-
-    // Verify mail transporter once at startup (fail fast in production if mail is enabled)
-    try {
-      const { verifyTransporterOnce } = require('./services/mailService');
-      await verifyTransporterOnce();
-    } catch (mailVerifyError) {
-      console.error('❌ SMTP verification failed at startup:', mailVerifyError.message);
-      // In production, this should be treated as fatal unless emails are explicitly disabled.
-      if (process.env.NODE_ENV === 'production' && process.env.DISABLE_ALL_EMAILS !== 'true') {
-        throw mailVerifyError;
-      }
     }
     
     // Start scheduled jobs after database is ready

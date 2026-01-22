@@ -2,11 +2,7 @@
 
 import React, { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import api from '../api/axios';
-import {
-    Typography, Button, CircularProgress, Alert, Snackbar, Dialog, DialogTitle,
-    DialogContent, DialogActions, Chip, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, Paper, Tooltip, IconButton, TableSortLabel, Box, TablePagination
-} from '@mui/material';
+import { Typography, Button, Alert, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tooltip, IconButton, TableSortLabel, Box, TablePagination } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -15,6 +11,7 @@ import ShiftForm from '../components/ShiftForm';
 import '../styles/ShiftsPage.css'; // The updated stylesheet
 import PageHeroHeader from '../components/PageHeroHeader';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // --- Helper Functions ---
 const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
@@ -246,7 +243,7 @@ const ShiftsPage = () => {
         [shifts, order, orderBy],
     );
 
-    if (loading) return <div className="flex-center"><CircularProgress /></div>;
+    if (loading) return <div className="flex-center"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></div>;
 
     return (
         <div className="shifts-page">

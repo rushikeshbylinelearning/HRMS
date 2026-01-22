@@ -1,14 +1,12 @@
 // frontend/src/components/WeeklyLogTable.jsx
 import React, { useState, useEffect, Fragment } from 'react';
 import axios from 'axios';
-import {
-    Box, Typography, Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
-    CircularProgress, Alert, Chip, Collapse, IconButton
-} from '@mui/material';
+import { Box, Typography, Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Alert, Chip, Collapse, IconButton } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LogDisplayTable from './LogDisplayTable';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
     return new Date(timeString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -114,7 +112,7 @@ const WeeklyLogTable = () => {
     return (
         <Paper sx={{ mt: 3, p: 2 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>My Weekly Log</Typography>
-            {loading && <Box sx={{textAlign: 'center', p: 2}}><CircularProgress /></Box>}
+            {loading && <Box sx={{textAlign: 'center', p: 2}}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></Box>}
             {error && <Alert severity="error">{error}</Alert>}
             {logs && <LogDisplayTable logs={logs} />}
         </Paper>

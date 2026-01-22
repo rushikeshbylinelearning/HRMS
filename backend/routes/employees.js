@@ -61,17 +61,8 @@ const sendEmploymentStatusChangeNotification = async (employee, oldStatus, newSt
             </div>
         `;
         
-        sendEmail({
-            to: recipients,
-            subject,
-            html,
-            isHREmail: true,
-            mailType: 'HREmploymentStatusChange',
-            recipientType: 'hr'
-        }).catch(err => {
-            console.error(`[Employment Status] Failed to send notification for ${employee.fullName}:`, err);
-        });
-        console.log(`[Employment Status] Notification queued for ${employee.fullName}'s status change from ${oldStatus} to ${newStatus}`);
+        await sendEmail({ to: recipients, subject, html, isHREmail: true });
+        console.log(`[Employment Status] Notification sent for ${employee.fullName}'s status change from ${oldStatus} to ${newStatus}`);
     } catch (error) {
         console.error(`[Employment Status] Failed to send notification for ${employee.fullName}:`, error);
     }
@@ -84,7 +75,6 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
-        // CRITICAL FIX: Added employmentStatus and probationStatus for Leave Tracker filtering
         const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus';
 
         if (getAllEmployees) {
@@ -385,16 +375,7 @@ router.post('/:id/probation-settings', [authenticateToken, isAdminOrHr], async (
                     </div>
                 `;
                 
-                sendEmail({
-                    to: recipients,
-                    subject,
-                    html,
-                    isHREmail: true,
-                    mailType: 'HRProbationSettingsUpdated',
-                    recipientType: 'hr'
-                }).catch(err => {
-                    console.error('Failed to send probation settings notification email:', err);
-                });
+                await sendEmail({ to: recipients, subject, html, isHREmail: true });
             }
         } catch (emailError) {
             console.error('Failed to send probation settings notification email:', emailError);

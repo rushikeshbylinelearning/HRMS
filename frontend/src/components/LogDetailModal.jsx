@@ -7,11 +7,7 @@
  * 4. No backend/API/timezone changes - purely UI/UX improvements
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, DialogActions, 
-    Button, TextField, Select, MenuItem, FormControl, InputLabel, Divider, 
-    CircularProgress, Paper, Stack, ToggleButtonGroup, ToggleButton, Alert, Grid, Chip
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, DialogActions, Button, TextField, Select, MenuItem, FormControl, InputLabel, Divider, Paper, Stack, ToggleButtonGroup, ToggleButton, Alert, Grid, Chip } from '@mui/material';
 import api from '../api/axios';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot } from '@mui/lab';
 import CloseIcon from '@mui/icons-material/Close';
@@ -31,6 +27,7 @@ import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { normalizeSession, validateSessionDuration, createNormalizedDateTime } from '../utils/timeNormalization';
 import '../styles/LogDetailModal.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // --- SHARED HELPER FUNCTIONS ---
 const formatTimeForDisplay = (dateTime) => {
     if (!dateTime) return '--:--';
@@ -1181,7 +1178,7 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         variant="contained" 
                         onClick={handleSaveChanges} 
                         disabled={isSaving}
-                        startIcon={isSaving ? <CircularProgress size={20} /> : <SaveIcon />}
+                        startIcon={isSaving ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : <SaveIcon />}
                         className="admin-edit-save-button"
                     >
                         {isSaving ? 'Saving...' : 'Save Changes'}
@@ -1266,7 +1263,7 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         variant="contained"
                         color="warning"
                         disabled={isOverriding || !overrideReason.trim()}
-                        startIcon={isOverriding ? <CircularProgress size={20} /> : null}
+                        startIcon={isOverriding ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : null}
                     >
                         {isOverriding ? 'Overriding...' : 'Confirm Override'}
                     </Button>

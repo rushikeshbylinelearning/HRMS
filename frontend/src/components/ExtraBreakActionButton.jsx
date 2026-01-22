@@ -1,9 +1,10 @@
 // frontend/src/components/ExtraBreakActionButton.jsx
 import React, { useState } from 'react';
-import { Button, Box, Typography, Alert, Chip, CircularProgress } from '@mui/material';
+import { Button, Box, Typography, Alert, Chip } from '@mui/material';
 import { PlayArrow, CheckCircle } from '@mui/icons-material';
 import api from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const ExtraBreakActionButton = ({ notification, onActionComplete }) => {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
@@ -66,7 +67,7 @@ const ExtraBreakActionButton = ({ notification, onActionComplete }) => {
                 color="success"
                 onClick={handleStartBreak}
                 disabled={loading || result?.type === 'success'}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
+                startIcon={loading ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : <PlayArrow />}
                 fullWidth
             >
                 {loading ? 'Starting...' : 'Start Extra Break'}

@@ -1,21 +1,6 @@
 // frontend/src/components/EmployeeAttendanceTrendChart.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Tooltip,
-  CircularProgress,
-  Alert
-} from '@mui/material';
+import { Box, Card, CardContent, Typography, Grid, FormControl, InputLabel, Select, MenuItem, Chip, IconButton, Tooltip, Alert } from '@mui/material';
 import {
   TrendingUp,
   FilterList,
@@ -43,6 +28,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import axios from '../api/axios';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 // Color scheme for attendance statuses
 const ATTENDANCE_COLORS = {
   present: '#4CAF50',      // Green
@@ -452,7 +438,7 @@ const EmployeeAttendanceTrendChart = ({ user, employeeData, startDate, endDate, 
         border: `1px solid ${COLORS.borderColor}`
       }}>
         <CardContent sx={{ p: 4, textAlign: 'center' }}>
-          <CircularProgress sx={{ color: COLORS.primary }} />
+          <SkeletonBox width="24px" height="24px" borderRadius="50%" />
           <Typography variant="body1" sx={{ mt: 2, color: COLORS.textSecondary }}>
             Loading attendance data...
           </Typography>

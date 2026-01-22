@@ -1,28 +1,9 @@
 // frontend/src/components/EnhancedLeaveRequestModal.jsx
 import React, { useState } from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Typography,
-    Box,
-    Chip,
-    Avatar,
-    Divider,
-    TextField,
-    Stack,
-    Card,
-    CardContent,
-    IconButton,
-    Tooltip,
-    Alert,
-    CircularProgress,
-    Collapse
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Chip, Avatar, Divider, TextField, Stack, Card, CardContent, IconButton, Tooltip, Alert, Collapse } from '@mui/material';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import api from '../api/axios';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 import {
     Person as PersonIcon,
     CalendarToday as CalendarIcon,
@@ -627,7 +608,7 @@ const EnhancedLeaveRequestModal = ({
                                     <Button
                                         variant="outlined"
                                         size="small"
-                                        startIcon={loadingCertificate ? <CircularProgress size={16} /> : <VisibilityIcon />}
+                                        startIcon={loadingCertificate ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <VisibilityIcon />}
                                         onClick={() => handleViewCertificate(request.medicalCertificate)}
                                         disabled={loadingCertificate}
                                         sx={{
@@ -645,7 +626,7 @@ const EnhancedLeaveRequestModal = ({
                                     <Button
                                         variant="contained"
                                         size="small"
-                                        startIcon={loadingCertificate ? <CircularProgress size={16} /> : <OpenInNewIcon />}
+                                        startIcon={loadingCertificate ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <OpenInNewIcon />}
                                         onClick={() => handleViewCertificate(request.medicalCertificate)}
                                         disabled={loadingCertificate}
                                         sx={{
@@ -761,7 +742,7 @@ const EnhancedLeaveRequestModal = ({
                                 <Button 
                                     onClick={handleReject} 
                                     variant="outlined"
-                                    startIcon={actionLoading ? <CircularProgress size={16} sx={{ color: '#f44336' }} /> : <CancelIcon />}
+                                    startIcon={actionLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <CancelIcon />}
                                     disabled={actionLoading}
                                     size="medium"
                                     sx={{
@@ -785,7 +766,7 @@ const EnhancedLeaveRequestModal = ({
                                 <Button 
                                     onClick={handleApprove} 
                                     variant="contained"
-                                    startIcon={actionLoading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <CheckIcon />}
+                                    startIcon={actionLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <CheckIcon />}
                                     disabled={actionLoading}
                                     size="medium"
                                     sx={{

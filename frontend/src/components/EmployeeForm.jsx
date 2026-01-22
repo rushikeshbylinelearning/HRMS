@@ -1,12 +1,9 @@
 // frontend/src/components/EmployeeForm.jsx
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid,
-    Select, MenuItem, InputLabel, FormControl, CircularProgress, Box, Stack, 
-    Typography, Chip, OutlinedInput, IconButton
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Box, Stack, Typography, Chip, OutlinedInput, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const initialFormState = {
     employeeCode: '',
     fullName: '',
@@ -448,7 +445,7 @@ const EmployeeForm = ({ open, onClose, onSave, employee, shifts, isSaving }) => 
                         '&:hover': { backgroundColor: '#d32f2f' }
                     }}
                 >
-                    {isSaving ? <CircularProgress size={22} color="inherit" /> : 'Save'}
+                    {isSaving ? <SkeletonBox width="22px" height="22px" borderRadius="50%" /> : 'Save'}
                 </Button>
             </DialogActions>
         </Dialog>

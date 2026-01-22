@@ -2,10 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import {
-    Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText,
-    Chip, Button, Tooltip, Divider, CircularProgress, Alert
-} from '@mui/material';
+import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText, Chip, Button, Tooltip, Divider, Alert } from '@mui/material';
 import {
     Close as CloseIcon, CheckCircle as CheckCircleIcon, Error as ErrorIcon, Info as InfoIcon,
     Warning as WarningIcon, NotificationsOffOutlined as NotificationsOffOutlinedIcon,
@@ -17,6 +14,7 @@ import useNewNotifications from '../hooks/useNewNotifications';
 import api from '../api/axios';
 import '../styles/NotificationDrawer.css';
 
+import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatDistanceToNow = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -129,7 +127,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                                     className="start-break-button"
                                     variant="contained"
                                     size="small"
-                                    startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : <StartBreakIcon />}
+                                    startIcon={actionLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <StartBreakIcon />}
                                     disabled={actionLoading}
                                     onClick={(e) => handleAction(e, onStartBreak, notification.id)}
                                 >
@@ -144,7 +142,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                                     variant="contained"
                                     color="success"
                                     size="small"
-                                    startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                                    startIcon={actionLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <CheckCircleIcon />}
                                     disabled={actionLoading}
                                     onClick={(e) => handleAction(e, onPromoteEmployee, notification.actionData.actionParams.employeeId, notification.id)}
                                 >
@@ -159,7 +157,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                                     variant="contained"
                                     color="warning"
                                     size="small"
-                                    startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                                    startIcon={actionLoading ? <SkeletonBox width="16px" height="16px" borderRadius="50%" /> : <CheckCircleIcon />}
                                     disabled={actionLoading}
                                     onClick={(e) => handleAction(e, onOverrideHalfDay, notification.actionData.actionParams.attendanceLogId, notification.id)}
                                 >
@@ -334,7 +332,7 @@ const NewNotificationDrawer = ({ open, onClose }) => {
             
             <Box className="drawer-body">
                 {loadingNotifications ? (
-                    <Box className="flex-center" sx={{ height: '100%' }}><CircularProgress color="inherit" /></Box>
+                    <Box className="flex-center" sx={{ height: '100%' }}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></Box>
                 ) : notifications.length > 0 ? (
                     <List className="notification-list">
                         {notifications.map((n) => (

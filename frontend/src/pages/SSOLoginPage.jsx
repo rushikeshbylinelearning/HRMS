@@ -1,8 +1,9 @@
 // frontend/src/pages/SSOLoginPage.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Box, CircularProgress, Typography, Alert, Link } from '@mui/material';
+import { Box, Typography, Alert, Link } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 
 const SSOLoginPage = () => {
   const [searchParams] = useSearchParams();
@@ -25,10 +26,10 @@ const SSOLoginPage = () => {
           console.log('🔄 No token provided - checking existing session...');
           
           try {
-            const apiUrl = import.meta.env.DEV 
-              ? 'http://localhost:3001/api' 
-              : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api') 
-                  ? import.meta.env.VITE_API_BASE_URL 
+            const apiUrl = import.meta.env.DEV
+              ? 'http://localhost:3001/api'
+              : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
+                  ? import.meta.env.VITE_API_BASE_URL
                   : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
             const response = await fetch(`${apiUrl}/auth/me`, {
               method: 'GET',
@@ -144,7 +145,7 @@ const SSOLoginPage = () => {
           gap: 2
         }}
       >
-        <CircularProgress size={60} />
+        <SkeletonBox width="60px" height="60px" borderRadius="50%" />
         <Typography variant="h6" color="text.secondary">
           Completing SSO login...
         </Typography>

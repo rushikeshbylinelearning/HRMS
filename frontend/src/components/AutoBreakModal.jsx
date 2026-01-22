@@ -1,16 +1,6 @@
 import React from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  Alert,
-  CircularProgress,
-  IconButton
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Alert, IconButton } from '@mui/material';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 import {
   AccessTime as AccessTimeIcon,
   Close as CloseIcon,
@@ -121,7 +111,7 @@ const AutoBreakModal = ({
           <Button
             onClick={onEndBreak}
             variant="contained"
-            startIcon={isEndingBreak ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+            startIcon={isEndingBreak ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : <PlayArrowIcon />}
             disabled={isEndingBreak}
             sx={{
               background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
