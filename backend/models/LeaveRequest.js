@@ -25,8 +25,24 @@ const leaveRequestSchema = new mongoose.Schema({
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },
     rejectionNotes: { type: String }, // Notes provided when rejecting a leave request
-    medicalCertificate: { type: String }, // URL/path to medical certificate file (required for Sick leave)
+    medicalCertificate: { type: String }, // URL/path to medical certificate file (optional for Sick leave)
     appliedAfterReturn: { type: Boolean, default: false }, // For sick leave tracking
+    // Medical proof tracking for Sick Leave
+    medicalProofStatus: {
+        type: String,
+        enum: ['NotRequired', 'Pending', 'Provided', 'Requested', 'Overdue'],
+        default: 'NotRequired',
+        // NotRequired: Certificate not needed (same-day, < threshold days)
+        // Pending: Future-dated SL without certificate yet (waiting for leave date)
+        // Provided: Certificate uploaded
+        // Requested: Admin requested proof
+        // Overdue: Certificate deadline passed without upload
+    },
+    medicalProofRequired: { type: Boolean, default: false }, // Whether proof is required based on policy
+    medicalProofDeadline: { type: Date }, // Deadline for certificate upload (leave date + N days)
+    medicalProofRequestedAt: { type: Date }, // When admin requested proof
+    medicalProofRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Admin who requested proof
+    medicalCertificateUploadedAt: { type: Date }, // When certificate was uploaded
     halfYearPeriod: { 
         type: String, 
         enum: ['First Half', 'Second Half'], 
@@ -89,6 +105,9 @@ const leaveRequestSchema = new mongoose.Schema({
         type: Date,
         // Timestamp when override was applied
     },
+    // Backdated Leave balance deduction breakdown (for restore on reject/delete)
+    backdatedSickDeducted: { type: Number, default: null },
+    backdatedCasualDeducted: { type: Number, default: null },
 }, { timestamps: true });
 
 // Compound unique index to prevent duplicate Year-End requests
@@ -111,5 +130,9 @@ leaveRequestSchema.index(
         background: true
     }
 );
+
+// Indexes for dashboard and pending-leaves: filter by status and requestType / leaveDates
+leaveRequestSchema.index({ status: 1, requestType: 1 }, { background: true });
+leaveRequestSchema.index({ status: 1, leaveDates: 1 }, { background: true });
 
 module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);

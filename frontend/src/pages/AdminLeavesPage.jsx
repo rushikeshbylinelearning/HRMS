@@ -39,6 +39,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
+import { filterActiveEmployees, filterEmployeesByRole } from '../utils/employeeFilterUtils';
+import {
+  getAdminLeavesCacheKey,
+  getLeavesCache,
+  setLeavesCache,
+  invalidateLeavesCache,
+  LEAVES_REFETCH_COOLDOWN_MS,
+} from '../utils/leavesCache';
 // --- Shared DatePicker SlotProps for Microsoft Calendar Style ---
 const datePickerSlotProps = {
     textField: {
@@ -218,11 +226,14 @@ const datePickerSlotProps = {
 };
 
 // --- Leave Count Summary Tab Component ---
-const LeaveCountSummaryTab = memo(() => {
+// Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
+// refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
+const LeaveCountSummaryTab = memo(({ refetchRef }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
     const [allLeaveRequests, setAllLeaveRequests] = useState([]);
+    const [analyticsCounts, setAnalyticsCounts] = useState(null); // From GET /admin/leaves/analytics/counts; null = use legacy allLeaveRequests
     const [analyticsData, setAnalyticsData] = useState({}); // Store analytics per employee
     const [totalWorkingDays, setTotalWorkingDays] = useState(null); // Total working days from monthly context settings
     const [monthlyContextDays, setMonthlyContextDays] = useState(30); // Monthly context days from settings
@@ -251,62 +262,75 @@ const LeaveCountSummaryTab = memo(() => {
     // Check if any filters are active
     const hasActiveFilters = searchTerm || selectedLeaveType || dateRange.start || dateRange.end;
     
-    // Fetch all data
-    const fetchData = useCallback(async () => {
+    // Load leave counts: try analytics endpoint first; on failure fall back to legacy pagination loop (non-blocking, safe).
+    const loadLeaveCounts = useCallback(async () => {
+        if (!employees.length) return;
         setLoading(true);
         setError('');
         try {
-            // Fetch all employees
-            const empRes = await api.get('/admin/employees?all=true');
-            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
-            // Filter for employees only (exclude interns)
-            const employeesOnly = allEmps.filter(emp => emp.role !== 'Intern');
-            setEmployees(employeesOnly);
-            
-            // Fetch all leave requests filtered by role at backend (employees only, exclude interns)
-            // Backend handles the filtering, so we get optimized results
+            const month = selectedMonth.getMonth() + 1;
+            const year = selectedMonth.getFullYear();
+            const params = { month, year, role: 'Employee' };
+            if (selectedLeaveType) params.leaveType = selectedLeaveType;
+            if (dateRange.start && dateRange.end) {
+                params.startDate = dateRange.start;
+                params.endDate = dateRange.end;
+            }
+            const res = await api.get('/admin/leaves/analytics/counts', { params });
+            setAnalyticsCounts(Array.isArray(res.data) ? res.data : []);
+            setAllLeaveRequests([]);
+        } catch (e) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('Leave analytics endpoint failed, using legacy fetch', e);
+            }
+            setAnalyticsCounts(null);
             let allLeaves = [];
-            let page = 1;
-            const limit = 1000; // Reasonable page size
+            let pageNum = 1;
+            const limit = 1000;
             let hasMore = true;
-            
             while (hasMore) {
                 try {
-                    // Pass role=Employee to backend for server-side filtering
-                    const leavesRes = await api.get(`/admin/leaves/all?page=${page}&limit=${limit}&role=Employee`);
-                    let pageLeaves = [];
-                    if (leavesRes.data.requests) {
-                        pageLeaves = Array.isArray(leavesRes.data.requests) ? leavesRes.data.requests : [];
-                    } else {
-                        pageLeaves = Array.isArray(leavesRes.data) ? leavesRes.data : [];
-                    }
-                    
+                    const leavesRes = await api.get(`/admin/leaves/all?page=${pageNum}&limit=${limit}&role=Employee`);
+                    const pageLeaves = Array.isArray(leavesRes.data?.requests) ? leavesRes.data.requests : (Array.isArray(leavesRes.data) ? leavesRes.data : []);
                     allLeaves = [...allLeaves, ...pageLeaves];
-                    
-                    // Check if there are more pages
-                    const totalCount = leavesRes.data.totalCount || 0;
-                    const totalPages = leavesRes.data.totalPages || Math.ceil(totalCount / limit);
-                    hasMore = page < totalPages && pageLeaves.length === limit;
-                    page++;
-                    
-                    // Safety limit to prevent infinite loops
-                    if (page > 100) {
-                        console.warn('Reached safety limit for leave requests pagination');
-                        break;
-                    }
+                    const totalCount = leavesRes.data?.totalCount || 0;
+                    const totalPages = leavesRes.data?.totalPages || Math.ceil(totalCount / limit);
+                    hasMore = pageNum < totalPages && pageLeaves.length === limit;
+                    pageNum++;
+                    if (pageNum > 100) break;
                 } catch (pageErr) {
                     console.error('Error fetching leave requests page:', pageErr);
                     hasMore = false;
                 }
             }
-            
             setAllLeaveRequests(allLeaves);
-        } catch (err) {
-            console.error('Failed to fetch leave count data:', err);
-            setError('Unable to load data');
         } finally {
             setLoading(false);
         }
+    }, [employees.length, selectedMonth, dateRange.start, dateRange.end, selectedLeaveType]);
+
+    // Register loadLeaveCounts with parent so it can trigger refetch when tab becomes visible after mutation
+    useEffect(() => {
+        if (refetchRef) refetchRef.current = loadLeaveCounts;
+        return () => { if (refetchRef) refetchRef.current = null; };
+    }, [loadLeaveCounts, refetchRef]);
+    
+    // Initial load: fetch employees only; loading stays true until loadLeaveCounts completes.
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            // Do NOT pass includeInactive: deactivated employees hidden from Leave page
+            const empRes = await api.get('/admin/employees?all=true');
+            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
+            const employeesOnly = filterEmployeesByRole(allEmps, 'Employee');
+            setEmployees(employeesOnly);
+        } catch (err) {
+            console.error('Failed to fetch leave count data:', err);
+            setError('Unable to load data');
+            setLoading(false);
+        }
+        // Do not set loading false here; loadLeaveCounts will run next and set it when leave counts are ready
     }, []);
     
     // Fetch actual worked days data using attendance summary API
@@ -375,6 +399,10 @@ const LeaveCountSummaryTab = memo(() => {
         fetchMonthlyContextSettings();
     }, [fetchData, fetchMonthlyContextSettings]);
     
+    useEffect(() => {
+        if (employees.length > 0) loadLeaveCounts();
+    }, [employees.length, loadLeaveCounts]);
+    
     // Fetch analytics when date range changes
     useEffect(() => {
         if (loading || !employees.length) return;
@@ -397,28 +425,50 @@ const LeaveCountSummaryTab = memo(() => {
         fetchAnalyticsData(startDate, endDate);
     }, [selectedMonth, dateRange, employees.length, loading, fetchAnalyticsData]);
     
-    // Aggregate and filter data
+    // Aggregate and filter data (from analytics API when available, else legacy allLeaveRequests)
     useEffect(() => {
         if (loading || !employees.length) return;
         
-        // Determine date range
+        // Determine date range for period display and working-days context
         let startDate, endDate;
         if (dateRange.start && dateRange.end) {
             startDate = new Date(dateRange.start);
             endDate = new Date(dateRange.end);
             endDate.setHours(23, 59, 59, 999);
         } else {
-            // Use selected month
             const year = selectedMonth.getFullYear();
             const month = selectedMonth.getMonth();
             startDate = new Date(year, month, 1);
             endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
         }
         
-        // Aggregate leave data per employee
-        // Note: Backend already filters by role, so allLeaveRequests only contains employee leaves
-        const aggregated = employees.map(emp => {
-            // Filter leaves for this employee within date range
+        let periodDisplay;
+        if (dateRange.start && dateRange.end) {
+            const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            periodDisplay = `${startStr} - ${endStr}`;
+        } else {
+            periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
+        }
+        const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays;
+        
+        const aggregated = analyticsCounts !== null
+            ? employees.map(emp => {
+                const row = analyticsCounts.find(c => String(c.employeeId) === String(emp._id));
+                const empAnalytics = analyticsData[emp._id] || {};
+                return {
+                    employee: emp,
+                    leaveApplied: row?.leaveApplied ?? 0,
+                    leaveApproved: row?.leaveApproved ?? 0,
+                    totalLeaveDays: row?.totalLeaveDays ?? 0,
+                    leaveTypeBreakdown: row?.leaveTypeBreakdown ?? {},
+                    totalWorkingDays: totalWorkingDaysForPeriod,
+                    actualWorkedDays: empAnalytics.actualWorkedDays || 0,
+                    month: periodDisplay
+                };
+            })
+            : employees.map(emp => {
+            // Legacy: filter leaves for this employee within date range
             const empLeaves = allLeaveRequests.filter(leave => {
                 // Match by employee ID (backend already filtered by role)
                 const leaveEmployeeId = leave.employee?._id?.toString() || leave.employee?.toString();
@@ -467,29 +517,16 @@ const LeaveCountSummaryTab = memo(() => {
                 }
             });
             
-            // Get working days from analytics API (not calculated on frontend)
             const empAnalytics = analyticsData[emp._id] || {};
-            const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays; // From monthly context settings
             const actualWorkedDays = empAnalytics.actualWorkedDays || 0;
-            
-            // Format period display
-            let periodDisplay;
-            if (dateRange.start && dateRange.end) {
-                const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                periodDisplay = `${startStr} - ${endStr}`;
-            } else {
-                periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
-            }
-            
             return {
                 employee: emp,
                 leaveApplied: appliedCount,
                 leaveApproved: approvedCount,
                 totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
                 leaveTypeBreakdown,
-                totalWorkingDays: totalWorkingDaysForPeriod, // From backend calendar API
-                actualWorkedDays: actualWorkedDays, // From backend attendance API
+                totalWorkingDays: totalWorkingDaysForPeriod,
+                actualWorkedDays,
                 month: periodDisplay
             };
         });
@@ -506,7 +543,7 @@ const LeaveCountSummaryTab = memo(() => {
         }
         
         setFilteredData(filtered);
-    }, [employees, allLeaveRequests, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
     
     // Calculate KPIs
     const kpis = useMemo(() => {
@@ -1224,109 +1261,122 @@ const LeaveCountSummaryTab = memo(() => {
 LeaveCountSummaryTab.displayName = 'LeaveCountSummaryTab';
 
 // --- Intern Leave Count Summary Tab Component ---
-const InternLeaveCountSummaryTab = memo(() => {
+// Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
+// refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
+const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
     const [allLeaveRequests, setAllLeaveRequests] = useState([]);
+    const [analyticsCounts, setAnalyticsCounts] = useState(null);
     const [analyticsData, setAnalyticsData] = useState({});
     const [totalWorkingDays, setTotalWorkingDays] = useState(null);
-    const [monthlyContextDays, setMonthlyContextDays] = useState(30); // Monthly context days from settings
+    const [monthlyContextDays, setMonthlyContextDays] = useState(30);
     const [filteredData, setFilteredData] = useState([]);
     
-    // Filter states
     const today = new Date();
     const [selectedMonth, setSelectedMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
     const [dateRange, setDateRange] = useState({ start: null, end: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeaveType, setSelectedLeaveType] = useState('');
     const [filtersExpanded, setFiltersExpanded] = useState(true);
-    
-    // Pagination
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     
-    // Clear all filters
     const handleClearFilters = () => {
         setSearchTerm('');
         setSelectedLeaveType('');
         setDateRange({ start: null, end: null });
         setSelectedMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     };
-    
-    // Check if any filters are active
     const hasActiveFilters = searchTerm || selectedLeaveType || dateRange.start || dateRange.end;
     
-    // Fetch monthly context settings (single source of truth for working days)
     const fetchMonthlyContextSettings = useCallback(async () => {
         try {
             const response = await api.get('/analytics/monthly-context-settings');
             const days = response.data?.days || 30;
             setMonthlyContextDays(days);
-            setTotalWorkingDays(days); // Use monthly context as total working days
+            setTotalWorkingDays(days);
         } catch (err) {
             console.error('Failed to fetch monthly context settings:', err);
-            // Use default value
             setMonthlyContextDays(30);
             setTotalWorkingDays(30);
         }
     }, []);
     
-    // Fetch all data
-    const fetchData = useCallback(async () => {
+    const loadLeaveCounts = useCallback(async () => {
+        if (!employees.length) return;
         setLoading(true);
         setError('');
         try {
-            // Fetch all employees
-            const empRes = await api.get('/admin/employees?all=true');
-            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
-            // Filter for interns only
-            const interns = allEmps.filter(emp => emp.role === 'Intern');
-            setEmployees(interns);
-            
-            // Fetch all leave requests filtered by role at backend (interns only)
-            // Backend handles the filtering, so we get optimized results
+            const month = selectedMonth.getMonth() + 1;
+            const year = selectedMonth.getFullYear();
+            const params = { month, year, role: 'Intern' };
+            if (selectedLeaveType) params.leaveType = selectedLeaveType;
+            if (dateRange.start && dateRange.end) {
+                params.startDate = dateRange.start;
+                params.endDate = dateRange.end;
+            }
+            const res = await api.get('/admin/leaves/analytics/counts', { params });
+            setAnalyticsCounts(Array.isArray(res.data) ? res.data : []);
+            setAllLeaveRequests([]);
+        } catch (e) {
+            if (process.env.NODE_ENV !== 'production') console.warn('Leave analytics endpoint failed (Intern), using legacy fetch', e);
+            setAnalyticsCounts(null);
             let allLeaves = [];
-            let page = 1;
+            let pageNum = 1;
             const limit = 1000;
             let hasMore = true;
-            
             while (hasMore) {
                 try {
-                    // Pass role=Intern to backend for server-side filtering
-                    const leavesRes = await api.get(`/admin/leaves/all?page=${page}&limit=${limit}&role=Intern`);
-                    let pageLeaves = [];
-                    if (leavesRes.data.requests) {
-                        pageLeaves = Array.isArray(leavesRes.data.requests) ? leavesRes.data.requests : [];
-                    } else {
-                        pageLeaves = Array.isArray(leavesRes.data) ? leavesRes.data : [];
-                    }
-                    
+                    const leavesRes = await api.get(`/admin/leaves/all?page=${pageNum}&limit=${limit}&role=Intern`);
+                    const pageLeaves = Array.isArray(leavesRes.data?.requests) ? leavesRes.data.requests : (Array.isArray(leavesRes.data) ? leavesRes.data : []);
                     allLeaves = [...allLeaves, ...pageLeaves];
-                    
-                    const totalCount = leavesRes.data.totalCount || 0;
-                    const totalPages = leavesRes.data.totalPages || Math.ceil(totalCount / limit);
-                    hasMore = page < totalPages && pageLeaves.length === limit;
-                    page++;
-                    
-                    if (page > 100) {
-                        console.warn('Reached safety limit for leave requests pagination');
-                        break;
-                    }
+                    const totalCount = leavesRes.data?.totalCount || 0;
+                    const totalPages = leavesRes.data?.totalPages || Math.ceil(totalCount / limit);
+                    hasMore = pageNum < totalPages && pageLeaves.length === limit;
+                    pageNum++;
+                    if (pageNum > 100) break;
                 } catch (pageErr) {
                     console.error('Error fetching leave requests page:', pageErr);
                     hasMore = false;
                 }
             }
-            
             setAllLeaveRequests(allLeaves);
-        } catch (err) {
-            console.error('Failed to fetch intern leave count data:', err);
-            setError('Unable to load data');
         } finally {
             setLoading(false);
         }
+    }, [employees.length, selectedMonth, dateRange.start, dateRange.end, selectedLeaveType]);
+
+    // Register loadLeaveCounts with parent so it can trigger refetch when tab becomes visible after mutation
+    useEffect(() => {
+        if (refetchRef) refetchRef.current = loadLeaveCounts;
+        return () => { if (refetchRef) refetchRef.current = null; };
+    }, [loadLeaveCounts, refetchRef]);
+    
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            // Do NOT pass includeInactive: deactivated interns hidden from Leave page
+            const empRes = await api.get('/admin/employees?all=true');
+            const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
+            const interns = filterEmployeesByRole(allEmps, 'Intern');
+            setEmployees(interns);
+        } catch (err) {
+            console.error('Failed to fetch intern leave count data:', err);
+            setError('Unable to load data');
+            setLoading(false);
+        }
     }, []);
+    
+    useEffect(() => {
+        fetchData();
+        fetchMonthlyContextSettings();
+    }, [fetchData, fetchMonthlyContextSettings]);
+    useEffect(() => {
+        if (employees.length > 0) loadLeaveCounts();
+    }, [employees.length, loadLeaveCounts]);
     
     // Fetch actual worked days data using attendance summary API
     const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
@@ -1413,72 +1463,73 @@ const InternLeaveCountSummaryTab = memo(() => {
             endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
         }
         
-        // Aggregate leave data per employee
-        // Note: Backend already filters by role, so allLeaveRequests only contains intern leaves
-        const aggregated = employees.map(emp => {
-            const empLeaves = allLeaveRequests.filter(leave => {
-                // Match by employee ID (backend already filtered by role)
-                const leaveEmployeeId = leave.employee?._id?.toString() || leave.employee?.toString();
-                if (leaveEmployeeId !== emp._id?.toString()) return false;
-                if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
-                
-                const hasDateInRange = leave.leaveDates.some(date => {
-                    const leaveDate = new Date(date);
-                    return leaveDate >= startDate && leaveDate <= endDate;
-                });
-                
-                if (!hasDateInRange) return false;
-                if (selectedLeaveType && leave.requestType !== selectedLeaveType) return false;
-                
-                return true;
-            });
-            
-            const appliedCount = empLeaves.length;
-            const approvedCount = empLeaves.filter(l => l.status === 'Approved').length;
-            
-            let totalLeaveDays = 0;
-            const leaveTypeBreakdown = {};
-            
-            empLeaves.forEach(leave => {
-                if (leave.status === 'Approved' && leave.leaveDates) {
-                    const daysInRange = leave.leaveDates.filter(date => {
+        let periodDisplay;
+        if (dateRange.start && dateRange.end) {
+            const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            periodDisplay = `${startStr} - ${endStr}`;
+        } else {
+            periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
+        }
+        const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays;
+        
+        const aggregated = analyticsCounts !== null
+            ? employees.map(emp => {
+                const row = analyticsCounts.find(c => String(c.employeeId) === String(emp._id));
+                const empAnalytics = analyticsData[emp._id] || {};
+                return {
+                    employee: emp,
+                    leaveApplied: row?.leaveApplied ?? 0,
+                    leaveApproved: row?.leaveApproved ?? 0,
+                    totalLeaveDays: row?.totalLeaveDays ?? 0,
+                    leaveTypeBreakdown: row?.leaveTypeBreakdown ?? {},
+                    totalWorkingDays: totalWorkingDaysForPeriod,
+                    actualWorkedDays: empAnalytics.actualWorkedDays || 0,
+                    month: periodDisplay
+                };
+            })
+            : employees.map(emp => {
+                const empLeaves = allLeaveRequests.filter(leave => {
+                    const leaveEmployeeId = leave.employee?._id?.toString() || leave.employee?.toString();
+                    if (leaveEmployeeId !== emp._id?.toString()) return false;
+                    if (!leave.leaveDates || leave.leaveDates.length === 0) return false;
+                    const hasDateInRange = leave.leaveDates.some(date => {
                         const leaveDate = new Date(date);
                         return leaveDate >= startDate && leaveDate <= endDate;
-                    }).length;
-                    
-                    const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
-                    const adjustedDays = daysInRange * multiplier;
-                    totalLeaveDays += adjustedDays;
-                    
-                    const reqType = leave.requestType || 'Unknown';
-                    leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
-                }
+                    });
+                    if (!hasDateInRange) return false;
+                    if (selectedLeaveType && leave.requestType !== selectedLeaveType) return false;
+                    return true;
+                });
+                const appliedCount = empLeaves.length;
+                const approvedCount = empLeaves.filter(l => l.status === 'Approved').length;
+                let totalLeaveDays = 0;
+                const leaveTypeBreakdown = {};
+                empLeaves.forEach(leave => {
+                    if (leave.status === 'Approved' && leave.leaveDates) {
+                        const daysInRange = leave.leaveDates.filter(date => {
+                            const leaveDate = new Date(date);
+                            return leaveDate >= startDate && leaveDate <= endDate;
+                        }).length;
+                        const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
+                        const adjustedDays = daysInRange * multiplier;
+                        totalLeaveDays += adjustedDays;
+                        const reqType = leave.requestType || 'Unknown';
+                        leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
+                    }
+                });
+                const empAnalytics = analyticsData[emp._id] || {};
+                return {
+                    employee: emp,
+                    leaveApplied: appliedCount,
+                    leaveApproved: approvedCount,
+                    totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
+                    leaveTypeBreakdown,
+                    totalWorkingDays: totalWorkingDaysForPeriod,
+                    actualWorkedDays: empAnalytics.actualWorkedDays || 0,
+                    month: periodDisplay
+                };
             });
-            
-            const empAnalytics = analyticsData[emp._id] || {};
-            const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays; // From monthly context settings
-            const actualWorkedDays = empAnalytics.actualWorkedDays || 0;
-            
-            let periodDisplay;
-            if (dateRange.start && dateRange.end) {
-                const startStr = new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                const endStr = new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                periodDisplay = `${startStr} - ${endStr}`;
-            } else {
-                periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
-            }
-            
-            return {
-                employee: emp,
-                leaveApplied: appliedCount,
-                leaveApproved: approvedCount,
-                totalLeaveDays: Math.round(totalLeaveDays * 10) / 10,
-                leaveTypeBreakdown,
-                totalWorkingDays: totalWorkingDaysForPeriod,
-                actualWorkedDays: actualWorkedDays,
-                month: periodDisplay
-            };
-        });
         
         let filtered = aggregated;
         if (searchTerm) {
@@ -1489,11 +1540,9 @@ const InternLeaveCountSummaryTab = memo(() => {
                 return name.includes(searchLower) || code.includes(searchLower);
             });
         }
-        
         setFilteredData(filtered);
-    }, [employees, allLeaveRequests, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
     
-    // Calculate KPIs
     const kpis = useMemo(() => {
         if (!filteredData.length) {
             return {
@@ -1505,14 +1554,12 @@ const InternLeaveCountSummaryTab = memo(() => {
                 totalWorkedDays: 0
             };
         }
-        
         const totalEmployees = filteredData.length;
         const leavesApplied = filteredData.reduce((sum, item) => sum + item.leaveApplied, 0);
         const leavesApproved = filteredData.reduce((sum, item) => sum + item.leaveApproved, 0);
         const totalLeaveDays = filteredData.reduce((sum, item) => sum + item.totalLeaveDays, 0);
         const totalWorkedDays = filteredData.reduce((sum, item) => sum + item.actualWorkedDays, 0);
-        const avgWorkingDays = totalWorkingDays || monthlyContextDays; // Use monthly context settings value
-        
+        const avgWorkingDays = totalWorkingDays || monthlyContextDays;
         return {
             totalEmployees,
             leavesApplied,
@@ -2667,7 +2714,8 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
 const AdminLeavesPage = () => {
     const [requests, setRequests] = useState([]);
     const [employees, setEmployees] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -2702,37 +2750,83 @@ const AdminLeavesPage = () => {
     // Query params for deep linking
     const [searchParams, setSearchParams] = useSearchParams();
     const fetchInitialDataRef = useRef(null);
+    const lastRefetchTimeRef = useRef(0);
+    const pendingFetchRef = useRef(null);
+    const yearEndDataLoadedRef = useRef(false);
+    // Leave Count / Intern Count tabs: refetch when tab becomes visible after a mutation
+    const [leaveCountsDirty, setLeaveCountsDirty] = useState(false);
+    const refetchLeaveCountTab2Ref = useRef(null);
+    const refetchLeaveCountTab3Ref = useRef(null);
 
-    const fetchInitialData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const [reqRes, empRes] = await Promise.all([
-                api.get(`/admin/leaves/all?page=${page + 1}&limit=${rowsPerPage}`),
-                api.get('/admin/employees?all=true')
-            ]);
-            
-            // Handle paginated response for requests
-            if (reqRes.data.requests) {
-                setRequests(Array.isArray(reqRes.data.requests) ? reqRes.data.requests : []);
-                setTotalCount(reqRes.data.totalCount || 0);
-            } else {
-                setRequests(Array.isArray(reqRes.data) ? reqRes.data : []);
-            }
-            
-            // Handle paginated response for employees
-            if (empRes.data.employees) {
-                setEmployees(Array.isArray(empRes.data.employees) ? empRes.data.employees : []);
-            } else {
-                setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
-            }
-        } catch (err) {
-            setError('Failed to fetch leave management data.');
-        } finally {
-            setLoading(false);
+    const applyInitialData = useCallback((data) => {
+        if (!data) return;
+        const { requests: reqs, totalCount: tot, employees: emps } = data;
+        if (reqs) {
+            setRequests(Array.isArray(reqs) ? reqs : []);
+            setTotalCount(tot ?? 0);
         }
-    }, [page, rowsPerPage]);
+        if (emps) setEmployees(filterActiveEmployees(emps));
+    }, []);
 
-    // Keep ref updated with latest fetchInitialData
+    const fetchInitialData = useCallback(async (forceRefresh = false) => {
+        const cacheKey = getAdminLeavesCacheKey(page + 1, rowsPerPage);
+        const now = Date.now();
+
+        if (pendingFetchRef.current && pendingFetchRef.current.key === cacheKey && !forceRefresh) {
+            return pendingFetchRef.current.promise;
+        }
+
+        const cached = !forceRefresh ? getLeavesCache(cacheKey) : null;
+        const cacheFresh = cached && (now - cached.timestamp < cached.ttlMs);
+
+        if (cacheFresh) {
+            applyInitialData(cached.data);
+            setIsInitialLoading(false);
+            setIsBackgroundRefreshing(false);
+            return;
+        }
+
+        if (cached && cached.data) {
+            applyInitialData(cached.data);
+            setIsInitialLoading(false);
+            setIsBackgroundRefreshing(true);
+        } else {
+            setIsInitialLoading(true);
+            setIsBackgroundRefreshing(false);
+        }
+
+        const promise = (async () => {
+            try {
+                const [reqRes, empRes] = await Promise.all([
+                    api.get(`/admin/leaves/all?page=${page + 1}&limit=${rowsPerPage}`),
+                    api.get('/admin/employees?all=true')
+                ]);
+                const rawEmps = empRes.data.employees
+                    ? (Array.isArray(empRes.data.employees) ? empRes.data.employees : [])
+                    : (Array.isArray(empRes.data) ? empRes.data : []);
+                const requestsList = reqRes.data.requests
+                    ? (Array.isArray(reqRes.data.requests) ? reqRes.data.requests : [])
+                    : (Array.isArray(reqRes.data) ? reqRes.data : []);
+                const total = reqRes.data.totalCount ?? 0;
+                setRequests(requestsList);
+                setTotalCount(total);
+                setEmployees(filterActiveEmployees(rawEmps));
+                setLeavesCache(cacheKey, { requests: requestsList, totalCount: total, employees: filterActiveEmployees(rawEmps) });
+                lastRefetchTimeRef.current = Date.now();
+                setError('');
+            } catch (err) {
+                setError('Failed to fetch leave management data.');
+            } finally {
+                setIsInitialLoading(false);
+                setIsBackgroundRefreshing(false);
+                if (pendingFetchRef.current?.key === cacheKey) pendingFetchRef.current = null;
+            }
+        })();
+
+        pendingFetchRef.current = { key: cacheKey, promise };
+        return promise;
+    }, [page, rowsPerPage, applyInitialData]);
+
     fetchInitialDataRef.current = fetchInitialData;
     
     const fetchYearEndActions = useCallback(async () => {
@@ -2775,12 +2869,15 @@ const AdminLeavesPage = () => {
         }
     };
     
-    // Pre-fetch year-end data on mount to prevent delay on first toggle
+    // Lazy load year-end data only when user opens Year-End tab (avoids extra API on initial page load).
     useEffect(() => {
+        if (currentTab !== 1) return;
+        if (yearEndDataLoadedRef.current) return;
+        yearEndDataLoadedRef.current = true;
         fetchYearEndActions();
         fetchYearEndFeatureStatus();
-    }, [fetchYearEndActions, fetchYearEndFeatureStatus]);
-    
+    }, [currentTab, fetchYearEndActions, fetchYearEndFeatureStatus]);
+
     // Handle URL parameters for deep linking from notifications
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -2788,12 +2885,8 @@ const AdminLeavesPage = () => {
         const leaveId = searchParams.get('leaveId');
         
         if (tab === 'year-end') {
-            // Activate Year-End tab (index 1)
+            // Activate Year-End tab (index 1); lazy-load effect will fetch year-end data when tab is 1
             setCurrentTab(1);
-            // Fetch Year-End requests if not already loaded
-            if (yearEndActions.length === 0) {
-                fetchYearEndActions();
-            }
             // Set highlighted request ID if provided
             if (actionId) {
                 setHighlightedActionId(actionId);
@@ -2844,56 +2937,90 @@ const AdminLeavesPage = () => {
     }, [searchParams, setSearchParams, fetchYearEndActions, yearEndActions.length]);
 
     useEffect(() => { fetchInitialData(); }, [fetchInitialData]);
+
+    // When switching to Leave Count or Intern Count tab after a mutation, refetch so counts are fresh
+    useEffect(() => {
+        if (currentTab === 2 && leaveCountsDirty) {
+            refetchLeaveCountTab2Ref.current?.();
+            setLeaveCountsDirty(false);
+        }
+        if (currentTab === 3 && leaveCountsDirty) {
+            refetchLeaveCountTab3Ref.current?.();
+            setLeaveCountsDirty(false);
+        }
+    }, [currentTab, leaveCountsDirty]);
     
-    // POLLING REMOVED: Socket events + visibility change provide real-time updates
+    // Socket: only leave-related events. Do NOT refetch on attendance_log_updated.
     useEffect(() => {
         if (!socket) return;
-
-        // Listen for leave request updates (if backend emits this event)
         const handleLeaveUpdate = () => {
-            console.log('[AdminLeavesPage] Received leave update event, refreshing data');
-            if (fetchInitialDataRef.current) {
-                fetchInitialDataRef.current();
-            }
+            invalidateLeavesCache('leaves:');
+            if (fetchInitialDataRef.current) fetchInitialDataRef.current(true);
         };
-
-        // Try to listen for leave_request_updated (may not exist yet)
         socket.on('leave_request_updated', handleLeaveUpdate);
-        socket.on('attendance_log_updated', handleLeaveUpdate); // Also listen for attendance updates
+        return () => socket.off('leave_request_updated', handleLeaveUpdate);
+    }, []);
 
-        // Fallback: Refresh on visibility change (socket disconnect recovery + user returns to page)
+    // Visibility: refetch only if cooldown (60s) passed to avoid refetch on every tab switch.
+    useEffect(() => {
         const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                // Always refresh when page becomes visible (user returns to tab)
-                if (fetchInitialDataRef.current) {
-                    fetchInitialDataRef.current();
-                }
-            }
+            if (document.hidden) return;
+            const now = Date.now();
+            if (now - lastRefetchTimeRef.current < LEAVES_REFETCH_COOLDOWN_MS && lastRefetchTimeRef.current > 0) return;
+            if (fetchInitialDataRef.current) fetchInitialDataRef.current(false);
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Cleanup
-        return () => {
-            socket.off('leave_request_updated', handleLeaveUpdate);
-            socket.off('attendance_log_updated', handleLeaveUpdate);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, []); // Empty deps - listeners registered once, use ref for latest callback
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
 
     const handleOpenForm = (request = null) => { setSelectedRequest(request); setIsFormOpen(true); };
     const handleCloseForm = () => { setSelectedRequest(null); setIsFormOpen(false); };
 
+    // Backend requires YYYY-MM-DD only; do not send ISO timestamps (avoids "Leave dates must be calendar dates only" error).
+    const toYYYYMMDD = (d) => {
+        if (d == null) return null;
+        const date = d instanceof Date ? d : new Date(d);
+        if (isNaN(date.getTime())) return null;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     const handleSaveRequest = async (formData) => {
         try {
+            // Extract only the fields needed for the API, excluding _id and internal fields
+            const payload = {
+                employee: formData.employee,
+                requestType: formData.requestType,
+                leaveType: formData.leaveType,
+                leaveDates: (formData.leaveDates || [])
+                    .filter(Boolean)
+                    .map((d) => toYYYYMMDD(d))
+                    .filter(Boolean),
+                alternateDate: toYYYYMMDD(formData.alternateDate) || null,
+                reason: formData.reason,
+                status: formData.status,
+            };
+            
+            // Include createdAt (appliedDate) only when editing and if provided
+            // Set time to start of day (00:00:00) for consistency
+            if (formData._id && formData.appliedDate) {
+                const appliedDate = new Date(formData.appliedDate);
+                appliedDate.setHours(0, 0, 0, 0); // Set to start of day
+                payload.createdAt = appliedDate.toISOString();
+            }
             if (formData._id) {
-                await api.put(`/admin/leaves/${formData._id}`, formData);
+                await api.put(`/admin/leaves/${formData._id}`, payload);
                 setSnackbar({ open: true, message: 'Request updated successfully!', severity: 'success' });
             } else {
-                await api.post('/admin/leaves', formData);
+                await api.post('/admin/leaves', payload);
                 setSnackbar({ open: true, message: 'Request created successfully!', severity: 'success' });
             }
             handleCloseForm();
-            fetchInitialData();
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to save request.', severity: 'error' });
         }
@@ -2907,7 +3034,9 @@ const AdminLeavesPage = () => {
             }
             await api.patch(`/admin/leaves/${requestId}/status`, payload);
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.`, severity: 'success' });
-            fetchInitialData();
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Action failed.', severity: 'error' });
         }
@@ -2946,7 +3075,9 @@ const AdminLeavesPage = () => {
             await api.patch(`/admin/leaves/year-end/${requestId}/status`, { status: 'Approved' });
             setSnackbar({ open: true, message: 'Year-End request approved successfully!', severity: 'success' });
             fetchYearEndActions();
-            fetchInitialData(); // Refresh main requests list too
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to approve request.', severity: 'error' });
         }
@@ -2962,7 +3093,9 @@ const AdminLeavesPage = () => {
             setSnackbar({ open: true, message: 'Year-End request rejected successfully!', severity: 'success' });
             setYearEndRejectDialog({ open: false, action: null, notes: '' });
             fetchYearEndActions();
-            fetchInitialData(); // Refresh main requests list too
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to reject request.', severity: 'error' });
         }
@@ -2992,6 +3125,9 @@ const AdminLeavesPage = () => {
             });
             setYearEndDeleteDialog({ open: false, action: null, isApproved: false });
             fetchYearEndActions();
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to delete Year-End request.', severity: 'error' });
         }
@@ -3011,13 +3147,15 @@ const AdminLeavesPage = () => {
             await api.delete(`/admin/leaves/${requestToDelete._id}`);
             setSnackbar({ open: true, message: 'Request deleted!', severity: 'success' });
             setDeleteDialog({ open: false, request: null });
-            fetchInitialData();
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to delete request.', severity: 'error' });
         }
     };
 
-    if (loading) {
+    if (isInitialLoading) {
         return (
             <div className="admin-leaves-page">
                 <Box sx={{ mb: 3 }}>
@@ -3451,7 +3589,7 @@ const AdminLeavesPage = () => {
                         visibility: currentTab === 2 ? 'visible' : 'hidden',
                     }}
                 >
-                    <LeaveCountSummaryTab />
+                    <LeaveCountSummaryTab refetchRef={refetchLeaveCountTab2Ref} />
                 </Box>
                 
                 {/* Intern Leave Count Summary Tab - Always mounted, visibility toggled */}
@@ -3470,7 +3608,7 @@ const AdminLeavesPage = () => {
                         visibility: currentTab === 3 ? 'visible' : 'hidden',
                     }}
                 >
-                    <InternLeaveCountSummaryTab />
+                    <InternLeaveCountSummaryTab refetchRef={refetchLeaveCountTab3Ref} />
                 </Box>
             </Box>
 

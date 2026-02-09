@@ -114,7 +114,7 @@
 }
 .profile-avatar-letter { font-size: 3rem; font-weight: bold; }
 
-.shift-info-card { padding: 24px !important; height: 460px;  width: 400px; }
+.shift-info-card { padding: 24px !important; height: 480px;  width: 400px; }
 .recent-activity-card { padding: 20px !important; height: 500px; width: 500px; }
 .saturday-schedule-card { padding: 24px !important; height: 300px; }
 
@@ -162,23 +162,41 @@
 .recent-activity-card > div::-webkit-scrollbar-thumb,
 .saturday-schedule-card > div::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 999px; }
 
-/* Time Tracking Content Fade Animation */
+/* Time Tracking: reserved height to prevent CLS when swapping skeleton for content */
+.time-tracking-skeleton,
+.time-tracking-content {
+    min-height: 200px;
+}
+
+/* Time Tracking Content — start hidden so first paint is never visible */
 .time-tracking-content {
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s var(--ease-out-quint), visibility 0.3s var(--ease-out-quint);
     will-change: opacity;
 }
 
+/* Fade-in via animation so it runs from 0→1 on first apply (transition does not run on new elements) */
+@keyframes time-tracking-fade-in {
+    from {
+        opacity: 0;
+        visibility: hidden;
+    }
+    to {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
 .time-tracking-content.visible {
-    opacity: 1;
     visibility: visible;
+    animation: time-tracking-fade-in 0.4s 0.15s var(--ease-out-quint) forwards;
 }
 
 .time-tracking-content.hidden {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    animation: none;
 }
 
 /* Break modal styles */
@@ -220,6 +238,65 @@
 .break-modal-icon.paid { background-color: var(--theme-success); }
 .break-modal-icon.unpaid { background-color: var(--accent-unpaid); }
 .break-modal-icon.extra { background-color: var(--accent-extra); }
+
+/* Early checkout: single unified popup (no animations) */
+.early-checkout-dialog-paper {
+    width: 100%;
+    max-width: 640px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.12) !important;
+    padding: 0;
+    overflow: hidden;
+}
+.early-checkout-dialog-title {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    color: var(--theme-black) !important;
+    padding: 24px 32px 16px !important;
+    margin-bottom: 0;
+}
+.early-checkout-dialog-divider {
+    margin: 0 32px !important;
+    border-color: var(--theme-border) !important;
+}
+.early-checkout-dialog-content {
+    padding: 20px 32px 28px !important;
+}
+.early-checkout-dialog-content .early-checkout-body-text {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--theme-text-secondary);
+    margin-bottom: 20px;
+}
+.early-checkout-remaining {
+    font-size: 0.9375rem !important;
+    font-weight: 600 !important;
+    color: var(--theme-black) !important;
+    padding: 12px 16px;
+    background-color: var(--theme-bg);
+    border-radius: 8px;
+    border: 1px solid var(--theme-border);
+    display: inline-block;
+    margin-bottom: 24px;
+}
+.early-checkout-reason-field {
+    margin-top: 4px !important;
+}
+.early-checkout-reason-field .MuiOutlinedInput-root {
+    min-height: 96px;
+}
+.early-checkout-actions {
+    padding: 16px 32px 24px !important;
+    justify-content: flex-end !important;
+    gap: 12px !important;
+}
+.early-checkout-actions .MuiButton-root {
+    min-height: 42px !important;
+    padding: 10px 22px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+}
 
 /* Late warning dialog */
 .late-warning-dialog { border-radius: 16px !important; padding: 6px; }

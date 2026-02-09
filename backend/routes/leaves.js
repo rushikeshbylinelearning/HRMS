@@ -10,8 +10,11 @@ const Setting = require('../models/Setting');
 const User = require('../models/User');
 const NewNotificationService = require('../services/NewNotificationService');
 const LeaveValidationService = require('../services/leaveValidationService');
+const LeavePolicyService = require('../services/LeavePolicyService');
 const uploadMedicalCertificate = require('../middleware/uploadMedicalCertificate');
-const { parseISTDate, formatISTDate } = require('../utils/istTime');
+const mongoose = require('mongoose');
+const { GridFSBucket } = require('mongodb');
+const { parseISTDate, formatISTDate, getTodayISTKey, normalizeLeaveDatesForApi } = require('../utils/istTime');
 
 const formatLeaveDateRangeForEmail = (leaveDates) => {
     if (!leaveDates || leaveDates.length === 0) return 'N/A';
@@ -125,16 +128,14 @@ router.get('/allowed-types', authenticateToken, async (req, res) => {
  * @param {string} employmentStatus - Employee's employment status
  * @returns {Array} Array of allowed leave types
  */
+// Single source aligned with frontend leaveTypePolicy; Backdated Leave for Permanent only.
 function getAllowedLeaveTypes(employmentStatus) {
     if (employmentStatus === 'Permanent') {
-        return ['Planned', 'Sick', 'Casual', 'Loss of Pay', 'Compensatory'];
+        return ['Planned', 'Sick', 'Casual', 'Loss of Pay', 'Compensatory', 'Backdated Leave'];
     }
-    
     if (employmentStatus === 'Probation' || employmentStatus === 'Intern') {
         return ['Loss of Pay', 'Compensatory'];
     }
-    
-    // Default fallback
     return ['Loss of Pay'];
 }
 
@@ -167,6 +168,7 @@ router.get('/holidays', authenticateToken, async (req, res) => {
 
 // POST /api/leaves/check-eligibility
 // Check leave eligibility before applying (for frontend validation)
+// Accept only YYYY-MM-DD for leaveDates at API boundary.
 router.post('/check-eligibility', authenticateToken, async (req, res) => {
     const { requestType, leaveType, leaveDates, medicalCertificate, alternateDate } = req.body;
     const { userId } = req.user;
@@ -175,20 +177,24 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields.' });
     }
 
+    const dateNorm = normalizeLeaveDatesForApi(leaveDates);
+    if (!dateNorm.valid) {
+        return res.status(400).json({ error: dateNorm.error });
+    }
+
     try {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
-        // Convert string dates to Date objects
-        const leaveDatesArray = leaveDates.map(date => new Date(date));
-
         const validation = await LeaveValidationService.validateLeaveRequest(
             employee,
             requestType,
-            leaveDatesArray,
+            dateNorm.dateStrings,
             leaveType,
             medicalCertificate,
-            alternateDate
+            alternateDate,
+            {},
+            req.body.reason
         );
 
         res.json({
@@ -197,7 +203,12 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
             warnings: validation.warnings,
             ...(validation.halfYearPeriod && { halfYearPeriod: validation.halfYearPeriod }),
             ...(validation.availableDays !== undefined && { availableDays: validation.availableDays }),
-            ...(validation.usedDays !== undefined && { usedDays: validation.usedDays })
+            ...(validation.usedDays !== undefined && { usedDays: validation.usedDays }),
+            // Include monthly limit info for frontend warnings
+            ...(validation.alreadyUsed !== undefined && { alreadyUsed: validation.alreadyUsed }),
+            ...(validation.requestedDays !== undefined && { requestedDays: validation.requestedDays }),
+            ...(validation.remainingDays !== undefined && { remainingDays: validation.remainingDays }),
+            ...(validation.totalAfterRequest !== undefined && { totalAfterRequest: validation.totalAfterRequest })
         });
     } catch (error) {
         console.error('Error checking leave eligibility:', error);
@@ -206,6 +217,7 @@ router.post('/check-eligibility', authenticateToken, async (req, res) => {
 });
 
 // POST /api/leaves/request
+// Accept only YYYY-MM-DD for leaveDates. All leave calendar dates normalized to IST.
 router.post('/request', authenticateToken, async (req, res) => {
     const { requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate } = req.body;
     const { userId } = req.user;
@@ -217,50 +229,58 @@ router.post('/request', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Alternate date is required for a compensatory request.' });
     }
 
+    const dateNorm = normalizeLeaveDatesForApi(leaveDates);
+    if (!dateNorm.valid) {
+        return res.status(400).json({ error: dateNorm.error });
+    }
+
     try {
         const employee = await User.findById(userId);
         if (!employee) return res.status(404).json({ error: 'Employee not found.' });
 
-        // Convert string dates to Date objects (parse as IST)
-        const leaveDatesArray = leaveDates.map(date => parseISTDate(date));
-
-        // Validate leave request based on company policy
         const validation = await LeaveValidationService.validateLeaveRequest(
             employee,
             requestType,
-            leaveDatesArray,
+            dateNorm.dateStrings,
             leaveType,
             medicalCertificate,
-            alternateDate
+            alternateDate,
+            {},
+            reason
         );
 
         if (!validation.valid) {
-            const errorResponse = {
+            return res.status(400).json({
                 error: validation.errors.join(' '),
                 errors: validation.errors,
                 warnings: validation.warnings || []
-            };
-            
-            // Include validation blocking details if leave was blocked by anti-exploitation rules
-            if (validation.validationBlocked) {
-                errorResponse.validationBlocked = true;
-                errorResponse.blockedRules = validation.blockedRules || [];
-                errorResponse.validationDetails = validation.validationDetails || {};
-            }
-            
-            return res.status(400).json(errorResponse);
+            });
         }
 
-        // Show warnings but allow submission
         if (validation.warnings && validation.warnings.length > 0) {
             console.log(`Leave request warnings for user ${userId}:`, validation.warnings);
         }
 
         const { startOfISTDay } = require('../utils/istTime');
+        // Note: Saturday clubbing is now handled in validateApply, so we use the dates from validation
+        // But we need to get the clubbed dates for saving. Let's club again here to ensure consistency.
+        const finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
+        let leaveDatesArray = dateNorm.dateStrings.map(d => parseISTDate(d));
+        
+        // Apply Saturday clubbing for Planned Leave (Paid Leave) - this should match what was done in validation
+        if (finalRequestType === 'Planned') {
+            const clubbedDates = LeavePolicyService.clubSaturdayInLeaveDates(
+                employee,
+                leaveDatesArray,
+                finalRequestType
+            );
+            // Convert clubbed date strings back to Date objects
+            leaveDatesArray = clubbedDates.map(d => parseISTDate(d));
+        }
+        
         const today = startOfISTDay();
         const firstLeaveDate = startOfISTDay(leaveDatesArray[0]);
         const isBackdated = firstLeaveDate < today;
-        const finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
 
         // Prepare leave request data
         const leaveRequestData = {
@@ -273,9 +293,18 @@ router.post('/request', authenticateToken, async (req, res) => {
             isBackdated,
         };
 
-        // Add medical certificate for sick leave
-        if (requestType === 'Sick' && medicalCertificate) {
-            leaveRequestData.medicalCertificate = medicalCertificate;
+        // Add medical certificate and proof status for sick leave
+        if (requestType === 'Sick') {
+            if (medicalCertificate) {
+                leaveRequestData.medicalCertificate = medicalCertificate;
+                leaveRequestData.medicalCertificateUploadedAt = new Date();
+            }
+            // Medical proof status fields are set by validateApply in LeavePolicyService
+            if (validation.medicalProofStatus) {
+                leaveRequestData.medicalProofStatus = validation.medicalProofStatus;
+                leaveRequestData.medicalProofRequired = validation.medicalProofRequired || false;
+                leaveRequestData.medicalProofDeadline = validation.medicalProofDeadline || null;
+            }
             leaveRequestData.appliedAfterReturn = validation.appliedAfterReturn || false;
         }
 
@@ -285,6 +314,15 @@ router.post('/request', authenticateToken, async (req, res) => {
         }
 
         const newRequest = await LeaveRequest.create(leaveRequestData);
+
+        // Invalidate pending-leaves cache so admin dashboard shows new request (IST date for cache key)
+        try {
+            const cacheService = require('../services/cacheService');
+            cacheService.invalidatePendingLeaves(getTodayISTKey());
+            cacheService.invalidateLeaveAnalytics();
+        } catch (e) {
+            // Cache invalidation must not break leave creation
+        }
         
         // --- NOTIFICATIONS ---
         // Asynchronously send emails
@@ -334,15 +372,43 @@ router.post('/request', authenticateToken, async (req, res) => {
 });
 
 // POST /api/leaves/upload-medical-certificate
-// Upload medical certificate for sick leave
-router.post('/upload-medical-certificate', authenticateToken, uploadMedicalCertificate.single('medicalCertificate'), async (req, res) => {
+// Upload medical certificate for sick leave (stored in MongoDB GridFS)
+router.post('/upload-medical-certificate', authenticateToken, uploadMedicalCertificate, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Medical certificate file is required.' });
         }
 
+        const db = mongoose.connection.db;
+        if (!db) {
+            return res.status(503).json({ error: 'Database not available.' });
+        }
+        const bucket = new GridFSBucket(db, { bucketName: 'medicalCertificates' });
+        const employeeId = req.user.userId;
+        const { buffer, originalname, mimetype } = req.file;
+        const uploadTimestamp = new Date();
+
+        const uploadStream = bucket.openUploadStream(originalname || 'medical-cert', {
+            metadata: {
+                employeeId: String(employeeId),
+                originalFilename: originalname || '',
+                mimetype: mimetype || '',
+                uploadTimestamp: uploadTimestamp.toISOString()
+            },
+            contentType: mimetype || undefined
+        });
+
+        const { Readable } = require('stream');
+        await new Promise((resolve, reject) => {
+            const bufStream = Readable.from(buffer);
+            uploadStream.on('finish', resolve).on('error', reject);
+            bufStream.on('error', reject);
+            bufStream.pipe(uploadStream);
+        });
+
+        const fileId = uploadStream.id.toString();
         const baseUrl = process.env.BACKEND_PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-        const fileUrl = `${baseUrl}/medical-certificates/${req.file.filename}`;
+        const fileUrl = `${baseUrl}/medical-certificates/${fileId}`;
 
         res.json({
             message: 'Medical certificate uploaded successfully.',
@@ -561,10 +627,14 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // Parallelize all data fetches
+        // Fetch user data once (employmentStatus and leaveBalances)
+        const user = await User.findById(userId).select('leaveBalances employmentStatus').lean();
+        const employmentStatus = user?.employmentStatus || null;
+        const leaveBalances = user?.leaveBalances || { paid: 0, sick: 0, casual: 0 };
+
+        // Parallelize remaining data fetches
         const [
             requestsResult,
-            leaveBalances,
             holidays,
             carryforwardStatus,
             yearEndFeatureStatus
@@ -584,12 +654,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
                     totalPages: Math.ceil(totalCount / limit)
                 };
             })(),
-            // 2. Leave balances
-            (async () => {
-                const user = await User.findById(userId).select('leaveBalances').lean();
-                return user?.leaveBalances || { paid: 0, sick: 0, casual: 0 };
-            })(),
-            // 3. Holidays (reuse existing logic)
+            // 2. Holidays (reuse existing logic)
             (async () => {
                 const holidays = await Holiday.find().lean();
                 return holidays.sort((a, b) => {
@@ -603,34 +668,14 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
                     return new Date(a.date) - new Date(b.date);
                 });
             })(),
-            // 4. Carryforward status (reuse existing logic directly)
+            // 3. Carryforward status - NOT IMPLEMENTED: previous-year-balances and carryforward-decision APIs do not exist.
+            // UI should not show carryforward banner (hasPendingDecision always false). See audit: option B - remove exposure.
+            (async () => ({ hasPendingDecision: false }))(),
+            // 4. Year-end feature status - SINGLE key: yearEndFeature (aligned with year-end-request and feature-status)
             (async () => {
                 try {
-                    // Reuse logic from /previous-year-balances endpoint
-                    const { getISTNow, getISTDateParts } = require('../utils/istTime');
-                    const dateParts = getISTDateParts(getISTNow());
-                    const currentYear = dateParts.year;
-                    const previousYear = currentYear - 1;
-                    
-                    const user = await User.findById(userId).select('leaveBalances leaveEntitlements').lean();
-                    if (!user) {
-                        return { hasPendingDecision: false };
-                    }
-                    
-                    // Check if user has previous year balances (this would be stored separately in a real implementation)
-                    // For now, return default - this endpoint may need to be implemented based on your data model
-                    return { hasPendingDecision: false };
-                } catch (err) {
-                    console.error('Error fetching carryforward status:', err);
-                    return { hasPendingDecision: false };
-                }
-            })(),
-            // 5. Year-end feature status (with error handling)
-            (async () => {
-                try {
-                    const user = await User.findById(userId).select('employmentStatus').lean();
-                    const isPermanent = user?.employmentStatus === 'Permanent';
-                    const featureSetting = await Setting.findOne({ key: 'yearEndLeaveFeatureEnabled' });
+                    const isPermanent = employmentStatus === 'Permanent';
+                    const featureSetting = await Setting.findOne({ key: 'yearEndFeature' });
                     const featureEnabled = featureSetting?.value === true || featureSetting?.value === 'true';
                     return { enabled: featureEnabled && isPermanent };
                 } catch (err) {
@@ -642,6 +687,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         res.json({
             requests: requestsResult,
             leaveBalances,
+            employmentStatus, // Include employmentStatus in response for frontend to use as source of truth
             holidays: Array.isArray(holidays) ? holidays : [],
             carryforwardStatus: carryforwardStatus || { hasPendingDecision: false },
             yearEndFeatureEnabled: yearEndFeatureStatus?.enabled || false

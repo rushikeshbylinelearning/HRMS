@@ -3,9 +3,9 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Typography, Paper, Box } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot, timelineItemClasses } from '@mui/lab';
+import { formatISTTime } from '../utils/istTime';
 import '../styles/RecentActivityCard.css';
 
-// Icons for different activity types
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import FreeBreakfastIcon from '@mui/icons-material/FreeBreakfast';
@@ -14,7 +14,7 @@ import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 
 const formatTime = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return formatISTTime(dateString, { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 const getActivityProps = (type) => {
@@ -76,7 +76,7 @@ const RecentActivityCard = ({ dailyData }) => {
 
     return (
         <Paper elevation={3} sx={{ p: 2.5, borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Recent Activity</Typography>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, letterSpacing: '0.025em', color: '#333333' }}>Recent Activity</Typography>
             {activities.length > 0 ? (
                 <Timeline
                     sx={{

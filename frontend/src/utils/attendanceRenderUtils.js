@@ -3,7 +3,7 @@
  * Used by both Admin and Employee views for consistency
  */
 
-import { formatISTTime, isSameISTDay, getISTDateString, getISTDateParts, getISTNow } from './istTime';
+import { formatISTTime, formatISTDate, isSameISTDay, getISTDateString, getISTDateParts, getISTNow } from './istTime';
 import { getStatusColor } from '../constants/attendanceColors';
 
 /**
@@ -21,25 +21,19 @@ export const formatTimeForDisplay = (dateTime) => {
 };
 
 /**
- * Format date for display (IST)
- * @param {Date|string} date - Date to format
- * @param {object} options - Formatting options
- * @returns {string} Formatted date string
+ * Format date for display (IST). Uses centralized IST utility.
+ * @param {Date|string} date - Date to format (backend ISO or Date)
+ * @param {object} options - Formatting options (merged with IST defaults)
+ * @returns {string} Formatted date string in IST
  */
 export const formatDateForDisplay = (date, options = {}) => {
     if (!date) return 'N/A';
-    
-    const defaultOptions = {
+    return formatISTDate(date, {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
-        weekday: 'short'
-    };
-    
-    return new Date(date).toLocaleDateString('en-GB', {
-        ...defaultOptions,
-        ...options,
-        timeZone: 'Asia/Kolkata'
+        weekday: 'short',
+        ...options
     });
 };
 
@@ -155,6 +149,17 @@ export const formatDuration = (totalMinutes) => {
     const minutes = Math.round(totalMinutes % 60);
     
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+/**
+ * Format duration from minutes to "N Min(s)" (short form)
+ * @param {number} totalMinutes - Total minutes
+ * @returns {string} Formatted duration (e.g. "45 Min(s)")
+ */
+export const formatDurationShort = (totalMinutes) => {
+    if (!totalMinutes || isNaN(totalMinutes) || totalMinutes < 0) return '0 Min(s)';
+    const mins = Math.round(totalMinutes);
+    return `${mins} Min(s)`;
 };
 
 /**

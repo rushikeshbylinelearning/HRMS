@@ -4,11 +4,17 @@ const AttendanceLog = require('../models/AttendanceLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
-const Setting = require('../models/Setting');
 const { getShiftDateTimeIST } = require('../utils/istTime');
+const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 const { 
     SHIFT_WORKING_MINUTES, 
     PAID_BREAK_ALLOWANCE_MINUTES,
+    MINIMUM_WORKING_HOURS,
+    MINIMUM_HOURS_FOR_HALF_DAY,
+    MINIMUM_TOTAL_HOURS_FOR_HALF_DAY,
+    HALF_DAY_WORKING_MINUTES,
+    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY,
+    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY,
     calculateRequiredLogoutTime 
 } = require('../config/shiftPolicy');
 
@@ -20,15 +26,26 @@ const DEFAULT_OPTIONS = {
 };
 
 /**
- * Recalculates late/half-day status based on current clockInTime.
+ * Recalculates late/half-day status based on current clockInTime and elapsed shift time.
  * This is the SINGLE SOURCE OF TRUTH for derived attendance status.
+ * 
+ * NEW SHIFT MODEL:
+ * Attendance status is based on elapsedShiftTime = clockOutTime - clockInTime (includes paid breaks)
+ * Break duration does NOT reduce attendance thresholds
+ * 
+ * PRIORITY LOGIC:
+ * 1. elapsedShiftTime < 5 hrs → Absent
+ * 2. elapsedShiftTime >= 5 hrs AND < 9 hrs → Half-day
+ * 3. elapsedShiftTime >= 9 hrs + within grace → On-time; beyond grace → Late or Half-day per lateArrivalMarksHalfDay
  * 
  * @param {Date} clockInTime - The actual clock-in time
  * @param {Object} shift - The user's shift object with startTime
  * @param {number} gracePeriodMinutes - Grace period in minutes (default: 30)
- * @returns {Object} { lateMinutes, isLate, isHalfDay, attendanceStatus }
+ * @param {number} elapsedShiftHours - Elapsed shift hours (clockOutTime - clockInTime, includes breaks) (optional, for complete status determination)
+ * @param {boolean} lateArrivalMarksHalfDay - If true, late arrival marks half-day; if false, only late is recorded (default: false)
+ * @returns {Object} { lateMinutes, isLate, isHalfDay, attendanceStatus, halfDayReasonCode, halfDayReasonText }
  */
-const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = null) => {
+const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = null, elapsedShiftHours = null, lateArrivalMarksHalfDay = false) => {
     if (!clockInTime || !shift || !shift.startTime) {
         return {
             lateMinutes: 0,
@@ -42,54 +59,78 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
     const shiftStartTime = getShiftDateTimeIST(clockIn, shift.startTime);
     const lateMinutes = Math.max(0, Math.floor((clockIn - shiftStartTime) / (1000 * 60)));
 
-    // Get grace period from settings if not provided
     let GRACE_PERIOD_MINUTES = gracePeriodMinutes;
     if (GRACE_PERIOD_MINUTES === null || GRACE_PERIOD_MINUTES === undefined) {
-        try {
-            const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-            if (graceSetting) {
-                // FIX: Explicitly convert to integer to ensure type consistency
-                const graceValue = parseInt(Number(graceSetting.value), 10);
-                if (!isNaN(graceValue) && graceValue >= 0) {
-                    GRACE_PERIOD_MINUTES = graceValue;
-                } else {
-                    console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
-                    GRACE_PERIOD_MINUTES = 30; // Default
-                }
-            } else {
-                GRACE_PERIOD_MINUTES = 30; // Default
-            }
-        } catch (err) {
-            console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
-            GRACE_PERIOD_MINUTES = 30;
-        }
+        GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
     }
 
-    // Consistent rules:
-    // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
-    // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day AND Late (for tracking/notifications)
+    // FIXED PRIORITY LOGIC:
+    // 1. Check if insufficient working hours (takes precedence over grace period)
+    // 2. Check if exceeds grace period (only if working hours are sufficient)
+    // 3. Otherwise, on-time
+    
     let isLate = false;
     let isHalfDay = false;
     let attendanceStatus = 'On-time';
     let halfDayReasonCode = null;
     let halfDayReasonText = '';
 
-    if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+    const withinGracePeriod = lateMinutes <= GRACE_PERIOD_MINUTES;
+    // Only check hours if clocked out (elapsedShiftHours > 0)
+    const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
+    // NEW MODEL: Use elapsed shift time (includes breaks) for status determination
+    const hasFullDayHours = elapsedShiftHours !== null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
+    const belowHalfDayMinimum = elapsedShiftHours !== null && elapsedShiftHours > 0 && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed = Absent
+    // Half-day: elapsed shift time >= 5 hrs AND < 9 hrs
+    const hasHalfDayHours = elapsedShiftHours !== null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 hrs to < 9 hrs elapsed
+
+    // RULE: Do not mark half-day/absent until checkout is done. If today and no checkout, always show Present (On-time).
+    if (!hasCheckedOut) {
+        isLate = !withinGracePeriod; // Keep late tracking for clock-out
+        isHalfDay = false;
+        attendanceStatus = 'On-time';
+        halfDayReasonCode = null;
+        halfDayReasonText = '';
+    } else if (belowHalfDayMinimum) {
+        // PRIORITY 1: Elapsed shift time less than 5 hrs → Absent
+        isHalfDay = false;
+        isLate = false;
+        attendanceStatus = 'Absent';
+        halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+        halfDayReasonText = `Less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours total shift time (${elapsedShiftHours.toFixed(1)} hours elapsed). Minimum ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs for half-day, ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hrs for full day.`;
+    } else if (hasHalfDayHours) {
+        // PRIORITY 2: Elapsed shift time >= 5 hrs AND < 9 hrs → Half-day (insufficient for full day)
+        isHalfDay = true;
+        isLate = false;
+        attendanceStatus = 'Half-day';
+        halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+        halfDayReasonText = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+    } else if (!withinGracePeriod && hasFullDayHours) {
+        // PRIORITY 2: Exceeds grace period (only if working hours are sufficient, i.e. checkout done)
+        // When lateArrivalMarksHalfDay is false, only record late (do not mark half-day)
+        isLate = true;
+        if (lateArrivalMarksHalfDay) {
+            isHalfDay = true;
+            attendanceStatus = 'Half-day';
+            halfDayReasonCode = 'LATE_LOGIN';
+            const clockInTimeStr = clockInTime.toLocaleTimeString('en-US', { 
+                timeZone: 'Asia/Kolkata',
+                hour12: true, 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
+        } else {
+            isHalfDay = false;
+            attendanceStatus = 'On-time';
+            halfDayReasonCode = null;
+            halfDayReasonText = '';
+        }
+    } else {
+        // PRIORITY 3: Within grace period and sufficient hours → On-time
         isLate = false;
         isHalfDay = false;
         attendanceStatus = 'On-time';
-    } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
-        isHalfDay = true;
-        isLate = true; // FIX: Set isLate=true for tracking and notifications
-        attendanceStatus = 'Half-day';
-        halfDayReasonCode = 'LATE_LOGIN';
-        const clockInTimeStr = clockInTime.toLocaleTimeString('en-US', { 
-            timeZone: 'Asia/Kolkata',
-            hour12: true, 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
     }
 
     return {
@@ -160,8 +201,9 @@ const mapActiveBreak = (breakDoc) => breakDoc ? ({
  * 3. All unpaid break time extends logout time
  * 
  * Returns both the logout time and breakdown metadata for UI display.
+ * When approvedHalfDayLeave is true, base work = 5 hrs (300 min); otherwise full shift.
  */
-const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift, activeBreak = null) => {
+const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift, activeBreak = null, approvedHalfDayLeave = false) => {
     if (!sessions?.length || !userShift || !attendanceLog) {
         return null;
     }
@@ -244,11 +286,14 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     
     // ============================================
     // USE AUTHORITATIVE POLICY CALCULATION
+    // Half-day leave: base work = 300 min; full day: shift working minutes
     // ============================================
+    const baseWorkMinutes = approvedHalfDayLeave ? HALF_DAY_WORKING_MINUTES : SHIFT_WORKING_MINUTES;
     const result = calculateRequiredLogoutTime(
         clockInTime,
         paidBreakMinutesTaken,
-        unpaidBreakMinutesTaken
+        unpaidBreakMinutesTaken,
+        { workingMinutes: baseWorkMinutes }
     );
     
     if (!result) {
@@ -269,23 +314,27 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     let requiredLogoutTime = result.requiredLogoutTime;
     
     // ============================================
-    // PRESERVE EXISTING RULE: Early logout restriction
-    // For 10 AM - 7 PM shift, ensure logout never goes below 7:00 PM
+    // POLICY: 7:00 PM minimum logout
+    // - Fixed shift with end time 7 PM (19:00): enforce floor (format-agnostic)
+    // - Flexible shift: policy is standard day ends at 7 PM, so enforce floor
     // ============================================
-    const isSpecialShift = userShift.shiftType === 'Fixed' && 
-                          userShift.startTime && 
-                          (userShift.startTime === '10:00' || 
-                           userShift.startTime === '10:00 AM' ||
-                           (typeof userShift.startTime === 'string' && userShift.startTime.startsWith('10:00'))) &&
-                          userShift.endTime && 
-                          (userShift.endTime === '19:00' || 
-                           userShift.endTime === '7:00 PM' ||
-                           userShift.endTime === '19:00:00' ||
-                           (typeof userShift.endTime === 'string' && (userShift.endTime.startsWith('19:') || userShift.endTime.startsWith('7:'))));
+    const parseEndTimeToHourMin = (endTime) => {
+        if (!endTime || typeof endTime !== 'string') return null;
+        const raw = endTime.trim();
+        const parts = raw.split(':').map(s => parseInt(String(s).replace(/\D/g, ''), 10));
+        const hour = parts[0];
+        const min = (parts[1] !== undefined && !Number.isNaN(parts[1])) ? parts[1] : 0;
+        if (Number.isNaN(hour)) return null;
+        const isPM = /pm|p\.m\./i.test(raw);
+        const hour24 = isPM && hour >= 1 && hour <= 12 ? hour + 12 : hour;
+        return { hour: hour24, min, isPM };
+    };
+    const endParsed = parseEndTimeToHourMin(userShift.endTime);
+    const shiftEndsAt7PM = endParsed && endParsed.min === 0 && (endParsed.hour === 19 || (endParsed.hour === 7 && endParsed.isPM));
+    const enforce7PMFloor = (userShift.shiftType === 'Fixed' && shiftEndsAt7PM) || (userShift.shiftType === 'Flexible');
     
-    if (isSpecialShift) {
+    if (enforce7PMFloor) {
         const sevenPM = setTime(clockInTime, '19:00');
-        // Enforce minimum logout time: never before 7:00 PM
         if (requiredLogoutTime < sevenPM) {
             requiredLogoutTime = sevenPM;
         }
@@ -338,13 +387,50 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     response.hasLog = true;
     response.attendanceLog = mapAttendanceLog(attendanceLog);
 
-    // CRITICAL: Recalculate late/half-day status from CURRENT clockInTime
+    // CRITICAL: Recalculate late/half-day status from FIRST check-in time (not latest)
     // This ensures admin edits to clockInTime immediately affect the response
     // BUT: Use persisted half-day reason if admin override exists
-    if (attendanceLog.clockInTime && response.shift && response.shift.startTime) {
+    // CRITICAL FIX: Use first session's startTime as authoritative first check-in
+    // Load first session to get authoritative first check-in time
+    let firstCheckInTime = null;
+    if (attendanceLog.clockInTime) {
+        // First, try to get first session's startTime (most authoritative)
+        try {
+            const firstSession = await AttendanceSession.findOne({ 
+                attendanceLog: attendanceLog._id 
+            }).sort({ startTime: 1 }).select('startTime').lean();
+            
+            if (firstSession && firstSession.startTime) {
+                firstCheckInTime = new Date(firstSession.startTime);
+            } else {
+                // Fallback to stored clockInTime if no sessions found
+                firstCheckInTime = new Date(attendanceLog.clockInTime);
+            }
+        } catch (err) {
+            // If session query fails, fallback to stored clockInTime
+            console.warn(`[getUserDailyStatus] Error loading first session, using clockInTime: ${err.message}`);
+            firstCheckInTime = new Date(attendanceLog.clockInTime);
+        }
+    }
+    
+    if (firstCheckInTime && response.shift && response.shift.startTime) {
+        // Calculate elapsed shift time (clockOutTime - clockInTime) for new shift model
+        // This includes breaks and is used for attendance status determination
+        let elapsedShiftHours = null;
+        if (attendanceLog.clockInTime && attendanceLog.clockOutTime) {
+            const elapsedShiftMinutes = (new Date(attendanceLog.clockOutTime) - new Date(attendanceLog.clockInTime)) / (1000 * 60);
+            elapsedShiftHours = elapsedShiftMinutes / 60;
+        }
+        
+        // Pass elapsed shift hours for accurate status determination
+        // Only treat as true when explicitly true; missing/undefined/false => do not mark half-day for late
+        const lateArrivalMarksHalfDay = user.featurePermissions?.lateArrivalMarksHalfDay === true;
         const recalculatedStatus = await recalculateLateStatus(
-            attendanceLog.clockInTime,
-            response.shift
+            firstCheckInTime,
+            response.shift,
+            null, // gracePeriodMinutes (will be fetched from settings)
+            elapsedShiftHours, // Pass elapsed shift hours (includes breaks) for priority logic
+            lateArrivalMarksHalfDay
         );
         // Override stored values with recalculated values
         response.attendanceLog.isLate = recalculatedStatus.isLate;

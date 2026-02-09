@@ -1,6 +1,5 @@
 // frontend/src/api/axios.js
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
 
 // Create a simple custom event that the AuthContext can listen for.
 // This is a more robust way to handle authentication errors globally.
@@ -35,37 +34,38 @@ const api = axios.create({
   },
 });
 
+
+
+// const baseURL = import.meta.env.DEV 
+//   ? '/api' // Use Vite proxy in development
+//   : (import.meta.env.VITE_API_BASE_URL 
+//       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
+//           ? import.meta.env.VITE_API_BASE_URL 
+//           : `${import.meta.env.VITE_API_BASE_URL}/api`)
+//       : 'https://attendance.bylinelms.com/api'); // Use full URL in production
+
+// const api = axios.create({
+//   baseURL: baseURL,
+//   withCredentials: true, // Enable credentials for cross-origin requests
+//   headers: {
+//     'Content-Type': 'application/json',
+//   },
+// });
+
+
 // Debug: Log the actual baseURL being used
 console.log('Axios baseURL:', api.defaults.baseURL);
 
-// Auto-restore token on app load
-// Hybrid approach: sessionStorage for tab isolation, localStorage for persistence
-// Check sessionStorage first (tab-specific), then localStorage (persistence)
+// Auto-restore token on app load (for SSO persistence)
+// Check for ams_token first (SSO preference), then fallback to token
 const restoreToken = () => {
-  // First check sessionStorage (tab-specific session)
-  let amsToken = sessionStorage.getItem('ams_token');
-  let token = sessionStorage.getItem('token');
-  let tokenToUse = amsToken || token;
-  let source = 'sessionStorage';
-  
-  // If no token in sessionStorage, restore from localStorage (persistence)
-  if (!tokenToUse) {
-    amsToken = localStorage.getItem('ams_token');
-    token = localStorage.getItem('token');
-    tokenToUse = amsToken || token;
-    source = 'localStorage';
-    
-    // Copy from localStorage to sessionStorage for this tab
-    if (tokenToUse) {
-      sessionStorage.setItem('ams_token', amsToken || tokenToUse);
-      sessionStorage.setItem('token', tokenToUse);
-      console.log('[Axios] Token restored from localStorage and copied to sessionStorage');
-    }
-  }
+  const amsToken = sessionStorage.getItem('ams_token');
+  const token = sessionStorage.getItem('token');
+  const tokenToUse = amsToken || token;
   
   if (tokenToUse) {
     api.defaults.headers.common['Authorization'] = `Bearer ${tokenToUse}`;
-    console.log('[Axios] Token auto-restored from', source);
+    console.log('[Axios] Token auto-restored from sessionStorage');
     console.log('[Axios] Token source:', amsToken ? 'ams_token' : 'token');
   }
 };
@@ -77,9 +77,8 @@ restoreToken();
 api.interceptors.request.use(
   (config) => {
     // Check for token in order: ams_token (SSO) > token
-    // Use sessionStorage first (tab-specific), fallback to localStorage
-    const amsToken = sessionStorage.getItem('ams_token') || localStorage.getItem('ams_token');
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const amsToken = sessionStorage.getItem('ams_token');
+    const token = sessionStorage.getItem('token');
     const tokenToUse = amsToken || token;
     
     if (tokenToUse) {
@@ -100,11 +99,14 @@ api.interceptors.request.use(
       });
     }
     
-    // Add timestamp to prevent browser caching of GET requests
-    if (config.method?.toUpperCase() === 'GET' && !config.params?._t) {
+    // Add timestamp to prevent browser caching of GET requests.
+    // Skip cache-busting for Leaves endpoints so frontend leaves cache can work (stable keys).
+    const isLeavesGet = config.method?.toUpperCase() === 'GET' &&
+      (config.url && (config.url.includes('/leaves') || config.url.includes('/admin/leaves')));
+    if (config.method?.toUpperCase() === 'GET' && !config.params?._t && !isLeavesGet) {
       config.params = { ...config.params, _t: Date.now() };
     }
-    
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -150,43 +152,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
       
-      // CRITICAL FIX: Only logout on actual auth failures, not on admin update errors
-      // Check if this is an auth-protected endpoint that requires valid token
-      const isAuthEndpoint = originalRequest.url?.includes('/auth/') || 
-                             originalRequest.url?.includes('/admin/') ||
-                             originalRequest.url?.includes('/attendance/') ||
-                             originalRequest.url?.includes('/employees/') ||
-                             originalRequest.url?.includes('/leaves/') ||
-                             originalRequest.url?.includes('/breaks/');
-      
-      // If this is NOT an auth-protected endpoint, don't logout
-      // Admin updates, data fetches, etc. might return 401 for other reasons
-      if (!isAuthEndpoint) {
-        console.log('[Axios Interceptor] 401 on non-auth endpoint - not logging out:', originalRequest.url);
-        return Promise.reject(error);
-      }
-      
-      // Verify token is actually expired/invalid before logging out
-      // Check sessionStorage first (tab-specific), then localStorage
-      const token = sessionStorage.getItem('token') || sessionStorage.getItem('ams_token') ||
-                    localStorage.getItem('token') || localStorage.getItem('ams_token');
-      if (token) {
-        try {
-          const decoded = jwtDecode(token);
-          const isExpired = decoded.exp * 1000 < Date.now();
-          
-          // If token is NOT expired, this might be a different error (e.g., permission denied)
-          // Don't logout - let the component handle the error
-          if (!isExpired) {
-            console.log('[Axios Interceptor] 401 but token is valid - not logging out (likely permission issue)');
-            return Promise.reject(error);
-          }
-        } catch (decodeError) {
-          // Token is malformed - proceed with logout
-          console.log('[Axios Interceptor] Token decode failed - proceeding with logout');
-        }
-      }
-      
       // Check if this request has already been retried to prevent infinite loops
       if (originalRequest._retry || originalRequest._retryFailed) {
         // If we've already retried and still got 401, the session is invalid
@@ -199,10 +164,10 @@ api.interceptors.response.use(
         isLoggingOut = true;
         
         // Clear all tokens
-        localStorage.removeItem('token');
-        localStorage.removeItem('ams_token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('sso_processed_token');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('ams_token');
+        sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('sso_processed_token');
         delete api.defaults.headers.common['Authorization'];
         
         // Dispatch logout event
@@ -239,7 +204,7 @@ api.interceptors.response.use(
       try {
         // Attempt to refresh the token
         // Check if we have a refresh token stored (if refresh token system exists)
-        const refreshToken = sessionStorage.getItem('refreshToken') || localStorage.getItem('refreshToken');
+        const refreshToken = sessionStorage.getItem('refreshToken');
         
         // If no refresh token exists, treat as expired session and logout immediately
         if (!refreshToken) {
@@ -264,11 +229,9 @@ api.interceptors.response.use(
           const newAccessToken = accessToken || newToken;
           
           if (newAccessToken) {
-            // Update token in both sessionStorage (tab-specific) and localStorage (persistence)
+            // Update token in storage and headers
             sessionStorage.setItem('token', newAccessToken);
             sessionStorage.setItem('ams_token', newAccessToken);
-            localStorage.setItem('token', newAccessToken);
-            localStorage.setItem('ams_token', newAccessToken);
             api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             
@@ -303,15 +266,11 @@ api.interceptors.response.use(
         }
         isLoggingOut = true;
         
-        // Clear all tokens immediately (both sessionStorage and localStorage)
+        // Clear all tokens immediately
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('ams_token');
         sessionStorage.removeItem('refreshToken');
         sessionStorage.removeItem('sso_processed_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('ams_token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('sso_processed_token');
         delete api.defaults.headers.common['Authorization'];
         
         // Dispatch logout event (AuthContext will handle additional cleanup)

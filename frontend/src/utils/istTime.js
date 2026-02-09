@@ -281,3 +281,53 @@ export const compareISTDates = (date1, date2) => {
     return 0;
 };
 
+/**
+ * Format timestamp as IST date + time for display.
+ * Accepts backend-provided ISO strings or Date only. No browser-local fallback.
+ * @param {Date|string} timestamp - ISO string or Date
+ * @param {object} options - Intl options (default: date + time in IST)
+ * @returns {string} Formatted datetime string in IST
+ */
+export const formatISTDateTime = (timestamp, options = {}) => {
+    if (!timestamp) return '';
+    const d = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    if (isNaN(d.getTime())) return '';
+    const defaultOpts = {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    };
+    return new Date(d).toLocaleString('en-GB', { ...defaultOpts, ...options });
+};
+
+/**
+ * Get YYYY-MM-DD (IST) from an ISO datetime string.
+ * Use for API payloads and attendanceDate. No browser-local derivation.
+ * @param {string} isoString - ISO 8601 datetime string from backend
+ * @returns {string} YYYY-MM-DD in IST
+ */
+export const getISTDateFromISO = (isoString) => {
+    if (!isoString || typeof isoString !== 'string') return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return getISTDateString(d);
+};
+
+/**
+ * Format time as HH:mm in IST for form inputs (24h).
+ * Accepts backend-provided ISO strings or Date only.
+ * @param {Date|string} dateTime - ISO string or Date
+ * @returns {string} "HH:mm" in IST
+ */
+export const formatISTTimeHHMM = (dateTime) => {
+    if (!dateTime) return '';
+    const d = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
+    if (isNaN(d.getTime())) return '';
+    return formatISTTime(d, { hour12: false, hour: '2-digit', minute: '2-digit' });
+};
+

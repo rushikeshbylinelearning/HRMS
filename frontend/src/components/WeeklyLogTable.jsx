@@ -5,11 +5,12 @@ import { Box, Typography, Paper, TableContainer, Table, TableHead, TableRow, Tab
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LogDisplayTable from './LogDisplayTable';
-
+import { formatTimeForDisplay, formatDateForDisplay } from '../utils/attendanceRenderUtils';
 import { SkeletonBox } from '../components/SkeletonLoaders';
+
 const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
-    return new Date(timeString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return formatTimeForDisplay(timeString);
 };
 
 const Row = ({ row }) => {
@@ -31,7 +32,7 @@ const Row = ({ row }) => {
                     </IconButton>
                 </TableCell>
                 <TableCell component="th" scope="row">
-                    {new Date(row.attendance_date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    {formatDateForDisplay(row.attendance_date, { weekday: 'long', month: 'short', day: 'numeric' })}
                 </TableCell>
                 <TableCell>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>

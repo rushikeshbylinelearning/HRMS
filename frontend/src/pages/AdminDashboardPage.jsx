@@ -18,6 +18,7 @@ import EmployeeListModal from '../components/EmployeeListModal';
 import EnhancedLeaveRequestModal from '../components/EnhancedLeaveRequestModal';
 import PageHeroHeader from '../components/PageHeroHeader';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
+import { formatISTTime, formatISTDate } from '../utils/istTime';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import socket from '../socket';
 import { SkeletonBox } from '../components/SkeletonLoaders';
@@ -39,40 +40,43 @@ const SummaryCard = memo(({ title, value, icon, iconBgClass, onClick, clickable 
     </div>
 ));
 
-const RequestItem = memo(({ request, onStatusChange, onViewDetails }) => (
-    <div 
-        className="request-item" 
-        onClick={onViewDetails}
-        style={{ cursor: 'pointer' }}
-    >
-        <Tooltip title={`${request.reason}`} placement="top-start">
-            <div className="request-info">
-                <strong>{request.employee.fullName}</strong>
-                <span className="date">{request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'N/A'}</span>
+const RequestItem = memo(({ request, onStatusChange, onViewDetails }) => {
+    if (!request) return null;
+    const employeeName = request?.employee?.fullName ?? '—';
+    return (
+        <div 
+            className="request-item" 
+            onClick={() => onViewDetails?.(request)}
+            style={{ cursor: 'pointer' }}
+        >
+            <Tooltip title={`${request?.reason ?? ''}`} placement="top-start">
+                <div className="request-info">
+                    <strong>{employeeName}</strong>
+                    <span className="date">{request?.createdAt ? formatISTDate(request.createdAt) : 'N/A'}</span>
+                </div>
+            </Tooltip>
+            <div className="applied-date">
+                {request?.leaveDates?.length > 0 
+                    ? formatISTDate(request.leaveDates[0])
+                    : 'N/A'}
             </div>
-        </Tooltip>
-        <div className="applied-date">
-            {request.leaveDates && request.leaveDates.length > 0 
-                ? new Date(request.leaveDates[0]).toLocaleDateString()
-                : 'N/A'}
+            <div><Chip label={formatLeaveRequestType(request?.requestType)} size="small" variant="outlined" /></div>
+            <div className="request-actions" onClick={(e) => e.stopPropagation()}>
+                <Button size="small" variant="contained" color="success" onClick={() => onStatusChange(request._id, 'Approved')}>Approve</Button>
+                <Button size="small" variant="outlined" color="error" onClick={() => onStatusChange(request._id, 'Rejected')}>Reject</Button>
+            </div>
         </div>
-        <div><Chip label={formatLeaveRequestType(request.requestType)} size="small" variant="outlined" /></div>
-        <div className="request-actions" onClick={(e) => e.stopPropagation()}>
-            <Button size="small" variant="contained" color="success" onClick={() => onStatusChange(request._id, 'Approved')}>Approve</Button>
-            <Button size="small" variant="outlined" color="error" onClick={() => onStatusChange(request._id, 'Rejected')}>Reject</Button>
-        </div>
-    </div>
-));
+    );
+});
 
+// Defensive: calculatedLogoutTime may be null (backend returns null to avoid N+1); UI shows "N/A".
 const WhosInItem = memo(({ employee }) => {
     const [liveLogoutTime, setLiveLogoutTime] = useState(null);
     const dataReceivedTimeRef = useRef(null);
     const intervalRef = useRef(null);
     const rafRef = useRef(null);
-    const lastTimeStringRef = useRef('');
 
     useEffect(() => {
-        // Clear any existing timers
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
@@ -82,62 +86,40 @@ const WhosInItem = memo(({ employee }) => {
             rafRef.current = null;
         }
 
-        if (!employee.calculatedLogoutTime) {
-            if (liveLogoutTime !== null) {
-                setLiveLogoutTime(null);
-            }
+        if (!employee?.calculatedLogoutTime) {
+            if (liveLogoutTime !== null) setLiveLogoutTime(null);
             dataReceivedTimeRef.current = null;
             return;
         }
 
-        // Store when we received this data
         dataReceivedTimeRef.current = new Date();
         const baseLogoutTime = new Date(employee.calculatedLogoutTime);
         setLiveLogoutTime(baseLogoutTime);
-
-        // If there's an active unpaid break, update logout time dynamically
-        // BACKEND-AUTHORITATIVE: Use server-calculated logout time directly
-        // The backend already includes active break duration in its calculation
-        // Frontend only displays the authoritative backend value
-        setLiveLogoutTime(baseLogoutTime);
-        
-        // Clear any existing timers
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-        }
-        
-        // Note: For real-time updates, the parent component should refresh employee data
-        // via socket events or periodic API calls. The backend recalculates on each call.
-    }, [employee.calculatedLogoutTime, employee.activeBreak]);
+    }, [employee?.calculatedLogoutTime, employee?.activeBreak]);
 
     const formatTime = (time) => {
         if (!time) return 'N/A';
-        return new Date(time).toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-        });
+        return formatISTTime(time, { hour: '2-digit', minute: '2-digit', hour12: true });
     };
+
+    if (!employee) return null;
+    const fullName = employee?.fullName ?? '';
+    const designation = employee?.designation ?? '';
 
     return (
         <div className="whos-in-item">
             <Avatar sx={{ bgcolor: 'var(--accent-teal)' }}>
-                {employee.fullName.charAt(0)}
+                {fullName.charAt(0) || '?'}
             </Avatar>
             <div className="item-details">
-                <div className="name">{employee.fullName}</div>
-                <div className="role">{employee.designation}</div>
+                <div className="name">{fullName}</div>
+                <div className="role">{designation}</div>
             </div>
             <div className="item-times">
                 <div className="time-column">
                     <div className="time-label">Log In</div>
                     <div className="time-value">
-                        {formatTime(employee.startTime)}
+                        {formatTime(employee?.startTime)}
                     </div>
                 </div>
                 <div className="time-column">
@@ -151,11 +133,12 @@ const WhosInItem = memo(({ employee }) => {
     );
 });
 
-const ActivityItem = memo(({ item, onClick }) => {
+const ActivityItem = memo(({ item, onOpenActivityModal }) => {
+    if (!item) return null;
     const isBreakRequest = item.type === 'ExtraBreakRequest';
     const isLeaveRequest = item.type === 'BackdatedLeaveRequest';
-    
-    
+    const isEarlyCheckoutRequest = item.type === 'EarlyCheckoutRequest';
+    const userName = item?.user?.fullName ?? '—';
     const getProps = () => {
         if (isBreakRequest) {
             return { icon: <MoreTimeIcon sx={{fontSize: '1rem'}}/>, chipLabel: 'Break Request', avatarBg: 'var(--accent-purple)', chipClass: 'activity-chip-break' };
@@ -163,26 +146,28 @@ const ActivityItem = memo(({ item, onClick }) => {
         if (isLeaveRequest) {
             return { icon: <HistoryEduIcon sx={{fontSize: '1rem'}}/>, chipLabel: 'Backdate Leave', avatarBg: 'var(--accent-orange)', chipClass: 'activity-chip-leave' };
         }
-        // Default is Note
-        return { icon: item.user.fullName.charAt(0), chipLabel: null, avatarBg: 'var(--accent-blue)', chipClass: '' };
+        if (isEarlyCheckoutRequest) {
+            return { icon: <AccessAlarmIcon sx={{fontSize: '1rem'}}/>, chipLabel: 'Early Checkout Request', avatarBg: '#ed6c02', chipClass: 'activity-chip-early-checkout' };
+        }
+        return { icon: userName.charAt(0), chipLabel: null, avatarBg: 'var(--accent-blue)', chipClass: '' };
     };
 
     const { icon, chipLabel, avatarBg, chipClass } = getProps();
 
     return (
-        <div className="activity-item" onClick={onClick}>
+        <div className="activity-item" onClick={() => onOpenActivityModal?.(item)}>
             <Avatar sx={{ bgcolor: avatarBg, width: 32, height: 32, fontSize: '0.9rem' }}>
                 {icon}
             </Avatar>
             <div className="activity-details">
                 <div className="name">
-                    {item.user.fullName}
+                    {userName}
                     {chipLabel && <Chip label={chipLabel} size="small" className={`activity-chip ${chipClass}`} />}
                 </div>
-                <div className="activity-preview">"{item.content}"</div>
+                <div className="activity-preview">"{item?.content ?? ''}"</div>
             </div>
             <div className="activity-time">
-                {new Date(item.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                {item?.timestamp ? formatISTTime(item.timestamp, { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
             </div>
         </div>
     );
@@ -214,38 +199,64 @@ const AdminDashboardPage = () => {
     // =================================================================
 
     const fetchAllDataRef = useRef(null);
-    
-    // Create stable fetch function
-    // PHASE 5: Use aggregate endpoint - single call instead of 2
+    const refetchSummaryOnlyRef = useRef(null);
+    const refetchPendingOnlyRef = useRef(null);
+
+    // OPTIMIZED: Single request for base summary + pending leaves (avoids sequential double call).
     fetchAllDataRef.current = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
         setError('');
         try {
-            // AGGREGATE ENDPOINT: Single call replaces 2 separate calls
-            const dashboardRes = await api.get('/admin/dashboard-summary', {
-                params: {
-                    includePendingLeaves: true,
-                    pendingPage: 1,
-                    pendingLimit: 20
-                }
+            const res = await api.get('/admin/dashboard-summary', {
+                params: { includePendingLeaves: true }
             });
-            const { summary, pendingLeaveRequests } = dashboardRes.data;
-            
-            setSummary(summary);
-            // Sort pending requests by createdAt in descending order (latest first)
-            const sortedRequests = Array.isArray(pendingLeaveRequests) 
+            const data = res?.data ?? null;
+            // Backend returns { summary, pendingLeaveRequests } when includePendingLeaves=true
+            const baseSummary = data?.summary ?? data ?? null;
+            const pendingLeaveRequests = data?.pendingLeaveRequests ?? [];
+            setSummary(baseSummary);
+            const sortedRequests = Array.isArray(pendingLeaveRequests)
                 ? [...pendingLeaveRequests].sort((a, b) => {
-                    const dateA = new Date(a.createdAt || 0);
-                    const dateB = new Date(b.createdAt || 0);
-                    return dateB - dateA; // Descending order (newest first)
+                    const dateA = new Date(a?.createdAt ?? 0);
+                    const dateB = new Date(b?.createdAt ?? 0);
+                    return dateB - dateA;
                 })
                 : [];
             setPendingRequests(sortedRequests);
         } catch (err) {
             setError('Failed to load dashboard data. Please try again later.');
-            console.error(err);
+            if (import.meta.env?.DEV) console.error('[AdminDashboard] fetch error:', err);
         } finally {
             if (isInitialLoad) setLoading(false);
+        }
+    };
+
+    // Targeted refetch: summary only (no full dashboard + pending). Used after break approve/reject.
+    refetchSummaryOnlyRef.current = async () => {
+        try {
+            const res = await api.get('/admin/dashboard-summary', { params: { includePendingLeaves: false } });
+            const data = res?.data ?? null;
+            setSummary(data);
+        } catch (e) {
+            if (import.meta.env?.DEV) console.error('[AdminDashboard] refetchSummaryOnly error:', e);
+        }
+    };
+
+    // Targeted refetch: pending leaves only. Used after leave approve/reject.
+    refetchPendingOnlyRef.current = async () => {
+        try {
+            const res = await api.get('/admin/dashboard-pending-leaves');
+            const list = res?.data?.pendingLeaveRequests ?? [];
+            const sorted = Array.isArray(list)
+                ? [...list].sort((a, b) => {
+                    const dateA = new Date(a?.createdAt ?? 0);
+                    const dateB = new Date(b?.createdAt ?? 0);
+                    return dateB - dateA;
+                })
+                : [];
+            setPendingRequests(sorted);
+        } catch (e) {
+            if (import.meta.env?.DEV) console.error('[AdminDashboard] refetchPendingOnly error:', e);
         }
     };
     
@@ -260,7 +271,7 @@ const AdminDashboardPage = () => {
         // CRITICAL FIX: Guard API calls - only execute if auth is ready and user is authenticated
         // This prevents API calls during page refresh before auth state is restored
         if (authLoading || !user) {
-            console.log('[AdminDashboard] Waiting for auth to initialize...');
+            if (import.meta.env?.DEV) console.log('[AdminDashboard] Waiting for auth to initialize...');
             return;
         }
         
@@ -270,7 +281,7 @@ const AdminDashboardPage = () => {
         const loadData = async () => {
             // Prevent duplicate execution in React StrictMode
             if (dataFetchedRef.current) {
-                console.log('[AdminDashboard] Data fetch already in progress, skipping duplicate call');
+                if (import.meta.env?.DEV) console.log('[AdminDashboard] Data fetch already in progress, skipping duplicate call');
                 return;
             }
             dataFetchedRef.current = true;
@@ -289,7 +300,7 @@ const AdminDashboardPage = () => {
             if (!document.hidden && mounted && fetchAllDataRef.current) {
                 // Only refresh if socket is disconnected (fallback safety)
                 if (socket.disconnected) {
-                    console.log('[AdminDashboard] Socket disconnected, refreshing data on visibility change');
+                    if (import.meta.env?.DEV) console.log('[AdminDashboard] Socket disconnected, refreshing data on visibility change');
                     fetchAllDataRef.current(false);
                 }
             }
@@ -303,56 +314,94 @@ const AdminDashboardPage = () => {
         };
     }, [user?.id, user?._id, authLoading]); // Depend on user IDs (stable) and loading to trigger when auth is ready
 
-    // Real-time consistency: refetch dashboard summary on relevant socket events (throttled, no polling)
+    // Real-time consistency: delta updates on socket events (throttled; minimal API calls).
+    // attendance_log_updated → refetch summary only. leave_* → refetch pending leaves only.
     useEffect(() => {
         if (!authReady) return;
 
-        const THROTTLE_MS = 1500;
-        let lastRun = 0;
-        let scheduledTimer = null;
+        const THROTTLE_MS = 500; // Reduced from 1800 for faster dashboard updates after socket events
+        let lastRunSummary = 0;
+        let lastRunPending = 0;
+        let scheduledSummaryTimer = null;
+        let scheduledPendingTimer = null;
 
-        const runRefetch = async () => {
-            if (!fetchAllDataRef.current) return;
-            lastRun = Date.now();
+        const runSummaryRefetch = async () => {
+            lastRunSummary = Date.now();
             try {
-                await fetchAllDataRef.current(false);
+                const res = await api.get('/admin/dashboard-summary', {
+                    params: { includePendingLeaves: false }
+                });
+                const data = res?.data ?? null;
+                setSummary(data);
             } catch (e) {
-                // Swallow to avoid breaking socket handler; error UI is managed by fetchAllData
+                // Swallow; error UI is managed by main fetch
             }
         };
 
-        const scheduleRefetch = () => {
+        const runPendingRefetch = async () => {
+            lastRunPending = Date.now();
+            try {
+                const res = await api.get('/admin/dashboard-pending-leaves');
+                const list = res?.data?.pendingLeaveRequests ?? [];
+                const sorted = Array.isArray(list)
+                    ? [...list].sort((a, b) => {
+                        const dateA = new Date(a?.createdAt ?? 0);
+                        const dateB = new Date(b?.createdAt ?? 0);
+                        return dateB - dateA;
+                    })
+                    : [];
+                setPendingRequests(sorted);
+            } catch (e) {
+                // Swallow
+            }
+        };
+
+        const scheduleSummaryRefetch = () => {
+            if (document.hidden) return;
             const now = Date.now();
-            const elapsed = now - lastRun;
-            if (elapsed >= THROTTLE_MS) {
-                runRefetch();
+            if (now - lastRunSummary >= THROTTLE_MS) {
+                runSummaryRefetch();
                 return;
             }
-            if (scheduledTimer) return;
-            scheduledTimer = setTimeout(() => {
-                scheduledTimer = null;
-                runRefetch();
-            }, THROTTLE_MS - elapsed);
+            if (scheduledSummaryTimer) return;
+            scheduledSummaryTimer = setTimeout(() => {
+                scheduledSummaryTimer = null;
+                runSummaryRefetch();
+            }, THROTTLE_MS - (now - lastRunSummary));
         };
 
-        const handleDashboardRelevantEvent = () => {
-            // Avoid unnecessary refresh when tab is hidden
+        const schedulePendingRefetch = () => {
             if (document.hidden) return;
-            scheduleRefetch();
+            const now = Date.now();
+            if (now - lastRunPending >= THROTTLE_MS) {
+                runPendingRefetch();
+                return;
+            }
+            if (scheduledPendingTimer) return;
+            scheduledPendingTimer = setTimeout(() => {
+                scheduledPendingTimer = null;
+                runPendingRefetch();
+            }, THROTTLE_MS - (now - lastRunPending));
         };
 
-        socket.on('attendance_log_updated', handleDashboardRelevantEvent);
-        socket.on('leave_request_updated', handleDashboardRelevantEvent);
-        // Safe subscription (may not be emitted yet in some deployments)
-        socket.on('leave_status_updated', handleDashboardRelevantEvent);
+        const onAttendanceEvent = () => scheduleSummaryRefetch();
+        const onLeaveEvent = () => schedulePendingRefetch();
+
+        socket.on('attendance_log_updated', onAttendanceEvent);
+        socket.on('leave_request_updated', onLeaveEvent);
+        socket.on('leave_status_updated', onLeaveEvent);
 
         return () => {
-            socket.off('attendance_log_updated', handleDashboardRelevantEvent);
-            socket.off('leave_request_updated', handleDashboardRelevantEvent);
-            socket.off('leave_status_updated', handleDashboardRelevantEvent);
-            if (scheduledTimer) {
-                clearTimeout(scheduledTimer);
-                scheduledTimer = null;
+            socket.off('attendance_log_updated', onAttendanceEvent);
+            socket.off('leave_request_updated', onLeaveEvent);
+            socket.off('leave_status_updated', onLeaveEvent);
+            if (scheduledSummaryTimer) {
+                clearTimeout(scheduledSummaryTimer);
+                scheduledSummaryTimer = null;
+            }
+            if (scheduledPendingTimer) {
+                clearTimeout(scheduledPendingTimer);
+                scheduledPendingTimer = null;
             }
         };
     }, [authReady]);
@@ -363,6 +412,10 @@ const AdminDashboardPage = () => {
         try {
             await api.patch(`/admin/leaves/${requestId}/status`, { status });
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
+            // Targeted refetch: summary + pending so "On Leave" count and list update immediately (no full fetchAllData)
+            if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
+                await Promise.all([refetchSummaryOnlyRef.current(), refetchPendingOnlyRef.current()]);
+            }
         } catch (err) {
             setPendingRequests(originalRequests);
             setError(err.response?.data?.error || 'Action failed. Please try again.');
@@ -370,24 +423,33 @@ const AdminDashboardPage = () => {
     };
 
     
-    const handleActivityResponse = async (activityId, status, type) => {
+    // After approve/reject: targeted refetch only (no full fetchAllData) for faster UI update.
+    const handleActivityResponse = async (activityId, status, type, extraPayload = null) => {
         setActionLoading(true);
-        let endpoint = '';
-        if (type === 'ExtraBreakRequest') {
-            endpoint = `/admin/breaks/extra/${activityId}/status`;
-        } else if (type === 'BackdatedLeaveRequest') {
-            endpoint = `/admin/leaves/${activityId}/status`;
-        } else {
-            setActionLoading(false);
-            return;
-        }
-
         try {
-            await api.patch(endpoint, { status });
-            setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
-            handleCloseActivityModal();
-            if (fetchAllDataRef.current) {
-                await fetchAllDataRef.current(false); // Refresh data
+            if (type === 'ExtraBreakRequest') {
+                await api.patch(`/admin/breaks/extra/${activityId}/status`, { status });
+                setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
+                handleCloseActivityModal();
+                if (refetchSummaryOnlyRef.current) await refetchSummaryOnlyRef.current();
+            } else if (type === 'BackdatedLeaveRequest') {
+                await api.patch(`/admin/leaves/${activityId}/status`, { status });
+                setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
+                handleCloseActivityModal();
+                if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
+                    await Promise.all([refetchSummaryOnlyRef.current(), refetchPendingOnlyRef.current()]);
+                }
+            } else if (type === 'EarlyCheckoutRequest') {
+                const url = status === 'Approved'
+                    ? `/admin/early-checkout-requests/${activityId}/approve`
+                    : `/admin/early-checkout-requests/${activityId}/reject`;
+                await api.post(url, status === 'Rejected' && extraPayload?.rejectionNote ? { rejectionNote: extraPayload.rejectionNote } : {});
+                setSnackbar({ open: true, message: `Early checkout request ${status.toLowerCase()}.` });
+                handleCloseActivityModal();
+                if (refetchSummaryOnlyRef.current) await refetchSummaryOnlyRef.current();
+            } else {
+                setActionLoading(false);
+                return;
             }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to action request.');
@@ -396,10 +458,10 @@ const AdminDashboardPage = () => {
         }
     };
 
-    const handleOpenActivityModal = (activity) => {
+    const handleOpenActivityModal = useCallback((activity) => {
         setSelectedActivity(activity);
         setIsActivityModalOpen(true);
-    };
+    }, []);
 
     const handleCloseActivityModal = () => {
         setIsActivityModalOpen(false);
@@ -418,9 +480,9 @@ const AdminDashboardPage = () => {
         setSelectedCardTitle('');
     };
 
-    const handleViewLeaveRequestDetails = (request) => {
+    const handleViewLeaveRequestDetails = useCallback((request) => {
         setViewLeaveRequestDialog({ open: true, request });
-    };
+    }, []);
 
     const handleCloseLeaveRequestDetails = () => {
         setViewLeaveRequestDialog({ open: false, request: null });
@@ -552,7 +614,7 @@ const AdminDashboardPage = () => {
                                         key={req._id} 
                                         request={req} 
                                         onStatusChange={handleRequestStatusChange} 
-                                        onViewDetails={() => handleViewLeaveRequestDetails(req)}
+                                        onViewDetails={handleViewLeaveRequestDetails}
                                     />
                                 ))
                             ) : (
@@ -624,7 +686,7 @@ const AdminDashboardPage = () => {
                                     ))
                                 ) : filteredRecentActivity.length > 0 ? (
                                     filteredRecentActivity.slice(0, 4).map(item => (
-                                        <ActivityItem key={item.type + item._id} item={item} onClick={() => handleOpenActivityModal(item)} />
+                                        <ActivityItem key={item.type + item._id} item={item} onOpenActivityModal={handleOpenActivityModal} />
                                     ))
                                 ) : (
                                     <div className="empty-state-small">
@@ -689,18 +751,26 @@ const AdminDashboardPage = () => {
                     PaperProps={{ style: { borderRadius: 12, padding: '16px', minWidth: '400px' } }}
                 >
                     <DialogTitle sx={{ fontWeight: 600, pb: 1, pt: 1 }}>
-                        {selectedActivity.type === 'Note' ? 'Note from ' : 'Request from '} {selectedActivity.user.fullName}
+                        {selectedActivity.type === 'Note' && 'Note from '}
+                        {selectedActivity.type === 'EarlyCheckoutRequest' && 'Early Checkout Request from '}
+                        {(selectedActivity.type === 'ExtraBreakRequest' || selectedActivity.type === 'BackdatedLeaveRequest') && 'Request from '}
+                        {selectedActivity.user?.fullName}
                     </DialogTitle>
                     <DialogContent>
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Employee Code: {selectedActivity.user.employeeCode} | Submitted: {new Date(selectedActivity.timestamp).toLocaleString()}
+                            Employee Code: {selectedActivity.user?.employeeCode} | Submitted: {new Date(selectedActivity.timestamp).toLocaleString()}
+                            {selectedActivity.type === 'EarlyCheckoutRequest' && selectedActivity.remainingTimeMinutes != null && (
+                                <span style={{ display: 'block', marginTop: 4 }}>
+                                    Remaining time: {Math.floor(selectedActivity.remainingTimeMinutes / 60)}h {selectedActivity.remainingTimeMinutes % 60}m
+                                </span>
+                            )}
                         </Typography>
                         <Typography variant="body1" sx={{ mt: 2, whiteSpace: 'pre-wrap', backgroundColor: '#f8f9fa', p: 2, borderRadius: 2 }}>
                             {selectedActivity.content}
                         </Typography>
                     </DialogContent>
                     
-                    {(selectedActivity.type === 'ExtraBreakRequest' || selectedActivity.type === 'BackdatedLeaveRequest') && (
+                    {(selectedActivity.type === 'ExtraBreakRequest' || selectedActivity.type === 'BackdatedLeaveRequest' || selectedActivity.type === 'EarlyCheckoutRequest') && (
                         <DialogActions>
                             <Stack direction="row" spacing={2} sx={{width: '100%', justifyContent: 'flex-end'}}>
                                 <Button onClick={() => handleActivityResponse(selectedActivity._id, 'Rejected', selectedActivity.type)} color="error" disabled={actionLoading}>Reject</Button>
@@ -741,8 +811,9 @@ const AdminDashboardPage = () => {
                             ...(rejectionNotes && { rejectionNotes })
                         });
                         setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
-                        if (fetchAllDataRef.current) {
-                            await fetchAllDataRef.current(false);
+                        // Targeted refetch: pending leaves + summary only (no full fetchAllData)
+                        if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
+                            await Promise.all([refetchSummaryOnlyRef.current(), refetchPendingOnlyRef.current()]);
                         }
                         // Modal will close itself after successful status change
                     } catch (err) {

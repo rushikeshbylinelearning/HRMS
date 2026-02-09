@@ -1,4 +1,6 @@
 // frontend/src/pages/EmployeeDashboardPage.jsx
+// AUDIT: Employee Dashboard – single API GET /attendance/dashboard/employee on load; auth guards; socket debounce; LiveClock isolated (memo); cleanup on unmount.
+// VALIDATION: One initial call, no duplicate on auth resolution, manual Retry on error, socket/visibility refresh, no memory leaks.
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef, forwardRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,6 +25,8 @@ import RecentActivityCard from '../components/RecentActivityCard';
 import ShiftProgressBar from '../components/ShiftProgressBar';
 import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, WeeklyTimeCardsSkeleton } from '../components/DashboardSkeletons';
 import { EmployeeDashboardSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
+import { getISTNow, formatISTDate } from '../utils/istTime';
+import { getUnifiedShiftTimeState } from '../utils/shiftTimeCalculation';
 import '../styles/EmployeeDashboardPage.css';
 
 // Icons
@@ -93,7 +97,19 @@ const EmployeeDashboardPage = () => {
     const [dailyData, setDailyData] = useState(null);
     const [weeklyLogs, setWeeklyLogs] = useState([]);
     const [myRequests, setMyRequests] = useState([]);
+    // Server-derived: required-logout checkout control (feature-toggled). No frontend recalculation.
+    const [canCheckout, setCanCheckout] = useState(true);
+    const [requiredLogoutAt, setRequiredLogoutAt] = useState(null);
+    const [remainingTime, setRemainingTime] = useState(null);
+    const [hasHalfDayLeave, setHasHalfDayLeave] = useState(false);
+    const [requiredWorkMinutes, setRequiredWorkMinutes] = useState(510);
+    const [earlyCheckoutWarningOpen, setEarlyCheckoutWarningOpen] = useState(false);
+    const [earlyCheckoutNote, setEarlyCheckoutNote] = useState('');
+    const [requireAdminApprovalForEarlyCheckout, setRequireAdminApprovalForEarlyCheckout] = useState(false);
+    const [pendingEarlyCheckoutRequest, setPendingEarlyCheckoutRequest] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [hasInitialLoadFinished, setHasInitialLoadFinished] = useState(false);
+    const [showTimeTrackingContentVisible, setShowTimeTrackingContentVisible] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
@@ -106,7 +122,9 @@ const EmployeeDashboardPage = () => {
     const breakActionInFlightRef = useRef(false);
     const clockInActionInFlightRef = useRef(false);
     const clockOutActionInFlightRef = useRef(false);
-
+    const fetchInFlightRef = useRef(false);
+    // When we last received calculatedLogoutTime from the server (used for real-time projection during break).
+    const lastLogoutBaselineReceivedAtRef = useRef(0);
 
     const isOnBreakUI = !!uiBreakState;
     // NOTE: Break UI is intentionally driven by uiBreakState (optimistic + single authority).
@@ -130,39 +148,88 @@ const EmployeeDashboardPage = () => {
         ];
     }, [dailyData?.breaks, uiBreakState]);
 
-    const isClockedInSession = dailyData?.status === 'Clocked In' || isOnBreakUI;
+    // Stable: only show timer/progress bar as "visible" when dailyData exists and status is explicitly Clocked In (or on break). Prevents flash when clocked out.
+    const isClockedInSession = Boolean(dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI));
+
+    const dataReady = !!dailyData;
+    const timeTrackingReady = dataReady && !loading && hasInitialLoadFinished;
 
     const fetchAllDataRef = useRef(null);
-    
+
+    // Fingerprint for dashboard payload to avoid setState when data unchanged (reduces re-renders and UI flicker).
+    const dashboardFingerprint = (dailyStatus, weeklyLogsArr, leaveRequestsArr) => {
+        const s = dailyStatus;
+        const sess = s?.sessions;
+        const br = s?.breaks;
+        return [
+            s?.status,
+            sess?.length,
+            sess?.[sess.length - 1]?.endTime ?? null,
+            br?.length,
+            br?.[br?.length - 1]?.endTime ?? null,
+            s?.attendanceLog?.penaltyMinutes,
+            Array.isArray(weeklyLogsArr) ? weeklyLogsArr.length : 0,
+            Array.isArray(leaveRequestsArr) ? leaveRequestsArr.length : 0,
+        ].join('|');
+    };
+
     // Create stable fetch function
     // PHASE 5: Use aggregate endpoint - single call instead of 3
     fetchAllDataRef.current = async (isInitialLoad = false) => {
         const localDate = getLocalDateString();
-        
+
+        if (fetchInFlightRef.current && !isInitialLoad) return;
+        fetchInFlightRef.current = true;
+
         if (isInitialLoad) {
             setLoading(true);
         }
-        
+
         try {
-            // AGGREGATE ENDPOINT: Single call replaces 3 separate calls
             const dashboardRes = await api.get(`/attendance/dashboard/employee?date=${localDate}`);
-            const { dailyStatus, weeklyLogs, leaveRequests } = dashboardRes.data;
-            
+            const { dailyStatus, weeklyLogs, leaveRequests, requiredLogoutAt: reqLogoutAt, canCheckout: canCheckoutFromServer, remainingTime: remTime, hasHalfDayLeave, requiredWorkMinutes, requireAdminApprovalForEarlyCheckout: reqApproval, pendingEarlyCheckoutRequest: pendingReq } = dashboardRes.data;
+            const wLogs = Array.isArray(weeklyLogs) ? weeklyLogs : [];
+            const lRequests = Array.isArray(leaveRequests) ? leaveRequests : [];
+
+            setRequiredLogoutAt(reqLogoutAt ?? null);
+            setCanCheckout(canCheckoutFromServer !== false);
+            // Convert server remainingTime (minutes) to seconds for consistency with real-time calculation
+            setRemainingTime(remTime != null ? remTime * 60 : null);
+            setHasHalfDayLeave(!!hasHalfDayLeave);
+            setRequiredWorkMinutes(requiredWorkMinutes ?? 510);
+            setRequireAdminApprovalForEarlyCheckout(!!reqApproval);
+            setPendingEarlyCheckoutRequest(pendingReq && pendingReq._id ? pendingReq : null);
+
+            if (!isInitialLoad && dailyData) {
+                const newFp = dashboardFingerprint(dailyStatus, wLogs, lRequests);
+                const curFp = dashboardFingerprint(dailyData, weeklyLogs, myRequests);
+                if (newFp === curFp) {
+                    if (isInitialLoad) setLoading(false);
+                    fetchInFlightRef.current = false;
+                    return;
+                }
+            }
+
             setDailyData(dailyStatus);
             reconcileFromBackend(dailyStatus);
-            setWeeklyLogs(Array.isArray(weeklyLogs) ? weeklyLogs : []);
-            setMyRequests(Array.isArray(leaveRequests) ? leaveRequests : []);
-            
+            setWeeklyLogs(wLogs);
+            setMyRequests(lRequests);
+            // Record when we received the baseline logout time so ShiftInfoDisplay can project in real time during break.
+            lastLogoutBaselineReceivedAtRef.current = Date.now();
+
             if (isInitialLoad) {
                 setLoading(false);
+                setHasInitialLoadFinished(true);
             }
         } catch (err) {
             console.error("Dashboard fetch error:", err);
             if (isInitialLoad) {
                 setError('Failed to load dashboard data. Please refresh the page.');
                 setLoading(false);
+                setHasInitialLoadFinished(true);
             }
-            // Don't show error for background refresh - silent fail
+        } finally {
+            fetchInFlightRef.current = false;
         }
     };
     
@@ -173,18 +240,15 @@ const EmployeeDashboardPage = () => {
     // Guard ref for React StrictMode duplicate execution prevention
     const dataFetchedRef = useRef(false);
     const { loading: authLoading } = useAuth();
-    
-    useEffect(() => { 
-        // CRITICAL FIX: Guard API calls - only execute if auth is ready and user is authenticated
-        // This prevents API calls during page refresh before auth state is restored
+
+    // AUDIT: Initial data fetch - ONE call on load. Guards: authLoading + contextUser. Cleanup: visibility + dataFetchedRef.
+    useEffect(() => {
         if (authLoading || !contextUser) {
-            console.log('[EmployeeDashboard] Waiting for auth to initialize...');
             return;
         }
-        
+
         let mounted = true;
-        let intervalId = null;
-        
+
         const loadData = async () => {
             // Prevent duplicate execution in React StrictMode
             if (dataFetchedRef.current) {
@@ -222,6 +286,16 @@ const EmployeeDashboardPage = () => {
         };
      }, [contextUser?.id, contextUser?._id, authLoading]); // Depend on user IDs (stable) and authLoading to trigger when auth is ready
 
+    // Defer applying .visible by one frame so the element paints at opacity 0 first, then fades in (prevents flash).
+    useEffect(() => {
+        if (!timeTrackingReady || !isClockedInSession) {
+            setShowTimeTrackingContentVisible(false);
+            return;
+        }
+        const raf = requestAnimationFrame(() => setShowTimeTrackingContentVisible(true));
+        return () => cancelAnimationFrame(raf);
+    }, [timeTrackingReady, isClockedInSession]);
+
     useEffect(() => {
         if (location.state?.refresh) {
             console.log("Dashboard received refresh signal, refetching data...");
@@ -232,41 +306,70 @@ const EmployeeDashboardPage = () => {
         }
     }, [location.state]); // Remove fetchAllData from deps to prevent re-runs
 
-    // Socket.IO listener for real-time attendance updates
+    // Socket debounce: prevent multiple refetches when several events fire in short succession
+    const socketDebounceRef = useRef(null);
+    const SOCKET_DEBOUNCE_MS = 600;
+
+    // Socket.IO listeners for real-time updates (attendance + leave requests)
+    // AUDIT: Listeners registered once per user; cleanup on unmount. Debounce avoids duplicate fetches.
     useEffect(() => {
         if (!contextUser) return;
 
-        // Listen for attendance log updates
-        const handleAttendanceLogUpdate = (data) => {
-            console.log('📡 EmployeeDashboardPage received attendance_log_updated event:', data);
-            
-            // Check if the update affects the current user
-            const isRelevantUpdate = (
-                data.userId === contextUser.id || // Update affects current user
-                data.userId === contextUser._id || // Alternative ID format
-                data.userId?.toString() === contextUser.id?.toString() ||
-                data.userId?.toString() === contextUser._id?.toString()
-            );
-
-            if (isRelevantUpdate) {
-                console.log('🔄 Refreshing EmployeeDashboardPage data due to attendance log update');
-                // Refetch all data to get updated attendance status (non-blocking)
+        const scheduleRefetch = () => {
+            if (socketDebounceRef.current) clearTimeout(socketDebounceRef.current);
+            socketDebounceRef.current = setTimeout(() => {
+                socketDebounceRef.current = null;
+                if (fetchInFlightRef.current) return;
                 if (fetchAllDataRef.current) {
                     fetchAllDataRef.current(false).catch(err => {
                         console.error('Failed to refresh after socket update:', err);
                     });
                 }
+            }, SOCKET_DEBOUNCE_MS);
+        };
+
+        const handleAttendanceLogUpdate = (data) => {
+            const isRelevant = !data?.userId || [contextUser.id, contextUser._id].some(
+                id => id != null && String(data.userId) === String(id)
+            );
+            if (isRelevant) scheduleRefetch();
+        };
+
+        const handleLeaveRequestUpdate = (data) => {
+            // Employee dashboard shows myRequests; any leave update for this user is relevant
+            const isRelevant = !data?.userId || [contextUser.id, contextUser._id].some(
+                id => id != null && String(data.userId) === String(id)
+            );
+            if (isRelevant) scheduleRefetch();
+        };
+
+        const handleUserProfileUpdate = (data) => {
+            // Refresh user context when Saturday policy or other profile fields are updated
+            const isRelevant = !data?.userId || [contextUser.id, contextUser._id].some(
+                id => id != null && String(data.userId) === String(id)
+            );
+            if (isRelevant && data.field === 'alternateSaturdayPolicy') {
+                // Refresh user data from AuthContext to get updated Saturday policy
+                if (updateUserContext) {
+                    updateUserContext({ alternateSaturdayPolicy: data.newValue });
+                }
+                // Also refresh dashboard data to reflect the change
+                scheduleRefetch();
             }
         };
 
-        // Set up event listener
         socket.on('attendance_log_updated', handleAttendanceLogUpdate);
+        socket.on('leave_request_updated', handleLeaveRequestUpdate);
+        socket.on('user_profile_updated', handleUserProfileUpdate);
 
-        // Cleanup on unmount
         return () => {
+            if (socketDebounceRef.current) clearTimeout(socketDebounceRef.current);
+            socketDebounceRef.current = null;
             socket.off('attendance_log_updated', handleAttendanceLogUpdate);
+            socket.off('leave_request_updated', handleLeaveRequestUpdate);
+            socket.off('user_profile_updated', handleUserProfileUpdate);
         };
-    }, [contextUser?.id, contextUser?._id]); // Only depend on user IDs, not fetchAllData
+    }, [contextUser?.id, contextUser?._id, updateUserContext]);
 
     const workedMinutes = useMemo(() => {
         if (!dailyData?.sessions?.[0]?.startTime) return 0;
@@ -292,6 +395,65 @@ const EmployeeDashboardPage = () => {
     }, [dailyData?.attendanceLog, dailyData?.shift]);
     
     const paidBreakAllowance = dailyData?.shift?.paidBreakMinutes || 30;
+    // Use shift duration only when valid (> 0); otherwise default 9h so Flexible/zero-duration shifts don't show 3-min "required logout"
+    const rawDurationHours = dailyData?.shift?.durationHours;
+    const scheduledShiftMinutes = (rawDurationHours != null && Number(rawDurationHours) > 0 ? Number(rawDurationHours) * 60 : null) ?? 9 * 60;
+
+    // Unified time model: single source for timer, progress bar, and required logout (updates every second when clocked in).
+    const [tickNow, setTickNow] = useState(() => new Date());
+    useEffect(() => {
+        const isClockedInOrBreak = statusForUi === 'Clocked In' || statusForUi === 'On Break';
+        if (!isClockedInOrBreak || !dailyData?.sessions?.length) return;
+        const intervalId = setInterval(() => setTickNow(new Date()), 1000);
+        return () => clearInterval(intervalId);
+    }, [statusForUi, dailyData?.sessions?.length]);
+
+    const unifiedState = useMemo(() => {
+        const clockIn = dailyData?.sessions?.[0]?.startTime;
+        if (!clockIn || !dailyData?.sessions?.length) return null;
+        return getUnifiedShiftTimeState(clockIn, dailyData.sessions, breaksForUi, tickNow, {
+            scheduledShiftMinutes,
+            allowedPaidBreakMinutes: paidBreakAllowance,
+        });
+    }, [dailyData?.sessions, breaksForUi, tickNow, scheduledShiftMinutes, paidBreakAllowance]);
+
+    // Real-time checkout availability: update canCheckout every second when clocked in
+    useEffect(() => {
+        const isClockedInOrBreak = statusForUi === 'Clocked In' || statusForUi === 'On Break';
+        if (!isClockedInOrBreak || pendingEarlyCheckoutRequest) {
+            // If not clocked in or pending request, keep current state (server controls)
+            return;
+        }
+
+        // Use unifiedState required logout time (most accurate, updates in real-time)
+        // Fallback to server requiredLogoutAt if unifiedState not available
+        const requiredLogoutTime = unifiedState?.requiredLogoutTime 
+            ? new Date(unifiedState.requiredLogoutTime)
+            : (requiredLogoutAt ? new Date(requiredLogoutAt) : null);
+
+        if (!requiredLogoutTime) {
+            // No required logout time means checkout is allowed (flexible shift or no enforcement)
+            setCanCheckout(true);
+            return;
+        }
+
+        // Check if current time >= required logout time
+        const now = tickNow;
+        const canCheckoutNow = now >= requiredLogoutTime;
+
+        // Update canCheckout state in real-time
+        setCanCheckout(canCheckoutNow);
+
+        // Also update remainingTime for display (if needed) - store in seconds for precision
+        if (!canCheckoutNow) {
+            const remainingMs = requiredLogoutTime.getTime() - now.getTime();
+            const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+            setRemainingTime(remainingSecs > 0 ? remainingSecs : null);
+        } else {
+            setRemainingTime(null);
+        }
+    }, [tickNow, unifiedState?.requiredLogoutTime, requiredLogoutAt, statusForUi, pendingEarlyCheckoutRequest]);
+
     const hasExhaustedPaidBreak = (serverCalculated.paidMinutesTaken || 0) >= paidBreakAllowance;
     const hasTakenUnpaidBreak = useMemo(() => dailyData?.breaks?.some(b => b.breakType === 'Unpaid'), [dailyData?.breaks]);
     const hasTakenExtraBreak = useMemo(() => dailyData?.breaks?.some(b => b.breakType === 'Extra'), [dailyData?.breaks]);
@@ -301,6 +463,13 @@ const EmployeeDashboardPage = () => {
     const paidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Paid'), [breakLimits]);
     const unpaidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Unpaid'), [breakLimits]);
     const extraBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Extra'), [breakLimits]);
+
+    const activeBreakOverride = useMemo(
+        () => (isOnBreakUI && uiBreakState
+            ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null }
+            : null),
+        [isOnBreakUI, uiBreakState?.id, uiBreakState?.type, uiBreakState?.startTime]
+    );
 
     const isAnyBreakPossible = useMemo(() => {
         if (!canAccess.breaks() || !canAccess.takeBreak()) return false;
@@ -373,25 +542,16 @@ const EmployeeDashboardPage = () => {
     };
     const handleClockOut = async () => {
         if (clockOutActionInFlightRef.current) return;
-        
         clockOutActionInFlightRef.current = true;
         setActionLoading(true);
         setError('');
         const previousDailyData = dailyData;
-        // Immediate optimistic update
         setDailyData(prev => ({ ...prev, status: 'Clocked Out' }));
         setSnackbar({ open: true, message: 'Checked out successfully!' });
-        
         try {
             await api.post('/attendance/clock-out');
-            // Refresh data from server (non-blocking for UI)
-            if (fetchAllDataRef.current) {
-                fetchAllDataRef.current(false).catch(err => {
-                    console.error('Failed to refresh data after clock-out:', err);
-                });
-            }
+            if (fetchAllDataRef.current) fetchAllDataRef.current(false).catch(() => {});
         } catch (err) {
-            // Revert on error
             setDailyData(previousDailyData);
             setError(err.response?.data?.error || 'Failed to clock out. Please try again.');
             setSnackbar({ open: true, message: 'Check out failed. Please try again.' });
@@ -400,6 +560,66 @@ const EmployeeDashboardPage = () => {
             clockOutActionInFlightRef.current = false;
         }
     };
+
+    const handleCheckOutClick = () => {
+        if (pendingEarlyCheckoutRequest) return; // Already pending; button is disabled
+        if (canCheckout) {
+            handleClockOut();
+        } else {
+            setEarlyCheckoutWarningOpen(true);
+        }
+    };
+
+    const handleEarlyCheckoutClose = () => {
+        setEarlyCheckoutWarningOpen(false);
+        setEarlyCheckoutNote('');
+    };
+
+    const handleEarlyCheckoutConfirm = async () => {
+        const note = (earlyCheckoutNote || '').trim();
+        if (!note || note.length < 25) return;
+        if (clockOutActionInFlightRef.current) return;
+        clockOutActionInFlightRef.current = true;
+        setActionLoading(true);
+        setError('');
+        setEarlyCheckoutWarningOpen(false);
+        setEarlyCheckoutNote('');
+        try {
+            await api.post('/attendance/early-checkout-request', { reason: note });
+            setSnackbar({ open: true, message: 'Early checkout request sent for admin approval.' });
+            setPendingEarlyCheckoutRequest(prev => prev || { status: 'Pending', _id: 'pending' });
+            setCanCheckout(false);
+            if (fetchAllDataRef.current) fetchAllDataRef.current(false).catch(() => {});
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed. Please try again.');
+            setSnackbar({ open: true, message: err.response?.data?.error || 'Request failed. Please try again.' });
+        } finally {
+            setActionLoading(false);
+            clockOutActionInFlightRef.current = false;
+        }
+    };
+
+    /** Format remaining seconds as "X hrs Y mins Z secs" or "Y mins Z secs" or "Z secs" (display only, includes seconds for clarity). */
+    const formatRemainingTimeDisplay = useMemo(() => (seconds) => {
+        if (seconds == null || typeof seconds !== 'number' || seconds < 0) return '';
+        const totalSeconds = Math.floor(seconds);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        
+        const parts = [];
+        if (h > 0) {
+            parts.push(`${h} ${h !== 1 ? 'hrs' : 'hr'}`);
+        }
+        if (m > 0 || h > 0) {
+            parts.push(`${m} ${m !== 1 ? 'mins' : 'min'}`);
+        }
+        if (s > 0 || (h === 0 && m === 0)) {
+            parts.push(`${s} ${s !== 1 ? 'secs' : 'sec'}`);
+        }
+        
+        return parts.join(' ');
+    }, []);
 
     const handleStartBreak = async (breakType) => {
         if (breakActionInFlightRef.current) return;
@@ -491,31 +711,41 @@ const EmployeeDashboardPage = () => {
         }
     };
 
-    const handleOpenBreakModal = () => setIsBreakModalOpen(true);
-    const handleCloseBreakModal = () => setIsBreakModalOpen(false);
-    const handleOpenReasonModal = () => { setIsBreakModalOpen(false); setIsReasonModalOpen(true); };
-    const handleCloseReasonModal = () => { setIsReasonModalOpen(false); setBreakReason(''); setError(''); };
+    const handleOpenBreakModal = useCallback(() => setIsBreakModalOpen(true), []);
+    const handleCloseBreakModal = useCallback(() => setIsBreakModalOpen(false), []);
+    const handleOpenReasonModal = useCallback(() => {
+        setIsBreakModalOpen(false);
+        setIsReasonModalOpen(true);
+    }, []);
+    const handleCloseReasonModal = useCallback(() => {
+        setIsReasonModalOpen(false);
+        setBreakReason('');
+        setError('');
+    }, []);
 
-    // =================================================================
-    // NON-BLOCKING: Show skeleton if authStatus is 'unknown' (auth still resolving)
-    // ProtectedRoute handles most cases, but this is a safety check
-    // If user is null but we're authenticated, show skeleton (user data loading)
     const { authStatus } = useAuth();
+
     if (authStatus === 'unknown' || !contextUser) {
-        return <EmployeeDashboardSkeleton />;
-    }
-    // =================================================================
-    
-    // Show skeleton/loading state if critical data not yet loaded, but don't block render
-    if (loading || !dailyData) {
-        // Render dashboard shell with skeletons - allows progressive loading
         return <EmployeeDashboardSkeleton />;
     }
 
     return (
         <Box className="employee-dashboard-container">
             <Box>
-                {error && ( <Alert severity="error" onClose={() => setError('')} sx={{ mb: 3 }}>{error}</Alert> )}
+                {error && (
+                    <Alert
+                        severity="error"
+                        onClose={() => setError('')}
+                        sx={{ mb: 3 }}
+                        action={
+                            <Button color="inherit" size="small" onClick={() => { setError(''); fetchAllDataRef.current?.(true); }}>
+                                Retry
+                            </Button>
+                        }
+                    >
+                        {error}
+                    </Alert>
+                )}
                 {hasPendingExtraBreak && (
                     <Alert severity="info" icon={<HourglassTopIcon />} sx={{ mb: 3, '.MuiAlert-message': { width: '100%' } }}>
                         <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -525,88 +755,125 @@ const EmployeeDashboardPage = () => {
                     </Alert>
                 )}
                 
-                <Grid container spacing={3}>
+                <Grid container spacing={3} alignItems="flex-start">
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base action-card">
                                 <Box>
-                                    <Typography variant="h5" sx={{ fontWeight: 500, letterSpacing: '0.025em' }} className="theme-text-black">Time Tracking</Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3, fontWeight: 400, letterSpacing: '0.025em' }}>
-                                        {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
-                                    </Typography>
-                                </Box>
-                                <Box 
-                                    className={`time-tracking-content ${isClockedInSession ? 'visible' : 'hidden'}`}
-                                    sx={{ my: 'auto' }}
-                                >
-                                    <MemoizedShiftProgressBar 
-                                        workedMinutes={workedMinutes} 
-                                        unpaidBreakMinutes={serverCalculated.unpaidBreakMinutesTaken}
-                                        paidBreakExcess={serverCalculated.paidBreakExcess}
-                                        status={statusForUi} 
-                                        breaks={breaksForUi} 
-                                        sessions={dailyData.sessions} 
-                                        activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}
-                                    />
-                                    <Box sx={{ mb: 2, textAlign: 'center' }}>
-                                        {isOnBreakUI ? (
-                                            <MemoizedBreakTimer
-                                                breaks={breaksForUi}
-                                                paidBreakAllowance={paidBreakAllowance}
-                                                activeBreakOverride={isOnBreakUI ? { _id: uiBreakState.id, breakType: uiBreakState.type, startTime: uiBreakState.startTime, endTime: null } : null}
-                                                unifiedDisplay={true}
-                                            />
-                                        ) : (
-                                            <MemoizedWorkTimeTracker sessions={dailyData.sessions} breaks={breaksForUi} status={statusForUi}/>
-                                        )}
-                                        <Typography
-                                            variant="overline"
-                                            sx={{
-                                                mt: 1,
-                                                color: 'var(--theme-black)',
-                                                fontWeight: 500,
-                                                fontSize: '0.75rem',
-                                                letterSpacing: '0.025em'
-                                            }}
-                                        >
-                                            {isOnBreakUI ? 'BREAK TIME' : 'WORK DURATION'}
+                                    <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '0.025em' }} className="theme-text-black">Time Tracking</Typography>
+                                    {timeTrackingReady ? (
+                                        <Typography variant="body2" sx={{ mb: 3, fontWeight: 400, letterSpacing: '0.025em', color: '#666666' }}>
+                                            {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
                                         </Typography>
-                                    </Box>
+                                    ) : (
+                                        <Skeleton variant="text" width="80%" height={20} sx={{ mb: 3 }} />
+                                    )}
                                 </Box>
-                                <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
-                                    {actionLoading ? (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', py: 1 }}>
-                                            <SkeletonBox width="100%" height="36px" borderRadius="8px" />
+                                {timeTrackingReady ? (
+                                    <>
+                                        <Box
+                                            className={`time-tracking-content ${showTimeTrackingContentVisible && isClockedInSession ? 'visible' : 'hidden'}`}
+                                            sx={{ my: 'auto' }}
+                                        >
+                                            <MemoizedShiftProgressBar
+                                                workedMinutes={workedMinutes}
+                                                unpaidBreakMinutes={serverCalculated.unpaidBreakMinutesTaken}
+                                                paidBreakExcess={serverCalculated.paidBreakExcess}
+                                                status={statusForUi}
+                                                breaks={breaksForUi}
+                                                sessions={dailyData.sessions}
+                                                activeBreakOverride={activeBreakOverride}
+                                                unifiedState={unifiedState}
+                                            />
+                                            <Box sx={{ mb: 2, textAlign: 'center' }}>
+                                                {isOnBreakUI ? (
+                                                    <MemoizedBreakTimer
+                                                        breaks={breaksForUi}
+                                                        paidBreakAllowance={paidBreakAllowance}
+                                                        activeBreakOverride={activeBreakOverride}
+                                                        unifiedDisplay={true}
+                                                    />
+                                                ) : (
+                                                    <MemoizedWorkTimeTracker
+                                                        sessions={dailyData.sessions}
+                                                        breaks={breaksForUi}
+                                                        status={statusForUi}
+                                                        unifiedState={unifiedState}
+                                                    />
+                                                )}
+                                                <Typography
+                                                    variant="overline"
+                                                    sx={{
+                                                        mt: 1,
+                                                        color: 'var(--theme-black)',
+                                                        fontWeight: 500,
+                                                        fontSize: '0.75rem',
+                                                        letterSpacing: '0.025em'
+                                                    }}
+                                                >
+                                                    {isOnBreakUI ? 'BREAK TIME' : 'WORK DURATION'}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                    ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
-                                        canAccess.checkIn() ? (
-                                            <Button fullWidth className="theme-button-red" onClick={handleClockIn}>Check In</Button>
-                                        ) : (
-                                            <Button fullWidth disabled className="theme-button-red">Check In (Disabled)</Button>
-                                        )
-                                    ) : isOnBreakUI ? (
-                                        <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
-                                    ) : dailyData.status === 'Clocked In' ? (
-                                        <>
-                                            <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
-                                                <span>
-                                                    <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
-                                                </span>
-                                            </Tooltip>
-                                            {canAccess.checkOut() ? (
-                                                <Button variant="outlined" className="theme-button-checkout" onClick={handleClockOut} startIcon={<LogoutIcon />} sx={{ ml: 'auto !important' }}>Check Out</Button>
-                                            ) : (
-                                                <Button variant="outlined" disabled className="theme-button-checkout" startIcon={<LogoutIcon />} sx={{ ml: 'auto !important' }}>Check Out (Disabled)</Button>
-                                            )}
-                                        </>
-                                    ) : null}
-                                </Stack>
+                                        <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
+                                            {actionLoading ? (
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', py: 1 }}>
+                                                    <SkeletonBox width="100%" height="36px" borderRadius="8px" />
+                                                </Box>
+                                            ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
+                                                canAccess.checkIn() ? (
+                                                    <Button fullWidth className="theme-button-red" onClick={handleClockIn}>Check In</Button>
+                                                ) : (
+                                                    <Button fullWidth disabled className="theme-button-red">Check In (Disabled)</Button>
+                                                )
+                                            ) : isOnBreakUI ? (
+                                                <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
+                                            ) : dailyData.status === 'Clocked In' ? (
+                                                <>
+                                                    <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
+                                                        <span>
+                                                            <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
+                                                        </span>
+                                                    </Tooltip>
+                                                    {canAccess.checkOut() ? (
+                                                        pendingEarlyCheckoutRequest ? (
+                                                            <Tooltip title="Early checkout request pending; checkout is blocked until admin approval" placement="top">
+                                                                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                                                    <Button variant="outlined" disabled className="theme-button-checkout" startIcon={<LogoutIcon />}>Check Out</Button>
+                                                                    <Chip size="small" label="Awaiting Admin Approval" color="warning" sx={{ fontWeight: 500 }} />
+                                                                </span>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <Tooltip title={!canCheckout ? 'Check out early (reason required)' : ''} placement="top">
+                                                                <span style={{ marginLeft: 'auto' }}>
+                                                                    <Button variant="outlined" className="theme-button-checkout" onClick={handleCheckOutClick} startIcon={<LogoutIcon />}>Check Out</Button>
+                                                                </span>
+                                                            </Tooltip>
+                                                        )
+                                                    ) : (
+                                                        <Button variant="outlined" disabled className="theme-button-checkout" startIcon={<LogoutIcon />} sx={{ ml: 'auto !important' }}>Check Out (Disabled)</Button>
+                                                    )}
+                                                </>
+                                            ) : null}
+                                        </Stack>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Box className="time-tracking-skeleton" sx={{ my: 'auto' }}>
+                                            <SkeletonBox width="100%" height={112} borderRadius="8px" sx={{ mb: 2 }} />
+                                            <SkeletonBox width="100%" height={72} borderRadius="8px" />
+                                        </Box>
+                                        <Stack direction="row" spacing={2} sx={{ mt: 'auto', width: '100%' }}>
+                                            <SkeletonBox width="100%" height="36px" borderRadius="8px" />
+                                        </Stack>
+                                    </>
+                                )}
                             </Paper>
                             <Paper className="dashboard-card-base weekly-view-card">
-                                {loading ? (
-                                    <WeeklyTimeCardsSkeleton />
-                                ) : (
+                                {dataReady ? (
                                     <MemoizedWeeklyTimeCards logs={weeklyLogs} shift={dailyData?.shift || contextUser?.shift} />
+                                ) : (
+                                    <WeeklyTimeCardsSkeleton />
                                 )}
                             </Paper>
                         </Stack>
@@ -614,27 +881,31 @@ const EmployeeDashboardPage = () => {
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base profile-card">
-                                <Avatar 
-                                    className="profile-avatar"
-                                >
+                                <Avatar className="profile-avatar">
                                     <Typography className="profile-avatar-letter">
                                         {contextUser.name?.charAt(0) || contextUser.fullName?.charAt(0) || 'U'}
                                     </Typography>
                                 </Avatar>
-                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 500, mb: 0.5, letterSpacing: '0.025em' }}>{contextUser.fullName || contextUser.name}</Typography>
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
+                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 700, mb: 0.5, letterSpacing: '0.025em', color: '#333333' }}>{contextUser.fullName || contextUser.name}</Typography>
+                                <Typography variant="body2" sx={{ color: '#666666', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
                                 <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />
                                 <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, letterSpacing: '0.025em' }} />
-                                <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary', letterSpacing: '0.025em' }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 400, color: '#666666', letterSpacing: '0.025em' }}>{formatISTDate(getISTNow(), { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
                             </Paper>
                             <Paper className="dashboard-card-base shift-info-card">
-                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Today's Shift</Typography>
+                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 700, letterSpacing: '0.025em' }}>Today's Shift</Typography>
                                 <Divider sx={{ mb: 2 }} />
-                                <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1 }}>
-                                    {loading ? (
-                                        <ShiftInfoSkeleton />
+                                <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1, minHeight: 260 }}>
+                                    {dataReady ? (
+                                        <MemoizedShiftInfoDisplay
+                                            dailyData={dailyData}
+                                            fallbackShift={contextUser?.shift}
+                                            lastLogoutBaselineReceivedAtRef={lastLogoutBaselineReceivedAtRef}
+                                            isOnBreak={isOnBreakUI}
+                                            unifiedState={unifiedState}
+                                        />
                                     ) : (
-                                        <MemoizedShiftInfoDisplay dailyData={dailyData} />
+                                        <ShiftInfoSkeleton />
                                     )}
                                     <MemoizedLiveClock />
                                 </Stack>
@@ -644,22 +915,22 @@ const EmployeeDashboardPage = () => {
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3} sx={{ height: '100%' }}>
                             <Paper className="dashboard-card-base recent-activity-card" sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-                                    {loading ? (
-                                        <RecentActivitySkeleton />
-                                    ) : (
+                                <Box sx={{ flexGrow: 1, overflowY: 'auto', minHeight: 320 }}>
+                                    {dataReady ? (
                                         <MemoizedRecentActivityCard dailyData={dailyData} />
+                                    ) : (
+                                        <RecentActivitySkeleton />
                                     )}
                                 </Box>
                             </Paper>
                             <Paper className="dashboard-card-base saturday-schedule-card" sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Upcoming Saturdays</Typography>
+                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 700, letterSpacing: '0.025em' }}>Upcoming Saturdays</Typography>
                                 <Divider sx={{ mb: 2.5 }} />
                                 <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-                                    {loading ? (
-                                        <SaturdayScheduleSkeleton />
-                                    ) : (
+                                    {dataReady ? (
                                         <MemoizedSaturdaySchedule policy={contextUser?.alternateSaturdayPolicy || 'All Saturdays Working'} requests={myRequests} />
+                                    ) : (
+                                        <SaturdayScheduleSkeleton />
                                     )}
                                 </Box>
                             </Paper>
@@ -727,6 +998,47 @@ const EmployeeDashboardPage = () => {
                     <DialogActions>
                         <Button onClick={() => setWeeklyLateDialog({ ...weeklyLateDialog, open: false })} className="theme-button-checkout">Dismiss</Button>
                         <Button onClick={() => { setWeeklyLateDialog({ ...weeklyLateDialog, open: false }); window.location.href = '/contact-hr'; }} variant="contained" className="theme-button-red">Contact HR</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Early checkout: single unified popup with warning, remaining time, and mandatory reason (feature-toggled) */}
+                <Dialog open={earlyCheckoutWarningOpen} onClose={handleEarlyCheckoutClose} maxWidth={false} fullWidth PaperProps={{ className: 'early-checkout-dialog-paper' }}>
+                    <DialogTitle className="early-checkout-dialog-title">Early Checkout</DialogTitle>
+                    <Divider className="early-checkout-dialog-divider" />
+                    <DialogContent className="early-checkout-dialog-content">
+                        <Typography variant="body1" className="early-checkout-body-text">
+                            You have not completed the required working time.
+                            Are you sure you want to check out early?
+                        </Typography>
+                        {remainingTime != null && (
+                            <Typography variant="body2" className="early-checkout-remaining">
+                                Remaining time: {formatRemainingTimeDisplay(remainingTime)}
+                                {hasHalfDayLeave && (
+                                    <Typography component="span" variant="caption" display="block" sx={{ mt: 0.5, color: 'text.secondary' }}>
+                                        Required: 5 hrs (half-day leave)
+                                    </Typography>
+                                )}
+                            </Typography>
+                        )}
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            placeholder="Please provide a reason for early checkout"
+                            value={earlyCheckoutNote}
+                            onChange={(e) => setEarlyCheckoutNote(e.target.value)}
+                            variant="outlined"
+                            className="early-checkout-reason-field"
+                            helperText={`Minimum 25 characters required${earlyCheckoutNote.trim() ? ` (${earlyCheckoutNote.trim().length}/25)` : ''}`}
+                            error={earlyCheckoutNote.trim().length > 0 && earlyCheckoutNote.trim().length < 25}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+                        />
+                    </DialogContent>
+                    <DialogActions className="early-checkout-actions">
+                        <Button variant="outlined" onClick={handleEarlyCheckoutClose}>Cancel</Button>
+                        <Button variant="contained" onClick={handleEarlyCheckoutConfirm} className="theme-button-red" disabled={!earlyCheckoutNote.trim() || earlyCheckoutNote.trim().length < 25}>
+                            Confirm Check Out
+                        </Button>
                     </DialogActions>
                 </Dialog>
                 

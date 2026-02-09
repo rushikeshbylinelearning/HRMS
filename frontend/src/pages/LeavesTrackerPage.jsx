@@ -836,12 +836,16 @@ const LeavesTrackerPage = () => {
     });
   }, [leaveRequests, selectedYear, selectedMonth, selectedWeek, selectedDepartment, selectedEmployee, searchTerm]);
   
+  const toYYYYMMDD = (d) => {
+    const date = new Date(d);
+    const y = date.getFullYear(), m = date.getMonth() + 1, day = date.getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
   const handleAssignLeave = async (formData) => {
     setIsAssigningLeave(true);
     try {
-      // Convert date to ISO string format
-      const leaveDates = formData.leaveDates.filter(d => d !== null).map(d => new Date(d).toISOString());
-      
+      const leaveDates = formData.leaveDates.filter(d => d !== null).map(d => toYYYYMMDD(d));
       if (leaveDates.length === 0) {
         setSnackbar({ open: true, message: 'Please select at least one leave date', severity: 'error' });
         setIsAssigningLeave(false);
@@ -852,14 +856,13 @@ const LeavesTrackerPage = () => {
         employee: formData.employee,
         requestType: formData.requestType,
         leaveType: formData.leaveType,
-        leaveDates: leaveDates,
+        leaveDates,
         reason: formData.reason,
         status: formData.status || 'Pending'
       };
 
-      // Add alternateDate if it's a Compensatory leave
       if (formData.requestType === 'Compensatory' && formData.alternateDate) {
-        payload.alternateDate = new Date(formData.alternateDate).toISOString();
+        payload.alternateDate = toYYYYMMDD(formData.alternateDate);
       }
 
       await axios.post('/admin/leaves', payload);

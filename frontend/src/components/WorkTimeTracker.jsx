@@ -1,10 +1,11 @@
 // frontend/src/components/WorkTimeTracker.jsx
+// When unifiedState is provided, uses shared time model: elapsed vs effective, actual work time, paid break.
 import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Typography, Box, Stack } from '@mui/material';
 
 const formatTimeUnit = (value) => String(value).padStart(2, '0');
 
-const WorkTimeTracker = ({ sessions, breaks, status }) => {
+const WorkTimeTracker = ({ sessions, breaks, status, unifiedState: unifiedStateProp }) => {
     const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
     const intervalRef = useRef(null);
     const lastTimeRef = useRef({ hours: 0, minutes: 0, seconds: 0 });
@@ -21,33 +22,23 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
         }
 
         const now = new Date();
-        // Calculate total time within all work sessions
         const grossTimeMs = sessions.reduce((total, s) => {
             const start = new Date(s.startTime);
-            // If session is finished, use its endTime. If active, use now.
             const end = s.endTime ? new Date(s.endTime) : now;
             return total + (end - start);
         }, 0);
-
-        // Calculate total duration of all breaks
         const totalBreakMs = (breaks || []).reduce((total, b) => {
             const start = new Date(b.startTime);
-             // If break is finished, use its endTime. If active, use now.
             const end = b.endTime ? new Date(b.endTime) : now;
             return total + (end - start);
         }, 0);
-
-        // Net work time is the difference
         const netWorkMs = Math.max(0, grossTimeMs - totalBreakMs);
         const totalSeconds = Math.floor(netWorkMs / 1000);
-
         const newTime = {
             hours: Math.floor(totalSeconds / 3600),
             minutes: Math.floor((totalSeconds % 3600) / 60),
             seconds: totalSeconds % 60,
         };
-
-        // Only update state if time actually changed (prevents unnecessary re-renders)
         if (JSON.stringify(lastTimeRef.current) !== JSON.stringify(newTime)) {
             lastTimeRef.current = newTime;
             setTime(newTime);
@@ -55,57 +46,54 @@ const WorkTimeTracker = ({ sessions, breaks, status }) => {
     }, [sessions, breaks]);
 
     useEffect(() => {
-        // Clear any existing interval
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
-
-        // Calculate immediately
+        if (displayRef.current) {
+            cancelAnimationFrame(displayRef.current);
+            displayRef.current = null;
+        }
         calculateWorkTime();
-
-        // The interval should ONLY run if the status is 'Clocked In'.
-        // When on break, the timer will "pause" because the interval is cleared.
-        if (status === 'Clocked In') {
+        const isClockedInOrOnBreak = status === 'Clocked In' || status === 'On Break';
+        if (isClockedInOrOnBreak && !unifiedStateProp) {
             intervalRef.current = setInterval(() => {
-                // Use requestAnimationFrame for smooth updates
-                if (displayRef.current) {
-                    cancelAnimationFrame(displayRef.current);
-                }
-                displayRef.current = requestAnimationFrame(() => {
-                    calculateWorkTime();
-                });
+                if (displayRef.current) cancelAnimationFrame(displayRef.current);
+                displayRef.current = requestAnimationFrame(() => calculateWorkTime());
             }, 1000);
         }
-
         return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-            if (displayRef.current) {
-                cancelAnimationFrame(displayRef.current);
-                displayRef.current = null;
-            }
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (displayRef.current) cancelAnimationFrame(displayRef.current);
         };
-    }, [status, calculateWorkTime]);
+    }, [status, calculateWorkTime, unifiedStateProp]);
 
     const TimeBlock = ({ value, label }) => (
-        <Box sx={{
-            textAlign: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            borderRadius: 1,
-            px: 1.5,
-            py: 0.5
-        }}>
+        <Box sx={{ textAlign: 'center', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: 1, px: 1.5, py: 0.5 }}>
             <Typography variant="h4" component="div" sx={{ fontWeight: 500, color: 'var(--theme-black)' }}>
                 {formatTimeUnit(value)}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>
-                {label}
-            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{label}</Typography>
         </Box>
     );
+
+    // Unified model: main timer = elapsedShiftTime (HH:MM:SS).
+    if (unifiedStateProp) {
+        const u = unifiedStateProp;
+        const totalSeconds = Math.floor(u.elapsedShiftTime * 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return (
+            <Stack direction="row" justifyContent="center" alignItems="center" spacing={1}>
+                <TimeBlock value={hours} label="Hours" />
+                <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
+                <TimeBlock value={minutes} label="Minutes" />
+                <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 400 }}>:</Typography>
+                <TimeBlock value={seconds} label="Seconds" />
+            </Stack>
+        );
+    }
 
     return (
         <Stack direction="row" justifyContent="center" alignItems="center" spacing={1}>

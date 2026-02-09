@@ -112,9 +112,61 @@ class NewNotificationService {
     static async notifyCheckOut(userId, userName) {
         const message = `${userName} clocked out.`;
         await this.broadcastToAdmins({
-            message, type: 'checkout', category: 'attendance', priority: 'medium',
-            navigationData: { page: 'attendance', params: { userId } }
+            message,
+            type: 'normal_checkout',
+            category: 'attendance',
+            priority: 'medium',
+            navigationData: { page: 'attendance', params: { userId } },
+            metadata: { type: 'NORMAL_CHECKOUT' }
         }, userId);
+    }
+
+    /** Early checkout request (admin): distinct from normal checkout */
+    static async notifyEarlyCheckoutRequest(userId, userName, metadata = {}) {
+        const { requestId, date, remainingTimeMinutes, reasonPreview } = metadata;
+        const remainingStr = remainingTimeMinutes != null ? ` (${Math.floor(remainingTimeMinutes / 60)}h ${remainingTimeMinutes % 60}m remaining)` : '';
+        const message = `${userName} requested early checkout${remainingStr}.`;
+        await this.broadcastToAdmins({
+            message,
+            type: 'early_checkout_request',
+            category: 'attendance',
+            priority: 'high',
+            navigationData: { page: 'attendance', params: { userId }, actionParams: { earlyCheckoutRequestId: requestId } },
+            metadata: { requestId, date, remainingTimeMinutes, reasonPreview, type: 'EARLY_CHECKOUT_REQUEST' }
+        }, userId);
+    }
+
+    /** Early checkout approved (employee) */
+    static async notifyEarlyCheckoutApproved(userId, userName) {
+        const message = 'Early checkout approved.';
+        await this.createAndEmitNotification({
+            message,
+            userId,
+            userName,
+            type: 'early_checkout_approved',
+            recipientType: 'user',
+            category: 'attendance',
+            priority: 'medium',
+            navigationData: { page: 'dashboard' },
+            metadata: { type: 'EARLY_CHECKOUT_APPROVED' }
+        });
+    }
+
+    /** Early checkout rejected (employee) */
+    static async notifyEarlyCheckoutRejected(userId, userName, rejectionNote = null) {
+        let message = 'Early checkout request rejected.';
+        if (rejectionNote && rejectionNote.trim()) message += ` Reason: ${rejectionNote.trim()}`;
+        await this.createAndEmitNotification({
+            message,
+            userId,
+            userName,
+            type: 'early_checkout_rejected',
+            recipientType: 'user',
+            category: 'attendance',
+            priority: 'medium',
+            navigationData: { page: 'dashboard' },
+            metadata: { type: 'EARLY_CHECKOUT_REJECTED' }
+        });
     }
 
     static async notifyBreakStart(userId, userName, breakType) {

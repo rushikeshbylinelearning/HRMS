@@ -86,24 +86,39 @@
   margin-right: 8px;
 }
 
-/* --- Requests Table Card --- */
+/* --- Requests Table Card (simple, flat) --- */
 .admin-leaves-page .requests-card {
   background-color: #fff;
-  border-radius: 12px;
+  border-radius: 0;
   border: 1px solid #e0e0e0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  overflow: hidden; /* Important for border-radius on children */
-  margin-top: 24px; /* Space between manager cards and table */
+  box-shadow: none;
+  overflow: hidden;
+  margin-top: 24px;
 }
 
 .admin-leaves-page .table-container {
-  max-height: calc(100vh - 450px); /* Adjust based on your layout */
-  overflow: auto; /* Enable scrollbars when needed */
+  max-height: calc(100vh - 450px);
+  overflow: auto;
 }
 
+/* Simple flat header: no gradient, no shadow */
 .admin-leaves-page .requests-table-head .MuiTableCell-root {
-    background-color: #f8f9fa;
-    font-weight: 600;
+  background-color: #f5f5f5 !important;
+  font-weight: 600;
+  border-bottom: 1px solid #e0e0e0;
+  color: #212121;
+}
+.admin-leaves-page .requests-table-head .MuiTableRow-root {
+  box-shadow: none !important;
+}
+.admin-leaves-page .table-container .MuiTableHead-root {
+  box-shadow: none !important;
+}
+.admin-leaves-page .table-container .MuiTableHead-root .MuiTableCell-root {
+  background: #f5f5f5 !important;
+}
+.admin-leaves-page .table-container .MuiTableHead-root .MuiTableCell-root::after {
+  display: none !important;
 }
 
 /* Table Row and Cell Styling */

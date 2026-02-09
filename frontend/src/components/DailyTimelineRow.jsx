@@ -216,7 +216,10 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
     const isFutureDate = dateStr > todayStr;
     const hasNoAttendanceData = !log || !log.sessions || log.sessions.length === 0;
     const isNotHolidayOrLeave = !status || (!status.startsWith('Holiday -') && !status.startsWith('Leave -') && status !== 'Comp Off' && status !== 'Swap Leave');
-    const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave);
+    // CRITICAL FIX: Prevent opening modal for absent/week-off/weekend when there's no log
+    const isAbsentWeekOffOrWeekend = status === 'Absent' || status === 'Weekly Off' || status === 'Week Off' || status === 'Weekend';
+    const shouldPreventClick = isAbsentWeekOffOrWeekend && hasNoAttendanceData && !leave && !dayData.holiday;
+    const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave) && !shouldPreventClick;
 
     const durationInfo = getDurationInfo(log, nowIST);
     
@@ -283,6 +286,39 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                             Half Day
                         </div>
                     )}
+                    {(() => {
+                        const overrideNote = log?.overrideReason;
+                        const hasValidOverride = log?.overriddenByAdmin === true
+                            && typeof overrideNote === 'string'
+                            && overrideNote.trim().length > 0;
+                        if (!hasValidOverride) return null;
+                        const note = overrideNote.trim();
+                        return (
+                            <div
+                                title={note}
+                                style={{
+                                    position: 'absolute',
+                                    top: '-20px',
+                                    right: '4px',
+                                    backgroundColor: '#fff8e1',
+                                    color: '#856404',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    border: '1px solid #ffc107',
+                                    zIndex: 10,
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '120px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                {note.length > 20 ? `${note.slice(0, 20)}…` : note}
+                            </div>
+                        );
+                    })()}
                     <div className="timeline-line" style={
                         isHalfDayLeave ? { borderTop: '2px dashed #ffc107' } : 
                         isHalfDayMarked ? { borderTop: '2px dashed #d32f2f' } : {}

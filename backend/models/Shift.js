@@ -37,6 +37,10 @@ shiftSchema.pre('save', function(next) {
         // For flexible shifts, ensure start and end times are cleared as they are not applicable.
         this.startTime = null;
         this.endTime = null;
+        // Ensure Flexible shifts have a valid duration (default 9h) so dashboard/timers don't show "3 min" required logout
+        if (this.durationHours == null || Number(this.durationHours) <= 0) {
+            this.durationHours = 9;
+        }
     }
   }
   next();

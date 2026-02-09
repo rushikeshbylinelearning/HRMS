@@ -72,13 +72,20 @@ const sendEmploymentStatusChangeNotification = async (employee, oldStatus, newSt
 router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
         const getAllEmployees = req.query.all === 'true';
+        const includeInactive = req.query.includeInactive === 'true';
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
         const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus';
 
+        // Filter: Exclude Admin role; optionally include deactivated (e.g. Employees page shows all)
+        const employeeQuery = { 
+            role: { $ne: 'Admin' }, 
+            ...(includeInactive ? {} : { isActive: true })
+        };
+
         if (getAllEmployees) {
-            const employees = await User.find({})
+            const employees = await User.find(employeeQuery)
                 .select(fieldsToSelect)
                 .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
                 .sort({ fullName: 1 })
@@ -90,9 +97,9 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         
-        const totalCount = await User.countDocuments({});
+        const totalCount = await User.countDocuments(employeeQuery);
         // Use the same `fieldsToSelect` for the paginated query
-        const employees = await User.find({})
+        const employees = await User.find(employeeQuery)
             .select(fieldsToSelect) // Added select here as well for consistency
             .populate('shiftGroup')
             .sort({ fullName: 1 })
@@ -256,6 +263,11 @@ router.patch('/:id/saturday-policy', [authenticateToken, isAdminOrHr], async (re
     }
 
     try {
+        const currentUser = await User.findById(id).select('alternateSaturdayPolicy');
+        if (!currentUser) {
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+
         const updatedUser = await User.findByIdAndUpdate(
             id,
             { alternateSaturdayPolicy: newPolicy },
@@ -264,6 +276,29 @@ router.patch('/:id/saturday-policy', [authenticateToken, isAdminOrHr], async (re
 
         if (!updatedUser) {
             return res.status(404).json({ error: 'Employee not found.' });
+        }
+
+        // Emit Socket.IO event to notify the employee about Saturday policy change
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('user_profile_updated', {
+                    userId: updatedUser._id,
+                    employeeCode: updatedUser.employeeCode,
+                    fullName: updatedUser.fullName,
+                    field: 'alternateSaturdayPolicy',
+                    oldValue: currentUser.alternateSaturdayPolicy,
+                    newValue: newPolicy,
+                    updatedBy: req.user.userId,
+                    timestamp: new Date().toISOString(),
+                    message: `Your Saturday policy has been updated to: ${newPolicy}`
+                });
+                console.log(`📡 Emitted user_profile_updated event for Saturday policy change - user ${updatedUser._id}`);
+            }
+        } catch (socketError) {
+            console.error('Failed to emit Socket.IO event:', socketError);
+            // Don't fail the main request if Socket.IO fails
         }
 
         res.json({ message: `${updatedUser.fullName}'s Saturday policy updated successfully.`, user: updatedUser });

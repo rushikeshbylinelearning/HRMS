@@ -209,7 +209,12 @@ async function processAttendanceRecord(log, gracePeriodMinutes, session) {
         
         // Check if it's also a late login case
         if (log.clockInTime && user.shiftGroup.startTime) {
-            const lateStatus = await recalculateLateStatus(log.clockInTime, user.shiftGroup, gracePeriodMinutes);
+            const lateStatus = await recalculateLateStatus(
+                log.clockInTime, 
+                user.shiftGroup, 
+                gracePeriodMinutes,
+                eligibility.workedHours // Pass working hours for priority logic
+            );
             if (lateStatus.isHalfDay && lateStatus.halfDayReasonCode === 'LATE_LOGIN') {
                 reasonCode = 'LATE_LOGIN';
                 reasonText = lateStatus.halfDayReasonText;

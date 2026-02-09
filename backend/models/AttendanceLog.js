@@ -31,10 +31,11 @@ const attendanceLogSchema = new mongoose.Schema({
   totalWorkingHours: { type: Number, default: 0 }, // in hours
   adminOverride: { 
     type: String, 
-    enum: ['None', 'Override Half Day', 'Override Late'], 
+    enum: ['None', 'Override Half Day', 'Override Late', 'Override Full Day', 'Override Holiday'], 
     default: 'None' 
   },
   overrideReason: { type: String, default: '' },
+  overrideType: { type: String, enum: ['fullday', 'halfday', 'holiday'], default: null },
   // Half-day reason tracking (structured)
   halfDayReasonCode: {
     type: String,
@@ -60,9 +61,13 @@ const attendanceLogSchema = new mongoose.Schema({
   }, // Track if clock-out was manual, automatic, or system cleanup
   autoLogoutReason: { type: String }, // Reason for auto-logout
   isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
+  // Early checkout (before required logout time): mandatory reason when feature toggle is ON
+  earlyCheckoutNote: { type: String, default: '' },
 }, { timestamps: true });
 
 // Ensure a user can only have one log per day
 attendanceLogSchema.index({ user: 1, attendanceDate: 1 }, { unique: true });
+// Index for dashboard: all logs for a given date (dashboard-summary, dashboard-employees)
+attendanceLogSchema.index({ attendanceDate: 1 }, { background: true });
 
 module.exports = mongoose.model('AttendanceLog', attendanceLogSchema);

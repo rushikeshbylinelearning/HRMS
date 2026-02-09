@@ -130,7 +130,10 @@ const userSchema = new mongoose.Schema({
 
     // Auto-break on inactivity settings
     autoBreakOnInactivity: { type: Boolean, default: false },
-    inactivityThresholdMinutes: { type: Number, default: 5, min: 1, max: 60 }
+    inactivityThresholdMinutes: { type: Number, default: 5, min: 1, max: 60 },
+
+    // When true, late arrival (beyond grace period) marks the day as half-day. When false, only "late" is recorded, not half-day.
+    lateArrivalMarksHalfDay: { type: Boolean, default: false }
   }
 }, { timestamps: true });
 

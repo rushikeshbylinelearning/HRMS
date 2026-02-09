@@ -7,15 +7,17 @@ const AttendanceLog = require('../models/AttendanceLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
-const Setting = require('../models/Setting');
 const Holiday = require('../models/Holiday');
 const LeaveRequest = require('../models/LeaveRequest');
+const Setting = require('../models/Setting');
+const EarlyCheckoutRequest = require('../models/EarlyCheckoutRequest');
 const NewNotificationService = require('../services/NewNotificationService');
 const logAction = require('../services/logAction');
-const { getUserDailyStatus } = require('../services/dailyStatusService');
-const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
+const { getUserDailyStatus, computeCalculatedLogoutTime } = require('../services/dailyStatusService');
+const LeavePolicyService = require('../services/LeavePolicyService');
 const cache = require('../utils/cache');
-const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime } = require('../utils/istTime');
+const { getISTNow, getISTDateString, parseISTDate, startOfISTDay, endOfISTDay, getShiftDateTimeIST, formatISTTime, getAttendanceDate } = require('../utils/istTime');
+const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 
 const router = express.Router();
 
@@ -53,18 +55,27 @@ router.get('/status', authenticateToken, async (req, res) => {
 
 router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, res) => {
     const { userId } = req.user;
-    const todayStr = getISTDateString();
+    if (!userId) {
+        return res.status(401).json({ error: 'Authentication required.' });
+    }
+    const todayStr = getAttendanceDate(userId);
     try {
-        // PHASE 2 OPTIMIZATION: Parallelize independent queries
-        // Batch 1: User + TodayLog + GraceSetting (independent, can run in parallel)
-        const [user, todayLog, graceSetting] = await Promise.all([
+        const [user, todayLog, GRACE_PERIOD_MINUTES] = await Promise.all([
             User.findById(userId).populate('shiftGroup'),
             AttendanceLog.findOne({ user: userId, attendanceDate: todayStr }),
-            Setting.findOne({ key: 'lateGraceMinutes' })
+            getGracePeriodMinutes()
         ]);
 
         if (!user) { return res.status(404).json({ error: 'User not found.' }); }
         if (!user.shiftGroup) { return res.status(400).json({ error: 'Cannot clock in. You have no shift assigned.' }); }
+
+        const shiftDurationMinutes = user.shiftGroup.durationHours != null
+            ? Number(user.shiftGroup.durationHours) * 60
+            : NaN;
+        if (!Number.isFinite(shiftDurationMinutes) || shiftDurationMinutes < 0) {
+            console.error('[Clock-In] Invalid shift duration for user:', userId, 'durationHours:', user.shiftGroup.durationHours);
+            return res.status(400).json({ error: 'Cannot clock in. Invalid shift configuration.' });
+        }
         
         // PHASE 6: Check if today is an approved leave day
         if (todayLog && todayLog.attendanceStatus === 'Leave') {
@@ -82,107 +93,139 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         
         let attendanceLog = todayLog;
         if (!attendanceLog) {
-            attendanceLog = await AttendanceLog.create({
-                user: userId,
-                attendanceDate: todayStr,
-                clockInTime: getISTNow(),
-                shiftDurationMinutes: user.shiftGroup.durationHours * 60,
-                penaltyMinutes: 0,
-                paidBreakMinutesTaken: 0,
-                unpaidBreakMinutesTaken: 0,
-            });
+            try {
+                attendanceLog = await AttendanceLog.create({
+                    user: userId,
+                    attendanceDate: todayStr,
+                    clockInTime: getISTNow(),
+                    shiftDurationMinutes,
+                    penaltyMinutes: 0,
+                    paidBreakMinutesTaken: 0,
+                    unpaidBreakMinutesTaken: 0,
+                });
+            } catch (createErr) {
+                if (createErr.code === 11000) {
+                    // Duplicate key: another request created the log (race). Reload and continue.
+                    attendanceLog = await AttendanceLog.findOne({ user: userId, attendanceDate: todayStr });
+                    if (!attendanceLog) {
+                        console.error('[Clock-In] Duplicate key but log not found:', createErr.message);
+                        return res.status(500).json({ error: 'Internal server error' });
+                    }
+                } else {
+                    console.error('[Clock-In] AttendanceLog.create failed:', createErr.name, createErr.message, createErr.code || '');
+                    if (createErr.name === 'ValidationError') {
+                        console.error('[Clock-In] Validation errors:', JSON.stringify(createErr.errors || {}));
+                    }
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+            }
         }
         
         const activeSession = await AttendanceSession.findOne({ attendanceLog: attendanceLog._id, endTime: null });
         if (activeSession) { return res.status(400).json({ error: 'You are already clocked in.' }); }
         
-        const newSession = await AttendanceSession.create({ 
-            attendanceLog: attendanceLog._id, 
-            startTime: getISTNow() 
-        });
+        let newSession;
+        try {
+            newSession = await AttendanceSession.create({
+                attendanceLog: attendanceLog._id,
+                startTime: getISTNow()
+            });
+        } catch (sessionErr) {
+            console.error('[Clock-In] AttendanceSession.create failed:', sessionErr.name, sessionErr.message, sessionErr.code || '');
+            if (sessionErr.name === 'ValidationError') {
+                console.error('[Clock-In] Session validation errors:', JSON.stringify(sessionErr.errors || {}));
+            }
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        const clockInTime = newSession.startTime;
 
         // --- ANALYTICS: Check for late login and update status ---
-        const clockInTime = getISTNow();
+        // CRITICAL FIX: Use FIRST check-in time for late calculation, not latest
+        // If this is the first check-in, use current time. If subsequent check-in, use first session's startTime
+        let clockInTimeForLateCalc;
+        const isFirstCheckIn = !todayLog; // Log was just created, so this is first check-in
+        
+        if (isFirstCheckIn) {
+            // First check-in: use current time
+            clockInTimeForLateCalc = getISTNow();
+        } else {
+            // Subsequent check-in: get first session's startTime (authoritative first check-in)
+            const allSessions = await AttendanceSession.find({ 
+                attendanceLog: attendanceLog._id 
+            }).sort({ startTime: 1 }).limit(1).lean();
+            
+            if (allSessions.length > 0 && allSessions[0].startTime) {
+                // Use first session's startTime (the actual first check-in of the day)
+                clockInTimeForLateCalc = new Date(allSessions[0].startTime);
+            } else {
+                // Fallback: use stored clockInTime (should not happen, but defensive)
+                clockInTimeForLateCalc = attendanceLog.clockInTime ? new Date(attendanceLog.clockInTime) : getISTNow();
+            }
+        }
         
         // Use the proper timezone-aware function to get shift start time
-        const shiftStartTime = getShiftDateTimeIST(clockInTime, user.shiftGroup.startTime);
+        const shiftStartTime = getShiftDateTimeIST(clockInTimeForLateCalc, user.shiftGroup.startTime);
         
-        const lateMinutes = Math.max(0, Math.floor((clockInTime - shiftStartTime) / (1000 * 60)));
+        let lateMinutes = Math.max(0, Math.floor((clockInTimeForLateCalc - shiftStartTime) / (1000 * 60)));
         
         let isLate = false;
         let isHalfDay = false;
         let attendanceStatus = 'On-time';
 
-        // Grace period: configurable via settings (default 30 minutes)
-        // PHASE 2 OPTIMIZATION: Already fetched in parallel batch above
-        let GRACE_PERIOD_MINUTES = 30;
-        if (graceSetting) {
-            // FIX: Explicitly convert to integer to ensure type consistency
-            const graceValue = parseInt(Number(graceSetting.value), 10);
-            if (!isNaN(graceValue) && graceValue >= 0) {
-                GRACE_PERIOD_MINUTES = graceValue;
-            } else {
-                console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
-            }
-        }
-        console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes})`);
+        console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes}, isFirstCheckIn: ${isFirstCheckIn})`);
 
-        // Consistent rules:
-        // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
-        // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day AND Late (for tracking/notifications)
-        // Grace period allows employees to arrive late without penalty
+        // FIXED PRIORITY LOGIC:
+        // At clock-in, we don't know working hours yet, so we apply grace period logic
+        // The insufficient hours check will happen at clock-out and may override this
+        // CRITICAL: Only recalculate late status if this is the FIRST check-in
+        // Subsequent check-ins should NOT affect late/half-day status
         let halfDayReasonCode = null;
         let halfDayReasonText = '';
         let halfDaySource = null;
         
-        if (lateMinutes <= GRACE_PERIOD_MINUTES) {
-            isLate = false;
-            isHalfDay = false;
-            attendanceStatus = 'On-time';
-            // Clear half-day reason if not half-day
-            halfDayReasonCode = null;
-            halfDayReasonText = '';
-            halfDaySource = null;
-        } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
-            isHalfDay = true;
-            isLate = true; // FIX: Set isLate=true for tracking and notifications
-            attendanceStatus = 'Half-day';
-            // Set half-day reason for late login
-            halfDayReasonCode = 'LATE_LOGIN';
-            const clockInTimeStr = formatISTTime(clockInTime, { hour12: true, hour: '2-digit', minute: '2-digit' });
-            halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
-            halfDaySource = 'AUTO';
-        }
-
-        // Update the attendance log with analytics data and half-day reason
-        const updateData = {
-            isLate,
-            isHalfDay,
-            lateMinutes,
-            attendanceStatus
-        };
-        
-        // Only update half-day reason fields if half-day is true
-        if (isHalfDay) {
-            updateData.halfDayReasonCode = halfDayReasonCode;
-            updateData.halfDayReasonText = halfDayReasonText;
-            updateData.halfDaySource = halfDaySource;
-            // Clear override fields if auto-marking as half-day (new auto determination)
-            if (!attendanceLog.overriddenByAdmin) {
-                updateData.overriddenByAdmin = false;
-                updateData.overriddenAt = null;
-                updateData.overriddenBy = null;
+        if (isFirstCheckIn) {
+            // Only calculate late status for first check-in.
+            // RULE: Do not mark half-day until checkout. Today before checkout -> always Present (On-time).
+            if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+                isLate = false;
+                isHalfDay = false;
+                attendanceStatus = 'On-time';
+                halfDayReasonCode = null;
+                halfDayReasonText = '';
+                halfDaySource = null;
+            } else {
+                // Beyond grace period: track late for clock-out, but do NOT mark half-day until checkout
+                isLate = true;
+                isHalfDay = false;
+                attendanceStatus = 'On-time';
+                halfDayReasonCode = null;
+                halfDayReasonText = '';
+                halfDaySource = null;
             }
-        } else {
-            // Clear half-day reason if not half-day (unless admin overridden)
+            
+            const updateData = {
+                isLate,
+                isHalfDay,
+                lateMinutes,
+                attendanceStatus
+            };
             if (!attendanceLog.overriddenByAdmin) {
                 updateData.halfDayReasonCode = null;
                 updateData.halfDayReasonText = '';
                 updateData.halfDaySource = null;
             }
+            await AttendanceLog.findByIdAndUpdate(attendanceLog._id, updateData);
+        } else {
+            // Subsequent check-in: Do NOT update late/half-day status
+            // The status should remain based on the first check-in
+            // Use existing values from the log
+            isLate = attendanceLog.isLate || false;
+            isHalfDay = attendanceLog.isHalfDay || false;
+            attendanceStatus = attendanceLog.attendanceStatus || 'On-time';
+            lateMinutes = attendanceLog.lateMinutes || 0;
+            console.log(`[Clock-In] Subsequent check-in detected. Preserving existing late status: ${attendanceStatus} (lateMinutes: ${lateMinutes})`);
         }
-        
-        await AttendanceLog.findByIdAndUpdate(attendanceLog._id, updateData);
 
         // Track late login for weekly monitoring
         // PHASE 2 OPTIMIZATION: Parallelize late tracking queries
@@ -261,8 +304,11 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${todayStr}`;
         cache.delete(cacheKey);
-        // Also invalidate dashboard summary cache
+        // Also invalidate dashboard summary cache (utils/cache)
         cache.deletePattern(`dashboard-summary:*`);
+        // CRITICAL: Invalidate real dashboard cache (cacheService stores dashboard_${date})
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateDashboard(todayStr);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -289,16 +335,21 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             // Don't fail the main request if Socket.IO fails
         }
 
+        cache.delete(`employee_dashboard:${userId}:${todayStr}`);
         res.status(201).json(responsePayload);
     } catch (error) {
-        console.error('Clock-in Error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        // Safe logging: no stack in production; always return JSON
+        console.error('[Clock-In] Error:', error.name || 'Error', error.message || String(error));
+        if (error.code) console.error('[Clock-In] Code:', error.code);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Internal server error' });
+        }
     }
 });
 
 router.post('/clock-out', authenticateToken, async (req, res) => {
     const { userId } = req.user;
-    const today = getISTDateString();
+    const today = getAttendanceDate(userId);
     try {
         // PHASE 2 OPTIMIZATION: Parallelize independent queries
         // Batch 1: Log + Breaks check (can run in parallel)
@@ -316,8 +367,37 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         
         if (activeBreak) return res.status(400).json({ error: 'You must end your break before clocking out.' });
         if (activeAutoBreak) return res.status(400).json({ error: 'You must end your auto-break before clocking out.' });
-        
-        const clockOutTime = getISTNow();
+
+        // HARD BLOCK: If current_time < required_logout_time, checkout MUST NOT occur. No exception.
+        // Only way to checkout early is via EarlyCheckoutRequest + admin approval.
+        const todayStart = startOfISTDay(today);
+        const todayEnd = endOfISTDay(today);
+        const [sessionsForLogout, breaksForLogout, userWithShift, approvedHalfDayLeaveDoc] = await Promise.all([
+            AttendanceSession.find({ attendanceLog: log._id }).sort({ startTime: 1 }),
+            BreakLog.find({ attendanceLog: log._id }),
+            User.findById(userId).populate('shiftGroup').lean(),
+            LeaveRequest.findOne({
+                employee: userId,
+                status: 'Approved',
+                leaveType: { $in: ['Half Day - First Half', 'Half Day - Second Half'] },
+                leaveDates: { $elemMatch: { $gte: todayStart, $lte: todayEnd } }
+            }).lean()
+        ]);
+        const approvedHalfDayLeave = !!approvedHalfDayLeaveDoc;
+        const logoutResult = computeCalculatedLogoutTime(sessionsForLogout, breaksForLogout, log, userWithShift?.shiftGroup || null, null, approvedHalfDayLeave);
+        const now = getISTNow();
+        if (logoutResult) {
+            const requiredAt = new Date(logoutResult.requiredLogoutTime);
+            if (now.getTime() < requiredAt.getTime()) {
+                return res.status(400).json({
+                    error: 'Early checkout is not allowed. You must submit an early checkout request and wait for admin approval.',
+                    code: 'EARLY_CHECKOUT_APPROVAL_REQUIRED'
+                });
+            }
+        }
+
+        const { earlyCheckoutNote } = req.body || {};
+        const clockOutTime = now;
         const updatedSession = await AttendanceSession.findOneAndUpdate(
             { attendanceLog: log._id, endTime: null },
             { 
@@ -354,38 +434,61 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
             }
         });
         
-        // Net working hours (excluding breaks)
+        // Net working hours (excluding breaks) - kept for backward compatibility
         const netWorkingMinutes = Math.max(0, totalWorkingMinutes - totalBreakMinutes);
         const totalWorkingHours = netWorkingMinutes / 60;
         
-        // Check if worked hours < 8 hours (480 minutes) - mark as half-day if so
-        // Only if not already overridden by admin
-        const MINIMUM_WORKING_HOURS = 8; // 8 hours = 480 minutes
-        const MINIMUM_WORKING_MINUTES = MINIMUM_WORKING_HOURS * 60;
+        // NEW SHIFT MODEL: Calculate elapsed shift time (clockOutTime - clockInTime, includes breaks)
+        const elapsedShiftMinutes = (clockOutTime - new Date(log.clockInTime)) / (1000 * 60);
+        const elapsedShiftHours = elapsedShiftMinutes / 60;
         
-        let updateData = {
+        // Policy: < 5 hrs elapsed = Absent; >= 5 hrs AND < 9 hrs elapsed = Half-day; >= 9 hrs elapsed = Full day
+        const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY, MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY } = require('../config/shiftPolicy');
+        
+        const updateData = {
             clockOutTime: clockOutTime,
-            totalWorkingHours: totalWorkingHours,
+            totalWorkingHours: totalWorkingHours, // Keep for backward compatibility
             logoutType: 'MANUAL',
             autoLogoutReason: null
         };
-        
+
         // Get current log to check override status
         const currentLog = await AttendanceLog.findById(log._id);
         
-        // Only auto-mark half-day if:
-        // 1. Worked less than 8 hours
-        // 2. Not already overridden by admin
-        // 3. Not already marked as half-day due to late login
-        if (netWorkingMinutes < MINIMUM_WORKING_MINUTES && 
-            !currentLog?.overriddenByAdmin && 
-            !currentLog?.isHalfDay) {
+        if (!currentLog?.overriddenByAdmin) {
+            const GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
+            const withinGracePeriod = (currentLog?.lateMinutes || 0) <= GRACE_PERIOD_MINUTES;
             
-            updateData.isHalfDay = true;
-            updateData.attendanceStatus = 'Half-day';
-            updateData.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
-            updateData.halfDayReasonText = `Insufficient working hours (${totalWorkingHours.toFixed(1)} hours worked, minimum required: ${MINIMUM_WORKING_HOURS} hours)`;
-            updateData.halfDaySource = 'AUTO';
+            // Use elapsed shift time for status determination
+            if (elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY) {
+                // Less than 5 hrs elapsed → Absent
+                updateData.isHalfDay = false;
+                updateData.isLate = false;
+                updateData.attendanceStatus = 'Absent';
+                updateData.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                updateData.halfDayReasonText = `Less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours total shift time (${elapsedShiftHours.toFixed(1)} hours elapsed). Minimum ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs for half-day, ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hrs for full day.`;
+                updateData.halfDaySource = 'AUTO';
+                console.log(`[CLOCK-OUT] Marked Absent for user ${userId} (${elapsedShiftHours.toFixed(1)} hours elapsed < ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs)`);
+            } else if (elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY) {
+                // 5 to < 9 hrs elapsed → Half-day
+                if (withinGracePeriod) {
+                    updateData.isHalfDay = true;
+                    updateData.isLate = false;
+                    updateData.attendanceStatus = 'Half-day';
+                    updateData.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                    updateData.halfDayReasonText = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                    updateData.halfDaySource = 'AUTO';
+                } else if (!currentLog?.isHalfDay) {
+                    updateData.isHalfDay = true;
+                    updateData.attendanceStatus = 'Half-day';
+                    updateData.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                    updateData.halfDayReasonText = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                    updateData.halfDaySource = 'AUTO';
+                } else {
+                    updateData.isHalfDay = true;
+                    updateData.attendanceStatus = 'Half-day';
+                }
+            }
         }
         
         await AttendanceLog.findByIdAndUpdate(log._id, { $set: updateData });
@@ -401,14 +504,16 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
                 .catch(err => console.error('Error sending clock-out notification to admins:', err));
             
             // Send confirmation to the user
-            let message = `You have successfully clocked out at ${formatISTTime(clockOutTime, { hour12: true })}. Total working hours: ${totalWorkingHours.toFixed(1)}h`;
-            if (updateData.isHalfDay) {
-                message += ` (Marked as half-day due to insufficient working hours)`;
+            let message = `You have successfully clocked out at ${formatISTTime(clockOutTime, { hour12: true })}. Total shift time: ${elapsedShiftHours.toFixed(1)}h`;
+            if (updateData.attendanceStatus === 'Absent') {
+                message += ` (Marked as Absent - less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours elapsed)`;
+            } else if (updateData.isHalfDay) {
+                message += ` (Marked as half-day due to insufficient shift time)`;
             }
             
             NewNotificationService.createAndEmitNotification({
                 message: message,
-                type: updateData.isHalfDay ? 'warning' : 'success',
+                type: (updateData.attendanceStatus === 'Absent' || updateData.isHalfDay) ? 'warning' : 'success',
                 userId,
                 userName: user.fullName,
                 recipientType: 'user',
@@ -421,8 +526,11 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${today}`;
         cache.delete(cacheKey);
-        // Also invalidate dashboard summary cache
+        // Also invalidate dashboard summary cache (utils/cache)
         cache.deletePattern(`dashboard-summary:*`);
+        // CRITICAL: Invalidate real dashboard cache (cacheService stores dashboard_${date})
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -450,13 +558,106 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
             // Don't fail the main request if Socket.IO fails
         }
 
-        res.json({ 
-            message: 'Clocked out successfully!', 
+        cache.delete(`employee_dashboard:${userId}:${today}`);
+        res.json({
+            message: 'Clocked out successfully!',
             session: updatedSession,
             totalWorkingHours: totalWorkingHours
         });
     } catch (error) {
         console.error('Clock-out Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/attendance/early-checkout-request - Create early checkout request (employee; no checkout until approved)
+router.post('/early-checkout-request', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    const today = getAttendanceDate(userId);
+    const { reason } = req.body || {};
+    const note = typeof reason === 'string' ? reason.trim() : '';
+    if (!note || note.length < 25) {
+        return res.status(400).json({ error: 'Early checkout reason must be at least 25 characters.' });
+    }
+    try {
+        const [log, activeBreak] = await Promise.all([
+            AttendanceLog.findOne({ user: userId, attendanceDate: today }),
+            BreakLog.findOne({ userId, endTime: null })
+        ]);
+        if (!log) return res.status(400).json({ error: 'Cannot find attendance log. You must clock in first.' });
+        if (activeBreak) return res.status(400).json({ error: 'You must end your break before requesting early checkout.' });
+        const todayStart = startOfISTDay(today);
+        const todayEnd = endOfISTDay(today);
+        const [sessionsForLogout, breaksForLogout, userWithShift, approvedHalfDayLeaveDoc] = await Promise.all([
+            AttendanceSession.find({ attendanceLog: log._id }).sort({ startTime: 1 }),
+            BreakLog.find({ attendanceLog: log._id }),
+            User.findById(userId).populate('shiftGroup').lean(),
+            LeaveRequest.findOne({
+                employee: userId,
+                status: 'Approved',
+                leaveType: { $in: ['Half Day - First Half', 'Half Day - Second Half'] },
+                leaveDates: { $elemMatch: { $gte: todayStart, $lte: todayEnd } }
+            }).lean()
+        ]);
+        const approvedHalfDayLeave = !!approvedHalfDayLeaveDoc;
+        const logoutResult = computeCalculatedLogoutTime(sessionsForLogout, breaksForLogout, log, userWithShift?.shiftGroup || null, null, approvedHalfDayLeave);
+        if (!logoutResult) return res.status(400).json({ error: 'Could not calculate required logout time.' });
+        const requiredAt = new Date(logoutResult.requiredLogoutTime);
+        const now = getISTNow();
+        if (now.getTime() >= requiredAt.getTime()) {
+            return res.status(400).json({ error: 'You have reached required logout time. Use Check Out directly.' });
+        }
+        const existing = await EarlyCheckoutRequest.findOne({ attendanceLog: log._id, status: 'Pending' });
+        if (existing) return res.status(400).json({ error: 'You already have a pending early checkout request for today.' });
+        const remainingMs = requiredAt.getTime() - now.getTime();
+        const remainingTimeMinutes = Math.max(0, Math.ceil(remainingMs / 60000));
+        const request = await EarlyCheckoutRequest.create({
+            employee: userId,
+            attendanceLog: log._id,
+            reason: note,
+            requestedAt: now,
+            requiredLogoutTime: requiredAt,
+            remainingTimeMinutes,
+            status: 'Pending'
+        });
+        const user = await User.findById(userId).select('fullName').lean();
+        const reasonPreview = note.length > 80 ? note.slice(0, 80) + '…' : note;
+        await NewNotificationService.notifyEarlyCheckoutRequest(userId, user?.fullName || 'Employee', {
+            requestId: request._id.toString(),
+            date: today,
+            remainingTimeMinutes,
+            reasonPreview
+        });
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateDashboard(today);
+        cache.delete(`employee_dashboard:${userId}:${today}`);
+        res.status(201).json({
+            message: 'Early checkout request sent for admin approval.',
+            request: {
+                _id: request._id,
+                status: request.status,
+                requestedAt: request.requestedAt,
+                requiredLogoutTime: request.requiredLogoutTime,
+                remainingTimeMinutes: request.remainingTimeMinutes
+            }
+        });
+    } catch (err) {
+        console.error('Early checkout request error:', err);
+        res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+});
+
+// GET /api/attendance/early-checkout-request/mine - Get current user's pending early checkout request for a date
+router.get('/early-checkout-request/mine', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    const date = req.query.date || getAttendanceDate(userId);
+    try {
+        const log = await AttendanceLog.findOne({ user: userId, attendanceDate: date });
+        if (!log) return res.json({ request: null });
+        const request = await EarlyCheckoutRequest.findOne({ attendanceLog: log._id }).sort({ createdAt: -1 }).lean();
+        res.json({ request: request || null });
+    } catch (err) {
+        console.error('Early checkout request mine error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -492,27 +693,39 @@ router.get('/my-weekly-log', authenticateToken, async (req, res) => {
     }
 });
 
+// Attendance notes: read-only for employees; only Admin/HR may create or update (RBAC enforced).
+// Employees CANNOT create, edit, or delete notes for any attendance record.
 router.patch('/log/:logId/note', authenticateToken, async (req, res) => {
     const { logId } = req.params;
     const { notes } = req.body;
-    const { userId } = req.user;
+    let { role } = req.user;
+    const userId = req.user.userId;
 
     try {
         if (!mongoose.Types.ObjectId.isValid(logId)) {
             return res.status(400).json({ error: 'Invalid log ID.' });
         }
 
-        const log = await AttendanceLog.findOne({ _id: logId, user: userId });
-        
-        if (!log) {
-            return res.status(404).json({ error: 'Attendance log not found or you do not have permission to edit it.' });
+        if (!role && userId) {
+            const u = await User.findById(userId).select('role').lean();
+            if (u) role = u.role;
         }
-        
-        log.notes = notes || '';
-        await log.save();
-        
-        res.json({ message: 'Note updated successfully.', log });
+        const isAdminOrHr = role === 'Admin' || role === 'HR';
+        if (!isAdminOrHr) {
+            return res.status(403).json({
+                error: 'Only Admin or HR can add or edit attendance notes. Notes are read-only for employees.'
+            });
+        }
 
+        const log = await AttendanceLog.findOne({ _id: logId });
+        if (!log) {
+            return res.status(404).json({ error: 'Attendance log not found.' });
+        }
+
+        log.notes = typeof notes === 'string' ? notes : '';
+        await log.save();
+
+        res.json({ message: 'Note updated successfully.', log });
     } catch (error) {
         console.error('Error updating note:', error);
         res.status(500).json({ error: 'Internal server error.' });
@@ -524,7 +737,7 @@ router.post('/auto-break', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.user;
         const { type = 'Auto-Unpaid-Break', reason = 'Inactivity detected' } = req.body;
-        const today = getISTDateString();
+        const today = getAttendanceDate(userId);
 
         console.log(`[AUTO-BREAK] Request from user ${userId}, reason: ${reason}`);
 
@@ -636,7 +849,7 @@ router.post('/auto-break', authenticateToken, async (req, res) => {
 router.get('/current-status', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.user;
-        const today = getISTDateString();
+        const today = getAttendanceDate(userId);
 
         // Find today's attendance log
         const attendanceLog = await AttendanceLog.findOne({ 
@@ -677,7 +890,7 @@ router.get('/current-status', authenticateToken, async (req, res) => {
 router.put('/end-break', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.user;
-        const today = getISTDateString();
+        const today = getAttendanceDate(userId);
 
         console.log(`[END-BREAK] Request from user ${userId}`);
 
@@ -786,64 +999,47 @@ router.put('/end-break', authenticateToken, async (req, res) => {
  * @returns {Promise<Array<string>>} Array of working dates in YYYY-MM-DD format
  */
 const getWorkingDatesForMonth = async (month, year, employee) => {
-    // month is 0-indexed (0-11), year is full year
-    // Create IST date for month start
-    const monthStartIST = parseISTDate(`${year}-${String(month + 1).padStart(2, '0')}-01`);
-    const monthStart = new Date(monthStartIST);
-    monthStart.setHours(0, 0, 0, 0);
-    
-    // Create IST date for month end
-    const monthEndIST = parseISTDate(`${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`);
-    const monthEnd = new Date(monthEndIST);
-    monthEnd.setHours(23, 59, 59, 999);
-    
-    // Get all holidays in this month (exclude tentative holidays)
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
     const holidays = await Holiday.find({
-        date: {
-            $gte: monthStart,
-            $lte: monthEnd,
-            $ne: null
-        },
+        date: { $gte: monthStart, $lte: monthEnd, $ne: null },
         isTentative: { $ne: true }
     }).lean();
-    
     const holidayDates = new Set(
         holidays
             .filter(h => h.date && !h.isTentative)
             .map(h => {
                 const d = new Date(h.date);
-                if (isNaN(d.getTime())) return null;
-                return getISTDateString(d);
+                return isNaN(d.getTime()) ? null : getISTDateString(d);
             })
-            .filter(dateStr => dateStr !== null)
+            .filter(Boolean)
     );
-    
-    const saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
+    return getWorkingDatesForMonthInMemory(month, year, holidayDates, employee?.alternateSaturdayPolicy || 'All Saturdays Working');
+};
+
+/**
+ * Pure in-memory: working dates for a month given holiday set and Saturday policy.
+ * No DB calls. Used by actual-work-days batch path.
+ * @param {number} month - Month (0-11)
+ * @param {number} year - Year
+ * @param {Set<string>} holidayDateSet - Set of YYYY-MM-DD holiday dates
+ * @param {string} alternateSaturdayPolicy - e.g. 'All Saturdays Working'
+ * @returns {Array<string>} Working dates in YYYY-MM-DD format
+ */
+function getWorkingDatesForMonthInMemory(month, year, holidayDateSet, alternateSaturdayPolicy) {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
     const workingDates = [];
-    
-    // Iterate through days in IST
     for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
         const dayOfWeek = d.getDay();
         const dateStr = getISTDateString(d);
-        
-        // Skip Sundays
         if (dayOfWeek === 0) continue;
-        
-        // Skip alternate Saturdays based on policy
-        if (dayOfWeek === 6) {
-            if (AntiExploitationLeaveService.isOffSaturday(d, saturdayPolicy)) {
-                continue;
-            }
-        }
-        
-        // Skip holidays
-        if (holidayDates.has(dateStr)) continue;
-        
+        if (dayOfWeek === 6 && LeavePolicyService.isSaturdayOff(d, alternateSaturdayPolicy)) continue;
+        if (holidayDateSet.has(dateStr)) continue;
         workingDates.push(dateStr);
     }
-    
     return workingDates;
-};
+}
 
 /**
  * GET /api/attendance/actual-work-days
@@ -867,137 +1063,167 @@ const getWorkingDatesForMonth = async (month, year, employee) => {
  * Multiple employees: Array of above objects
  */
 router.get('/actual-work-days', authenticateToken, async (req, res) => {
+    const routeStart = Date.now();
+    let dbQueriesCount = 0;
     try {
         const { employeeId, month, year } = req.query;
         const { userId, role } = req.user;
-        
+
         // Validate required params
         if (!month || !year) {
-            return res.status(400).json({ 
-                error: 'Month and year are required query parameters.' 
+            return res.status(400).json({
+                error: 'Month and year are required query parameters.'
             });
         }
-        
+
         const monthNum = parseInt(month, 10);
         const yearNum = parseInt(year, 10);
-        
+
         if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-            return res.status(400).json({ 
-                error: 'Month must be a number between 1 and 12.' 
+            return res.status(400).json({
+                error: 'Month must be a number between 1 and 12.'
             });
         }
-        
+
         if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
-            return res.status(400).json({ 
-                error: 'Year must be a valid year.' 
+            return res.status(400).json({
+                error: 'Year must be a valid year.'
             });
         }
-        
+
         // Access control: Employee can only see their own data
         if (employeeId) {
             if (!mongoose.Types.ObjectId.isValid(employeeId)) {
                 return res.status(400).json({ error: 'Invalid employee ID format.' });
             }
-            
-            // If employee is requesting, ensure they can only see their own data
             if (role !== 'Admin' && role !== 'HR' && employeeId !== userId) {
-                return res.status(403).json({ 
-                    error: 'You do not have permission to view this employee\'s data.' 
+                return res.status(403).json({
+                    error: 'You do not have permission to view this employee\'s data.'
                 });
             }
         } else {
-            // Bulk request (no employeeId) - only Admin/HR allowed
             if (role !== 'Admin' && role !== 'HR') {
-                return res.status(403).json({ 
-                    error: 'Only Admin and HR can view all employees\' data.' 
+                return res.status(403).json({
+                    error: 'Only Admin and HR can view all employees\' data.'
                 });
             }
         }
-        
-        // Convert month to 0-indexed for Date constructor
+
         const monthIndex = monthNum - 1;
-        
-        // Determine which employees to process
-        let employeesToProcess = [];
-        
+        const firstDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+        const lastDay = new Date(yearNum, monthNum, 0).getDate();
+        const lastDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+        // --- Batch: 1 query for users ---
+        const t0 = Date.now();
+        let employeesToProcess;
         if (employeeId) {
-            // Single employee
-            const employee = await User.findById(employeeId).select('_id fullName employeeCode alternateSaturdayPolicy role');
+            const employee = await User.findById(employeeId).select('_id fullName employeeCode alternateSaturdayPolicy role').lean();
             if (!employee) {
                 return res.status(404).json({ error: 'Employee not found.' });
             }
             employeesToProcess = [employee];
         } else {
-            // All employees (Admin/HR only)
-            employeesToProcess = await User.find({ 
-                isActive: true 
-            }).select('_id fullName employeeCode alternateSaturdayPolicy role').lean();
+            employeesToProcess = await User.find({ isActive: true })
+                .select('_id fullName employeeCode alternateSaturdayPolicy role')
+                .lean();
         }
-        
-        // Process each employee
-        const results = await Promise.all(
-            employeesToProcess.map(async (employee) => {
-                try {
-                    // Get working dates for this employee's month
-                    const workingDates = await getWorkingDatesForMonth(
-                        monthIndex, 
-                        yearNum, 
-                        employee
-                    );
-                    
-                    const totalWorkingDays = workingDates.length;
-                    
-                    // Fetch attendance records for working dates only
-                    // Count unique dates where employee has check-in
-                    const attendanceLogs = await AttendanceLog.find({
-                        user: employee._id,
-                        attendanceDate: { $in: workingDates },
-                        clockInTime: { $exists: true, $ne: null }
-                    }).select('attendanceDate').lean();
-                    
-                    // Deduplicate by date (in case of multiple records per date)
-                    const presentDateSet = new Set(
-                        attendanceLogs.map(log => log.attendanceDate)
-                    );
-                    
-                    const actualWorkedDays = presentDateSet.size;
-                    const absentDays = totalWorkingDays - actualWorkedDays;
-                    
-                    return {
-                        employeeId: employee._id.toString(),
-                        employeeName: employee.fullName,
-                        employeeCode: employee.employeeCode,
-                        month: monthNum,
-                        year: yearNum,
-                        totalWorkingDays,
-                        actualWorkedDays,
-                        absentDays
-                    };
-                } catch (error) {
-                    console.error(`Error processing employee ${employee._id}:`, error);
-                    // Return error data for this employee
-                    return {
-                        employeeId: employee._id.toString(),
-                        employeeName: employee.fullName,
-                        employeeCode: employee.employeeCode,
-                        month: monthNum,
-                        year: yearNum,
-                        error: 'Failed to calculate work days'
-                    };
-                }
-            })
+        dbQueriesCount += 1;
+        const dbFetchUsersMs = Date.now() - t0;
+
+        // --- Batch: 1 query for holidays (shared for all employees) ---
+        const t1 = Date.now();
+        const monthStart = new Date(yearNum, monthIndex, 1);
+        const monthEnd = new Date(yearNum, monthIndex + 1, 0, 23, 59, 59, 999);
+        const holidays = await Holiday.find({
+            date: { $gte: monthStart, $lte: monthEnd, $ne: null },
+            isTentative: { $ne: true }
+        }).select('date').lean();
+        dbQueriesCount += 1;
+        const dbFetchHolidaysMs = Date.now() - t1;
+
+        const holidayDateSet = new Set(
+            holidays
+                .filter(h => h.date && !h.isTentative)
+                .map(h => {
+                    const d = new Date(h.date);
+                    return isNaN(d.getTime()) ? null : getISTDateString(d);
+                })
+                .filter(Boolean)
         );
-        
-        // Return single object if single employee requested, array if bulk
+
+        // --- In-memory: working dates per policy (no DB) ---
+        const policiesSeen = new Set();
+        const policyToWorkingDates = new Map();
+        for (const emp of employeesToProcess) {
+            const policy = emp.alternateSaturdayPolicy || 'All Saturdays Working';
+            if (!policiesSeen.has(policy)) {
+                policiesSeen.add(policy);
+                policyToWorkingDates.set(policy, getWorkingDatesForMonthInMemory(monthIndex, yearNum, holidayDateSet, policy));
+            }
+        }
+
+        const employeeIds = employeesToProcess.map(e => e._id);
+
+        // --- Batch: 1 query for all attendance logs in month for these users ---
+        const t2 = Date.now();
+        const attendanceLogs = await AttendanceLog.find({
+            user: { $in: employeeIds },
+            attendanceDate: { $gte: firstDateStr, $lte: lastDateStr },
+            clockInTime: { $exists: true, $ne: null }
+        }).select('user attendanceDate').lean();
+        dbQueriesCount += 1;
+        const dbFetchAttendanceMs = Date.now() - t2;
+
+        // --- In-memory: group by user -> Set of present dates, then build results (no DB) ---
+        const computeStart = Date.now();
+        const presentByUser = new Map();
+        for (const log of attendanceLogs) {
+            const uid = log.user && log.user.toString ? log.user.toString() : String(log.user);
+            if (!presentByUser.has(uid)) presentByUser.set(uid, new Set());
+            presentByUser.get(uid).add(log.attendanceDate);
+        }
+
+        // --- In-memory: build result per employee ---
+        const results = employeesToProcess.map((employee) => {
+            const policy = employee.alternateSaturdayPolicy || 'All Saturdays Working';
+            const workingDates = policyToWorkingDates.get(policy) || [];
+            const totalWorkingDays = workingDates.length;
+            const presentSet = presentByUser.get(employee._id.toString()) || new Set();
+            const workingDateSet = new Set(workingDates);
+            let actualWorkedDays = 0;
+            for (const d of presentSet) {
+                if (workingDateSet.has(d)) actualWorkedDays++;
+            }
+            const absentDays = totalWorkingDays - actualWorkedDays;
+            return {
+                employeeId: employee._id.toString(),
+                employeeName: employee.fullName,
+                employeeCode: employee.employeeCode,
+                month: monthNum,
+                year: yearNum,
+                totalWorkingDays,
+                actualWorkedDays,
+                absentDays
+            };
+        });
+        const computeMs = Date.now() - computeStart;
+        const totalMs = Date.now() - routeStart;
+
+        if (process.env.NODE_ENV !== 'test') {
+            console.log(
+                `[ACTUAL_WORK_DAYS] db_fetch_ms=users:${dbFetchUsersMs} holidays:${dbFetchHolidaysMs} attendance:${dbFetchAttendanceMs} total_db=${dbFetchUsersMs + dbFetchHolidaysMs + dbFetchAttendanceMs} compute_ms=${computeMs} total_ms=${totalMs} users_processed=${results.length} db_queries=${dbQueriesCount}`
+            );
+        }
+
         if (employeeId) {
             res.json(results[0]);
         } else {
             res.json(results);
         }
-        
     } catch (error) {
         console.error('Error calculating actual work days:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error while calculating actual work days.',
             details: error.message
         });
@@ -1053,24 +1279,50 @@ router.get('/summary', authenticateToken, async (req, res) => {
             targetUserId = userId;
         }
 
-        // Import status resolver
         const { resolveAttendanceStatus, generateDateRange } = require('../utils/attendanceStatusResolver');
+        const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 
-        // Generate full date series for the range (IST)
         const dateRange = generateDateRange(startDate, endDate);
-
-        // Parallelize: Fetch employee, logs, holidays, and leave requests
         const shouldIncludeHolidays = includeHolidays === 'true' || includeHolidays === true;
-        const [employee, logs, holidays, leaveRequests] = await Promise.all([
+        const [employee, logs, holidays, leaveRequests, gracePeriodMinutes, userWithShift] = await Promise.all([
             // Fetch employee to get Saturday policy
             User.findById(targetUserId).select('alternateSaturdayPolicy').lean(),
             // Fetch attendance logs for date range
+            // CRITICAL: Include user and shiftGroup for lateMinutes recalculation
             AttendanceLog.aggregate([
             { 
                 $match: { 
                     user: new mongoose.Types.ObjectId(targetUserId), 
                     attendanceDate: { $gte: startDate, $lte: endDate } 
                 } 
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'userData'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$userData',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'shiftgroups',
+                    localField: 'userData.shiftGroup',
+                    foreignField: '_id',
+                    as: 'shiftGroupData'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$shiftGroupData',
+                    preserveNullAndEmptyArrays: true
+                }
             },
             { 
                 $lookup: { 
@@ -1104,6 +1356,9 @@ router.get('/summary', authenticateToken, async (req, res) => {
                     overriddenByAdmin: 1,
                     overriddenAt: 1,
                     overriddenBy: 1,
+                    overrideReason: 1,
+                    overrideType: 1,
+                    adminOverride: 1,
                     lateMinutes: 1,
                     totalWorkingHours: 1,
                     paidBreakMinutesTaken: 1,
@@ -1111,6 +1366,14 @@ router.get('/summary', authenticateToken, async (req, res) => {
                     penaltyMinutes: 1,
                     logoutType: 1,
                     autoLogoutReason: 1,
+                    earlyCheckoutNote: 1,
+                    user: {
+                        _id: '$userData._id',
+                        shiftGroup: {
+                            _id: '$shiftGroupData._id',
+                            startTime: '$shiftGroupData.startTime'
+                        }
+                    },
                     sessions: { 
                         $map: { 
                             input: "$sessions", 
@@ -1153,7 +1416,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
             // Fetch all approved leave requests for the date range
             // LeaveRequest uses leaveDates array, so we need to check if any leaveDate falls within range
             LeaveRequest.find({
-                user: new mongoose.Types.ObjectId(targetUserId),
+                employee: new mongoose.Types.ObjectId(targetUserId),
                 status: 'Approved',
                 leaveDates: {
                     $elemMatch: {
@@ -1161,7 +1424,10 @@ router.get('/summary', authenticateToken, async (req, res) => {
                         $lte: parseISTDate(endDate + 'T23:59:59+05:30')
                     }
                 }
-            }).sort({ createdAt: 1 }).lean()
+            }).sort({ createdAt: 1 }).lean(),
+            getGracePeriodMinutes(),
+            // Fetch user with shiftGroup for lateMinutes recalculation
+            User.findById(targetUserId).populate('shiftGroup').lean()
         ]);
 
         // Get Saturday policy (from User.alternateSaturdayPolicy field)
@@ -1185,7 +1451,14 @@ router.get('/summary', authenticateToken, async (req, res) => {
         });
 
         const leaveRequestsMap = new Map();
+        // CRITICAL FIX: Only map leaves that are actually approved and exist
+        // This ensures deleted leaves don't appear in the summary
         leaveRequests.forEach(leave => {
+            // Double-check: Only process approved leaves (query already filters, but defensive check)
+            if (!leave || leave.status !== 'Approved') {
+                return; // Skip non-approved or null leaves
+            }
+            
             // LeaveRequest model uses leaveDates array (not startDate/endDate)
             if (Array.isArray(leave.leaveDates) && leave.leaveDates.length > 0) {
                 leave.leaveDates.forEach(leaveDate => {
@@ -1199,19 +1472,79 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 });
             }
         });
+        
+        // CRITICAL FIX: Clean up attendance logs that reference deleted leaves
+        // Check all logs and remove leaveRequest references if the leave no longer exists
+        const validLeaveIds = new Set(leaveRequests.map(l => l._id.toString()));
+        const logsToCleanup = [];
+        
+        for (const log of logs) {
+            const leaveRefId = log.leaveRequest?.toString();
+            const hasOrphanedLeaveRef = leaveRefId && !validLeaveIds.has(leaveRefId);
+            const hasLeaveStatusButNoLeave = log.attendanceStatus === 'Leave' && !leaveRequestsMap.has(log.attendanceDate);
+            
+            if (hasOrphanedLeaveRef || hasLeaveStatusButNoLeave) {
+                // This log references a deleted leave or has Leave status but no valid leave exists
+                console.log(`[ATTENDANCE_SUMMARY] Found orphaned leave reference in log ${log._id} for date ${log.attendanceDate}`);
+                
+                // Clean up the log object for this response
+                log.leaveRequest = null;
+                if (!log.clockInTime && !log.clockOutTime && log.attendanceStatus === 'Leave') {
+                    // No attendance data and status is Leave - set to Absent
+                    log.attendanceStatus = 'Absent';
+                    log.isLate = false;
+                    log.isHalfDay = false;
+                    log.lateMinutes = 0;
+                }
+                
+                // Queue for async cleanup in database
+                logsToCleanup.push({
+                    logId: log._id,
+                    hasClockIn: !!log.clockInTime,
+                    currentStatus: log.attendanceStatus
+                });
+            }
+        }
+        
+        // Async cleanup of orphaned references in database (don't block response)
+        if (logsToCleanup.length > 0) {
+            Promise.all(logsToCleanup.map(({ logId, hasClockIn, currentStatus }) => {
+                const updateData = { leaveRequest: null };
+                if (!hasClockIn && currentStatus === 'Absent') {
+                    updateData.attendanceStatus = 'Absent';
+                    updateData.isLate = false;
+                    updateData.isHalfDay = false;
+                    updateData.lateMinutes = 0;
+                }
+                return AttendanceLog.findByIdAndUpdate(logId, updateData).catch(err => {
+                    console.error(`[ATTENDANCE_SUMMARY] Failed to cleanup orphaned leave reference in log ${logId}:`, err);
+                });
+            })).catch(err => {
+                console.error('[ATTENDANCE_SUMMARY] Error during batch cleanup of orphaned leave references:', err);
+            });
+        }
 
         // Process each date in the range and resolve status
         const resolvedLogs = dateRange.map(attendanceDate => {
             const log = logsMap.get(attendanceDate) || null;
-            const leaveRequest = leaveRequestsMap.get(attendanceDate) || null;
+            let leaveRequest = leaveRequestsMap.get(attendanceDate) || null;
+            
+            // CRITICAL FIX: If log has leaveRequest reference, verify it's still valid
+            // This prevents showing deleted leaves in the summary
+            if (log && log.leaveRequest && !leaveRequest) {
+                // Log has leaveRequest reference but it's not in our approved leaves map
+                // This means the leave was deleted - ignore the reference
+                console.log(`[ATTENDANCE_SUMMARY] Log ${log._id} has orphaned leaveRequest reference for date ${attendanceDate}`);
+                leaveRequest = null; // Don't use the orphaned reference
+            }
 
-            // Resolve status using the resolver (enforces precedence)
             const statusInfo = resolveAttendanceStatus({
                 attendanceDate,
                 attendanceLog: log,
                 holidays: holidays || [],
-                leaveRequest,
-                saturdayPolicy
+                leaveRequest, // Will be null if leave was deleted
+                saturdayPolicy,
+                gracePeriodMinutes
             });
 
             // Build the response object
@@ -1232,6 +1565,9 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 halfDayReasonCode: statusInfo.halfDayReasonCode || null,
                 halfDaySource: statusInfo.halfDaySource || null,
                 overriddenByAdmin: statusInfo.overriddenByAdmin || false,
+                overrideReason: log?.overrideReason || null,
+                overrideType: log?.overrideType || null,
+                adminOverride: log?.adminOverride || null,
                 leaveReason: statusInfo.leaveReason || null,
                 // Holiday/Leave info
                 holidayInfo: statusInfo.holidayInfo,
@@ -1246,6 +1582,11 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 penaltyMinutes: log?.penaltyMinutes || 0,
                 logoutType: log?.logoutType || null,
                 autoLogoutReason: log?.autoLogoutReason || null,
+                // Early checkout note (only when checkout before required logout and employee submitted a note)
+                earlyCheckoutNote: (log?.earlyCheckoutNote && String(log.earlyCheckoutNote).trim()) ? String(log.earlyCheckoutNote).trim() : null,
+                hasEarlyCheckoutNote: !!(log?.earlyCheckoutNote && String(log.earlyCheckoutNote).trim()),
+                // Half-day leave for date (from already-fetched leave; no per-cell fetch)
+                hasHalfDayLeave: !!(leaveRequest && (leaveRequest.leaveType === 'Half Day - First Half' || leaveRequest.leaveType === 'Half Day - Second Half')),
                 // Sessions and breaks
                 sessions: log?.sessions || [],
                 breaks: Array.isArray(log?.breaks) ? log.breaks : [],
@@ -1260,27 +1601,33 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 totalWorkedMinutes: log?.totalWorkingHours ? Math.round(log.totalWorkingHours * 60) : 0,
                 // Payable minutes based on resolved status
                 payableMinutes: (() => {
+                    const { SHIFT_WORKING_MINUTES, MINIMUM_WORKING_HOURS } = require('../config/shiftPolicy');
+                    const FULL_DAY_MINUTES = SHIFT_WORKING_MINUTES; // 8.5 hours = 510 minutes
+                    const HALF_DAY_MINUTES = Math.round(SHIFT_WORKING_MINUTES / 2); // 4.25 hours = 255 minutes
+                    const HALF_DAY_LEAVE_MINUTES = 270; // 4.5 hours = 270 minutes for half day leave
+                    
                     if (statusInfo.status === 'Holiday' || statusInfo.status === 'Weekly Off') {
                         return 0;
                     }
                     if (statusInfo.status === 'Leave') {
                         if (statusInfo.isHalfDay) {
-                            return 270; // 4.5 hours = 270 minutes for half day leave
+                            return HALF_DAY_LEAVE_MINUTES;
                         }
                         return 0; // Full day leave = 0 payable
                     }
                     if (statusInfo.status === 'Half-day' || statusInfo.isHalfDay) {
-                        return 240; // 4 hours = 240 minutes for half day
+                        return HALF_DAY_MINUTES;
                     }
                     if (statusInfo.status === 'Absent') {
                         return 0;
                     }
                     // Present or other status - full day
-                    return 480; // 8 hours = 480 minutes for full day
+                    return FULL_DAY_MINUTES; // 8.5 hours = 510 minutes for full day
                 })()
             };
 
             // Compute firstIn and lastOut from sessions
+            // CRITICAL FIX: Also recalculate lateMinutes from FIRST check-in, not stored value
             if (log?.sessions && Array.isArray(log.sessions) && log.sessions.length > 0) {
                 const sortedSessions = [...log.sessions].sort((a, b) => 
                     new Date(a.startTime) - new Date(b.startTime)
@@ -1288,12 +1635,111 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 
                 if (sortedSessions[0]?.startTime) {
                     result.firstIn = sortedSessions[0].startTime;
+                    
+                    // CRITICAL: Recalculate lateMinutes from FIRST check-in time
+                    // This ensures we always use the actual first check-in, even if stored lateMinutes is wrong
+                    // Use userWithShift fetched above (already populated with shiftGroup)
+                    const userShiftGroup = (log.user && log.user.shiftGroup && log.user.shiftGroup.startTime) 
+                        ? log.user.shiftGroup 
+                        : (userWithShift && userWithShift.shiftGroup) 
+                            ? userWithShift.shiftGroup 
+                            : null;
+                    
+                    if (userShiftGroup && userShiftGroup.startTime) {
+                        try {
+                            const { getShiftDateTimeIST } = require('../utils/istTime');
+                            const firstCheckInTime = new Date(sortedSessions[0].startTime);
+                            const shiftStartTime = getShiftDateTimeIST(firstCheckInTime, userShiftGroup.startTime);
+                            const recalculatedLateMinutes = Math.max(0, Math.floor((firstCheckInTime - shiftStartTime) / (1000 * 60)));
+                            
+                            // Override stored lateMinutes with recalculated value from first check-in
+                            result.lateMinutes = recalculatedLateMinutes;
+                            
+                            // NEW SHIFT MODEL: Use elapsed shift time (clockOutTime - clockInTime) for attendance status
+                            // Policy: < 5 hrs elapsed = Absent; >= 5 hrs AND < 9 hrs elapsed = Half-day; >= 9 hrs elapsed = Full day
+                            const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY, MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY } = require('../config/shiftPolicy');
+                            
+                            // Calculate elapsed shift time (includes breaks)
+                            let elapsedShiftHours = null;
+                            if (log.clockInTime && log.clockOutTime) {
+                                const elapsedShiftMinutes = (new Date(log.clockOutTime) - new Date(log.clockInTime)) / (1000 * 60);
+                                elapsedShiftHours = elapsedShiftMinutes / 60;
+                            }
+                            
+                            const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
+                            const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed
+                            const hasHalfDayHours = hasCheckedOut && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 to < 9 hrs elapsed
+                            const hasFullDayHours = elapsedShiftHours != null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
+                            const withinGracePeriod = recalculatedLateMinutes <= gracePeriodMinutes;
+                            
+                            if (belowHalfDayMinimum) {
+                                result.isLate = false;
+                                result.isHalfDay = false;
+                                result.attendanceStatus = 'Absent';
+                                result.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                                result.halfDayReason = `Less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours total shift time (${elapsedShiftHours.toFixed(1)} hours elapsed). Minimum ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs for half-day, ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hrs for full day.`;
+                                result.payableMinutes = 0; // Absent = 0 payable
+                            } else if (withinGracePeriod && hasFullDayHours) {
+                                result.isLate = false;
+                                result.isHalfDay = false;
+                                result.attendanceStatus = 'On-time';
+                                result.halfDayReasonCode = null;
+                                result.halfDayReason = null;
+                            } else if (hasHalfDayHours) {
+                                result.isLate = false;
+                                result.isHalfDay = true;
+                                result.attendanceStatus = 'Half-day';
+                                result.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                                result.halfDayReason = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                            } else if (hasFullDayHours) {
+                                result.isLate = true;
+                                const lateArrivalMarksHalfDay = !!(userWithShift && userWithShift.featurePermissions && userWithShift.featurePermissions.lateArrivalMarksHalfDay);
+                                if (lateArrivalMarksHalfDay) {
+                                    result.isHalfDay = true;
+                                    result.attendanceStatus = 'Half-day';
+                                    result.halfDayReasonCode = 'LATE_LOGIN';
+                                    result.halfDayReason = `Late login beyond ${gracePeriodMinutes} min grace period (logged at ${firstCheckInTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: true, hour: '2-digit', minute: '2-digit' })}, ${recalculatedLateMinutes} minutes late)`;
+                                } else {
+                                    result.isHalfDay = false;
+                                    result.attendanceStatus = 'On-time';
+                                    result.halfDayReasonCode = null;
+                                    result.halfDayReason = null;
+                                }
+                            } else {
+                                result.isLate = !withinGracePeriod;
+                                result.isHalfDay = false;
+                                result.attendanceStatus = 'On-time';
+                                result.halfDayReasonCode = null;
+                                result.halfDayReason = null;
+                            }
+                            
+                            console.log(`[Attendance Summary] ✅ Recalculated for ${log.attendanceDate}: lateMinutes ${log.lateMinutes} → ${recalculatedLateMinutes}, status: ${log.attendanceStatus} → ${result.attendanceStatus}, isHalfDay: ${log.isHalfDay} → ${result.isHalfDay}, halfDayReasonCode: ${log.halfDayReasonCode} → ${result.halfDayReasonCode}`);
+                        } catch (err) {
+                            console.error(`[Attendance Summary] ❌ Error recalculating lateMinutes for log ${log._id}: ${err.message}`, err);
+                            // Fallback to stored value if recalculation fails
+                        }
+                    } else {
+                        console.warn(`[Attendance Summary] ⚠️ Cannot recalculate lateMinutes for log ${log._id}: Missing user or shiftGroup data. log.user: ${!!log.user}, userWithShift: ${!!userWithShift}`);
+                    }
                 }
                 
                 const sessionsWithEnd = sortedSessions.filter(s => s.endTime);
                 if (sessionsWithEnd.length > 0) {
                     const lastSession = sessionsWithEnd[sessionsWithEnd.length - 1];
                     result.lastOut = lastSession.endTime;
+                }
+                // RULE: Today + no checkout -> do not mark half-day; show Present (On-time) in all views
+                const todayIST = getISTDateString();
+                const noCheckout = sessionsWithEnd.length === 0;
+                if (attendanceDate === todayIST && noCheckout && (result.isHalfDay || result.attendanceStatus === 'Half-day')) {
+                    result.attendanceStatus = 'On-time';
+                    result.isHalfDay = false;
+                    result.halfDayReasonCode = null;
+                    result.halfDayReasonText = null;
+                    result.halfDayReason = null;
+                    result.halfDaySource = null;
+                    const { SHIFT_WORKING_MINUTES } = require('../config/shiftPolicy');
+                    result.payableMinutes = SHIFT_WORKING_MINUTES; // full day
                 }
             }
 
@@ -1323,7 +1769,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 // =================================================================
 // AGGREGATE ENDPOINT: /api/dashboard/employee
 // Combines: /attendance/status, /attendance/my-weekly-log, /leaves/my-requests
-// Purpose: Single endpoint for employee dashboard (reduces 3 calls to 1)
+// AUDIT: Single aggregation + limit(10) leaves; status from cache (30s); optional full-response cache (45s); invalidated on clock-in/out and break start/end.
 // =================================================================
 router.get('/dashboard/employee', authenticateToken, async (req, res) => {
     try {
@@ -1333,6 +1779,13 @@ router.get('/dashboard/employee', authenticateToken, async (req, res) => {
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
             return res.status(400).json({ error: 'A valid `date` query parameter is required in YYYY-MM-DD format.' });
+        }
+
+        // Optional short-term response cache (45s) - key by userId + date; cache only successful payload
+        const dashboardCacheKey = `employee_dashboard:${userId}:${localDate}`;
+        const cachedResponse = cache.get(dashboardCacheKey);
+        if (cachedResponse !== null) {
+            return res.json(cachedResponse);
         }
 
         // Calculate weekly date range for weekly logs
@@ -1345,8 +1798,8 @@ router.get('/dashboard/employee', authenticateToken, async (req, res) => {
         const startDate = getISTDateString(firstDayOfWeek);
         const endDate = getISTDateString(lastDayOfWeek);
 
-        // Parallelize all three data fetches
-        const [dailyStatus, weeklyLogs, leaveRequests] = await Promise.all([
+        // Parallelize data fetches (including early checkout approval setting and pending request)
+        const [dailyStatus, weeklyLogs, leaveRequests, enforceLogoutSetting, requireApprovalSetting, pendingEarlyCheckoutRequest] = await Promise.all([
             // 1. Daily status (reuse existing logic with caching)
             (async () => {
                 const cacheKey = `status:${userId}:${localDate}`;
@@ -1366,18 +1819,84 @@ router.get('/dashboard/employee', authenticateToken, async (req, res) => {
                 { $project: { _id: 1, attendanceDate: 1, status: 1, clockInTime: 1, clockOutTime: 1, notes: 1, paidBreakMinutesTaken: 1, unpaidBreakMinutesTaken: 1, penaltyMinutes: 1, sessions: { $map: { input: "$sessions", as: "s", in: { startTime: "$$s.startTime", endTime: "$$s.endTime" } } }, breaks: { $map: { input: "$breaks", as: "b", in: { startTime: "$$b.startTime", endTime: "$$b.endTime", durationMinutes: "$$b.durationMinutes", breakType: "$$b.breakType" } } } } },
                 { $sort: { attendanceDate: 1 } }
             ]),
-            // 3. Leave requests (reuse existing logic, no pagination for dashboard)
+            // 3. Leave requests (reuse existing logic; limit 30 so today's approved half-day is included when present)
             LeaveRequest.find({ employee: userId })
                 .sort({ createdAt: -1 })
-                .limit(10) // Limit to recent 10 for dashboard
-                .lean()
+                .limit(30)
+                .select('status leaveType leaveDates')
+                .lean(),
+            // 4. Feature toggle: enforce required logout before checkout (single read, no N+1)
+            Setting.findOne({ key: 'enforceRequiredLogoutBeforeCheckout' }).lean(),
+            // 5. Feature toggle: require admin approval for early checkout
+            Setting.findOne({ key: 'requireAdminApprovalForEarlyCheckout' }).lean(),
+            // 6. Pending early checkout request for today (disables checkout until approved/rejected)
+            (async () => {
+                const log = await AttendanceLog.findOne({ user: userId, attendanceDate: localDate }).select('_id').lean();
+                if (!log) return null;
+                return EarlyCheckoutRequest.findOne({ attendanceLog: log._id, status: 'Pending' }).lean();
+            })()
         ]);
 
-        res.json({
-            dailyStatus,
+        // Half-day leave aware: derive from already-fetched leave (no extra query)
+        const hasHalfDayLeave = Array.isArray(leaveRequests) && leaveRequests.some(l =>
+            l.status === 'Approved' &&
+            (l.leaveType === 'Half Day - First Half' || l.leaveType === 'Half Day - Second Half') &&
+            Array.isArray(l.leaveDates) &&
+            l.leaveDates.some(d => getISTDateString(new Date(d)) === localDate)
+        );
+
+        // Required logout: when half-day leave, use 5 hrs base; otherwise from dailyStatus (single pass, no recompute in UI)
+        let requiredLogoutAt = dailyStatus?.calculatedLogoutTime || null;
+        if (hasHalfDayLeave && dailyStatus?.sessions?.length && dailyStatus?.shift) {
+            const halfDayLogout = computeCalculatedLogoutTime(
+                dailyStatus.sessions,
+                dailyStatus.breaks,
+                dailyStatus.attendanceLog,
+                dailyStatus.shift,
+                dailyStatus.activeBreak || null,
+                true
+            );
+            if (halfDayLogout) requiredLogoutAt = halfDayLogout.requiredLogoutTime;
+        }
+        const requiredWorkMinutes = hasHalfDayLeave ? 300 : (dailyStatus?.logoutBreakdown?.requiredWorkingMinutes ?? 510);
+
+        const enforceRequiredLogout = !!enforceLogoutSetting?.value;
+        const requireAdminApprovalForEarlyCheckout = !!requireApprovalSetting?.value;
+        const isClockedIn = dailyStatus?.status === 'Clocked In' || dailyStatus?.status === 'On Break' || dailyStatus?.status === 'On Auto-Break';
+        const nowMs = getISTNow().getTime();
+        const requiredAtMs = requiredLogoutAt ? new Date(requiredLogoutAt).getTime() : null;
+        let canCheckout = !enforceRequiredLogout || !isClockedIn || !requiredLogoutAt
+            ? true
+            : (nowMs >= requiredAtMs);
+        if (pendingEarlyCheckoutRequest) canCheckout = false;
+        const remainingTime = (!canCheckout && requiredAtMs != null) ? Math.max(0, Math.ceil((requiredAtMs - nowMs) / 60000)) : null;
+
+        // Today's Shift card uses dailyStatus.calculatedLogoutTime: send half-day–aware value when applicable (no cache mutation)
+        const dailyStatusForPayload = {
+            ...dailyStatus,
+            calculatedLogoutTime: requiredLogoutAt ?? dailyStatus?.calculatedLogoutTime ?? null
+        };
+
+        const payload = {
+            dailyStatus: dailyStatusForPayload,
             weeklyLogs: Array.isArray(weeklyLogs) ? weeklyLogs : [],
-            leaveRequests: Array.isArray(leaveRequests) ? leaveRequests : []
-        });
+            leaveRequests: Array.isArray(leaveRequests) ? leaveRequests.slice(0, 10) : [],
+            requiredLogoutAt: requiredLogoutAt || null,
+            canCheckout,
+            remainingTime,
+            hasHalfDayLeave: !!hasHalfDayLeave,
+            requiredWorkMinutes,
+            requireAdminApprovalForEarlyCheckout,
+            pendingEarlyCheckoutRequest: pendingEarlyCheckoutRequest ? {
+                _id: pendingEarlyCheckoutRequest._id,
+                status: pendingEarlyCheckoutRequest.status,
+                requestedAt: pendingEarlyCheckoutRequest.requestedAt,
+                requiredLogoutTime: pendingEarlyCheckoutRequest.requiredLogoutTime,
+                remainingTimeMinutes: pendingEarlyCheckoutRequest.remainingTimeMinutes
+            } : null
+        };
+        cache.set(dashboardCacheKey, payload, 45000); // 45s TTL
+        res.json(payload);
     } catch (error) {
         console.error("Error fetching employee dashboard data:", error);
         res.status(500).json({ error: 'Internal Server Error' });

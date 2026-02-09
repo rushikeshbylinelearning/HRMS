@@ -22,7 +22,8 @@ import {
     parseISTDate, 
     getISTWeekRange, 
     getISTDateParts,
-    formatDateRange as formatISTDateRange
+    formatDateRange as formatISTDateRange,
+    formatISTDate
 } from '../utils/istTime';
 import {
     formatTimeForDisplay,
@@ -114,7 +115,8 @@ const AttendanceSummaryPage = () => {
         }
     }, [currentDate, viewMode]);
 
-    // Socket.IO listener for real-time updates
+    // Socket.IO listener for real-time updates (approval, rejection, and deletion)
+    // Backend emits leave_request_updated with employeeId when a leave is updated or deleted
     useEffect(() => {
         if (!user) return;
 
@@ -127,6 +129,7 @@ const AttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
+                // Refetch so calendar reflects approval, rejection, or deletion (no stale leave data)
                 if (fetchLogsForWeekRef.current) {
                     fetchLogsForWeekRef.current(currentDate).catch(err => {
                         console.error('Failed to refresh after leave update:', err);
@@ -252,10 +255,10 @@ const AttendanceSummaryPage = () => {
                 notes: notesModal.notes
             });
             
-            setLogs(prevLogs => 
-                prevLogs.map(log => 
-                    log._id === notesModal.logId 
-                        ? { ...log, notes: notesModal.notes }
+            setLogs(prevLogs =>
+                prevLogs.map(log =>
+                    log._id === notesModal.logId
+                        ? { ...log, notes: notesModal.notes, earlyCheckoutNote: notesModal.notes }
                         : log
                 )
             );
@@ -294,8 +297,8 @@ const AttendanceSummaryPage = () => {
             const dateKey = getISTDateString(date);
             const log = logs.find(l => l.attendanceDate === dateKey);
             
-            // Format date string for display (IST)
-            const dateString = formatISTDateRange(date, false).split(' - ')[0];
+            // Format this row's date for display (IST) - not the week range
+            const dateString = formatISTDate(date);
             
             // Use backend computed fields - NO RECALCULATION
             const firstIn = log?.firstIn ? formatTimeForDisplay(log.firstIn) : '-';
@@ -321,11 +324,13 @@ const AttendanceSummaryPage = () => {
                 status: statusInfo.status,
                 statusColor: statusInfo.color,
                 shift,
-                notes: log?.notes || '',
+                notes: log?.notes || log?.earlyCheckoutNote || '',
                 logId: log?._id || null,
-                // Include half-day reason for display
                 halfDayReason: log?.halfDayReason || null,
-                overriddenByAdmin: log?.overriddenByAdmin || false
+                halfDayReasonCode: log?.halfDayReasonCode || null,
+                lateMinutes: log?.lateMinutes ?? 0,
+                overriddenByAdmin: log?.overriddenByAdmin || false,
+                overrideReason: log?.overrideReason || null
             };
         });
     };
@@ -465,15 +470,15 @@ const AttendanceSummaryPage = () => {
                                                 style={{ backgroundColor: row.statusColor }}
                                             ></div>
                                             <span>{row.status}</span>
-                                            {/* Show half-day reason if available */}
-                                            {row.halfDayReason && (row.status.includes('Half') || row.status === 'Half-day') && (
-                                                <div className="half-day-reason-tooltip" style={{ 
-                                                    fontSize: '0.7rem', 
-                                                    color: '#666',
-                                                    marginTop: '2px',
-                                                    fontStyle: 'italic'
-                                                }} title={row.halfDayReason}>
-                                                    {row.halfDayReason.length > 30 ? `${row.halfDayReason.substring(0, 30)}...` : row.halfDayReason}
+                                            {row.overriddenByAdmin === true && typeof row.overrideReason === 'string' && row.overrideReason.trim().length > 0 && (
+                                                <div className="override-note-display" style={{ fontSize: '0.7rem', color: '#856404', marginTop: '2px' }} title={row.overrideReason.trim()}>
+                                                    <span style={{ fontWeight: 600 }}>Overridden</span>
+                                                    {' — '}{(row.overrideReason.trim()).length > 28 ? `${(row.overrideReason.trim()).substring(0, 28)}…` : row.overrideReason.trim()}
+                                                </div>
+                                            )}
+                                            {!(row.overriddenByAdmin === true && typeof row.overrideReason === 'string' && row.overrideReason.trim().length > 0) && (row.status.includes('Half') || row.status === 'Half-day') && (
+                                                <div className="half-day-summary-secondary" style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                                                    {row.halfDayReasonCode === 'LATE_LOGIN' ? `Late Arrival — Late by ${Number(row.lateMinutes) || 0} minutes` : 'Incomplete hours'}
                                                 </div>
                                             )}
                                         </div>
@@ -485,22 +490,28 @@ const AttendanceSummaryPage = () => {
                                                 <span className="notes-text" title={row.notes}>
                                                     {row.notes.length > 20 ? `${row.notes.substring(0, 20)}...` : row.notes}
                                                 </span>
-                                                <button 
-                                                    className="edit-notes-btn"
-                                                    onClick={() => handleEditNotes(row.logId, row.notes)}
-                                                    title="Edit notes"
-                                                >
-                                                    ✏️
-                                                </button>
+                                                {user && ['Admin', 'HR'].includes(user.role) && (
+                                                    <button 
+                                                        className="edit-notes-btn"
+                                                        onClick={() => handleEditNotes(row.logId, row.notes)}
+                                                        title="Edit notes"
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                )}
                                             </div>
                                         ) : (
-                                            <button 
-                                                className="add-notes-btn"
-                                                onClick={() => handleEditNotes(row.logId, '')}
-                                                title="Add notes"
-                                            >
-                                                + Add
-                                            </button>
+                                            user && ['Admin', 'HR'].includes(user.role) ? (
+                                                <button 
+                                                    className="add-notes-btn"
+                                                    onClick={() => handleEditNotes(row.logId, '')}
+                                                    title="Add notes"
+                                                >
+                                                    + Add
+                                                </button>
+                                            ) : (
+                                                <span className="notes-text" style={{ color: '#999' }}>—</span>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -524,6 +535,7 @@ const AttendanceSummaryPage = () => {
                     date={selectedDate}
                     isAdmin={true}
                     onSave={handleSaveLog}
+                    onRefresh={() => fetchLogsForWeek(currentDate)}
                     holiday={selectedHoliday}
                     leave={selectedLeave}
                 />

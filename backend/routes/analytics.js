@@ -10,9 +10,11 @@ const BreakLog = require('../models/BreakLog');
 const LeaveRequest = require('../models/LeaveRequest');
 const Setting = require('../models/Setting'); // <-- IMPORT SETTING MODEL
 const Holiday = require('../models/Holiday');
-const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
+const LeavePolicyService = require('../services/LeavePolicyService');
 const { sendEmail } = require('../services/mailService');
 const { getISTNow, getISTDateString, parseISTDate, getShiftDateTimeIST, formatISTTime, getISTDateParts } = require('../utils/istTime');
+const { getGracePeriodMinutes } = require('../utils/gracePeriod');
+const { recalculateLateStatus } = require('../services/dailyStatusService');
 
 const router = express.Router();
 
@@ -63,7 +65,7 @@ const getWorkingDatesForRange = async (startDate, endDate, employee) => {
     
     // Skip alternate Saturdays based on policy
     if (dayOfWeek === 6) {
-      if (AntiExploitationLeaveService.isOffSaturday(d, saturdayPolicy)) {
+      if (LeavePolicyService.isSaturdayOff(d, saturdayPolicy)) {
         continue;
       }
     }
@@ -121,16 +123,7 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
     lateMinutes: 0,
     averageLateMinutes: 0
   };
-  // Read dynamic late-grace setting so our derivation matches runtime behavior
-  let lateGraceMinutes = 30;
-  try {
-    const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-    if (graceSetting && !isNaN(Number(graceSetting.value))) {
-      lateGraceMinutes = Number(graceSetting.value);
-    }
-  } catch (err) {
-    console.error('Failed to fetch late grace setting for analytics derivation, using default 30 minutes', err);
-  }
+  const lateGraceMinutes = await getGracePeriodMinutes();
 
   // Process only working day logs for status calculations
   // This ensures all metrics (onTimeDays, lateDays, etc.) are based on working days only
@@ -281,7 +274,25 @@ const calculateAnalyticsMetrics = async (userId, startDate, endDate, monthlyCont
 const checkAndUpdateLateStatus = async (attendanceLog, user) => {
   if (!user.shiftGroup || !user.shiftGroup.startTime) return;
 
-  const clockInTime = new Date(attendanceLog.clockInTime);
+  // CRITICAL FIX: Use FIRST check-in time from sessions, not clockInTime field
+  // This ensures we always use the actual first check-in, even if clockInTime was incorrectly set
+  const AttendanceSession = require('../models/AttendanceSession');
+  const sessions = await AttendanceSession.find({ 
+    attendanceLog: attendanceLog._id 
+  }).sort({ startTime: 1 }).limit(1).lean();
+  
+  // Use first session's startTime if available, otherwise fallback to clockInTime
+  let clockInTime;
+  if (sessions.length > 0 && sessions[0].startTime) {
+    clockInTime = new Date(sessions[0].startTime);
+  } else if (attendanceLog.clockInTime) {
+    // Fallback to stored clockInTime if no sessions found (shouldn't happen, but defensive)
+    clockInTime = new Date(attendanceLog.clockInTime);
+  } else {
+    // No clock-in time available, cannot calculate late status
+    console.warn(`[checkAndUpdateLateStatus] No clock-in time found for attendance log ${attendanceLog._id}`);
+    return;
+  }
   
   // Use the proper timezone-aware function to get shift start time
   const shiftStartTime = getShiftDateTimeIST(clockInTime, user.shiftGroup.startTime);
@@ -291,42 +302,32 @@ const checkAndUpdateLateStatus = async (attendanceLog, user) => {
   let isLate = false;
   let isHalfDay = false;
   let attendanceStatus = 'On-time';
-  // Grace period: configurable via settings (default 30 minutes)
-  let GRACE_PERIOD_MINUTES = 30;
-  try {
-    const graceSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
-    if (graceSetting) {
-      // FIX: Explicitly convert to integer to ensure type consistency
-      const graceValue = parseInt(Number(graceSetting.value), 10);
-      if (!isNaN(graceValue) && graceValue >= 0) {
-        GRACE_PERIOD_MINUTES = graceValue;
-      } else {
-        console.warn(`[Grace Period] Invalid value in database: ${graceSetting.value}, using default 30`);
-      }
-    }
-  } catch (err) {
-    console.error('Failed to fetch late grace setting, falling back to 30 minutes', err);
-  }
+  const GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
   console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for late calculation (lateMinutes: ${lateMinutes})`);
 
-  // Consistent rules:
-  // - If lateMinutes <= GRACE_PERIOD_MINUTES -> On-time (within grace period)
-  // - If lateMinutes > GRACE_PERIOD_MINUTES -> Half-day AND Late (for tracking/notifications)
-  // - Employee is always present if they clocked in (never absent)
-  // Grace period allows employees to arrive late without penalty
+  // FIXED PRIORITY LOGIC:
+  // 1. Check if insufficient working hours (takes precedence over grace period)
+  // 2. Check if exceeds grace period (only if working hours are sufficient or unknown)
+  // 3. Otherwise, on-time
+  
   let halfDayReasonCode = null;
   let halfDayReasonText = '';
   let halfDaySource = null;
+
+  const withinGracePeriod = lateMinutes <= GRACE_PERIOD_MINUTES;
+  // Note: In analytics route, we don't have totalWorkingHours yet, so we can't apply the full priority logic
+  // This will be corrected at clock-out when working hours are calculated
   
-  if (lateMinutes <= GRACE_PERIOD_MINUTES) {
+  if (withinGracePeriod) {
     isLate = false;
     isHalfDay = false;
     attendanceStatus = 'On-time';
-  } else if (lateMinutes > GRACE_PERIOD_MINUTES) {
+  } else {
+    // Beyond grace period - mark as half-day with late arrival reason
+    // This may be overridden later at clock-out if insufficient hours is the actual cause
     isHalfDay = true;
-    isLate = true; // FIX: Set isLate=true for tracking and notifications
+    isLate = true;
     attendanceStatus = 'Half-day';
-    // Set half-day reason for late login
     halfDayReasonCode = 'LATE_LOGIN';
     const clockInTimeStr = clockInTime.toLocaleTimeString('en-US', { 
       timeZone: 'Asia/Kolkata',
@@ -1188,22 +1189,14 @@ router.get('/monthly-context-settings', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/analytics/late-grace-settings - Get late grace minutes setting
+// GET /api/analytics/late-grace-settings - Get late grace minutes setting (Manage section)
 router.get('/late-grace-settings', authenticateToken, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'Admin' && role !== 'HR') {
       return res.status(403).json({ error: 'Access denied' });
     }
-
-    const setting = await Setting.findOne({ key: 'lateGraceMinutes' });
-    // FIX: Explicitly convert to integer to ensure type consistency
-    const minutes = setting ? parseInt(Number(setting.value), 10) : 30; // default 30
-    if (isNaN(minutes)) {
-      console.warn('[Grace Period] Invalid value in database, using default 30');
-      return res.json({ minutes: 30 });
-    }
-    console.log(`[Grace Period] Retrieved: ${minutes} minutes (type: ${typeof minutes})`);
+    const minutes = await getGracePeriodMinutes();
     res.json({ minutes });
   } catch (error) {
     console.error('Error fetching late grace settings:', error);
@@ -1226,6 +1219,10 @@ router.put('/late-grace-settings', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Minutes must be a valid number between 0 and 1440' });
     }
 
+    // Get old grace period value for comparison
+    const oldSetting = await Setting.findOne({ key: 'lateGraceMinutes' });
+    const oldGracePeriod = oldSetting ? parseInt(Number(oldSetting.value), 10) : 30;
+
     // FIX: Explicitly store as number to prevent type issues
     const setting = await Setting.findOneAndUpdate(
       { key: 'lateGraceMinutes' },
@@ -1235,8 +1232,121 @@ router.put('/late-grace-settings', authenticateToken, async (req, res) => {
 
     // FIX: Ensure response value is always a number
     const responseValue = Number(setting.value);
-    console.log(`[Grace Period] Updated to ${responseValue} minutes (type: ${typeof responseValue})`);
-    res.json({ minutes: responseValue });
+    console.log(`[Grace Period] Updated from ${oldGracePeriod} to ${responseValue} minutes (type: ${typeof responseValue})`);
+
+    // Automatically recalculate today's attendance records with new grace period
+    // Also recalculate last 7 days to fix any incorrectly marked records
+    const today = getISTDateString();
+    const sevenDaysAgo = getISTDateString(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    
+    console.log(`[Grace Period] Recalculating attendance records from ${sevenDaysAgo} to ${today}...`);
+    
+    const logsToRecalculate = await AttendanceLog.find({
+      attendanceDate: { $gte: sevenDaysAgo, $lte: today },
+      clockInTime: { $exists: true, $ne: null }
+    }).populate({ path: 'user', populate: { path: 'shiftGroup' } }).lean();
+
+    let recalculatedCount = 0;
+    let fixedCount = 0;
+
+    for (const log of logsToRecalculate) {
+      try {
+        // Skip admin-overridden records - preserve admin decisions
+        if (log.overriddenByAdmin) {
+          continue;
+        }
+        
+        // Skip Leave records - grace period doesn't apply to leave days
+        if (log.attendanceStatus === 'Leave') {
+          continue;
+        }
+        
+        if (!log.user || !log.user.shiftGroup || !log.user.shiftGroup.startTime) {
+          continue;
+        }
+
+        // CRITICAL FIX: Use FIRST session's startTime, not stored clockInTime
+        // This ensures we always use the actual first check-in, even if clockInTime was incorrectly set
+        const AttendanceSession = require('../models/AttendanceSession');
+        const firstSession = await AttendanceSession.findOne({ 
+          attendanceLog: log._id 
+        }).sort({ startTime: 1 }).select('startTime').lean();
+        
+        let clockInTimeForRecalc;
+        if (firstSession && firstSession.startTime) {
+          clockInTimeForRecalc = new Date(firstSession.startTime);
+        } else if (log.clockInTime) {
+          // Fallback to stored clockInTime if no sessions found (defensive)
+          clockInTimeForRecalc = new Date(log.clockInTime);
+        } else {
+          // Skip if no clock-in time available
+          console.warn(`[Grace Period Recalc] No clock-in time found for log ${log._id}`);
+          continue;
+        }
+
+        // Use existing totalWorkingHours from log (already calculated)
+        const totalWorkingHours = log.totalWorkingHours && log.totalWorkingHours > 0 ? log.totalWorkingHours : null;
+
+        // Recalculate with new grace period using FIRST check-in time
+        const lateArrivalMarksHalfDay = !!(log.user && log.user.featurePermissions && log.user.featurePermissions.lateArrivalMarksHalfDay);
+        const recalculated = await recalculateLateStatus(
+          clockInTimeForRecalc,
+          log.user.shiftGroup,
+          responseValue, // Use new grace period
+          totalWorkingHours,
+          lateArrivalMarksHalfDay
+        );
+
+        // Check if status needs to be updated
+        const needsUpdate = 
+          log.isLate !== recalculated.isLate ||
+          log.isHalfDay !== recalculated.isHalfDay ||
+          log.attendanceStatus !== recalculated.attendanceStatus ||
+          (log.lateMinutes || 0) !== recalculated.lateMinutes;
+
+        if (needsUpdate) {
+          const updateData = {
+            isLate: recalculated.isLate,
+            isHalfDay: recalculated.isHalfDay,
+            attendanceStatus: recalculated.attendanceStatus,
+            lateMinutes: recalculated.lateMinutes
+          };
+
+          // Update half-day reason if applicable
+          if (recalculated.isHalfDay) {
+            updateData.halfDayReasonCode = recalculated.halfDayReasonCode;
+            updateData.halfDayReasonText = recalculated.halfDayReasonText;
+            updateData.halfDaySource = 'AUTO';
+          } else {
+            // Clear half-day reason if not half-day (unless admin overridden)
+            if (!log.overriddenByAdmin) {
+              updateData.halfDayReasonCode = null;
+              updateData.halfDayReasonText = '';
+              updateData.halfDaySource = null;
+            }
+          }
+
+          await AttendanceLog.findByIdAndUpdate(log._id, updateData);
+          recalculatedCount++;
+          
+          // Count as "fixed" if it changed from half-day to on-time
+          if (log.isHalfDay && !recalculated.isHalfDay) {
+            fixedCount++;
+            console.log(`✅ Fixed: ${log.user.fullName || log.user.email} on ${log.attendanceDate} - ${log.attendanceStatus} → ${recalculated.attendanceStatus} (${recalculated.lateMinutes} min late, grace: ${responseValue} min)`);
+          }
+        }
+      } catch (err) {
+        console.error(`Error recalculating log ${log._id}:`, err.message);
+      }
+    }
+
+    console.log(`[Grace Period] Recalculation complete: ${recalculatedCount} records updated, ${fixedCount} records fixed (half-day → on-time)`);
+    
+    res.json({ 
+      minutes: responseValue,
+      recalculated: recalculatedCount,
+      fixed: fixedCount
+    });
   } catch (error) {
     console.error('Error updating late grace settings:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -33,6 +33,10 @@ const getNotificationIcon = (type) => {
     const iconMap = {
         checkin: <LoginIcon className="notification-icon success" />,
         checkout: <LogoutIcon className="notification-icon info" />,
+        normal_checkout: <LogoutIcon className="notification-icon info normal-checkout" />,
+        early_checkout_request: <WarningIcon className="notification-icon warning early-checkout-request" />,
+        early_checkout_approved: <CheckCircleIcon className="notification-icon success" />,
+        early_checkout_rejected: <ErrorIcon className="notification-icon error" />,
         break_start: <CoffeeIcon className="notification-icon warning" />,
         break_end: <CoffeeIcon className="notification-icon info" />,
         leave_request: <EventNoteIcon className="notification-icon info" />,
@@ -91,8 +95,9 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
             } else {
                 console.warn('[Notification] Profile update but no employeeId found');
             }
+        } else if (notification.type === 'early_checkout_request' || notification.metadata?.type === 'EARLY_CHECKOUT_REQUEST') {
+            onNavigate(notification.navigationData || {}, notification.type, notification.metadata);
         } else if (notification.navigationData) {
-            // Pass notification type and metadata for proper routing
             onNavigate(notification.navigationData, notification.type, notification.metadata);
         } else {
             console.warn('[Notification] No navigation data available');
@@ -116,10 +121,25 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                 {getNotificationIcon(notification.type)}
             </ListItemIcon>
             <ListItemText
-                primary={<Typography className="notification-message">{notification.message}</Typography>}
+                primary={
+                    <Box>
+                        {notification.type === 'early_checkout_request' && (
+                            <Chip size="small" label="Early Checkout Request" color="warning" sx={{ mb: 0.5, fontWeight: 600 }} />
+                        )}
+                        {notification.type === 'normal_checkout' && (
+                            <Chip size="small" label="Normal Checkout" variant="outlined" sx={{ mb: 0.5 }} />
+                        )}
+                        <Typography className="notification-message">{notification.message}</Typography>
+                    </Box>
+                }
                 secondaryTypographyProps={{ component: 'div' }}
                 secondary={
                     <Box>
+                        {notification.type === 'early_checkout_request' && notification.metadata?.remainingTimeMinutes != null && (
+                            <Typography variant="caption" display="block" color="warning.main" fontWeight={600}>
+                                Remaining: {Math.floor(notification.metadata.remainingTimeMinutes / 60)}h {notification.metadata.remainingTimeMinutes % 60}m
+                            </Typography>
+                        )}
                         <Typography className="notification-timestamp">{formatDistanceToNow(notification.createdAt)}</Typography>
                         {notification.actionData?.requiresAction && notification.actionData?.actionType === 'start_break' && (
                             <Box sx={{ mt: 1.5 }}>
@@ -176,7 +196,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
     );
 };
 
-const NewNotificationDrawer = ({ open, onClose }) => {
+const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const {
@@ -188,7 +208,15 @@ const NewNotificationDrawer = ({ open, onClose }) => {
     const handleNavigate = (navigationData, notificationType, metadata) => {
         onClose();
         const isAdmin = ['Admin', 'HR'].includes(user?.role);
-        
+
+        // ECR: Early Checkout Request — open approval modal only for admins; do not navigate
+        const isECR = notificationType === 'early_checkout_request' || metadata?.type === 'EARLY_CHECKOUT_REQUEST';
+        const requestId = metadata?.requestId || navigationData?.actionParams?.earlyCheckoutRequestId;
+        if (isECR && requestId && isAdmin && typeof onOpenECRModal === 'function') {
+            onOpenECRModal(requestId);
+            return;
+        }
+
         console.log('[Notification] Navigation triggered:', { notificationType, navigationData, metadata, isAdmin });
         
         // Handle PROFILE_UPDATE notifications FIRST (most specific)

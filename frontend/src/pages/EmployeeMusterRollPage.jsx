@@ -18,6 +18,7 @@ import { getAttendanceStatus } from '../utils/saturdayUtils';
 import axios from '../api/axios';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
+import { filterActiveEmployees } from '../utils/employeeFilterUtils';
 const EmployeeMusterRollPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -73,8 +74,8 @@ const EmployeeMusterRollPage = () => {
     try {
       const response = await axios.get('/admin/employees?all=true');
       const employeesData = response.data;
-      // Filter out admin accounts - only show regular employees
-      const nonAdminEmployees = employeesData.filter(emp => emp.role !== 'Admin');
+      // Filter out Admin accounts and inactive users (defensive filtering: backend should already filter)
+      const nonAdminEmployees = filterActiveEmployees(Array.isArray(employeesData) ? employeesData : []);
       setEmployees(nonAdminEmployees);
       
       // Extract unique departments

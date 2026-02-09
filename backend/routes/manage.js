@@ -5,6 +5,7 @@ const User = require('../models/User');
 const authenticateToken = require('../middleware/authenticateToken');
 const { validateUserCreation, handleValidationErrors } = require('../middleware/validation');
 const { logError } = require('../utils/logger');
+const attendanceCache = require('../utils/cache');
 
 // Middleware to check for Admin role only
 const isAdmin = (req, res, next) => {
@@ -21,6 +22,7 @@ router.get('/test', (req, res) => {
 });
 
 // GET /api/admin/manage - Get all users with their feature permissions
+// Only active users: deactivated employees are hidden from Manage section
 router.get('/', [authenticateToken, isAdmin], async (req, res) => {
     try {
         console.log('Manage endpoint accessed by user:', req.user?.userId);
@@ -58,7 +60,8 @@ router.get('/', [authenticateToken, isAdmin], async (req, res) => {
                 advancedFeatures: {
                     canBulkActions: false,
                     canExportData: false
-                }
+                },
+                lateArrivalMarksHalfDay: false
             }
         }));
 
@@ -109,7 +112,8 @@ router.get('/:userId', [authenticateToken, isAdmin], async (req, res) => {
                 advancedFeatures: {
                     canBulkActions: false,
                     canExportData: false
-                }
+                },
+                lateArrivalMarksHalfDay: false
             }
         };
 
@@ -145,7 +149,8 @@ router.get('/bulk/template', [authenticateToken, isAdmin], async (req, res) => {
                 advancedFeatures: {
                     canBulkActions: false,
                     canExportData: false
-                }
+                },
+                lateArrivalMarksHalfDay: false
             }
         };
 
@@ -170,7 +175,7 @@ router.put('/bulk', [authenticateToken, isAdmin], async (req, res) => {
             'leaves', 'breaks', 'extraFeatures', 'maxBreaks', 'breakAfterHours',
             'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'privilegeLevel',
             'restrictedFeatures', 'advancedFeatures', 'breakWindows',
-            'autoBreakOnInactivity', 'inactivityThresholdMinutes'
+            'autoBreakOnInactivity', 'inactivityThresholdMinutes', 'lateArrivalMarksHalfDay'
         ];
 
         const invalidKeys = Object.keys(featurePermissions).filter(key => !validPermissionKeys.includes(key));
@@ -267,7 +272,12 @@ router.put('/bulk', [authenticateToken, isAdmin], async (req, res) => {
         
         targetUserIds.forEach(userId => {
             cacheService.invalidateUser(userId);
-            
+            // Invalidate attendance status and dashboard cache so "Today's Shift" reflects lateArrivalMarksHalfDay etc.
+            const uid = String(userId);
+            if (attendanceCache.deletePattern) {
+                attendanceCache.deletePattern(`status:${uid}:*`);
+                attendanceCache.deletePattern(`employee_dashboard:${uid}:*`);
+            }
             // Notify each user about permission changes via socket
             if (io) {
                 io.to(`user_${userId}`).emit('permissions_updated', {
@@ -303,7 +313,7 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
             'leaves', 'breaks', 'extraFeatures', 'maxBreaks', 'breakAfterHours',
             'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'privilegeLevel',
             'restrictedFeatures', 'advancedFeatures', 'breakWindows',
-            'autoBreakOnInactivity', 'inactivityThresholdMinutes'
+            'autoBreakOnInactivity', 'inactivityThresholdMinutes', 'lateArrivalMarksHalfDay'
         ];
 
         const invalidKeys = Object.keys(featurePermissions).filter(key => !validPermissionKeys.includes(key));
@@ -387,6 +397,12 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
         // Invalidate user cache to ensure fresh data on next request
         const cacheService = require('../services/cacheService');
         cacheService.invalidateUser(req.params.userId);
+        // Invalidate attendance status and dashboard cache so "Today's Shift" reflects lateArrivalMarksHalfDay etc.
+        const uid = String(req.params.userId);
+        if (attendanceCache.deletePattern) {
+            attendanceCache.deletePattern(`status:${uid}:*`);
+            attendanceCache.deletePattern(`employee_dashboard:${uid}:*`);
+        }
 
         // Notify user about permission changes via socket
         const { getIO } = require('../socketManager');
@@ -452,7 +468,8 @@ router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => 
             advancedFeatures: {
                 canBulkActions: false,
                 canExportData: false
-            }
+            },
+            lateArrivalMarksHalfDay: false
         };
 
         await user.save();
@@ -460,6 +477,11 @@ router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => 
         // Invalidate user cache to ensure fresh data on next request
         const cacheService = require('../services/cacheService');
         cacheService.invalidateUser(req.params.userId);
+        const uid = String(req.params.userId);
+        if (attendanceCache.deletePattern) {
+            attendanceCache.deletePattern(`status:${uid}:*`);
+            attendanceCache.deletePattern(`employee_dashboard:${uid}:*`);
+        }
 
         // Notify user about permission changes via socket
         const { getIO } = require('../socketManager');

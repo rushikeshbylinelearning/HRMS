@@ -216,6 +216,20 @@ export const isWorkingSaturday = (date, saturdayPolicy) => {
 };
 
 /**
+ * Expected weekly working hours based on employee Saturday schedule.
+ * 6 working days → 54 hrs (3240 min); 5 working days → 45 hrs (2700 min).
+ * @param {string} saturdayPolicy - 'All Saturdays Working' | 'All Saturdays Off' | 'Week 1 & 3 Off' | 'Week 2 & 4 Off'
+ * @param {Date} weekSaturdayDate - The Saturday of the week (Sun–Sat)
+ * @returns {{ workingDays: number, expectedMinutes: number }}
+ */
+export const getExpectedWeeklyWorkingHours = (saturdayPolicy, weekSaturdayDate) => {
+  const workingSaturday = isWorkingSaturday(weekSaturdayDate, saturdayPolicy || 'All Saturdays Working');
+  const workingDays = workingSaturday ? 6 : 5;
+  const expectedMinutes = workingDays * 9 * 60; // 9 hrs per day
+  return { workingDays, expectedMinutes };
+};
+
+/**
  * Format leave request type for display
  * Converts "Loss of Pay" to "Loss of pay" for better readability
  * @param {string} requestType - The leave request type

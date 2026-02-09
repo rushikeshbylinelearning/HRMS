@@ -16,7 +16,7 @@
  */
 
 const { parseISTDate, getISTDateString, getISTDateParts } = require('./istTime');
-const AntiExploitationLeaveService = require('../services/antiExploitationLeaveService');
+const LeavePolicyService = require('../services/LeavePolicyService');
 
 /**
  * Check if a date is a holiday
@@ -64,13 +64,13 @@ function isWeeklyOff(date, saturdayPolicy = 'All Saturdays Working') {
             return true;
         }
         
-        // Check Saturday policy using AntiExploitationLeaveService
+        // Check Saturday policy using LeavePolicyService
         if (dayOfWeek === 6) {
             if (!saturdayPolicy || typeof saturdayPolicy !== 'string') {
                 console.warn('[isWeeklyOff] Invalid saturdayPolicy:', saturdayPolicy);
                 return false; // Default to working if policy is invalid
             }
-            return AntiExploitationLeaveService.isOffSaturday(parseISTDate(getISTDateString(date)), saturdayPolicy);
+            return LeavePolicyService.isSaturdayOff(parseISTDate(getISTDateString(date)), saturdayPolicy);
         }
         
         return false;
@@ -88,6 +88,7 @@ function isWeeklyOff(date, saturdayPolicy = 'All Saturdays Working') {
  * @param {Array} params.holidays - Array of holiday objects
  * @param {Object|null} params.leaveRequest - LeaveRequest document (if exists)
  * @param {string} params.saturdayPolicy - Employee's Saturday policy
+ * @param {number} [params.gracePeriodMinutes] - Grace period from Setting (lateGraceMinutes). When provided, enforces: within grace + insufficient hours → Incomplete Hours; exceeds grace → Late Arrival.
  * @returns {Object} Resolved status object with all flags
  */
 function resolveAttendanceStatus({
@@ -95,7 +96,8 @@ function resolveAttendanceStatus({
     attendanceLog = null,
     holidays = [],
     leaveRequest = null,
-    saturdayPolicy = 'All Saturdays Working'
+    saturdayPolicy = 'All Saturdays Working',
+    gracePeriodMinutes = null
 }) {
     // Defensive validation
     if (!attendanceDate) {
@@ -200,8 +202,16 @@ function resolveAttendanceStatus({
     }
     
     // Check for weekly off (THIRD PRIORITY)
+    // CRITICAL FIX: If employee worked on weekly off day, show "Present" instead of "Weekly Off"
     const weeklyOffFlag = isWeeklyOff(date, saturdayPolicy);
-    if (weeklyOffFlag) {
+    
+    // Check if employee has attendance log with sessions (meaning they worked)
+    const hasSessions = attendanceLog && attendanceLog.sessions && 
+                       Array.isArray(attendanceLog.sessions) && 
+                       attendanceLog.sessions.length > 0;
+    
+    if (weeklyOffFlag && !hasSessions) {
+        // It's a weekly off day AND employee didn't work → Weekly Off
         status = 'Weekly Off';
         isWeeklyOffFlag = true;
         isWorkingDay = false;
@@ -234,12 +244,12 @@ function resolveAttendanceStatus({
             leaveInfo: null
         };
     }
+    // If weeklyOffFlag is true BUT hasSessions is true, skip weekly off status
+    // and continue to check attendance log (employee worked on weekly off day → Present)
     
     // Check attendance log (if exists)
     if (attendanceLog) {
-        const hasSessions = attendanceLog.sessions && 
-                           Array.isArray(attendanceLog.sessions) && 
-                           attendanceLog.sessions.length > 0;
+        // hasSessions already checked above (line 207-209), reuse it
         
         // Check if log has sessions OR if it's an override case (log exists but might not have sessions yet)
         // Also handle case where log exists but sessions array is empty
@@ -261,27 +271,88 @@ function resolveAttendanceStatus({
                 }
             } else if (hasSessions) {
                 // Has sessions - normal processing
-                if (attendanceLog.isHalfDay || 
+                    // NEW SHIFT MODEL: Use elapsed shift time (clockOutTime - clockInTime) for attendance status
+                    // Policy: < 5 hrs elapsed = Absent; >= 5 hrs AND < 9 hrs elapsed = Half-day; >= 9 hrs elapsed = Full day
+                    const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY, MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY } = require('../config/shiftPolicy');
+                    
+                    // Calculate elapsed shift time (includes breaks)
+                    let elapsedShiftHours = null;
+                    if (attendanceLog.clockInTime && attendanceLog.clockOutTime) {
+                        const elapsedShiftMinutes = (new Date(attendanceLog.clockOutTime) - new Date(attendanceLog.clockInTime)) / (1000 * 60);
+                        elapsedShiftHours = elapsedShiftMinutes / 60;
+                    }
+                    
+                    const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
+                    const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed
+                    const hasHalfDayHours = hasCheckedOut && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 to < 9 hrs elapsed
+                    const hasSufficient = elapsedShiftHours != null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
+                    const withinGrace = gracePeriodMinutes != null && (attendanceLog.lateMinutes || 0) <= gracePeriodMinutes;
+                
+                // PRIORITY 0: Elapsed shift time < 5 hrs → Absent
+                if (belowHalfDayMinimum) {
+                    status = 'Absent';
+                    isHalfDay = false;
+                    isAbsent = true;
+                    halfDayReason = `Less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours total shift time (${elapsedShiftHours.toFixed(1)} hours elapsed). Minimum ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs for half-day, ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hrs for full day.`;
+                    halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                } else if (withinGrace && hasSufficient) {
+                // PRIORITY 1: If within grace period AND sufficient hours → On-time (NOT half-day)
+                    // Should be On-time, not Half-day
+                    status = 'On-time';
+                    isHalfDay = false;
+                    halfDayReason = null;
+                    halfDayReasonCode = null;
+                } else if (attendanceLog.isHalfDay || 
                     attendanceLog.attendanceStatus === 'Half-day' ||
                     attendanceLog.attendanceStatus === 'Half Day') {
+                    // Only mark as half-day if conditions warrant it
                     status = 'Half-day';
                     isHalfDay = true;
                     
-                    // USE PERSISTED REASON if available (backend is source of truth)
-                    if (attendanceLog.halfDayReasonText) {
-                        halfDayReason = attendanceLog.halfDayReasonText;
-                        halfDayReasonCode = attendanceLog.halfDayReasonCode || null;
+                    // PRIORITY 2: If insufficient hours AND within grace period, always use INSUFFICIENT_WORKING_HOURS
+                    // This overrides any persisted "Late Arrival" reason when employee is within grace period
+                    if (hasHalfDayHours && withinGrace) {
+                        halfDayReason = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                        halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                    } else if (hasHalfDayHours && !withinGrace) {
+                        // 5 to < 9 hrs elapsed but beyond grace period - use insufficient hours reason
+                        halfDayReason = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                        halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                    } else if (attendanceLog.halfDayReasonText && !hasHalfDayHours) {
+                        // Use persisted reason only if NOT insufficient hours AND beyond grace period
+                        // Check if persisted reason is LATE_LOGIN and if it's actually beyond grace period
+                        const persistedIsLate = (attendanceLog.halfDayReasonCode || '') === 'LATE_LOGIN';
+                        if (persistedIsLate && withinGrace) {
+                            // Persisted as LATE_LOGIN but actually within grace period - should not be late
+                            // This handles cases where stored data is incorrect
+                            if (hasSufficient) {
+                                // Should be On-time, not Half-day
+                                status = 'On-time';
+                                isHalfDay = false;
+                                halfDayReason = null;
+                                halfDayReasonCode = null;
+                            } else {
+                                // Insufficient hours - use that reason
+                                halfDayReason = `Insufficient shift time (${elapsedShiftHours.toFixed(1)} hours elapsed, minimum required: ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hours for full day)`;
+                                halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
+                            }
+                        } else {
+                            // Use persisted reason (EARLY_LOGOUT, MANUAL_ADMIN, etc.)
+                            halfDayReason = attendanceLog.halfDayReasonText;
+                            halfDayReasonCode = attendanceLog.halfDayReasonCode || null;
+                        }
                     } else {
-                        // Fallback: Calculate reason if not persisted (legacy records)
-                        if (attendanceLog.lateMinutes > 0) {
+                        // Fallback: Determine reason from available data
+                        if (gracePeriodMinutes != null && (attendanceLog.lateMinutes || 0) > gracePeriodMinutes) {
+                            // Beyond grace period
+                            halfDayReason = `Late arrival (${Math.round(attendanceLog.lateMinutes)} minutes late)`;
+                            halfDayReasonCode = 'LATE_LOGIN';
+                        } else if (attendanceLog.lateMinutes > 0 && gracePeriodMinutes == null) {
                             halfDayReason = `Late arrival (${Math.round(attendanceLog.lateMinutes)} minutes late)`;
                             halfDayReasonCode = 'LATE_LOGIN';
                         } else if (attendanceLog.autoLogoutReason) {
                             halfDayReason = `Early checkout: ${attendanceLog.autoLogoutReason}`;
                             halfDayReasonCode = 'EARLY_LOGOUT';
-                        } else if (attendanceLog.totalWorkingHours && attendanceLog.totalWorkingHours < 8) {
-                            halfDayReason = `Insufficient working hours (${attendanceLog.totalWorkingHours.toFixed(1)} hours worked, minimum required: 8 hours)`;
-                            halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
                         } else if (attendanceLog.logoutType === 'Manual' || attendanceLog.halfDaySource === 'MANUAL') {
                             halfDayReason = attendanceLog.overrideReason || 'Manual half-day marking';
                             halfDayReasonCode = 'MANUAL_ADMIN';
@@ -291,17 +362,39 @@ function resolveAttendanceStatus({
                         }
                     }
                 } else if (attendanceLog.attendanceStatus) {
-                    // Use existing status from log (Present, Late, etc.)
-                    status = attendanceLog.attendanceStatus;
-                    if (attendanceLog.attendanceStatus === 'Late' && attendanceLog.lateMinutes > 0) {
-                        halfDayReason = `Late arrival (${Math.round(attendanceLog.lateMinutes)} minutes late)`;
+                    // Use existing status from log, but verify it's correct
+                    // CRITICAL: If within grace period AND sufficient hours, should be On-time, not Late or Half-day
+                    const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY } = require('../config/shiftPolicy');
+                    
+                    // Calculate elapsed shift time (includes breaks)
+                    let elapsedShiftHours = null;
+                    if (attendanceLog.clockInTime && attendanceLog.clockOutTime) {
+                        const elapsedShiftMinutes = (new Date(attendanceLog.clockOutTime) - new Date(attendanceLog.clockInTime)) / (1000 * 60);
+                        elapsedShiftHours = elapsedShiftMinutes / 60;
+                    }
+                    
+                    const hasSufficient = elapsedShiftHours != null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY;
+                    const withinGrace = gracePeriodMinutes != null && (attendanceLog.lateMinutes || 0) <= gracePeriodMinutes;
+                    
+                    if (withinGrace && hasSufficient && (attendanceLog.attendanceStatus === 'Late' || attendanceLog.attendanceStatus === 'Half-day')) {
+                        // Stored status is incorrect - should be On-time
+                        status = 'On-time';
+                        isHalfDay = false;
+                        halfDayReason = null;
+                        halfDayReasonCode = null;
+                    } else {
+                        // Use existing status from log (Present, Late, etc.)
+                        status = attendanceLog.attendanceStatus;
+                        if (attendanceLog.attendanceStatus === 'Late' && attendanceLog.lateMinutes > 0) {
+                            halfDayReason = `Late arrival (${Math.round(attendanceLog.lateMinutes)} minutes late)`;
+                        }
                     }
                 } else {
                     status = 'Present';
                 }
             }
             
-            isAbsent = false;
+            isAbsent = (status === 'Absent');
             
             // Defensive assertion: Half-day must have reason
             if (isHalfDay && !halfDayReason) {
@@ -323,7 +416,7 @@ function resolveAttendanceStatus({
                 isHoliday: false,
                 isWeeklyOff: false,
                 isLeave: false,
-                isAbsent: false,
+                isAbsent: isAbsent,
                 isHalfDay: isHalfDay || false,
                 holidayInfo: null,
                 leaveInfo: null

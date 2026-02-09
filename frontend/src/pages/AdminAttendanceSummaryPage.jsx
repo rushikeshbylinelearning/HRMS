@@ -9,12 +9,14 @@ import {
     ViewModule as ViewModuleIcon,
     CalendarMonth as CalendarMonthIcon,
     MoreVert as MoreVertIcon,
-    People as PeopleIcon
+    People as PeopleIcon,
+    Edit as EditIcon
 } from '@mui/icons-material';
 import api from '../api/axios';
 import AttendanceTimeline from '../components/AttendanceTimeline';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import LogDetailModal from '../components/LogDetailModal';
+import UniversalOverrideModal from '../components/UniversalOverrideModal';
 import { 
     getISTNow, 
     getISTDateString, 
@@ -22,6 +24,7 @@ import {
     getISTWeekRange, 
     getISTDateParts,
     formatDateRange as formatISTDateRange,
+    formatISTDate,
     isSameISTDay
 } from '../utils/istTime';
 import {
@@ -33,6 +36,7 @@ import socket from '../socket';
 import '../styles/AdminAttendanceSummaryPage.css';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
+import { filterActiveEmployees } from '../utils/employeeFilterUtils';
 const AdminAttendanceSummaryPage = () => {
     const [employees, setEmployees] = useState([]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -55,7 +59,8 @@ const AdminAttendanceSummaryPage = () => {
     const [holidays, setHolidays] = useState([]);
     // Track data freshness for debugging (internal only - not displayed to users)
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
-    
+    const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+
     // Note: selectedHoliday and selectedLeave are used for modal display - kept for UI purposes
 
     const selectedEmployeeObject = useMemo(() => {
@@ -65,10 +70,9 @@ const AdminAttendanceSummaryPage = () => {
     useEffect(() => {
         const fetchEmployees = async () => {
             try {
+                // Do NOT pass includeInactive: deactivated employees must be hidden from attendance summary
                 const { data } = await api.get('/admin/employees?all=true');
-                const activeEmployees = Array.isArray(data) 
-                    ? data.filter(emp => emp.isActive !== false) 
-                    : [];
+                const activeEmployees = filterActiveEmployees(Array.isArray(data) ? data : []);
                 setEmployees(activeEmployees);
             } catch (err) {
                 setError('Failed to fetch employee list. Please try again.');
@@ -292,6 +296,11 @@ const AdminAttendanceSummaryPage = () => {
         window.location.href = '/employee-muster-roll';
     };
 
+    const handleOverrideAttendanceClick = () => {
+        handleMoreMenuClose();
+        setOverrideModalOpen(true);
+    };
+
     const handleSaveLog = async (logId, updatedData) => {
         try {
             if (!logId) {
@@ -343,8 +352,8 @@ const AdminAttendanceSummaryPage = () => {
             const dateKey = getISTDateString(date);
             const log = logs.find(l => l.attendanceDate === dateKey);
             
-            // Format date string for display (IST)
-            const dateString = formatISTDateRange(date, false).split(' - ')[0];
+            // Format this row's date for display (IST) - not the week range
+            const dateString = formatISTDate(date);
             
             // Use backend computed fields - NO RECALCULATION
             const firstIn = log?.firstIn ? formatTimeForDisplay(log.firstIn) : '-';
@@ -370,9 +379,11 @@ const AdminAttendanceSummaryPage = () => {
                 status: statusInfo.status,
                 statusColor: statusInfo.color,
                 shift,
-                // Include half-day reason for display
                 halfDayReason: log?.halfDayReason || null,
-                overriddenByAdmin: log?.overriddenByAdmin || false
+                halfDayReasonCode: log?.halfDayReasonCode || null,
+                lateMinutes: log?.lateMinutes ?? 0,
+                overriddenByAdmin: log?.overriddenByAdmin || false,
+                overrideReason: log?.overrideReason || null
             };
         });
     };
@@ -421,15 +432,15 @@ const AdminAttendanceSummaryPage = () => {
                                             style={{ backgroundColor: row.statusColor }}
                                         ></div>
                                         <span>{row.status}</span>
-                                        {/* Show half-day reason if available */}
-                                        {row.halfDayReason && (row.status.includes('Half') || row.status === 'Half-day') && (
-                                            <div className="half-day-reason-tooltip" style={{ 
-                                                fontSize: '0.7rem', 
-                                                color: '#666',
-                                                marginTop: '2px',
-                                                fontStyle: 'italic'
-                                            }} title={row.halfDayReason}>
-                                                {row.halfDayReason.length > 30 ? `${row.halfDayReason.substring(0, 30)}...` : row.halfDayReason}
+                                        {row.overriddenByAdmin === true && typeof row.overrideReason === 'string' && row.overrideReason.trim().length > 0 && (
+                                            <div className="override-note-display" style={{ fontSize: '0.7rem', color: '#856404', marginTop: '2px' }} title={row.overrideReason.trim()}>
+                                                <span style={{ fontWeight: 600 }}>Overridden</span>
+                                                {' — '}{(row.overrideReason.trim()).length > 28 ? `${(row.overrideReason.trim()).substring(0, 28)}…` : row.overrideReason.trim()}
+                                            </div>
+                                        )}
+                                        {!(row.overriddenByAdmin === true && typeof row.overrideReason === 'string' && row.overrideReason.trim().length > 0) && (row.status.includes('Half') || row.status === 'Half-day') && (
+                                            <div className="half-day-summary-secondary" style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                                                {row.halfDayReasonCode === 'LATE_LOGIN' ? `Late Arrival — Late by ${Number(row.lateMinutes) || 0} minutes` : 'Incomplete hours'}
                                             </div>
                                         )}
                                     </div>
@@ -594,6 +605,7 @@ const AdminAttendanceSummaryPage = () => {
                 date={selectedDate}
                 isAdmin={true}
                 onSave={handleSaveLog}
+                onRefresh={() => fetchLogsForWeek(currentDate, selectedEmployeeId)}
                 holiday={selectedHoliday}
                 leave={selectedLeave}
             />
@@ -617,6 +629,12 @@ const AdminAttendanceSummaryPage = () => {
                     horizontal: 'right',
                 }}
             >
+                <MenuItem onClick={handleOverrideAttendanceClick}>
+                    <ListItemIcon>
+                        <EditIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Override Attendance</ListItemText>
+                </MenuItem>
                 <MenuItem onClick={handleMusterRollClick}>
                     <ListItemIcon>
                         <PeopleIcon fontSize="small" />
@@ -624,6 +642,16 @@ const AdminAttendanceSummaryPage = () => {
                     <ListItemText>Employee Muster Roll</ListItemText>
                 </MenuItem>
             </Menu>
+
+            <UniversalOverrideModal
+                open={overrideModalOpen}
+                onClose={() => setOverrideModalOpen(false)}
+                employees={employees}
+                onSuccess={async (data) => {
+                    setSnackbar({ open: true, message: data?.message || 'Override applied successfully.' });
+                    if (selectedEmployeeId) fetchLogsForWeek(currentDate, selectedEmployeeId);
+                }}
+            />
         </>
     );
 };

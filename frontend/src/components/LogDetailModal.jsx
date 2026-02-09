@@ -25,63 +25,38 @@ import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { normalizeSession, validateSessionDuration, createNormalizedDateTime } from '../utils/timeNormalization';
+import { formatTimeForDisplay, formatDateForDisplay, formatDuration, formatDurationShort } from '../utils/attendanceRenderUtils';
+import { getISTDateString, parseISTDate, formatISTDate, formatISTTimeHHMM, getISTNow } from '../utils/istTime';
 import '../styles/LogDetailModal.css';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
-// --- SHARED HELPER FUNCTIONS ---
-const formatTimeForDisplay = (dateTime) => {
-    if (!dateTime) return '--:--';
-    return new Date(dateTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-};
 
+/** Format time as HH:mm (IST) for form inputs. Uses centralized IST utility. */
 const formatTimeToHHMM = (dateTime) => {
     if (!dateTime) return '';
-    const dateObj = new Date(dateTime);
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+    return formatISTTimeHHMM(dateTime);
 };
 
-const formatDuration = (totalMins) => {
-    if (isNaN(totalMins) || totalMins < 0) return '00:00 Hrs';
-    const hours = String(Math.floor(totalMins / 60)).padStart(2, '0');
-    const minutes = String(Math.round(totalMins % 60)).padStart(2, '0');
-    return `${hours}:${minutes} Hrs`;
-};
-
-const formatDurationShort = (totalMins) => {
-    if (isNaN(totalMins) || totalMins < 0) return '0 Min(s)';
-    const mins = Math.round(totalMins);
-    return `${mins} Min(s)`;
-};
-
-const formatDateForDisplay = (dateTime) => {
-    if (!dateTime) return 'N/A';
-    const date = new Date(dateTime);
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayName = dayNames[date.getDay()];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-    return `${dayName}, ${day} ${month} ${year}`;
-};
-
+/** Duration in minutes → display. Uses IST now when end not yet set. */
 const calculateEventDuration = (startTime, endTime, now = null) => {
     if (!startTime) return 0;
     const start = new Date(startTime);
-    const end = endTime ? new Date(endTime) : (now || new Date());
-    return Math.max(0, (end - start) / (1000 * 60)); // Return minutes
+    const end = endTime ? new Date(endTime) : (now || getISTNow());
+    return Math.max(0, (end - start) / (1000 * 60));
 };
 
-const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, leave }) => {
+const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, onRefresh, holiday, leave }) => {
     const [editableLog, setEditableLog] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [adminView, setAdminView] = useState('view');
     const [localError, setLocalError] = useState('');
     const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+    const [overrideModalMode, setOverrideModalMode] = useState('apply'); // 'apply' | 'update'
+    const [overrideType, setOverrideType] = useState('halfday');
     const [overrideReason, setOverrideReason] = useState('');
     const [isOverriding, setIsOverriding] = useState(false);
+    const [removeOverrideConfirmOpen, setRemoveOverrideConfirmOpen] = useState(false);
+    const [isRemovingOverride, setIsRemovingOverride] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
@@ -92,6 +67,8 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                 const newEditableLog = JSON.parse(JSON.stringify(log));
                 newEditableLog.sessions = (newEditableLog.sessions || []).map(s => ({ ...s, _id: s._id || uuidv4() }));
                 newEditableLog.breaks = (Array.isArray(newEditableLog.breaks) ? newEditableLog.breaks : []).map(b => ({ ...b, _id: b._id || uuidv4() }));
+                // ECR lives in notes section: show notes or early checkout reason so Admin can edit
+                newEditableLog.notes = (newEditableLog.notes && String(newEditableLog.notes).trim()) || (newEditableLog.earlyCheckoutNote && String(newEditableLog.earlyCheckoutNote).trim()) || '';
                 setEditableLog(newEditableLog);
             } else {
                 setEditableLog(null);
@@ -114,12 +91,17 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     }, [log]);
     
     // Allow modal to open even without log if there's holiday or leave info
+    // CRITICAL FIX: Prevent opening modal for absent/week-off/weekend when there's no log
     if (!date) return null;
     if (!log && !holiday && !leave) return null;
     if (log && !editableLog) return null;
 
-    const fullDateStr = date.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
-    const dateForApi = log ? date.toLocaleDateString('en-CA') : null;
+    // IST-only: dateForApi from backend when editing; fullDateStr always IST-formatted
+    const dateForApi = log ? log.attendanceDate : null;
+    const dateForDisplay = log
+        ? parseISTDate(log.attendanceDate)
+        : (typeof date === 'string' ? parseISTDate(date) : parseISTDate(getISTDateString(date)));
+    const fullDateStr = formatISTDate(dateForDisplay, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
 
     const handleSessionChange = (id, field, value) => {
         const updatedSessions = editableLog.sessions.map(s => {
@@ -128,14 +110,13 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                     if (!value) {
                         return { ...s, [field]: null };
                     }
-
-                    // Create datetime from base date and time
-                    let newDateTime = dayjs(`${dateForApi}T${value}`);
+                    const parts = String(value).split(':');
+                    const timePart = parts.length >= 3 ? value : `${parts[0] || '00'}:${(parts[1] || '00').padStart(2, '0')}:00`;
+                    let newDateTime = dayjs(`${dateForApi}T${timePart}+05:30`);
 
                     // If updating endTime, check if it should be next day
                     if (field === 'endTime' && s.startTime) {
                         const startTime = dayjs(s.startTime);
-                        // If end time is before start time, add 1 day (cross-day scenario)
                         if (newDateTime.isBefore(startTime)) {
                             newDateTime = newDateTime.add(1, 'day');
                         }
@@ -144,11 +125,8 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                     // If updating startTime, check if endTime needs adjustment
                     if (field === 'startTime' && s.endTime) {
                         const endTime = dayjs(s.endTime);
-                        // If new start is after current end, end might need to be next day
-                        // But we'll let the endTime update handle this, so just ensure end is after start
                         if (endTime.isBefore(newDateTime)) {
-                            // End time will be adjusted when user edits it, or we can auto-adjust here
-                            // For now, we'll let the user update endTime if needed
+                            // End time will be adjusted when user edits it
                         }
                     }
 
@@ -169,23 +147,23 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                     if (!value) {
                         return { ...b, [field]: null };
                     }
-
-                    // Create datetime from base date and time
-                    let newDateTime = dayjs(`${dateForApi}T${value}`);
+                    const parts = String(value).split(':');
+                    const timePart = parts.length >= 3 ? value : `${parts[0] || '00'}:${(parts[1] || '00').padStart(2, '0')}:00`;
+                    let newDateTime = dayjs(`${dateForApi}T${timePart}+05:30`);
 
                     // If updating endTime, check if it should be next day
                     if (field === 'endTime' && b.startTime) {
                         const startTime = dayjs(b.startTime);
-                        // If end time is before start time, add 1 day (cross-day scenario)
                         if (newDateTime.isBefore(startTime)) {
                             newDateTime = newDateTime.add(1, 'day');
                         }
                     }
 
-                    // If updating startTime, check if endTime needs adjustment
                     if (field === 'startTime' && b.endTime) {
                         const endTime = dayjs(b.endTime);
-                        // Similar logic as sessions - end will be adjusted when edited
+                        if (endTime.isBefore(newDateTime)) {
+                            // End will be adjusted when user edits it
+                        }
                     }
 
                     return { ...b, [field]: newDateTime.toISOString() };
@@ -198,10 +176,11 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
     };
 
     const addSession = () => {
+        // IST: explicit +05:30 so datetimes are IST
         const newSession = {
             _id: uuidv4(),
-            startTime: new Date(`${dateForApi}T09:00:00`).toISOString(),
-            endTime: new Date(`${dateForApi}T17:00:00`).toISOString()
+            startTime: new Date(`${dateForApi}T09:00:00+05:30`).toISOString(),
+            endTime: new Date(`${dateForApi}T17:00:00+05:30`).toISOString()
         };
         setEditableLog(prev => ({ ...prev, sessions: [...prev.sessions, newSession] }));
     };
@@ -210,8 +189,8 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
         const newBreak = {
             _id: uuidv4(),
             breakType: 'Paid',
-            startTime: new Date(`${dateForApi}T12:00:00`).toISOString(),
-            endTime: new Date(`${dateForApi}T13:00:00`).toISOString()
+            startTime: new Date(`${dateForApi}T12:00:00+05:30`).toISOString(),
+            endTime: new Date(`${dateForApi}T13:00:00+05:30`).toISOString()
         };
         setEditableLog(prev => ({ ...prev, breaks: [...(Array.isArray(prev.breaks) ? prev.breaks : []), newBreak] }));
     };
@@ -415,7 +394,10 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
 
     const ReadOnlyView = () => {
         // If no log but there's holiday or leave, show that information
-        if (!log && (holiday || leave)) {
+        // Also show leave info when log exists but it's a leave day (no sessions)
+        const isLeaveDay = leave || log?.isLeave || log?.attendanceStatus === 'Leave' || log?.leaveInfo;
+        const hasNoSessions = !log?.sessions || log.sessions.length === 0;
+        if ((!log && (holiday || leave)) || (isLeaveDay && hasNoSessions && !holiday)) {
             return (
                 <DialogContent className="dialog-content audit-dialog-content">
                     <Box className="audit-timeline-container">
@@ -431,21 +413,79 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                                         </Typography>
                                     )}
                                 </Box>
-                            ) : leave ? (
+                            ) : (leave || log?.leaveInfo) ? (
                                 <Box>
-                                    <Typography variant="h6" gutterBottom>
-                                        Leave: {formatLeaveRequestType(leave.requestType)}
-                                    </Typography>
-                                    {(leave?.leaveType || leave?.requestType) && (
-                                        <Box sx={{ mt: 1, mb: 1 }}>
-                                            <Chip 
-                                                label={leave.leaveType === 'Full Day' ? 'Full Day Leave' : (leave.leaveType || leave.requestType || 'Leave')}
-                                                color={leave.leaveType === 'Full Day' ? 'primary' : 'secondary'}
-                                                variant="outlined"
-                                                sx={{ fontWeight: 600 }}
-                                            />
-                                        </Box>
-                                    )}
+                                    {/* Use leave prop if available, otherwise use log.leaveInfo */}
+                                    {(() => {
+                                        const effectiveLeave = leave || log?.leaveInfo || null;
+                                        const requestType = effectiveLeave?.requestType || effectiveLeave?.leaveType || 'Leave';
+                                        const leaveType = effectiveLeave?.leaveType || 'Full Day';
+                                        
+                                        return (
+                                            <>
+                                                <Typography variant="h6" gutterBottom>
+                                                    Leave: {formatLeaveRequestType(requestType)}
+                                                </Typography>
+                                                {(leaveType || requestType) && (
+                                                    <Box sx={{ mt: 1, mb: 1 }}>
+                                                        <Chip 
+                                                            label={leaveType === 'Full Day' ? 'Full Day Leave' : (leaveType || requestType || 'Leave')}
+                                                            color={leaveType === 'Full Day' ? 'primary' : 'secondary'}
+                                                            variant="outlined"
+                                                            sx={{ fontWeight: 600 }}
+                                                        />
+                                                    </Box>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                    {/* CRITICAL FIX: Always display employee's leave reason when available */}
+                                    {/* Check multiple sources: log.leaveReason, leave.reason, log.leaveInfo.reason */}
+                                    {/* IMPORTANT: Backend sends leaveInfo.reason even when there's no attendance log */}
+                                    {(() => {
+                                        // Try multiple sources in order of priority
+                                        // 1. Direct leaveReason from log (backend field)
+                                        // 2. leaveInfo.reason from log (backend leaveInfo object)
+                                        // 3. leave.reason from prop (passed from calendar)
+                                        // Use leave prop if available, otherwise fall back to log data
+                                        const effectiveLeave = leave || log?.leaveInfo || null;
+                                        const leaveReason = log?.leaveReason || 
+                                                          (effectiveLeave?.reason) || 
+                                                          (log?.leaveInfo?.reason) ||
+                                                          (leave?.reason);
+                                        
+                                        // Debug logging for development
+                                        if (process.env.NODE_ENV === 'development' && leave && !leaveReason) {
+                                            console.warn('[LogDetailModal] Leave reason not found:', {
+                                                hasLog: !!log,
+                                                logLeaveReason: log?.leaveReason,
+                                                logLeaveInfo: log?.leaveInfo,
+                                                leaveProp: leave,
+                                                leaveReason: leave?.reason
+                                            });
+                                        }
+                                        
+                                        // Display reason if available (even if it's "No reason provided")
+                                        if (leaveReason) {
+                                            return (
+                                                <Box sx={{ mt: 1, p: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#1565c0', display: 'block', mb: 0.5 }}>
+                                                        Employee's Reason:
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.primary">
+                                                        {leaveReason}
+                                                    </Typography>
+                                                </Box>
+                                            );
+                                        }
+                                        
+                                        // No reason found
+                                        return (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                                No reason provided
+                                            </Typography>
+                                        );
+                                    })()}
                                     {/* Display half-day reason if this is a half-day (show for both regular half-day and half-day leave) */}
                                     {log?.isHalfDay && log?.halfDayReason && (
                                         <Box sx={{ mt: 1, p: 1.5, bgcolor: '#fff3cd', borderRadius: 1, border: '1px solid #ffc107' }}>
@@ -461,17 +501,6 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                                                 </Typography>
                                             )}
                                         </Box>
-                                    )}
-                                    {/* Use backend leaveReason if available, fallback to leave.reason */}
-                                    {(log?.leaveReason || leave?.reason) && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Reason: {log?.leaveReason || leave?.reason}
-                                        </Typography>
-                                    )}
-                                    {!log?.leaveReason && !leave?.reason && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
-                                            No reason provided
-                                        </Typography>
                                     )}
                                 </Box>
                             ) : null}
@@ -764,6 +793,33 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                             </Paper>
                         </Grid>
                     </Grid>
+
+                    {/* Admin override note: strict check — overrideReason required */}
+                    {log?.overriddenByAdmin === true && typeof log?.overrideReason === 'string' && log.overrideReason.trim().length > 0 && (
+                        <Box sx={{ mt: 2, mb: 2, p: 1.5, bgcolor: '#fff8e1', borderRadius: 1, border: '1px solid #ffc107' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#856404', display: 'block', mb: 0.5 }}>
+                                Overridden
+                            </Typography>
+                            <Typography variant="body2" color="text.primary">
+                                {log.overrideReason.trim()}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Early Checkout Reason (synced with notes; editable from Admin Notes section) */}
+                    {(() => {
+                        const ecrText = (log?.earlyCheckoutNote && String(log.earlyCheckoutNote).trim()) || (log?.notes && String(log.notes).trim()) || '';
+                        return ecrText ? (
+                            <Box sx={{ mt: 2, mb: 2, p: 1.5, bgcolor: 'rgba(229, 57, 53, 0.08)', borderRadius: 1, border: '1px solid rgba(229, 57, 53, 0.3)' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#c62828', display: 'block', mb: 0.5 }}>
+                                    Early Checkout Reason
+                                </Typography>
+                                <Typography variant="body2" color="text.primary">
+                                    {ecrText}
+                                </Typography>
+                            </Box>
+                        ) : null;
+                    })()}
 
                     {/* Timeline Events */}
                     {processedTimeline.length > 0 ? (
@@ -1112,35 +1168,74 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                             </Button>
                         </Paper>
 
-                        {/* Half-Day Override Section (only if half-day) */}
-                        {editableLog?.isHalfDay && (
+                        {/* Override Section: apply (half-day) or update/remove (already overridden) */}
+                        {(editableLog?.isHalfDay || editableLog?.overriddenByAdmin) && (
                             <Paper className="admin-edit-section admin-edit-section-override" sx={{ border: '2px solid #ffc107', bgcolor: '#fff3cd' }}>
                                 <Box className="admin-edit-section-header admin-edit-section-header-override">
                                     <Typography className="admin-edit-section-title" sx={{ color: '#856404', fontWeight: 600 }}>
-                                        Half-Day Status Override
+                                        {editableLog?.overriddenByAdmin ? 'Attendance Override' : 'Half-Day Status Override'}
                                     </Typography>
                                 </Box>
                                 
                                 <Box sx={{ p: 2 }}>
-                                    <Typography variant="body2" sx={{ mb: 2, color: '#856404' }}>
-                                        Current Reason: {editableLog.halfDayReasonText || 'No reason specified'}
-                                    </Typography>
-                                    
-                                    <Button 
-                                        variant="contained" 
-                                        color="warning"
-                                        fullWidth
-                                        onClick={() => setOverrideModalOpen(true)}
-                                        startIcon={<EditIcon />}
-                                        sx={{ fontWeight: 600 }}
-                                    >
-                                        Override Half-Day to Present
-                                    </Button>
-                                    
-                                    {editableLog.overriddenByAdmin && (
-                                        <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#856404', fontStyle: 'italic' }}>
-                                            Previously overridden by admin
-                                        </Typography>
+                                    {editableLog?.overriddenByAdmin ? (
+                                        <>
+                                            {editableLog.overrideReason && (
+                                                <Typography variant="body2" sx={{ mb: 2, color: '#856404' }}>
+                                                    <strong>Override note:</strong> {editableLog.overrideReason}
+                                                </Typography>
+                                            )}
+                                            <Grid container spacing={1}>
+                                                <Grid item xs={12} sm={6}>
+                                                    <Button 
+                                                        variant="contained" 
+                                                        color="warning"
+                                                        fullWidth
+                                                        size="small"
+                                                        onClick={() => {
+                                                            setOverrideModalMode('update');
+                                                            setOverrideReason(editableLog.overrideReason || '');
+                                                            setOverrideModalOpen(true);
+                                                        }}
+                                                        startIcon={<EditIcon />}
+                                                    >
+                                                        Update Override
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item xs={12} sm={6}>
+                                                    <Button 
+                                                        variant="outlined" 
+                                                        color="error"
+                                                        fullWidth
+                                                        size="small"
+                                                        onClick={() => setRemoveOverrideConfirmOpen(true)}
+                                                        startIcon={<DeleteIcon />}
+                                                    >
+                                                        Remove Override
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Typography variant="body2" sx={{ mb: 2, color: '#856404' }}>
+                                                Current Reason: {editableLog.halfDayReasonText || 'No reason specified'}
+                                            </Typography>
+                                            <Button 
+                                                variant="contained" 
+                                                color="warning"
+                                                fullWidth
+                                                onClick={() => {
+                                                    setOverrideModalMode('apply');
+                                                    setOverrideReason('');
+                                                    setOverrideModalOpen(true);
+                                                }}
+                                                startIcon={<EditIcon />}
+                                                sx={{ fontWeight: 600 }}
+                                            >
+                                                Override Half-Day to Present
+                                            </Button>
+                                        </>
                                     )}
                                 </Box>
                             </Paper>
@@ -1187,40 +1282,63 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
             </>
             )}
             
-            {/* Override Half-Day Modal */}
+            {/* Override Modal: Apply (half-day → present) or Update (edit note) */}
             <Dialog 
                 open={overrideModalOpen} 
                 onClose={() => {
                     setOverrideModalOpen(false);
+                    setOverrideModalMode('apply');
+                    setOverrideType('halfday');
                     setOverrideReason('');
                 }}
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Override Half-Day Status</DialogTitle>
+                <DialogTitle>{overrideModalMode === 'update' ? 'Update Override' : 'Override Attendance'}</DialogTitle>
                 <DialogContent>
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                        This will convert Half-Day status to Present. The override reason will be logged for audit purposes.
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        {overrideModalMode === 'update'
+                            ? 'Edit the override note. The note is required for audit.'
+                            : 'This will update the attendance status for this day. The override note is required for audit.'}
                     </Alert>
                     
+                    {overrideModalMode === 'apply' && (
+                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                            <InputLabel>Override type</InputLabel>
+                            <Select
+                                value={overrideType}
+                                label="Override type"
+                                onChange={(e) => setOverrideType(e.target.value)}
+                            >
+                                <MenuItem value="halfday">Half Day → Full Day</MenuItem>
+                                <MenuItem value="fullday" disabled>Full Day (coming soon)</MenuItem>
+                                <MenuItem value="holiday" disabled>Holiday (coming soon)</MenuItem>
+                            </Select>
+                        </FormControl>
+                    )}
+                    
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                        Override note *
+                    </Typography>
                     <TextField
                         fullWidth
                         multiline
-                        rows={4}
-                        label="Override Reason *"
-                        placeholder="Provide a reason for overriding the half-day status (e.g., 'Employee had genuine emergency, worked full day', 'Policy exception approved')"
+                        rows={3}
+                        placeholder="e.g. Election Day, Company Event, Special Approval"
                         value={overrideReason}
                         onChange={(e) => setOverrideReason(e.target.value)}
                         required
-                        sx={{ mt: 1 }}
                         error={overrideModalOpen && !overrideReason.trim()}
-                        helperText={overrideModalOpen && !overrideReason.trim() ? 'Override reason is required' : ''}
+                        helperText={overrideModalOpen && !overrideReason.trim() ? 'Override note is required' : ''}
+                        sx={{ mt: 0.5 }}
                     />
                 </DialogContent>
                 <DialogActions>
                     <Button 
                         onClick={() => {
                             setOverrideModalOpen(false);
+                            setOverrideModalMode('apply');
+                            setOverrideType('halfday');
                             setOverrideReason('');
                         }}
                         variant="outlined"
@@ -1230,32 +1348,32 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                     <Button 
                         onClick={async () => {
                             if (!overrideReason.trim()) {
-                                setLocalError('Override reason is required');
+                                setLocalError('Override note is required');
                                 return;
                             }
-                            
                             setIsOverriding(true);
                             setLocalError('');
-                            
                             try {
-                                await api.post('/admin/attendance/override-half-day', {
-                                    attendanceLogId: editableLog._id,
-                                    overrideReason: overrideReason.trim()
-                                });
-                                
-                                // Refresh log data
-                                if (onSave && editableLog._id) {
-                                    // Trigger parent to refresh
-                                    await onSave(editableLog._id, {});
+                                if (overrideModalMode === 'update') {
+                                    await api.patch(`/admin/attendance/override/${editableLog._id}`, {
+                                        overrideReason: overrideReason.trim()
+                                    });
+                                } else {
+                                    await api.post('/admin/attendance/override-half-day', {
+                                        attendanceLogId: editableLog._id,
+                                        overrideReason: overrideReason.trim()
+                                    });
                                 }
-                                
                                 setOverrideModalOpen(false);
+                                setOverrideModalMode('apply');
+                                setOverrideType('halfday');
                                 setOverrideReason('');
-                                // Close modal to show updated data
-                                onClose();
+                                if (onRefresh) await onRefresh();
+                                if (overrideModalMode === 'apply') onClose();
+                                else setEditableLog(prev => prev ? { ...prev, overrideReason: overrideReason.trim() } : null);
                             } catch (error) {
-                                console.error('Error overriding half-day:', error);
-                                setLocalError(error.response?.data?.error || 'Failed to override half-day status');
+                                console.error(overrideModalMode === 'update' ? 'Error updating override:' : 'Error overriding half-day:', error);
+                                setLocalError(error.response?.data?.error || (overrideModalMode === 'update' ? 'Failed to update override' : 'Failed to override half-day status'));
                             } finally {
                                 setIsOverriding(false);
                             }
@@ -1265,7 +1383,38 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, holiday, le
                         disabled={isOverriding || !overrideReason.trim()}
                         startIcon={isOverriding ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : null}
                     >
-                        {isOverriding ? 'Overriding...' : 'Confirm Override'}
+                        {isOverriding ? (overrideModalMode === 'update' ? 'Updating...' : 'Overriding...') : (overrideModalMode === 'update' ? 'Update Override' : 'Confirm Override')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Remove Override confirmation */}
+            <Dialog open={removeOverrideConfirmOpen} onClose={() => !isRemovingOverride && setRemoveOverrideConfirmOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Remove Override</DialogTitle>
+                <DialogContent>
+                    <Typography>Override will be cleared and attendance status will be restored to system-calculated (e.g. Half-day if applicable). The attendance record is not deleted.</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRemoveOverrideConfirmOpen(false)} variant="outlined" disabled={isRemovingOverride}>Cancel</Button>
+                    <Button 
+                        variant="contained" 
+                        color="error" 
+                        disabled={isRemovingOverride}
+                        onClick={async () => {
+                            setIsRemovingOverride(true);
+                            try {
+                                await api.post('/admin/attendance/remove-override', { attendanceLogId: editableLog?._id });
+                                setRemoveOverrideConfirmOpen(false);
+                                if (onRefresh) await onRefresh();
+                                onClose();
+                            } catch (e) {
+                                setLocalError(e.response?.data?.error || 'Failed to remove override');
+                            } finally {
+                                setIsRemovingOverride(false);
+                            }
+                        }}
+                    >
+                        {isRemovingOverride ? 'Removing...' : 'Remove Override'}
                     </Button>
                 </DialogActions>
             </Dialog>

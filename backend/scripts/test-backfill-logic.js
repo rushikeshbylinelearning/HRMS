@@ -109,7 +109,12 @@ async function testLateLogin(scenario) {
     if (!scenario.clockInTime) return null;
     
     try {
-        const lateStatus = await recalculateLateStatus(scenario.clockInTime, mockShift, 30);
+        const lateStatus = await recalculateLateStatus(
+            scenario.clockInTime, 
+            mockShift, 
+            30,
+            scenario.workedHours || null // Pass working hours if available
+        );
         return lateStatus;
     } catch (error) {
         console.warn('Late status calculation failed:', error.message);

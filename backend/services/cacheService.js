@@ -17,7 +17,7 @@ class CacheService {
     });
     
     this.dashboardCache = new NodeCache({ 
-      stdTTL: 120, // 2 minutes
+      stdTTL: 60, // 1 minute - short TTL so dashboard summary cache is effective without stale data
       checkperiod: 30,
       useClones: false
     });
@@ -108,6 +108,43 @@ class CacheService {
     this.dashboardCache.set(`dashboard_${date}`, summaryData);
   }
 
+  // Pending leaves cache (short TTL; invalidate on leave create/approve/reject/delete)
+  getPendingLeaves(date) {
+    return this.dashboardCache.get(`pending_leaves_${date}`);
+  }
+
+  setPendingLeaves(date, data, ttlSeconds = 45) {
+    this.dashboardCache.set(`pending_leaves_${date}`, data, ttlSeconds);
+  }
+
+  invalidatePendingLeaves(date = null) {
+    if (date) {
+      this.dashboardCache.del(`pending_leaves_${date}`);
+    } else {
+      const keys = this.dashboardCache.keys();
+      keys.forEach(key => {
+        if (key.startsWith('pending_leaves_')) this.dashboardCache.del(key);
+      });
+    }
+  }
+
+  // Per-user daily status for "who's in" (short TTL to avoid repeated getUserDailyStatus on cache miss)
+  getDailyStatus(userId, date) {
+    try {
+      return this.dashboardCache.get(`daily_status_${String(userId)}_${date}`);
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  setDailyStatus(userId, date, data) {
+    try {
+      this.dashboardCache.set(`daily_status_${String(userId)}_${date}`, data, 60);
+    } catch (e) {
+      // ignore
+    }
+  }
+
   getRecentActivity(date) {
     return this.dashboardCache.get(`recent_activity_${date}`);
   }
@@ -142,6 +179,36 @@ class CacheService {
   setReport(reportType, params, reportData) {
     const key = `report_${reportType}_${JSON.stringify(params)}`;
     this.reportsCache.set(key, reportData);
+  }
+
+  // Leave counts analytics (TTL 10 min; cache failure must never break the API)
+  getLeaveCountsAnalytics(key) {
+    try {
+      return this.reportsCache.get(`leave_analytics_${key}`);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  setLeaveCountsAnalytics(key, value, ttlSeconds = 600) {
+    try {
+      this.reportsCache.set(`leave_analytics_${key}`, value, ttlSeconds);
+    } catch (e) {
+      // Cache failure must never break the API
+    }
+  }
+
+  invalidateLeaveAnalytics() {
+    try {
+      const keys = this.reportsCache.keys();
+      keys.forEach(key => {
+        if (key.startsWith('leave_analytics_')) {
+          this.reportsCache.del(key);
+        }
+      });
+    } catch (e) {
+      // Cache failure must never break the API
+    }
   }
 
   // Generic caching methods
@@ -228,6 +295,7 @@ class CacheService {
     if (date) {
       this.dashboardCache.del(`dashboard_${date}`);
       this.dashboardCache.del(`recent_activity_${date}`);
+      this.dashboardCache.del(`pending_leaves_${date}`);
     } else {
       this.dashboardCache.flushAll();
     }

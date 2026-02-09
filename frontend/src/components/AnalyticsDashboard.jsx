@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import socket from '../socket';
-
+import { formatISTDate, formatISTTime } from '../utils/istTime';
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const AnalyticsDashboard = () => {
   const { user } = useAuth();
@@ -273,7 +273,7 @@ const AnalyticsDashboard = () => {
             textAlign: 'center',
             mb: 1
           }}>
-            📅 {new Date(overviewData.date).toLocaleDateString('en-US', { 
+            📅 {formatISTDate(overviewData.date, { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
@@ -293,7 +293,7 @@ const AnalyticsDashboard = () => {
               display: 'block',
               mt: 1
             }}>
-              Last updated: {lastUpdated.toLocaleTimeString()}
+              Last updated: {formatISTTime(lastUpdated, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
             </Typography>
           )}
         </CardContent>
@@ -630,10 +630,7 @@ const AnalyticsDashboard = () => {
                               color: COLORS.textSecondary,
                               fontWeight: '500'
                             }}>
-                              Login: {new Date(employee.loginTime).toLocaleTimeString('en-US', { 
-                                timeZone: 'Asia/Kolkata', 
-                                hour12: true 
-                              })}
+                              Login: {formatISTTime(employee.loginTime, { hour: '2-digit', minute: '2-digit', hour12: true })}
                               {employee.lateMinutes > 0 && (
                                 <span style={{ 
                                   color: COLORS.warning, 

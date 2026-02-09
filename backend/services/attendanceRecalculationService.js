@@ -169,9 +169,13 @@ const cleanupOrphanedLeaveReferences = async (userId = null, startDate, endDate)
                     const user = await User.findById(log.user).populate('shiftGroup');
                     if (user && user.shiftGroup) {
                         const { recalculateLateStatus } = require('./dailyStatusService');
+                        const lateArrivalMarksHalfDay = !!(user.featurePermissions && user.featurePermissions.lateArrivalMarksHalfDay);
                         const recalculated = await recalculateLateStatus(
                             log.clockInTime,
-                            user.shiftGroup
+                            user.shiftGroup,
+                            null, // gracePeriodMinutes (will be fetched from settings)
+                            log.totalWorkingHours, // Pass working hours for priority logic
+                            lateArrivalMarksHalfDay
                         );
                         log.attendanceStatus = recalculated.attendanceStatus;
                         log.isLate = recalculated.isLate;

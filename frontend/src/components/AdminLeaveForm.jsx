@@ -17,6 +17,7 @@ const initialFormState = {
     alternateDate: null,
     reason: '',
     status: 'Pending',
+    appliedDate: null, // Employee applied date (only editable in admin edit mode)
 };
 
 const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving }) => {
@@ -35,6 +36,7 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     alternateDate: request.alternateDate ? new Date(request.alternateDate) : null,
                     reason: request.reason || '',
                     status: request.status || 'Pending',
+                    appliedDate: request.createdAt ? new Date(request.createdAt) : null,
                 });
             } else {
                 setFormData(initialFormState);
@@ -69,6 +71,10 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
 
     const handleAlternateDateChange = (date) => {
         setFormData(prev => ({ ...prev, alternateDate: date }));
+    };
+
+    const handleAppliedDateChange = (date) => {
+        setFormData(prev => ({ ...prev, appliedDate: date }));
     };
 
     const handleSaveClick = () => {
@@ -472,9 +478,13 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     {formData.requestType === 'Compensatory' && (
                         <LocalizationProvider dateAdapter={AdapterDateFns}>
                             <DatePicker 
-                                label="Alternate Working Date" 
+                                label="Alternate Working Date (Saturday or Sunday)" 
                                 value={formData.alternateDate} 
                                 onChange={handleAlternateDateChange}
+                                shouldDisableDate={(date) => {
+                                    const day = date.getDay();
+                                    return day !== 0 && day !== 6;
+                                }}
                                 slotProps={{
                                     textField: {
                                         fullWidth: true,
@@ -547,6 +557,47 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             },
                         }}
                     />
+                    {/* Employee Applied Date - Admin only field, only visible when editing */}
+                    {isEditing && (
+                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                            <DatePicker 
+                                label="Employee Applied Date" 
+                                value={formData.appliedDate} 
+                                onChange={handleAppliedDateChange}
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        placeholder: 'Select Date',
+                                        sx: {
+                                            // redesigned form field UI – neutral theme
+                                            '& .MuiInputLabel-root': {
+                                                color: '#6B7280',
+                                                fontSize: '0.875rem',
+                                                '&.Mui-focused': {
+                                                    color: '#111827',
+                                                },
+                                            },
+                                            '& .MuiOutlinedInput-root': {
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '8px',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#D1D5DB',
+                                                },
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#9CA3AF',
+                                                },
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: '#111827',
+                                                    borderWidth: '1px',
+                                                },
+                                            },
+                                        }
+                                    }
+                                }}
+                            />
+                        </LocalizationProvider>
+                    )}
+
                     {/* Status Dropdown - Admin only field */}
                     <FormControl fullWidth required sx={{
                         // redesigned form field UI – neutral theme

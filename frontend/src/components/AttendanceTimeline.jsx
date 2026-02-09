@@ -7,28 +7,23 @@ import {
     getISTDateString, 
     parseISTDate, 
     getISTWeekRange,
-    isSameISTDay
+    isSameISTDay,
+    formatISTTime
 } from '../utils/istTime';
 import {
     formatDuration,
     getDisplayStatus
 } from '../utils/attendanceRenderUtils';
+import { getExpectedWeeklyWorkingHours } from '../utils/saturdayUtils';
 import '../styles/AttendanceTimeline.css';
 
-// Helper to format shift time from "HH:mm" to "hh:mm AM/PM" in IST
+// Format shift time "HH:mm" as IST display (hh:mm AM/PM)
 const formatShiftTime = (time) => {
     if (!time) return '';
-    const [hours, minutes] = time.split(':');
-    // Create a date at midnight IST, then set the hours
-    const todayIST = getISTNow();
-    const todayStr = getISTDateString(todayIST);
-    const date = parseISTDate(`${todayStr}T${hours}:${minutes}:00+05:30`);
-    return date.toLocaleTimeString('en-US', { 
-        timeZone: 'Asia/Kolkata',
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-    });
+    const [hours, minutes] = String(time).split(':');
+    const todayStr = getISTDateString(getISTNow());
+    const date = parseISTDate(`${todayStr}T${hours.padStart(2, '0')}:${(minutes || '00').padStart(2, '0')}:00+05:30`);
+    return formatISTTime(date, { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 // Optimized: Calculate 'now' internally using IST
@@ -110,13 +105,14 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
     }, [weekDays, summary]);
     
     const payableHours = useMemo(() => {
-        // FIXED: Use backend payable hours calculation based on working days and alternate Saturday policy
-        if (summary && summary.totalPayableMinutes !== undefined) {
-            return formatDuration(summary.totalPayableMinutes);
+        // Dynamic expected weekly hours from employee Saturday schedule: 6 working days → 54 hrs, 5 → 45 hrs
+        const saturdayDate = weekDays.length > 6 ? weekDays[6].date : null;
+        if (saturdayDate) {
+            const { expectedMinutes } = getExpectedWeeklyWorkingHours(saturdayPolicy, saturdayDate);
+            return formatDuration(expectedMinutes);
         }
-        // Fallback: Old calculation (incorrect - only for backward compatibility)
-        return formatDuration(summaryStats.present * 540); // 9 hours per present day
-    }, [summaryStats, summary]);
+        return formatDuration(54 * 60); // default 54 hrs if week not ready
+    }, [weekDays, saturdayPolicy]);
 
     const timeAxisLabels = ['10AM', '11AM', '12PM', '01PM', '02PM', '03PM', '04PM', '05PM', '06PM', '07PM'];
 

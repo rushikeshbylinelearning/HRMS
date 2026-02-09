@@ -1,37 +1,30 @@
-
 // frontend/src/components/ShiftInfoDisplay.jsx
+// Required Log Out: backend calculatedLogoutTime is the baseline; during active break we project in real time
+// by adding (now - receivedAt) so the display stays in sync with BreakTimer/ShiftProgressBar.
 import React, { useState, useEffect, useRef } from 'react';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import UpdateIcon from '@mui/icons-material/Update';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TimerOffIcon from '@mui/icons-material/TimerOff';
+import { formatISTTime, getISTDateString, getISTNow, parseISTDate } from '../utils/istTime';
 import '../styles/ShiftInfoDisplay.css';
 
 const formatTimeIST = (time) => {
     if (!time) return 'N/A';
-
     let date;
     if (String(time).includes('T')) {
         date = new Date(time);
-    } 
-    else {
+    } else {
         const timeParts = String(time).split(':');
         if (timeParts.length < 2) return 'N/A';
         const hours = parseInt(timeParts[0], 10);
         const minutes = parseInt(timeParts[1], 10);
         if (isNaN(hours) || isNaN(minutes)) return 'N/A';
-        date = new Date();
-        date.setHours(hours, minutes, 0, 0);
+        const todayStr = getISTDateString(getISTNow());
+        date = parseISTDate(`${todayStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+05:30`);
     }
-
     if (isNaN(date.getTime())) return 'N/A';
-    
-    return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Kolkata'
-    });
+    return formatISTTime(date, { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 /**
@@ -62,14 +55,31 @@ const getShiftStartDateTimeIST = (onDate, shiftStartTime) => {
 };
 
 
-const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
+/**
+ * Compute projected logout time during active break.
+ * Baseline = backend calculatedLogoutTime (at last fetch). Backend included active break duration up to fetch time.
+ * We add (now - receivedAt) so the displayed time moves in real time without refetch.
+ * Safe: we never reduce the time (Math.max(0, delta)); missing data falls back to baseline.
+ */
+const computeProjectedLogoutTime = (baselineIso, receivedAtMs) => {
+    if (!baselineIso || !receivedAtMs || receivedAtMs <= 0) return null;
+    const baseline = new Date(baselineIso);
+    if (isNaN(baseline.getTime())) return null;
+    const now = Date.now();
+    const deltaMs = Math.max(0, now - receivedAtMs);
+    return new Date(baseline.getTime() + deltaMs);
+};
+
+const ShiftInfoDisplay = ({ dailyData, fallbackShift, lastLogoutBaselineReceivedAtRef, isOnBreak, unifiedState: unifiedStateProp }) => {
     const [liveLogoutTime, setLiveLogoutTime] = useState(null);
     const { shift, sessions, breaks, status } = dailyData || {};
     const clockInTime = sessions?.[0]?.startTime;
+    // When unified state is provided, required logout = clockInTime + effectiveShiftDuration (live, no desync with timer/progress).
+    const logoutTimeToShow = unifiedStateProp?.requiredLogoutTime ?? liveLogoutTime;
     const intervalRef = useRef(null);
     const rafRef = useRef(null);
     const lastTimeStringRef = useRef('');
-    
+
     // Use shift from dailyData, or fallback to the user's assigned shift
     const effectiveShift = shift || fallbackShift;
 
@@ -105,45 +115,56 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
             return;
         }
 
-        // The live calculation should only run when the user is actively clocked in or on break.
+        // When not clocked in or not on break, show backend value only (no projection).
         const shouldRunTimer = status === 'Clocked In' || status === 'On Break';
-
         if (!shouldRunTimer) {
-             // If not clocked in, but we have a server time, display that statically.
             if (dailyData.calculatedLogoutTime) {
                 const staticTime = new Date(dailyData.calculatedLogoutTime);
                 setLiveLogoutTime(staticTime);
             }
-            return; // Exit the effect, no timer needed.
+            return;
         }
 
-        // BACKEND-AUTHORITATIVE: Use server-calculated logout time directly
-        // The backend already includes active break duration in its calculation
-        // Frontend only displays the authoritative backend value
-        const updateLogoutTime = () => {
-            if (dailyData?.calculatedLogoutTime) {
-                const serverLogoutTime = new Date(dailyData.calculatedLogoutTime);
+        const baselineIso = dailyData?.calculatedLogoutTime;
+        const receivedAtRef = lastLogoutBaselineReceivedAtRef;
+
+        // ON BREAK: real-time projection so Required Log Out moves with break timer.
+        // Baseline = backend value at last fetch. Projected = baseline + (now - receivedAt).
+        // Safe: we only add time; never reduce. After break ends, refetch provides new baseline.
+        if (isOnBreak && baselineIso && receivedAtRef?.current) {
+            const updateProjected = () => {
+                const projected = computeProjectedLogoutTime(baselineIso, receivedAtRef.current);
+                if (!projected) return;
+                const timeString = projected.toISOString();
+                if (lastTimeStringRef.current !== timeString) {
+                    lastTimeStringRef.current = timeString;
+                    setLiveLogoutTime(projected);
+                }
+            };
+            updateProjected();
+            intervalRef.current = setInterval(updateProjected, 1000);
+            return () => {
+                if (intervalRef.current) {
+                    clearInterval(intervalRef.current);
+                    intervalRef.current = null;
+                }
+            };
+        }
+
+        // NOT ON BREAK: show backend value; sync when dailyData updates (e.g. after refetch).
+        const updateFromBackend = () => {
+            if (baselineIso) {
+                const serverLogoutTime = new Date(baselineIso);
                 const timeString = serverLogoutTime.toISOString();
-                
-                // Only update state if time actually changed (prevents unnecessary re-renders)
                 if (lastTimeStringRef.current !== timeString) {
                     lastTimeStringRef.current = timeString;
                     setLiveLogoutTime(serverLogoutTime);
                 }
             }
         };
-        
-        updateLogoutTime(); // Run once immediately
+        updateFromBackend();
+        intervalRef.current = setInterval(updateFromBackend, 5000);
 
-        // Refresh logout time periodically when clocked in or on break
-        // This ensures we get updated backend calculations as active breaks progress
-        // The backend recalculates on each API call, including current active break duration
-        intervalRef.current = setInterval(() => {
-            // Trigger a refresh by updating the logout time from dailyData
-            // The parent component should refresh dailyData periodically or via socket events
-            updateLogoutTime();
-        }, 5000); // Refresh every 5 seconds to get updated backend calculation
-        
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
@@ -153,9 +174,8 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
             }
-        }; 
-
-    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog]);
+        };
+    }, [clockInTime, breaks, effectiveShift, status, dailyData?.calculatedLogoutTime, dailyData?.hasLog, dailyData?.attendanceLog, isOnBreak]);
 
     if (!effectiveShift) {
         return <div className="shift-info-display-container no-shift">No shift assigned for today.</div>;
@@ -165,7 +185,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
     const isFlexible = !effectiveShift.startTime;
     
     const formattedClockIn = formatTimeIST(clockInTime);
-    const formattedLiveLogout = formatTimeIST(liveLogoutTime);
+    const formattedLiveLogout = formatTimeIST(logoutTimeToShow);
     
     // CRITICAL: Only show late/half-day flags if log actually exists
     // This prevents stale UI state after log deletion
@@ -194,7 +214,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift }) => {
                 <div className="info-value shift-name-value">
                     <AccessTimeIcon fontSize="small" />
                     {isFlexible
-                        ? `${shiftName} (${effectiveShift.duration || effectiveShift.durationHours || 'Unknown'} Hours)`
+                        ? `${shiftName} (${(effectiveShift.duration ?? effectiveShift.durationHours) > 0 ? (effectiveShift.duration ?? effectiveShift.durationHours) : '9'} Hours)`
                         : `${shiftName} (${formatTimeIST(effectiveShift.startTime)} - ${formatTimeIST(effectiveShift.endTime)})`
                     }
                 </div>

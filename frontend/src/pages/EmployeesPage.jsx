@@ -96,12 +96,13 @@ const EmployeesPage = () => {
         try {
             // If searching, fetch all employees for client-side filtering
             // Otherwise, use server-side pagination
+            // includeInactive=true: deactivated employees MUST remain visible on Employees page (Admin)
             const shouldFetchAll = debouncedSearchTerm.length > 0;
             
             const [empsRes, shiftsRes] = await Promise.all([
                 shouldFetchAll 
-                    ? api.get('/admin/employees?all=true')
-                    : api.get(`/admin/employees?page=${page + 1}&limit=${rowsPerPage}`),
+                    ? api.get('/admin/employees?all=true&includeInactive=true')
+                    : api.get(`/admin/employees?page=${page + 1}&limit=${rowsPerPage}&includeInactive=true`),
                 api.get('/admin/shifts'),
             ]);
             

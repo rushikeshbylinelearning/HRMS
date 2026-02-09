@@ -14,4 +14,7 @@ const attendanceSessionSchema = new mongoose.Schema({
   isLegacySession: { type: Boolean, default: false }, // Flag for legacy/orphan sessions
 }, { timestamps: true });
 
+// Index for "who's in" and dashboard queries: match active sessions (endTime: null)
+attendanceSessionSchema.index({ endTime: 1 }, { background: true });
+
 module.exports = mongoose.model('AttendanceSession', attendanceSessionSchema);

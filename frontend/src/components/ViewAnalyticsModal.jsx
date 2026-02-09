@@ -50,6 +50,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import socket from '../socket';
+import { getISTDateString, getISTNow, formatISTTime, formatISTDate } from '../utils/istTime';
 import './ViewAnalyticsModal.css';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
@@ -158,15 +159,7 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
     }
   }, [counter, analyticsData]);
 
-  const formatISTDateForAPI = (date) => {
-    const dtf = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Kolkata',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    return dtf.format(date);
-  };
+  const formatISTDateForAPI = (date) => getISTDateString(date || getISTNow());
 
   const fetchEmployeeData = async () => {
     setLoading(true);
@@ -178,14 +171,9 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
       console.log('Employee ID:', employeeId);
       console.log('Employee Name:', employeeName);
       
-      // Get current date in IST for API call
-      const todayIST = new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"});
-      const todayISTDate = new Date(todayIST);
-      
-      // Format dates properly to avoid timezone issues
       const startYear = selectedYear;
       const startDate = `${startYear}-01-01`;
-      const endDate = formatISTDateForAPI(todayISTDate);
+      const endDate = formatISTDateForAPI(getISTNow());
       
       console.log('Fetching analytics for:', `/analytics/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`);
       
@@ -354,15 +342,9 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
 
   if (!open) return null;
 
-  // Format time to HH:MM in IST
   const formatTime = (dateString) => {
     if (!dateString) return '--:--';
-    const date = new Date(dateString);
-    // Convert to IST for display
-    const istTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-    const hours = String(istTime.getHours()).padStart(2, '0');
-    const minutes = String(istTime.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+    return formatISTTime(dateString, { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   // Format late minutes to HH:MM format
@@ -1495,15 +1477,10 @@ const ViewAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => {
                                 <TableCell sx={{ fontWeight: 'medium' }}>
                                   <Box>
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                      {new Date(log.attendanceDate).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric'
-                                      })}
+                                      {formatISTDate(log.attendanceDate, { month: 'short', day: 'numeric' })}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                      {new Date(log.attendanceDate).toLocaleDateString('en-US', {
-                                        weekday: 'short'
-                                      })}
+                                      {formatISTDate(log.attendanceDate, { weekday: 'short' })}
                                     </Typography>
                                   </Box>
                                 </TableCell>

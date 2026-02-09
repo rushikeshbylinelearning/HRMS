@@ -5,9 +5,17 @@ process.env.TZ = 'Asia/Kolkata';
 
 require('dotenv').config();
 
-// Verify timezone is set correctly
+// Verify timezone is set correctly (safe - no timezone conversion at import time)
 console.log(`🌏 Process timezone set to: ${process.env.TZ}`);
-console.log(`🌏 Current IST time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })}`);
+// SAFE: Only log timezone setting, don't execute timezone conversion at import time
+// Timezone conversion will happen at runtime via istTime utilities
+try {
+    const now = new Date();
+    console.log(`🌏 Server started at: ${now.toISOString()}`);
+} catch (err) {
+    // Never crash on import - just log error
+    console.error('⚠️ Could not log startup time:', err.message);
+}
 
 // Validate environment variables before starting
 const { validateAndExit } = require('./utils/envValidator');
@@ -42,6 +50,7 @@ require('./models/BreakLog');
 require('./models/LeaveRequest');
 require('./models/Setting');
 require('./models/ExtraBreakRequest');
+require('./models/EarlyCheckoutRequest');
 require('./models/NewNotification'); // <-- THIS IS THE FIX
 require('./models/Holiday');
 require('./models/OfficeLocation');
@@ -177,8 +186,8 @@ app.use(
         ...defaultDirectives,
         // Allow embedding from SSO portal - CRITICAL for iframe embedding
         'frame-ancestors': process.env.NODE_ENV === 'development' 
-          ? ["'self'", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://127.0.0.1:5175"]
-          : ["'self'", "https://sso.legatolxp.online", "https://sso.bylinelms.com", "https://sso.leagatolxp.online", "https://attendance.bylinelms.com"],
+          ? ["'self'", "http://localhost:5173"]
+          : ["'self'", "https://attendance.bylinelms.com"],
       },
     },
     // Disable X-Frame-Options since we're using CSP frame-ancestors instead
@@ -261,8 +270,13 @@ app.use((req, res, next) => {
   
   // Production allowed origins for iframe embedding
   const allowedOrigins = process.env.NODE_ENV === 'development' 
-    ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
+          ? ["'self'", "http://localhost:5173"]
+          : ["'self'", "https://attendance.bylinelms.com"]
+
+
+
+    // ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
+    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
   
   // If frame-ancestors is not in CSP, add it
   // If it exists but is different, replace it
@@ -370,6 +384,23 @@ const staticOptions = {
 // Static file serving - MUST be before any authentication middleware
 // These routes are public and should never trigger authentication
 app.use('/avatars', express.static(path.join(__dirname, 'uploads/avatars'), staticOptions));
+// Medical certificates: serve GridFS by ID (24-char hex) first, then static for legacy filenames
+app.get('/medical-certificates/:fileId', (req, res, next) => {
+    const id = req.params.fileId;
+    if (/^[a-fA-F0-9]{24}$/.test(id) && mongoose.connection.readyState === 1) {
+        const { GridFSBucket } = require('mongodb');
+        const { ObjectId } = require('mongodb');
+        const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'medicalCertificates' });
+        const downStream = bucket.openDownloadStream(new ObjectId(id));
+        downStream.on('data', (chunk) => res.write(chunk));
+        downStream.on('end', () => res.end());
+        downStream.on('error', (err) => {
+            if (!res.headersSent) res.status(404).json({ error: 'File not found' });
+        });
+        return;
+    }
+    next();
+});
 app.use('/medical-certificates', express.static(path.join(__dirname, 'uploads/medical-certificates'), staticOptions));
 app.use('/public', express.static(path.join(__dirname, 'public'), staticOptions));
 
@@ -710,10 +741,24 @@ app.use((req, res, next) => {
   }
   
   // For all other routes, serve the React app with no-cache headers
+  const indexPath = path.join(__dirname, '../frontend/dist/index.html');
+  const fs = require('fs');
+  if (!fs.existsSync(indexPath)) {
+    logger.warn('[SPA] Frontend build not found at ' + indexPath + ' – ensure frontend/dist exists when serving SPA');
+    res.set('Cache-Control', 'no-cache');
+    return res.status(503).send(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setup Required</title></head><body><h1>Frontend not built</h1><p>Deploy <code>frontend/dist</code> or set up the frontend URL. API is available at /api.</p></body></html>'
+    );
+  }
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      logger.error('[SPA] sendFile failed:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 });
 
 const PORT = process.env.PORT || 3001;

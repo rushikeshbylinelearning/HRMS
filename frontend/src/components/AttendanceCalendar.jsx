@@ -22,18 +22,39 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
     const isFutureDate = day.date > getISTNow() && !day.log && day.status !== 'holiday' && day.status !== 'leave' && day.status !== 'weekend' && day.status !== 'week-off';
     const hasNoAttendanceData = !day.log || !day.log.sessions || day.log.sessions.length === 0;
     const isNotHolidayOrLeave = !day.status || (!day.status.startsWith('holiday') && !day.status.startsWith('leave') && day.status !== 'comp-off' && day.status !== 'swap-leave');
-    const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave);
+    // CRITICAL FIX: Prevent opening modal for absent/week-off/weekend when there's no log
+    const isAbsentWeekOffOrWeekend = day.status === 'absent' || day.status === 'week-off' || day.status === 'weekend';
+    const shouldPreventClick = isAbsentWeekOffOrWeekend && hasNoAttendanceData && !day.leave && !day.holiday;
+    const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave) && !shouldPreventClick;
 
     // Determine if this is a half-day leave for UI rendering (UI-only; backend remains source of truth)
     const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
+    // CRITICAL FIX: Get leave type from log.leaveInfo first, then fallback to leave prop
+    // Backend sends leaveInfo with requestType and leaveType fields
     const leaveTypeText = day.log?.leaveInfo?.requestType
         ? formatLeaveRequestType(day.log.leaveInfo.requestType)
         : leave?.requestType
             ? formatLeaveRequestType(leave.requestType)
-            : 'Leave';
+            : day.log?.leaveInfo?.leaveType
+                ? formatLeaveRequestType(day.log.leaveInfo.leaveType)
+                : leave?.leaveType
+                    ? formatLeaveRequestType(leave.leaveType)
+                    : 'Leave';
 
     const lateMinutes = Number(day.log?.lateMinutes || 0);
-    const isLateHalfDay = day.status === 'half-day' && lateMinutes > 0;
+    // halfDayReasonCode (LATE_LOGIN vs INSUFFICIENT_WORKING_HOURS) drives secondary label in summary
+    const hasEarlyCheckoutNote = day.log?.hasEarlyCheckoutNote === true;
+    const earlyCheckoutNoteText = (day.log?.earlyCheckoutNote && String(day.log.earlyCheckoutNote).trim()) || '';
+    const earlyCheckoutTooltip = earlyCheckoutNoteText
+        ? `Early Checkout Reason:\n${earlyCheckoutNoteText}`
+        : '';
+
+    // Strict override check: show override UI ONLY when explicit admin override AND valid note exists.
+    // Do NOT infer from status, hours, or half-day. Guard against null/empty/legacy.
+    const overrideNote = day.log?.overrideReason;
+    const hasValidOverride = day.log?.overriddenByAdmin === true
+        && typeof overrideNote === 'string'
+        && overrideNote.trim().length > 0;
 
     const dayData = {
         log: day.log,
@@ -56,26 +77,52 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
             {day.status === 'present' && (
                 <div className="attendance-status present">
                     <div className="status-label">Present</div>
-                    <div className="hours-worked">{day.hoursWorked}</div>
+                    {hasValidOverride && (
+                        <div className="override-note-primary" style={{ fontSize: '0.65rem', marginTop: '2px', color: '#856404', fontWeight: 700 }} title={overrideNote.trim()}>
+                            {overrideNote.trim().length > 36 ? `${overrideNote.trim().slice(0, 36)}…` : overrideNote.trim()}
+                        </div>
+                    )}
+                    {day.hoursWorked != null && day.hoursWorked !== '' && (
+                        <div className={`hours-worked ${hasValidOverride ? 'override-hours-secondary' : ''}`} style={hasValidOverride ? { fontSize: '0.7rem', color: 'rgba(0,0,0,0.6)', marginTop: '2px' } : undefined}>
+                            {day.hoursWorked}
+                        </div>
+                    )}
+                    {hasEarlyCheckoutNote && (
+                        <span className="early-checkout-nt-badge" title={earlyCheckoutTooltip}>ECN</span>
+                    )}
                 </div>
             )}
             
             {day.status === 'half-day' && (
                 <div className="attendance-status half-day">
-                    {day.hoursWorked && (
-                        <div className="status-meta status-meta-top">{day.hoursWorked}</div>
-                    )}
-                    <div className="status-badge">Half Day</div>
-                    {isLateHalfDay ? (
+                    {hasValidOverride ? (
                         <>
-                            <div className="status-primary">Late Arrival</div>
-                            <div className="status-secondary">Late by {lateMinutes} minutes</div>
+                            <div className="override-note-primary" style={{ fontSize: '0.7rem', fontWeight: 700, color: '#856404' }} title={overrideNote.trim()}>
+                                {overrideNote.trim().length > 40 ? `${overrideNote.trim().slice(0, 40)}…` : overrideNote.trim()}
+                            </div>
+                            {day.hoursWorked != null && day.hoursWorked !== '' && (
+                                <div className="override-hours-secondary" style={{ fontSize: '0.7rem', color: 'rgba(0,0,0,0.6)', marginTop: '2px' }}>{day.hoursWorked}</div>
+                            )}
+                            {hasEarlyCheckoutNote && (
+                                <span className="early-checkout-nt-badge" title={earlyCheckoutTooltip}>ECN</span>
+                            )}
                         </>
                     ) : (
                         <>
-                            <div className="status-primary">Half Day</div>
-                            {day.log?.halfDayReason && (
-                                <div className="status-secondary">{day.log.halfDayReason}</div>
+                            {day.hoursWorked != null && day.hoursWorked !== '' && (
+                                <div className="status-meta status-meta-top">{day.hoursWorked}</div>
+                            )}
+                            <div className="status-badge">Half Day</div>
+                            {day.log?.halfDayReasonCode === 'LATE_LOGIN' ? (
+                                <>
+                                    <div className="status-primary">Late Arrival</div>
+                                    <div className="status-secondary">Late by {lateMinutes} minutes</div>
+                                </>
+                            ) : (
+                                <div className="status-secondary">Incomplete hours</div>
+                            )}
+                            {hasEarlyCheckoutNote && (
+                                <span className="early-checkout-nt-badge" title={earlyCheckoutTooltip}>ECR</span>
                             )}
                         </>
                     )}
@@ -113,8 +160,8 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
             )}
             
             {day.status === 'leave' && (
-                <div className={`attendance-status leave ${isHalfDayLeave ? 'half-day-leave' : 'full-day-leave'}`} title={leave?.reason || ''}>
-                    {/* Half-day leave: keep badge, move leave type into the translucent secondary box (no "Applied leave") */}
+                <div className={`attendance-status leave ${isHalfDayLeave ? 'half-day-leave' : 'full-day-leave'}`} title={leave?.reason || day.log?.leaveReason || day.log?.leaveInfo?.reason || ''}>
+                    {/* Half-day leave: show only leave type, not the full reason */}
                     {isHalfDayLeave ? (
                         <>
                             {day.hoursWorked && (
@@ -125,9 +172,9 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
                         </>
                     ) : (
                         <>
-                            {/* Full-day leave: remove redundant top "Leave" text */}
-                            <div className="status-primary">Full Day</div>
-                            <div className="status-secondary">Leave — {leaveTypeText}</div>
+                            {/* Full-day leave: show only "Full Day — Leave — <Leave Type>" format, reason only in tooltip and log detail */}
+                            <div className="status-primary">Full Day — Leave</div>
+                            <div className="status-secondary">{leaveTypeText}</div>
                         </>
                     )}
                 </div>
@@ -220,10 +267,11 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick }) => {
                     status = 'swap-leave';
                 } else if (statusInfo.status.startsWith('Leave -') || statusInfo.status === 'Leave' || statusInfo.status === 'On Leave') {
                     status = 'leave';
-                    // UI-only: if backend indicates a half-day leave and provides worked minutes, display it (no recalculation)
+                    // UI-only: if backend indicates a half-day leave, display elapsed shift time
                     const isHalfDayLeave = log?.leaveInfo?.leaveType && String(log.leaveInfo.leaveType).startsWith('Half Day');
-                    if (isHalfDayLeave && log?.totalWorkedMinutes) {
-                        hoursWorked = formatDuration(log.totalWorkedMinutes) + ' Hrs';
+                    if (isHalfDayLeave && log?.clockInTime && log?.clockOutTime) {
+                        const elapsedShiftMinutes = (new Date(log.clockOutTime) - new Date(log.clockInTime)) / (1000 * 60);
+                        hoursWorked = formatDuration(Math.floor(elapsedShiftMinutes)) + ' Hrs';
                     }
                 } else if (statusInfo.status === 'Weekly Off' || statusInfo.status === 'Week Off' || statusInfo.status === 'Day Off') {
                     status = 'week-off';
@@ -235,14 +283,45 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick }) => {
                     status = 'absent';
                 } else if (statusInfo.status === 'Present' || statusInfo.status === 'On-time' || statusInfo.status === 'Late') {
                     status = 'present';
-                    // Use backend computed totalWorkedMinutes
-                    if (log?.totalWorkedMinutes) {
-                        hoursWorked = formatDuration(log.totalWorkedMinutes) + ' Hrs';
+                    // NEW SHIFT MODEL: Show total shift time (elapsedShiftTime = clockOutTime - clockInTime, includes breaks)
+                    // For current day: show elapsed time so far if not clocked out yet
+                    // For past days: show total elapsed shift time
+                    if (log?.clockInTime) {
+                        const clockIn = new Date(log.clockInTime);
+                        let elapsedShiftMinutes = 0;
+                        
+                        if (log?.clockOutTime) {
+                            // Past day or clocked out: calculate total elapsed shift time
+                            elapsedShiftMinutes = (new Date(log.clockOutTime) - clockIn) / (1000 * 60);
+                        } else if (isToday) {
+                            // Current day, not clocked out: show elapsed time so far
+                            const now = getISTNow();
+                            elapsedShiftMinutes = (now - clockIn) / (1000 * 60);
+                        }
+                        
+                        if (elapsedShiftMinutes > 0) {
+                            hoursWorked = formatDuration(Math.floor(elapsedShiftMinutes)) + ' Hrs';
+                        }
                     }
                 } else if (statusInfo.status === 'Half-day') {
                     status = 'half-day';
-                    if (log?.totalWorkedMinutes) {
-                        hoursWorked = formatDuration(log.totalWorkedMinutes) + ' Hrs';
+                    // NEW SHIFT MODEL: Show total shift time (elapsedShiftTime = clockOutTime - clockInTime, includes breaks)
+                    if (log?.clockInTime) {
+                        const clockIn = new Date(log.clockInTime);
+                        let elapsedShiftMinutes = 0;
+                        
+                        if (log?.clockOutTime) {
+                            // Past day or clocked out: calculate total elapsed shift time
+                            elapsedShiftMinutes = (new Date(log.clockOutTime) - clockIn) / (1000 * 60);
+                        } else if (isToday) {
+                            // Current day, not clocked out: show elapsed time so far
+                            const now = getISTNow();
+                            elapsedShiftMinutes = (now - clockIn) / (1000 * 60);
+                        }
+                        
+                        if (elapsedShiftMinutes > 0) {
+                            hoursWorked = formatDuration(Math.floor(elapsedShiftMinutes)) + ' Hrs';
+                        }
                     }
                 } else {
                     status = 'absent';
@@ -272,11 +351,30 @@ const AttendanceCalendar = ({ logs, currentDate, onDayClick }) => {
                 isCurrentMonth,
                 isToday,
                 log,
+                // CRITICAL FIX: Get leaveInfo from log - backend always sends leaveInfo in log object
+                // even when there's no attendance log (backend creates log entry for each date)
                 leave: log?.leaveInfo || null,
                 holiday: log?.holidayInfo || null
             });
             
             current.setDate(current.getDate() + 1);
+        }
+        
+        // Remove trailing empty rows: find the last day of the current month and trim after its week ends
+        // This prevents showing extra empty rows when the month doesn't fill all 6 weeks
+        let lastCurrentMonthIndex = -1;
+        for (let i = days.length - 1; i >= 0; i--) {
+            if (days[i].isCurrentMonth) {
+                lastCurrentMonthIndex = i;
+                break;
+            }
+        }
+        
+        // If we found a last day, trim to end of that week (keep only complete weeks)
+        if (lastCurrentMonthIndex >= 0) {
+            const daysInWeek = 7;
+            const lastWeekEnd = Math.ceil((lastCurrentMonthIndex + 1) / daysInWeek) * daysInWeek;
+            return days.slice(0, lastWeekEnd);
         }
         
         return days;

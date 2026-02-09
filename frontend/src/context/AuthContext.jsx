@@ -322,7 +322,8 @@ export const AuthProvider = ({ children }) => {
                 open: true,
                 message: data.message
             });
-            
+            // Notify dashboard to refetch so "Today's Shift" / half-day status updates immediately
+            window.dispatchEvent(new CustomEvent('dashboard-refresh-requested'));
             // Refresh user data after a short delay
             setTimeout(() => {
                 refreshUserData().catch(console.error);
@@ -343,12 +344,30 @@ export const AuthProvider = ({ children }) => {
             }
         };
 
+        // Listen for user profile updates (e.g., Saturday policy changes)
+        const handleUserProfileUpdate = (data) => {
+            // Only refresh if this update is for the current user
+            if (data.userId === user._id || data.userId === user.id) {
+                if (data.field === 'alternateSaturdayPolicy') {
+                    setPermissionNotification({
+                        open: true,
+                        message: data.message || `Your Saturday policy has been updated to: ${data.newValue}`
+                    });
+                    
+                    // Refresh user data immediately to update Saturday policy
+                    refreshUserData().catch(console.error);
+                }
+            }
+        };
+
         socket.on('permissions_updated', handlePermissionUpdate);
         socket.on('employment_status_updated', handleEmploymentStatusUpdate);
+        socket.on('user_profile_updated', handleUserProfileUpdate);
 
         return () => {
             socket.off('permissions_updated', handlePermissionUpdate);
             socket.off('employment_status_updated', handleEmploymentStatusUpdate);
+            socket.off('user_profile_updated', handleUserProfileUpdate);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             // Don't disconnect socket here - let it handle reconnection automatically
             // socket.disconnect();

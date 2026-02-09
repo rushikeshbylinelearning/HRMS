@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
             shiftType,
             startTime: shiftType === 'Fixed' ? startTime : null,
             endTime: shiftType === 'Fixed' ? endTime : null,
-            durationHours: shiftType === 'Fixed' ? durationHours : null,
+            durationHours: shiftType === 'Fixed' ? durationHours : (durationHours != null && Number(durationHours) > 0 ? Number(durationHours) : 9),
             paidBreakMinutes: paidBreakMinutes || 60
         });
 
@@ -107,7 +107,7 @@ router.put('/:id', async (req, res) => {
             shiftType,
             startTime: shiftType === 'Fixed' ? startTime : null,
             endTime: shiftType === 'Fixed' ? endTime : null,
-            durationHours: shiftType === 'Fixed' ? durationHours : null,
+            durationHours: shiftType === 'Fixed' ? durationHours : (durationHours != null && Number(durationHours) > 0 ? Number(durationHours) : 9),
             paidBreakMinutes: paidBreakMinutes || 60
         };
 

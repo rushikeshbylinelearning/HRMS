@@ -70,11 +70,13 @@ router.post('/start', authenticateToken, async (req, res) => {
         }
 
         // PHASE 4 OPTIMIZATION: Cache invalidation on mutation
-        // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${today}`;
         cache.delete(cacheKey);
-        // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
+        cache.delete(`employee_dashboard:${userId}:${today}`);
+        // Invalidate real dashboard cache (cacheService) so "who's in" and summary stay fresh
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateDashboard(today);
 
         // Emit Socket.IO event for real-time updates (replaces polling)
         try {
@@ -168,12 +170,10 @@ router.post('/end', authenticateToken, async (req, res) => {
         }
 
         // PHASE 4 OPTIMIZATION: Cache invalidation on mutation
-        // Invalidate status cache for this user and date
         const cacheKey = `status:${userId}:${today}`;
         cache.delete(cacheKey);
-        // Also invalidate dashboard summary cache
         cache.deletePattern(`dashboard-summary:*`);
-        // Also invalidate existing cacheService dashboard cache
+        cache.delete(`employee_dashboard:${userId}:${today}`);
         const cacheService = require('../services/cacheService');
         cacheService.invalidateDashboard(today);
 

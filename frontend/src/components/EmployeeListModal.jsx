@@ -9,7 +9,7 @@ import {
     Notes as NotesIcon
 } from '@mui/icons-material';
 import api from '../api/axios';
-
+import { formatISTTime, formatISTDate } from '../utils/istTime';
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
     const [employees, setEmployees] = useState([]);
@@ -68,11 +68,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
 
     const formatTime = (timeString) => {
         if (!timeString) return 'N/A';
-        return new Date(timeString).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
+        return formatISTTime(timeString, { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
     const getStatusColor = (status) => {
@@ -334,7 +330,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                                             }}>
                                                 Joined:
                                             </Box>
-                                            {new Date(employee.joiningDate).toLocaleDateString()}
+                                            {formatISTDate(employee.joiningDate)}
                                         </Typography>
                                     </Box>
                                 )}

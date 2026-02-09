@@ -1,51 +1,103 @@
 // backend/middleware/uploadMedicalCertificate.js
-const multer = require('multer');
+// Custom multipart parser for medical certificate upload (no multer).
+// Buffers file in memory and attaches req.file for GridFS upload in the route.
+
+const busboy = require('busboy');
 const path = require('path');
-const fs = require('fs');
 
-// Define the destination directory for medical certificates
-const uploadDir = path.join(__dirname, '../uploads/medical-certificates');
+const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
+const ALLOWED_EXT = /\.(jpeg|jpg|png|gif|pdf)$/i;
+const ALLOWED_MIME = /^(image\/(jpeg|jpg|png|gif)|application\/pdf)$/i;
 
-// Ensure the directory exists
-fs.mkdirSync(uploadDir, { recursive: true });
-
-// Set up storage engine using multer.diskStorage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Create a unique filename: user-ID-timestamp.extension
-        const uniqueSuffix = req.user.userId + '-' + Date.now();
-        cb(null, 'medical-cert-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-// Check File Type to allow PDFs and images
-function checkFileType(file, cb) {
-    // Allowed extensions
-    const filetypes = /jpeg|jpg|png|gif|pdf/;
-    // Check extension
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    // Check mime type
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-        return cb(null, true);
-    } else {
-        cb(new Error('Error: Only PDF and image files are allowed!'));
-    }
+function checkFileType(originalname, mimetype) {
+    const extOk = ALLOWED_EXT.test(path.extname(originalname || ''));
+    const mimeOk = ALLOWED_MIME.test(mimetype || '');
+    return extOk && mimeOk;
 }
 
-// Initialize upload variable with configuration
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB file size limit
-    fileFilter: (req, file, cb) => {
-        checkFileType(file, cb);
+/**
+ * Express middleware: parse multipart/form-data, expect field "medicalCertificate",
+ * buffer file in memory, set req.file = { buffer, originalname, mimetype, size }.
+ * Rejects missing file, invalid type, or size over limit.
+ */
+function uploadMedicalCertificate(req, res, next) {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+        return res.status(400).json({ error: 'Content-Type must be multipart/form-data.' });
     }
-});
 
-module.exports = upload;
+    const chunks = [];
+    let originalname = '';
+    let mimetype = '';
+    let totalSize = 0;
+    let foundFile = false;
+    let rejected = false;
 
+    function sendError(status, message) {
+        if (rejected) return;
+        rejected = true;
+        res.status(status).json({ error: message });
+    }
 
+    const bb = busboy({ headers: { 'content-type': contentType } });
+
+    bb.on('file', (fieldname, file, info) => {
+        if (fieldname !== 'medicalCertificate') {
+            file.resume();
+            return;
+        }
+        foundFile = true;
+        originalname = info.filename || 'unknown';
+        mimetype = info.mimeType || 'application/octet-stream';
+
+        file.on('data', (chunk) => {
+            if (rejected) return;
+            totalSize += chunk.length;
+            if (totalSize > FILE_SIZE_LIMIT) {
+                sendError(400, 'File size exceeds 10MB limit.');
+                file.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+
+        file.on('error', (err) => {
+            if (!rejected) sendError(500, 'Error reading uploaded file.');
+        });
+
+        file.on('end', () => {
+            if (rejected) return;
+            if (!checkFileType(originalname, mimetype)) {
+                sendError(400, 'Only PDF and image files (JPEG, PNG, GIF) are allowed.');
+            }
+        });
+
+        file.resume();
+    });
+
+    bb.on('finish', () => {
+        if (rejected) return;
+        if (!foundFile || chunks.length === 0) {
+            return sendError(400, 'Medical certificate file is required.');
+        }
+        if (!checkFileType(originalname, mimetype)) {
+            return sendError(400, 'Only PDF and image files (JPEG, PNG, GIF) are allowed.');
+        }
+        const buffer = Buffer.concat(chunks);
+        req.file = {
+            buffer,
+            originalname,
+            mimetype,
+            size: buffer.length
+        };
+        next();
+    });
+
+    bb.on('error', (err) => {
+        if (!rejected) sendError(400, 'Invalid multipart request.');
+    });
+
+    req.pipe(bb);
+}
+
+module.exports = uploadMedicalCertificate;

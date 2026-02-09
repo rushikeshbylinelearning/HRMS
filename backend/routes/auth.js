@@ -34,6 +34,7 @@ const { checkGeofence } = require('../services/geofencingService');
 const ssoService = require('../services/ssoService');
 const SSOVerification = require('../utils/ssoVerification');
 const jwtUtils = require('../utils/jwtUtils');
+const { isNightShiftEmployee } = require('../utils/istTime');
 
 const DEFAULT_SSO_ROLE = (() => {
     const allowed = ['Admin', 'HR', 'Employee', 'Intern'];
@@ -61,7 +62,9 @@ const normalizeEmail = (email) => {
 // SSO authentication uses /api/auth/sso-consume instead
 // =================================================================
 router.post('/login', loginGeofencingMiddleware, async (req, res) => {
-    const { email, password } = req.body;
+    // Validate required fields before any async work (production-safe)
+    const email = req.body && typeof req.body.email === 'string' ? req.body.email.trim() : '';
+    const password = req.body && typeof req.body.password === 'string' ? req.body.password : '';
     if (!email || !password) {
         return res.status(400).json({ error: 'Email/Employee Code and password are required.' });
     }
@@ -130,7 +133,10 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
         }
 
         const payload = { userId: user._id, email: user.email, role: user.role };
-        const token = jwtUtils.sign(payload, { expiresIn: '7d' });
+        // For night-shift employees, use 10 hours session duration, otherwise 7 days
+        const sessionHours = isNightShiftEmployee(user._id.toString()) ? 10 : 168; // 10h for night-shift, 7d (168h) for regular
+        const expiresIn = isNightShiftEmployee(user._id.toString()) ? '10h' : '7d';
+        const token = jwtUtils.sign(payload, { expiresIn });
 
         console.log('[Standalone Login] ✅ Login successful for:', user.email, 'via standalone route');
 
@@ -185,8 +191,12 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login Error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        // Safe logging: no stack trace or sensitive data; safe for production
+        console.error('[Standalone Login] Error:', error.name || 'Error', error.message || String(error));
+        if (error.code) console.error('[Standalone Login] Code:', error.code);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Internal server error' });
+        }
     }
 });
 
@@ -195,23 +205,31 @@ router.get('/me', async (req, res) => {
         let userId;
         let authMethod = 'local';
 
-        // Check for SSO session first
-        if (req.session && req.session.user) {
-            userId = req.session.user.id;
-            authMethod = 'SSO';
-            console.log('[/me] SSO session found for user:', userId);
-        } else {
+        // Check for SSO session first (defensive: session store may fail when hosted)
+        try {
+            if (req.session && req.session.user) {
+                userId = req.session.user.id;
+                authMethod = 'SSO';
+                console.log('[/me] SSO session found for user:', userId);
+            }
+        } catch (sessionErr) {
+            console.warn('[/me] Session access failed, falling back to JWT:', sessionErr?.message || sessionErr);
+        }
+
+        if (!userId) {
             // Check for JWT token in Authorization header
             const authHeader = req.headers['authorization'];
             const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-            if (token == null) {
+            if (token == null || (typeof token !== 'string')) {
                 console.log('[/me] No authorization header or token found');
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
             console.log('[/me] Attempting to verify JWT token...');
-            console.log('[/me] Token preview:', token.substring(0, 50) + '...');
+            if (typeof token === 'string') {
+                console.log('[/me] Token preview:', token.slice(0, 50) + (token.length > 50 ? '...' : ''));
+            }
             
             // Try to determine token type by decoding header
             let decoded;
@@ -322,6 +340,10 @@ router.get('/me', async (req, res) => {
                     code: 'TOKEN_VERIFICATION_FAILED'
                 });
             }
+        }
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
         }
 
         // Check cache first

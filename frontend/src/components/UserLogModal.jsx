@@ -7,44 +7,10 @@ import WorkIcon from '@mui/icons-material/Work';
 import TimerIcon from '@mui/icons-material/Timer';
 import WatchLaterIcon from '@mui/icons-material/WatchLater';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
+import { formatTimeForDisplay, formatDateForDisplay, formatDuration, formatDurationShort } from '../utils/attendanceRenderUtils';
 import '../styles/UserLogModal.css';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
-// Helper functions
-const formatTimeForDisplay = (dateTime) => {
-    if (!dateTime) return '--:--';
-    return new Date(dateTime).toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-    });
-};
-
-const formatDateForDisplay = (dateTime) => {
-    if (!dateTime) return 'N/A';
-    const date = dateTime instanceof Date ? dateTime : new Date(dateTime);
-    if (isNaN(date.getTime())) return 'N/A';
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayName = dayNames[date.getDay()];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-    return `${dayName}, ${day} ${month} ${year}`;
-};
-
-const formatDuration = (totalMins) => {
-    if (isNaN(totalMins) || totalMins < 0) return '00:00 Hrs';
-    const hours = String(Math.floor(totalMins / 60)).padStart(2, '0');
-    const minutes = String(Math.round(totalMins % 60)).padStart(2, '0');
-    return `${hours}:${minutes} Hrs`;
-};
-
-const formatDurationShort = (totalMins) => {
-    if (isNaN(totalMins) || totalMins < 0) return '0 Min(s)';
-    const mins = Math.round(totalMins);
-    return `${mins} Min(s)`;
-};
 
 const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leave }) => {
     const [timelineEvents, setTimelineEvents] = useState([]);
@@ -324,7 +290,7 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                             ) : leave ? (
                                 <Box>
                                     <Typography variant="h6" gutterBottom>
-                                        Leave: {formatLeaveRequestType(leave.requestType)}
+                                        Leave: {formatLeaveRequestType(leave.requestType || leave.leaveType || 'Leave')}
                                     </Typography>
                                     {leave.leaveType && (
                                         <Box sx={{ mt: 1, mb: 1 }}>
@@ -336,22 +302,32 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                                             />
                                         </Box>
                                     )}
-                                    {/* Use backend leaveReason if available, fallback to leave.reason */}
-                                    {(log?.leaveReason || leave?.reason) && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Reason: {log?.leaveReason || leave?.reason}
-                                        </Typography>
-                                    )}
-                                    {!log?.leaveReason && !leave?.reason && (
+                                    {/* CRITICAL FIX: Always display employee's leave reason when available */}
+                                    {/* Check multiple sources: log.leaveReason, leave.reason, log.leaveInfo.reason */}
+                                    {(log?.leaveReason || leave?.reason || log?.leaveInfo?.reason) ? (
+                                        <Box sx={{ mt: 1, p: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#1565c0', display: 'block', mb: 0.5 }}>
+                                                Employee's Reason:
+                                            </Typography>
+                                            <Typography variant="body2" color="text.primary">
+                                                {log?.leaveReason || leave?.reason || log?.leaveInfo?.reason}
+                                            </Typography>
+                                        </Box>
+                                    ) : (
                                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
                                             No reason provided
                                         </Typography>
                                     )}
                                     {/* Display half-day reason if this is a half-day leave */}
                                     {log?.isHalfDay && log?.halfDayReason && (
-                                        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
-                                            Half-day reason: {log.halfDayReason}
-                                        </Typography>
+                                        <Box sx={{ mt: 1, p: 1.5, bgcolor: '#fff3cd', borderRadius: 1, border: '1px solid #ffc107' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#856404', display: 'block', mb: 0.5 }}>
+                                                Half-Day Reason:
+                                            </Typography>
+                                            <Typography variant="body2" color="text.primary">
+                                                {log.halfDayReason}
+                                            </Typography>
+                                        </Box>
                                     )}
                                 </Box>
                             ) : null}
@@ -427,6 +403,41 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                                 </Paper>
                             </Grid>
                         </Grid>
+
+                        {/* Leave reason: Display when log exists and has leave information */}
+                        {(log?.attendanceStatus === 'Leave' || log?.leaveInfo || log?.leaveReason || leave) && (
+                            <Box sx={{ mt: 2, mb: 2, p: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#1565c0', display: 'block', mb: 0.5 }}>
+                                    Employee's Leave Reason:
+                                </Typography>
+                                <Typography variant="body2" color="text.primary">
+                                    {log?.leaveReason || log?.leaveInfo?.reason || leave?.reason || 'No reason provided'}
+                                </Typography>
+                                {(log?.leaveInfo?.leaveType || leave?.leaveType) && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Chip 
+                                            label={(log?.leaveInfo?.leaveType || leave?.leaveType) === 'Full Day' ? 'Full Day Leave' : (log?.leaveInfo?.leaveType || leave?.leaveType)}
+                                            color={(log?.leaveInfo?.leaveType || leave?.leaveType) === 'Full Day' ? 'primary' : 'secondary'}
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ fontWeight: 600 }}
+                                        />
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Admin override note: strict check — overrideReason required */}
+                        {log?.overriddenByAdmin === true && typeof log?.overrideReason === 'string' && log.overrideReason.trim().length > 0 && (
+                            <Box sx={{ mt: 2, mb: 2, p: 1.5, bgcolor: '#fff8e1', borderRadius: 1, border: '1px solid #ffc107' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#856404', display: 'block', mb: 0.5 }}>
+                                    Overridden
+                                </Typography>
+                                <Typography variant="body2" color="text.primary">
+                                    {log.overrideReason.trim()}
+                                </Typography>
+                            </Box>
+                        )}
 
                         {/* Timeline Events */}
                         {timelineEvents.length > 0 ? (

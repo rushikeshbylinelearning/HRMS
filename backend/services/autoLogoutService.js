@@ -20,6 +20,7 @@ const Setting = require('../models/Setting');
 const { getUserDailyStatus } = require('./dailyStatusService');
 const NewNotificationService = require('./NewNotificationService');
 const logAction = require('./logAction');
+const { isNightShiftEmployee } = require('../utils/istTime');
 
 // Note: We cannot import computeCalculatedLogoutTime directly as it requires sessions/breaks arrays
 // Instead, we use getUserDailyStatus which internally computes the logout time correctly
@@ -640,6 +641,15 @@ const checkAndAutoLogout = async () => {
 
                 // Populate user with shift group
                 const user = await User.findById(attendanceLog.user._id || attendanceLog.user).populate('shiftGroup');
+                
+                // CRITICAL: Skip auto-logout for night-shift employees
+                // Night-shift employees have extended attendance day until 6 AM
+                if (user && isNightShiftEmployee(user._id.toString())) {
+                    console.log(`[autoLogoutService] ⏰ Skipping auto-logout for ${user.email} - night-shift employee (attendance day extends until 6 AM)`);
+                    skippedCount++;
+                    continue;
+                }
+                
                 if (!user || !user.shiftGroup) {
                     // User exists but has no shift - this might be a legacy case
                     // Check if session is very old (> 24 hours)

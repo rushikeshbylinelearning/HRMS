@@ -219,12 +219,32 @@ const syncAttendanceOnLeaveRejection = async (leaveRequest, session) => {
             const hasClockIn = existingLog.clockInTime && existingLog.clockInTime instanceof Date;
 
             if (hasClockIn) {
-                // Employee clocked in - recalculate status based on clock-in time
-                console.log(`[LEAVE_REVERT] Recalculating attendance for ${dateStr} - employee clocked in at ${existingLog.clockInTime}`);
+                // Employee clocked in - recalculate status based on FIRST check-in time
+                // CRITICAL FIX: Use FIRST session's startTime, not stored clockInTime
+                const AttendanceSession = require('../models/AttendanceSession');
+                const firstSession = await AttendanceSession.findOne({ 
+                    attendanceLog: existingLog._id 
+                }).sort({ startTime: 1 }).select('startTime').lean();
+                
+                let clockInTimeForRecalc;
+                if (firstSession && firstSession.startTime) {
+                    clockInTimeForRecalc = new Date(firstSession.startTime);
+                } else if (existingLog.clockInTime) {
+                    clockInTimeForRecalc = new Date(existingLog.clockInTime);
+                } else {
+                    console.warn(`[LEAVE_REVERT] No clock-in time found for log ${existingLog._id}`);
+                    continue;
+                }
+                
+                console.log(`[LEAVE_REVERT] Recalculating attendance for ${dateStr} - employee clocked in at ${clockInTimeForRecalc}`);
                 if (shiftGroup && shiftGroup.startTime) {
+                    const lateArrivalMarksHalfDay = !!(employee && employee.featurePermissions && employee.featurePermissions.lateArrivalMarksHalfDay);
                     const recalculatedStatus = await recalculateLateStatus(
-                        existingLog.clockInTime,
-                        shiftGroup
+                        clockInTimeForRecalc,
+                        shiftGroup,
+                        null, // gracePeriodMinutes (will be fetched from settings)
+                        existingLog.totalWorkingHours, // Pass working hours for priority logic
+                        lateArrivalMarksHalfDay
                     );
                     existingLog.attendanceStatus = recalculatedStatus.attendanceStatus;
                     existingLog.isLate = recalculatedStatus.isLate;
@@ -260,8 +280,15 @@ const syncAttendanceOnLeaveRejection = async (leaveRequest, session) => {
                 }
             }
 
-            // Remove leave reference
+            // CRITICAL FIX: Remove leave reference and ensure status is updated
             existingLog.leaveRequest = null;
+            // If log has no clock-in and was set to Leave, change to Absent
+            if (!existingLog.clockInTime && existingLog.attendanceStatus === 'Leave') {
+                existingLog.attendanceStatus = 'Absent';
+                existingLog.isLate = false;
+                existingLog.isHalfDay = false;
+                existingLog.lateMinutes = 0;
+            }
             await existingLog.save({ session });
             updatedLogs.push(existingLog._id);
         } else {

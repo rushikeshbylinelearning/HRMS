@@ -3,13 +3,24 @@
 const express = require('express');
 const router = express.Router();
 const Setting = require('../models/Setting');
-// You should protect these routes with admin-level authentication in a real app
-// const authMiddleware = require('../middleware/auth');
-// const adminMiddleware = require('../middleware/admin');
+const authenticateToken = require('../middleware/authenticateToken');
+const cache = require('../utils/cache');
+
+// Admin-only middleware for RBAC-protected settings (e.g. enforce required logout toggle)
+const isAdmin = (req, res, next) => {
+    if (req.user?.role !== 'Admin') {
+        return res.status(403).json({ error: 'Access forbidden: Requires Admin role.' });
+    }
+    next();
+};
 
 const HR_EMAIL_KEY = 'hrNotificationEmails';
 const HIRING_EMAIL_KEY = 'hiringNotificationEmails';
 const YEAR_END_FEATURE_KEY = 'yearEndFeature';
+// Feature toggle: disable Check-out until required logout time (shift end + excess paid break)
+const ENFORCE_REQUIRED_LOGOUT_KEY = 'enforceRequiredLogoutBeforeCheckout';
+// Feature toggle: require admin approval before early checkout is executed
+const REQUIRE_ADMIN_APPROVAL_EARLY_CHECKOUT_KEY = 'requireAdminApprovalForEarlyCheckout';
 
 // GET /api/admin/settings/hr-emails - Get the list of HR emails
 router.get('/hr-emails', async (req, res) => {
@@ -138,6 +149,65 @@ router.post('/year-end-feature', async (req, res) => {
         res.json({ enabled: updatedSetting.value });
     } catch (error) {
         res.status(500).json({ error: 'Server error updating year-end feature setting.' });
+    }
+});
+
+// GET /api/admin/settings/enforce-required-logout - Get "Enforce Required Logout Before Checkout" toggle (Admin only)
+router.get('/enforce-required-logout', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const setting = await Setting.findOne({ key: ENFORCE_REQUIRED_LOGOUT_KEY });
+        res.json({ enabled: setting ? !!setting.value : false });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error fetching enforce required logout setting.' });
+    }
+});
+
+// POST /api/admin/settings/enforce-required-logout - Update toggle (hot-applied; no deploy/refresh required)
+router.post('/enforce-required-logout', [authenticateToken, isAdmin], async (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Enabled must be a boolean value.' });
+    }
+    try {
+        const updatedSetting = await Setting.findOneAndUpdate(
+            { key: ENFORCE_REQUIRED_LOGOUT_KEY },
+            { value: enabled },
+            { upsert: true, new: true }
+        );
+        // Invalidate employee dashboard cache so next load gets fresh canCheckout (hot-applied)
+        cache.deletePattern('employee_dashboard:*');
+        res.json({ enabled: !!updatedSetting.value });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error updating enforce required logout setting.' });
+    }
+});
+
+// GET /api/admin/settings/require-admin-approval-early-checkout - Get "Require Admin Approval for Early Checkout" toggle (Admin only)
+router.get('/require-admin-approval-early-checkout', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const setting = await Setting.findOne({ key: REQUIRE_ADMIN_APPROVAL_EARLY_CHECKOUT_KEY });
+        res.json({ enabled: setting ? !!setting.value : false });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error fetching require admin approval for early checkout setting.' });
+    }
+});
+
+// POST /api/admin/settings/require-admin-approval-early-checkout - Update toggle (hot-applied)
+router.post('/require-admin-approval-early-checkout', [authenticateToken, isAdmin], async (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Enabled must be a boolean value.' });
+    }
+    try {
+        const updatedSetting = await Setting.findOneAndUpdate(
+            { key: REQUIRE_ADMIN_APPROVAL_EARLY_CHECKOUT_KEY },
+            { value: enabled },
+            { upsert: true, new: true }
+        );
+        cache.deletePattern('employee_dashboard:*');
+        res.json({ enabled: !!updatedSetting.value });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error updating require admin approval for early checkout setting.' });
     }
 });
 

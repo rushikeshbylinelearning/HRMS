@@ -41,6 +41,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import { io } from 'socket.io-client';
+import { formatISTDate, formatISTTime } from '../utils/istTime';
+import { SkeletonBox } from '../components/SkeletonLoaders';
 
 // Format hours as Hrs.mm (e.g., 8.30 for 8h 30m)
 const formatHoursAsHrsDotMM = (hours) => {
@@ -112,7 +114,7 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
       ? 'http://localhost:3001' 
       : (import.meta.env.VITE_SOCKET_URL || 'https://attendance.bylinelms.com');
     
-import { SkeletonBox } from '../components/SkeletonLoaders';
+
     // A2 Hosting: Polling first for better compatibility
     const socket = io(socketUrl, {
       auth: { token },
@@ -1287,7 +1289,7 @@ import { SkeletonBox } from '../components/SkeletonLoaders';
                               fontWeight: '600',
                               color: COLORS.textPrimary
                             }}>
-                              {new Date(log.attendanceDate).toLocaleDateString('en-US', { 
+                              {formatISTDate(log.attendanceDate, { 
                                 weekday: 'short', 
                                 year: 'numeric', 
                                 month: 'short', 
@@ -1313,10 +1315,7 @@ import { SkeletonBox } from '../components/SkeletonLoaders';
                               fontWeight: '500',
                               color: COLORS.textPrimary
                             }}>
-                              {log.clockInTime ? new Date(log.clockInTime).toLocaleTimeString('en-US', { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              }) : '-'}
+                              {log.clockInTime ? formatISTTime(log.clockInTime, { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                             </Typography>
                           </td>
                           <td style={{ padding: '16px 12px', textAlign: 'center' }}>
@@ -1324,10 +1323,7 @@ import { SkeletonBox } from '../components/SkeletonLoaders';
                               fontWeight: '500',
                               color: COLORS.textPrimary
                             }}>
-                              {log.clockOutTime ? new Date(log.clockOutTime).toLocaleTimeString('en-US', { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              }) : '-'}
+                              {log.clockOutTime ? formatISTTime(log.clockOutTime, { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                             </Typography>
                           </td>
                           <td style={{ padding: '16px 12px', textAlign: 'center' }}>

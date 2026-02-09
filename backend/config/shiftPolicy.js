@@ -32,6 +32,37 @@ const PAID_BREAK_ALLOWANCE_MINUTES = 30; // Maximum paid break allowed
 const UNPAID_BREAK_ALLOWANCE_MINUTES = 10; // Allowance for unpaid breaks (for penalty tracking only)
 const EXTRA_BREAK_ALLOWANCE_MINUTES = 10; // Allowance for extra breaks (for penalty tracking only)
 
+// Minimum working hours policy (DEPRECATED - kept for backward compatibility)
+// NEW MODEL: Use elapsed shift time (clockOutTime - clockInTime) for attendance status
+const MINIMUM_WORKING_HOURS = 8.5; // 8 hours 30 minutes (510 minutes) - minimum required for full day
+const MINIMUM_WORKING_MINUTES = MINIMUM_WORKING_HOURS * 60; // 510 minutes
+
+// Minimum to count as half-day: 4.5 hours worked + 0.5 hours break allowance = 5 total hours
+// Below 5 total hours (worked + break allowance) = Absent; 5 total hours (4.5 worked + 0.5 break) to < 8.5 worked hours = Half-day; >= 8.5 worked hours = Full day
+// Note: Break allowance (0.5 hours) is always added regardless of whether employee takes a break
+// DEPRECATED: Use MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY instead
+const MINIMUM_HOURS_FOR_HALF_DAY = 4.5; // 4.5 hours worked time (270 minutes) - below this = Absent
+const MINIMUM_MINUTES_FOR_HALF_DAY = MINIMUM_HOURS_FOR_HALF_DAY * 60; // 270 minutes worked time
+
+// Total time threshold for half-day (worked time + break allowance)
+// DEPRECATED: Use MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY instead
+const MINIMUM_TOTAL_HOURS_FOR_HALF_DAY = 5; // 5 total hours (4.5 worked + 0.5 break)
+const MINIMUM_TOTAL_MINUTES_FOR_HALF_DAY = MINIMUM_TOTAL_HOURS_FOR_HALF_DAY * 60; // 300 minutes total
+
+// NEW SHIFT MODEL: Elapsed shift time thresholds (includes paid breaks)
+// Attendance status is based on elapsedShiftTime = clockOutTime - clockInTime
+// Break duration does NOT reduce attendance thresholds
+const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY = 9; // 9 hours elapsed shift time = Full Day (Present)
+const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_FULL_DAY = MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY * 60; // 540 minutes
+
+const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY = 5; // 5 hours elapsed shift time = Half Day
+const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_HALF_DAY = MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY * 60; // 300 minutes
+
+// Below 5 hours elapsed shift time = Absent
+
+// Half-day leave: required work = 4.5 hours (270 minutes) for approved half-day leave
+const HALF_DAY_WORKING_MINUTES = 270;
+
 /**
  * Calculate required logout time based on policy rules
  * 
@@ -67,16 +98,16 @@ const calculateRequiredLogoutTime = (clockInTime, totalPaidBreakMinutes = 0, tot
     const workingMinutes = shiftPolicy.workingMinutes || SHIFT_WORKING_MINUTES;
     const paidBreakAllowance = shiftPolicy.paidBreakAllowance || PAID_BREAK_ALLOWANCE_MINUTES;
 
-    // Calculate excess paid break (beyond allowance)
+    // Calculate excess paid break (beyond allowance) in whole minutes so checkout aligns with frontend
     // Paid breaks up to 30 minutes are included in the shift, excess extends logout
-    const excessPaidBreak = Math.max(0, totalPaidBreakMinutes - paidBreakAllowance);
+    const excessPaidBreak = Math.max(0, Math.floor(totalPaidBreakMinutes - paidBreakAllowance));
 
-    // Total extension = excess paid break + all unpaid break
-    const totalExtensionMinutes = excessPaidBreak + totalUnpaidBreakMinutes;
+    // Total extension = excess paid break + all unpaid break (whole minutes only)
+    const totalExtensionMinutes = excessPaidBreak + Math.floor(totalUnpaidBreakMinutes);
 
     // Required logout time = clock-in + base shift duration + extensions
     // Base shift duration = 9 hours (8.5 working + 0.5 paid break allowance)
-    // Extensions = excess paid break + unpaid break
+    // Extensions = excess paid break + unpaid break (floored so UI and server match)
     const baseShiftMinutes = workingMinutes + paidBreakAllowance;
     const requiredLogoutTime = new Date(clockInTime);
     requiredLogoutTime.setMinutes(requiredLogoutTime.getMinutes() + baseShiftMinutes + totalExtensionMinutes);
@@ -116,7 +147,20 @@ module.exports = {
     PAID_BREAK_ALLOWANCE_MINUTES,
     UNPAID_BREAK_ALLOWANCE_MINUTES,
     EXTRA_BREAK_ALLOWANCE_MINUTES,
+    MINIMUM_WORKING_HOURS,
+    MINIMUM_WORKING_MINUTES,
+    MINIMUM_HOURS_FOR_HALF_DAY,
+    MINIMUM_MINUTES_FOR_HALF_DAY,
+    MINIMUM_TOTAL_HOURS_FOR_HALF_DAY,
+    MINIMUM_TOTAL_MINUTES_FOR_HALF_DAY,
+    HALF_DAY_WORKING_MINUTES,
     
+    // New shift model: Elapsed shift time thresholds
+    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY,
+    MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_FULL_DAY,
+    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY,
+    MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_HALF_DAY,
+
     // Calculation function
     calculateRequiredLogoutTime
 };

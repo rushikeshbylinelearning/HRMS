@@ -18,7 +18,8 @@ import {
   RestartAlt as RestartAltIcon,
   PeopleAlt as PeopleAltIcon,
   Insights as InsightsIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import api from '../api/axios';
 import '../styles/ManageSectionPage.css';
@@ -109,6 +110,10 @@ const ManageSectionPage = () => {
   const [graceDialog, setGraceDialog] = useState({ open: false, value: 30 });
   const [updatingGrace, setUpdatingGrace] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [enforceLogoutDialog, setEnforceLogoutDialog] = useState({ open: false, enabled: false });
+  const [updatingEnforceLogout, setUpdatingEnforceLogout] = useState(false);
+  const [earlyCheckoutApprovalDialog, setEarlyCheckoutApprovalDialog] = useState({ open: false, enabled: false });
+  const [updatingEarlyCheckoutApproval, setUpdatingEarlyCheckoutApproval] = useState(false);
 
   // Fetch all users with their permissions
   const fetchUsers = useCallback(async () => {
@@ -145,6 +150,72 @@ const ManageSectionPage = () => {
   useEffect(() => {
     fetchGracePeriod();
   }, [fetchGracePeriod]);
+
+  const fetchEnforceLogoutSetting = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/settings/enforce-required-logout');
+      return !!response.data?.enabled;
+    } catch (err) {
+      console.error('Error fetching enforce required logout setting:', err);
+      return false;
+    }
+  }, []);
+
+  const openEnforceLogoutDialog = useCallback(async () => {
+    setMenuAnchor(null);
+    setEnforceLogoutDialog({ open: true, enabled: false });
+    const enabled = await fetchEnforceLogoutSetting();
+    setEnforceLogoutDialog({ open: true, enabled });
+  }, [fetchEnforceLogoutSetting]);
+
+  const handleEnforceLogoutToggle = useCallback(async (event) => {
+    const enabled = event.target.checked;
+    setUpdatingEnforceLogout(true);
+    try {
+      await api.post('/admin/settings/enforce-required-logout', { enabled });
+      setEnforceLogoutDialog((prev) => ({ ...prev, enabled }));
+      setSuccess(enabled ? 'Required logout before checkout is now enforced.' : 'Required logout before checkout is now disabled.');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update setting.');
+      console.error('Error updating enforce required logout:', err);
+    } finally {
+      setUpdatingEnforceLogout(false);
+    }
+  }, []);
+
+  const fetchRequireEarlyCheckoutApprovalSetting = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/settings/require-admin-approval-early-checkout');
+      return !!response.data?.enabled;
+    } catch (err) {
+      console.error('Error fetching require admin approval for early checkout:', err);
+      return false;
+    }
+  }, []);
+
+  const openEarlyCheckoutApprovalDialog = useCallback(async () => {
+    setMenuAnchor(null);
+    setEarlyCheckoutApprovalDialog({ open: true, enabled: false });
+    const enabled = await fetchRequireEarlyCheckoutApprovalSetting();
+    setEarlyCheckoutApprovalDialog({ open: true, enabled });
+  }, [fetchRequireEarlyCheckoutApprovalSetting]);
+
+  const handleEarlyCheckoutApprovalToggle = useCallback(async (event) => {
+    const enabled = event.target.checked;
+    setUpdatingEarlyCheckoutApproval(true);
+    try {
+      await api.post('/admin/settings/require-admin-approval-early-checkout', { enabled });
+      setEarlyCheckoutApprovalDialog((prev) => ({ ...prev, enabled }));
+      setSuccess(enabled ? 'Early checkout now requires admin approval.' : 'Early checkout no longer requires admin approval.');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update setting.');
+      console.error('Error updating require admin approval for early checkout:', err);
+    } finally {
+      setUpdatingEarlyCheckoutApproval(false);
+    }
+  }, []);
 
   // Check if user has unsaved changes
   const hasUnsavedChanges = useCallback((userId) => {
@@ -1070,6 +1141,30 @@ const privilegeOptions = useMemo(() => {
               >
                 <AccessTimeIcon sx={{ color: '#e53935' }} />
                 Update Grace Period ({gracePeriodMinutes} min)
+              </MenuItem>
+              <MenuItem
+                onClick={openEnforceLogoutDialog}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  padding: '10px 20px'
+                }}
+              >
+                <ScheduleIcon sx={{ color: '#e53935' }} />
+                Enforce Required Logout Before Checkout
+              </MenuItem>
+              <MenuItem
+                onClick={openEarlyCheckoutApprovalDialog}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  padding: '10px 20px'
+                }}
+              >
+                <ScheduleIcon sx={{ color: '#ed6c02' }} />
+                Require Admin Approval for Early Checkout
               </MenuItem>
             </Menu>
           </Stack>
@@ -2238,6 +2333,70 @@ const privilegeOptions = useMemo(() => {
             disabled={updatingGrace}
           >
             {updatingGrace ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enforce Required Logout Before Checkout - feature toggle (hot-applied, no deploy required) */}
+      <Dialog
+        open={enforceLogoutDialog.open}
+        onClose={() => setEnforceLogoutDialog((prev) => ({ ...prev, open: false }))}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Enforce Required Logout Before Checkout</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            When enabled, employees cannot check out until the required logout time (shift end + excess paid break over 30 min).
+            Paid break ≤ 30 min never blocks checkout.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={enforceLogoutDialog.enabled}
+                onChange={handleEnforceLogoutToggle}
+                disabled={updatingEnforceLogout}
+                color="primary"
+              />
+            }
+            label={enforceLogoutDialog.enabled ? 'Enforced (checkout blocked until required time)' : 'Off (checkout allowed anytime)'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEnforceLogoutDialog((prev) => ({ ...prev, open: false }))}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Require Admin Approval for Early Checkout - feature toggle */}
+      <Dialog
+        open={earlyCheckoutApprovalDialog.open}
+        onClose={() => setEarlyCheckoutApprovalDialog((prev) => ({ ...prev, open: false }))}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Require Admin Approval for Early Checkout</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            When enabled, employees who try to check out before the required logout time must submit a request. Checkout is performed only after an admin approves it.
+            Requires &quot;Enforce Required Logout Before Checkout&quot; to be enabled.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={earlyCheckoutApprovalDialog.enabled}
+                onChange={handleEarlyCheckoutApprovalToggle}
+                disabled={updatingEarlyCheckoutApproval}
+                color="primary"
+              />
+            }
+            label={earlyCheckoutApprovalDialog.enabled ? 'On (early checkout requires approval)' : 'Off (early checkout allowed with reason)'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEarlyCheckoutApprovalDialog((prev) => ({ ...prev, open: false }))}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
