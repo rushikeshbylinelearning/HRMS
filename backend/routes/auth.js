@@ -27,6 +27,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const authenticateToken = require('../middleware/authenticateToken');
 const { loginGeofencingMiddleware } = require('../middleware/geofencingMiddleware');
@@ -362,6 +363,16 @@ router.get('/me', async (req, res) => {
             .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
             .select('-passwordHash -__v')
             .lean();
+        
+        // Manually populate reportingPerson if it's a valid ObjectId
+        if (user && user.reportingPerson && mongoose.Types.ObjectId.isValid(user.reportingPerson)) {
+            const reportingPerson = await User.findById(user.reportingPerson)
+                .select('fullName email department designation')
+                .lean();
+            user.reportingPerson = reportingPerson || null;
+        } else if (user) {
+            user.reportingPerson = null;
+        }
 
         if (!user) {
             console.log('[/me] User not found:', userId);
@@ -381,9 +392,14 @@ router.get('/me', async (req, res) => {
             domain: user.domain,
             designation: user.designation,
             department: user.department,
+            joiningDate: user.joiningDate,
             alternateSaturdayPolicy: user.alternateSaturdayPolicy,
             profileImageUrl: user.profileImageUrl,
             authMethod: authMethod,
+            // Add personal details, identity details, and reporting person
+            personalDetails: user.personalDetails || {},
+            identityDetails: user.identityDetails || {},
+            reportingPerson: user.reportingPerson || null,
             featurePermissions: user.featurePermissions || {
                 leaves: true,
                 breaks: true,
@@ -466,6 +482,7 @@ router.get('/callback', async (req, res) => {
             domain: user.domain,
             designation: user.designation,
             department: user.department,
+            joiningDate: user.joiningDate,
             alternateSaturdayPolicy: user.alternateSaturdayPolicy,
             profileImageUrl: user.profileImageUrl,
             authMethod: 'SSO',
@@ -914,6 +931,7 @@ router.post('/sso-consume', async (req, res) => {
             domain: user.domain,
             designation: user.designation,
             department: user.department,
+            joiningDate: user.joiningDate,
             alternateSaturdayPolicy: user.alternateSaturdayPolicy,
             profileImageUrl: user.profileImageUrl,
             authMethod: 'SSO',

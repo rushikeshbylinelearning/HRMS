@@ -32,11 +32,12 @@ export const preloadCriticalResources = () => {
         preloadModule(() => import('../pages/EmployeeDashboardPage'), 'employee-dashboard');
         preloadModule(() => import('../pages/AdminDashboardPage'), 'admin-dashboard');
 
-        // Preload commonly accessed pages
+        // Preload commonly accessed pages (SKIP protected routes)
         setTimeout(() => {
-            preloadModule(() => import('../pages/LeavesPage'), 'leaves-page');
-            preloadModule(() => import('../pages/ProfilePage'), 'profile-page');
+            // REMOVED: preloadModule(() => import('../pages/LeavesPage'), 'leaves-page');
+            // REMOVED: preloadModule(() => import('../pages/ProfilePage'), 'profile-page');
             preloadModule(() => import('../pages/EmployeesPage'), 'employees-page');
+            preloadModule(() => import('../pages/AttendanceSummaryPage'), 'attendance-summary-page');
         }, 2000);
     }, 3000); // Wait 3s after app load to avoid blocking initial render
 };

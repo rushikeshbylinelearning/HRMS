@@ -1,6 +1,7 @@
 // backend/routes/users.js
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const multer = require('multer');
 const User = require('../models/User'); // Adjust path as needed
@@ -14,8 +15,17 @@ router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.userId)
             .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
-            .populate('reportingPerson', 'fullName email department')
             .lean();
+        
+        // Manually populate reportingPerson if it's a valid ObjectId
+        if (user && user.reportingPerson && mongoose.Types.ObjectId.isValid(user.reportingPerson)) {
+            const reportingPerson = await User.findById(user.reportingPerson)
+                .select('fullName email department')
+                .lean();
+            user.reportingPerson = reportingPerson || null;
+        } else if (user) {
+            user.reportingPerson = null;
+        }
 
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
@@ -76,8 +86,17 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
         // Return updated user
         const updatedUser = await User.findById(req.user.userId)
             .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
-            .populate('reportingPerson', 'fullName email department')
             .lean();
+        
+        // Manually populate reportingPerson if it's a valid ObjectId
+        if (updatedUser && updatedUser.reportingPerson && mongoose.Types.ObjectId.isValid(updatedUser.reportingPerson)) {
+            const reportingPerson = await User.findById(updatedUser.reportingPerson)
+                .select('fullName email department')
+                .lean();
+            updatedUser.reportingPerson = reportingPerson || null;
+        } else if (updatedUser) {
+            updatedUser.reportingPerson = null;
+        }
 
         res.json({
             message: 'Profile updated successfully.',

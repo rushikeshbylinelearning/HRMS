@@ -60,11 +60,15 @@ function aggregateBreakMinutes(breaks, now) {
  * Get unified shift time state for a single point in time.
  * All UI (timer, progress bar, required logout) should use this so values never desync.
  *
+ * IMPORTANT: For requiredLogoutTime, this function now accepts a backend-calculated value
+ * and only projects it forward during active breaks. The backend handles all policy logic
+ * (7 PM floor for General Shift 1, etc.). Frontend never recalculates from scratch.
+ *
  * @param {string|Date} clockInTime - First session start
  * @param {Array} sessions - Attendance sessions
  * @param {Array} breaks - Break records (with breakType)
  * @param {Date} now - Reference time (e.g. new Date())
- * @param {Object} options - { scheduledShiftMinutes?, allowedPaidBreakMinutes? }
+ * @param {Object} options - { scheduledShiftMinutes?, allowedPaidBreakMinutes?, backendRequiredLogoutTime? }
  * @returns {Object|null} Unified state or null if no clock-in
  */
 export function getUnifiedShiftTimeState(clockInTime, sessions, breaks, now, options = {}) {
@@ -91,8 +95,15 @@ export function getUnifiedShiftTimeState(clockInTime, sessions, breaks, now, opt
     // So required logout = clockIn + effectiveShiftDuration; no early completion if you took less break.
     const effectiveShiftDuration = scheduledShiftDuration + extraBreakTime + unpaidExtension;
 
-    // Required logout time (live)
-    const requiredLogoutTime = new Date(clockIn.getTime() + effectiveShiftDuration * 60000);
+    // Required logout time: USE BACKEND VALUE if provided (respects 7 PM floor and all policy logic)
+    // Only fall back to frontend calculation if backend value is missing (shouldn't happen in normal flow)
+    let requiredLogoutTime;
+    if (options.backendRequiredLogoutTime) {
+        requiredLogoutTime = new Date(options.backendRequiredLogoutTime);
+    } else {
+        // Fallback: simple duration-based calculation (no policy enforcement)
+        requiredLogoutTime = new Date(clockIn.getTime() + effectiveShiftDuration * 60000);
+    }
 
     // Progress: elapsed / effective (0..1). Cap at 1 when shift is done.
     const progress = effectiveShiftDuration > 0 ? Math.min(1, elapsedShiftTime / effectiveShiftDuration) : 0;

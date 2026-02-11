@@ -69,6 +69,32 @@ const userSchema = new mongoose.Schema({
     enum: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     default: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   },
+  
+  // --- PERSONAL & IDENTITY DETAILS ---
+  personalDetails: {
+    type: Object,
+    default: {}
+  },
+  
+  identityDetails: {
+    type: Object,
+    default: {}
+  },
+  
+  // --- REPORTING PERSON ---
+  reportingPerson: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    set: function(value) {
+      // Convert empty string to null
+      if (value === '' || value === undefined) {
+        return null;
+      }
+      return value;
+    }
+  },
+  
   // --- FEATURE PERMISSIONS ---
   featurePermissions: {
     // Core feature toggles

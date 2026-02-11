@@ -4,6 +4,9 @@
 const prefetchedRoutes = new Set();
 const prefetchTimeouts = new Map();
 
+// CRITICAL: Routes that should NOT be prefetched (zero-mutation requirement)
+const NO_PREFETCH_ROUTES = ['/profile', '/leaves'];
+
 /**
  * Prefetch a route component
  * @param {string} route - Route path to prefetch
@@ -11,6 +14,12 @@ const prefetchTimeouts = new Map();
  * @param {number} delay - Delay before prefetching (default: 100ms)
  */
 export const prefetchRoute = (route, importFn, delay = 100) => {
+    // CRITICAL: Skip prefetch for protected routes
+    if (NO_PREFETCH_ROUTES.includes(route)) {
+        console.log(`[Prefetch] Skipping protected route: ${route}`);
+        return;
+    }
+
     if (prefetchedRoutes.has(route)) {
         return; // Already prefetched
     }
@@ -55,10 +64,11 @@ export const setupPrefetchListeners = (routeMap) => {
         // Prefetch dashboard routes immediately
         prefetchRoute('/dashboard', routeMap['/dashboard'], 0);
 
-        // Prefetch common routes after a short delay
+        // Prefetch common routes after a short delay (SKIP protected routes)
         setTimeout(() => {
-            prefetchRoute('/leaves', routeMap['/leaves'], 0);
-            prefetchRoute('/profile', routeMap['/profile'], 0);
+            // REMOVED: prefetchRoute('/leaves', routeMap['/leaves'], 0);
+            // REMOVED: prefetchRoute('/profile', routeMap['/profile'], 0);
+            prefetchRoute('/attendance-summary', routeMap['/attendance-summary'], 0);
         }, 1000);
     }, 2000); // Wait 2s after app load
 

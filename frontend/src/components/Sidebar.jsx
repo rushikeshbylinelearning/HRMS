@@ -15,6 +15,7 @@ import Badge from '@mui/material/Badge';
 import useNewNotifications from '../hooks/useNewNotifications';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PolicyIcon from '@mui/icons-material/Policy';
 
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -41,6 +42,7 @@ const Sidebar = ({ onNotificationClick }) => {
         { text: 'Employees', icon: <PeopleIcon />, path: '/employees', roles: ['HR', 'Admin'] },
         { text: 'Shift Management', icon: <TimelapseIcon />, path: '/shifts', roles: ['Admin'] },
         { text: 'Office Locations', icon: <LocationOnIcon />, path: '/office-locations', roles: ['Admin'] },
+        { text: 'Policies & CIF', icon: <PolicyIcon />, path: '/admin/policies', roles: ['Admin'] },
         { text: 'Manage Section', icon: <AdminPanelSettingsIcon />, path: '/manage-section', roles: ['Admin'] },
         { 
             text: 'Leaves', 

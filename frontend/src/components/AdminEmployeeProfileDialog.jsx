@@ -51,9 +51,7 @@ const defaultFormState = {
     bankName: '',
     accountNumber: '',
     ifscCode: '',
-    reportingPersonName: '',
-    reportingPersonEmail: '',
-    reportingPersonDepartment: ''
+    reportingPersonId: ''
 };
 
 const AdminEmployeeProfileDialog = ({
@@ -98,9 +96,7 @@ const AdminEmployeeProfileDialog = ({
         bankName: data?.identityDetails?.bankName || '',
         accountNumber: data?.identityDetails?.accountNumber || '',
         ifscCode: data?.identityDetails?.ifscCode || '',
-        reportingPersonName: data?.reportingPerson?.name || '',
-        reportingPersonEmail: data?.reportingPerson?.email || '',
-        reportingPersonDepartment: data?.reportingPerson?.department || ''
+        reportingPersonId: data?.reportingPerson?._id || ''
     }), []);
 
     useEffect(() => {
@@ -140,9 +136,7 @@ const AdminEmployeeProfileDialog = ({
             setSelectedReportingOption(null);
             return;
         }
-        const match =
-            reportingOptions.find(opt => employee.reportingPerson?.email && opt.email === employee.reportingPerson.email) ||
-            reportingOptions.find(opt => employee.reportingPerson?.name && opt.fullName === employee.reportingPerson.name);
+        const match = reportingOptions.find(opt => employee.reportingPerson?._id && opt._id === employee.reportingPerson._id);
         setSelectedReportingOption(match || null);
     }, [employee, reportingOptions]);
 
@@ -179,9 +173,12 @@ const AdminEmployeeProfileDialog = ({
         if (newValue) {
             setFormData(prev => ({
                 ...prev,
-                reportingPersonName: newValue.fullName || '',
-                reportingPersonEmail: newValue.email || '',
-                reportingPersonDepartment: newValue.department || ''
+                reportingPersonId: newValue._id || ''
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                reportingPersonId: ''
             }));
         }
     };
@@ -231,11 +228,7 @@ const AdminEmployeeProfileDialog = ({
                 accountNumber: formData.accountNumber,
                 ifscCode: formData.ifscCode
             },
-            reportingPerson: {
-                name: formData.reportingPersonName,
-                email: formData.reportingPersonEmail,
-                department: formData.reportingPersonDepartment
-            }
+            reportingPerson: formData.reportingPersonId || null
         };
 
         if (!payload.joiningDate) {

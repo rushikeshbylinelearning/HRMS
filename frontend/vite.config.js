@@ -137,6 +137,26 @@ export default defineConfig({
             }
           });
         },
+      },
+      // --- Policy PDFs proxy for development ---
+      '/policies': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            if (err.code !== 'ECONNREFUSED') {
+              console.log('[Vite Proxy] Policies error:', err.message);
+            }
+            if (!res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'Backend server is not available.' 
+              }));
+            }
+          });
+        },
       }
     }
   },
@@ -214,6 +234,13 @@ export default defineConfig({
       '@mui/icons-material/History',
       'react-is',
       'prop-types',
+      // PDF.js dependencies
+      'react-pdf',
+      'pdfjs-dist',
+    ],
+    exclude: [
+      // Exclude worker files from optimization
+      'pdfjs-dist/build/pdf.worker.min.mjs',
     ],
     esbuildOptions: {
       // Ensure proper initialization order

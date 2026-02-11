@@ -1,6 +1,7 @@
 // backend/routes/employees.js
 const express = require('express');
 const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
 const router = express.Router();
 
 // --- Middleware ---
@@ -76,7 +77,7 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
-        const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus';
+        const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus personalDetails identityDetails reportingPerson';
 
         // Filter: Exclude Admin role; optionally include deactivated (e.g. Employees page shows all)
         const employeeQuery = { 
@@ -85,11 +86,43 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         };
 
         if (getAllEmployees) {
+            // First, get employees without populating reportingPerson to avoid CastError
             const employees = await User.find(employeeQuery)
                 .select(fieldsToSelect)
                 .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
                 .sort({ fullName: 1 })
                 .lean();
+            
+            // Manually populate reportingPerson for valid ObjectIds
+            const validReportingPersonIds = employees
+                .filter(emp => emp.reportingPerson && mongoose.Types.ObjectId.isValid(emp.reportingPerson))
+                .map(emp => emp.reportingPerson);
+            
+            if (validReportingPersonIds.length > 0) {
+                const reportingPersons = await User.find({ _id: { $in: validReportingPersonIds } })
+                    .select('fullName email department designation')
+                    .lean();
+                
+                const reportingPersonMap = reportingPersons.reduce((map, person) => {
+                    map[person._id.toString()] = person;
+                    return map;
+                }, {});
+                
+                // Add populated reportingPerson to employees
+                employees.forEach(emp => {
+                    if (emp.reportingPerson && mongoose.Types.ObjectId.isValid(emp.reportingPerson)) {
+                        emp.reportingPerson = reportingPersonMap[emp.reportingPerson.toString()] || null;
+                    } else {
+                        emp.reportingPerson = null;
+                    }
+                });
+            } else {
+                // Set reportingPerson to null for all employees
+                employees.forEach(emp => {
+                    emp.reportingPerson = null;
+                });
+            }
+            
             return res.json(employees);
         }
         
@@ -106,6 +139,36 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
             .skip(skip)
             .limit(limit)
             .lean();
+        
+        // Manually populate reportingPerson for valid ObjectIds
+        const validReportingPersonIds = employees
+            .filter(emp => emp.reportingPerson && mongoose.Types.ObjectId.isValid(emp.reportingPerson))
+            .map(emp => emp.reportingPerson);
+        
+        if (validReportingPersonIds.length > 0) {
+            const reportingPersons = await User.find({ _id: { $in: validReportingPersonIds } })
+                .select('fullName email department designation')
+                .lean();
+            
+            const reportingPersonMap = reportingPersons.reduce((map, person) => {
+                map[person._id.toString()] = person;
+                return map;
+            }, {});
+            
+            // Add populated reportingPerson to employees
+            employees.forEach(emp => {
+                if (emp.reportingPerson && mongoose.Types.ObjectId.isValid(emp.reportingPerson)) {
+                    emp.reportingPerson = reportingPersonMap[emp.reportingPerson.toString()] || null;
+                } else {
+                    emp.reportingPerson = null;
+                }
+            });
+        } else {
+            // Set reportingPerson to null for all employees
+            employees.forEach(emp => {
+                emp.reportingPerson = null;
+            });
+        }
             
         res.json({
             employees,
@@ -125,7 +188,8 @@ router.post('/', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { 
         employeeCode, fullName, email, password, role, domain, designation, 
         department, joiningDate, shiftGroup, alternateSaturdayPolicy,
-        employmentStatus, leaveBalances, internshipDurationMonths, workingDays
+        employmentStatus, leaveBalances, internshipDurationMonths, workingDays,
+        personalDetails, identityDetails, reportingPerson
     } = req.body;
     if (!employeeCode || !fullName || !email || !password) {
         return res.status(400).json({ error: 'Employee Code, Name, Email, and Password are required.' });
@@ -136,6 +200,14 @@ router.post('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         // IMPORTANT: Save email exactly as typed by admin (trim whitespace only, no normalization)
         // Email normalization is only applied in SSO authentication flow, not for admin-created users
         const emailToSave = email.trim();
+        
+        // Validate reporting person if provided
+        if (reportingPerson) {
+            const managerExists = await User.findById(reportingPerson);
+            if (!managerExists) {
+                return res.status(400).json({ error: 'Selected reporting person does not exist.' });
+            }
+        }
         
         const newUser = new User({ 
             employeeCode, 
@@ -152,7 +224,11 @@ router.post('/', [authenticateToken, isAdminOrHr], async (req, res) => {
             employmentStatus,
             leaveBalances,
             internshipDurationMonths: employmentStatus === 'Intern' ? internshipDurationMonths : null,
-            workingDays
+            workingDays,
+            // Add new fields
+            personalDetails: personalDetails || {},
+            identityDetails: identityDetails || {},
+            reportingPerson: reportingPerson || null
         });
         await newUser.save();
         res.status(201).json({ message: 'Employee created successfully!' });
@@ -170,7 +246,7 @@ router.put('/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
         employeeCode, fullName, email, role, domain, designation, department, 
         joiningDate, shiftGroup, isActive, alternateSaturdayPolicy,
         employmentStatus, leaveBalances, internshipDurationMonths, workingDays,
-        password
+        password, personalDetails, identityDetails, reportingPerson
     } = req.body;
     
     // IMPORTANT: Save email exactly as typed by admin (trim whitespace only, no normalization)
@@ -182,13 +258,31 @@ router.put('/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
         joiningDate, shiftGroup: shiftGroup || null, isActive, alternateSaturdayPolicy,
         employmentStatus, leaveBalances,
         internshipDurationMonths: employmentStatus === 'Intern' ? internshipDurationMonths : null,
-        workingDays
+        workingDays,
+        // Add new fields
+        personalDetails: personalDetails || {},
+        identityDetails: identityDetails || {},
+        reportingPerson: reportingPerson || null
     };
 
     try {
         const currentEmployee = await User.findById(id);
         if (!currentEmployee) {
             return res.status(404).json({ error: 'Employee not found.' });
+        }
+
+        // Validate reporting person
+        if (reportingPerson) {
+            // Check if employee is trying to assign themselves as reporting person
+            if (reportingPerson.toString() === id) {
+                return res.status(400).json({ error: 'Employee cannot report to themselves.' });
+            }
+            
+            // Check if reporting person exists
+            const managerExists = await User.findById(reportingPerson);
+            if (!managerExists) {
+                return res.status(400).json({ error: 'Selected reporting person does not exist.' });
+            }
         }
 
         if (password && password.trim() !== '') {

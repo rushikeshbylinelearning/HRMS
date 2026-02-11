@@ -3,7 +3,6 @@
 // VALIDATION: One initial call, no duplicate on auth resolution, manual Retry on error, socket/visibility refresh, no memory leaks.
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef, forwardRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
     Typography, Button, Alert, Stack, Box, Grid, Paper,
     Avatar, Divider, Chip, IconButton, Dialog, DialogTitle, DialogContent,
@@ -54,27 +53,6 @@ const BreakModalTransition = forwardRef(function Transition(props, ref) {
     return <Fade ref={ref} {...props} timeout={400} />;
 });
 
-// Framer Motion variants for break modal items
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: { staggerChildren: 0.07 }
-    }
-};
-
-const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-        y: 0, 
-        opacity: 1, 
-        transition: { 
-            type: "spring", 
-            stiffness: 100,
-            damping: 15
-        } 
-    }
-};
 // CRITICAL: Use IST timezone for date string to match backend
 // This ensures the frontend sends the same date as the backend expects
 const getLocalDateString = (date = new Date()) => {
@@ -414,8 +392,9 @@ const EmployeeDashboardPage = () => {
         return getUnifiedShiftTimeState(clockIn, dailyData.sessions, breaksForUi, tickNow, {
             scheduledShiftMinutes,
             allowedPaidBreakMinutes: paidBreakAllowance,
+            backendRequiredLogoutTime: dailyData?.calculatedLogoutTime || null,
         });
-    }, [dailyData?.sessions, breaksForUi, tickNow, scheduledShiftMinutes, paidBreakAllowance]);
+    }, [dailyData?.sessions, dailyData?.calculatedLogoutTime, breaksForUi, tickNow, scheduledShiftMinutes, paidBreakAllowance]);
 
     // Real-time checkout availability: update canCheckout every second when clocked in
     useEffect(() => {
@@ -947,26 +926,22 @@ const EmployeeDashboardPage = () => {
                     <DialogTitle className="break-modal-title">Choose Your Break Type<IconButton aria-label="close" onClick={handleCloseBreakModal} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton></DialogTitle>
                     <DialogContent dividers>
                         <Stack 
-                            spacing={2} 
-                            component={motion.div}
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
+                            spacing={2}
                         >
                             <Tooltip title={!paidBreakCheck.allowed ? paidBreakCheck.message : (hasExhaustedPaidBreak ? 'You have used all your paid break time' : '')} arrow placement="left">
-                                <Box component={motion.div} variants={itemVariants}>
+                                <Box>
                                     <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Paid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
                             
                             <Tooltip title={!unpaidBreakCheck.allowed ? unpaidBreakCheck.message : (hasTakenUnpaidBreak ? 'You have already taken an unpaid break today' : '')} arrow placement="left">
-                                <Box component={motion.div} variants={itemVariants}>
+                                <Box>
                                     <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Unpaid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>10 minute break</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
 
                             <Tooltip title={!extraBreakCheck.allowed ? extraBreakCheck.message : (hasPendingExtraBreak ? 'Your request is pending' : hasTakenExtraBreak ? 'You have already used an extra break' : '')} arrow placement="left">
-                                <Box component={motion.div} variants={itemVariants}>
+                                <Box>
                                     <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>

@@ -6,17 +6,17 @@ const BreakLog = require('../models/BreakLog');
 const ExtraBreakRequest = require('../models/ExtraBreakRequest');
 const { getShiftDateTimeIST } = require('../utils/istTime');
 const { getGracePeriodMinutes } = require('../utils/gracePeriod');
-const { 
-    SHIFT_WORKING_MINUTES, 
+const {
+    SHIFT_WORKING_MINUTES,
     PAID_BREAK_ALLOWANCE_MINUTES,
     MINIMUM_WORKING_HOURS,
     MINIMUM_HOURS_FOR_HALF_DAY,
     MINIMUM_TOTAL_HOURS_FOR_HALF_DAY,
     HALF_DAY_WORKING_MINUTES,
     MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY,
-    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY,
-    calculateRequiredLogoutTime 
+    MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY
 } = require('../config/shiftPolicy');
+const { calculateRequiredLogoutTime } = require('./requiredLogoutService');
 
 const DEFAULT_OPTIONS = {
     includeSessions: true,
@@ -68,7 +68,7 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
     // 1. Check if insufficient working hours (takes precedence over grace period)
     // 2. Check if exceeds grace period (only if working hours are sufficient)
     // 3. Otherwise, on-time
-    
+
     let isLate = false;
     let isHalfDay = false;
     let attendanceStatus = 'On-time';
@@ -113,11 +113,11 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
             isHalfDay = true;
             attendanceStatus = 'Half-day';
             halfDayReasonCode = 'LATE_LOGIN';
-            const clockInTimeStr = clockInTime.toLocaleTimeString('en-US', { 
+            const clockInTimeStr = clockInTime.toLocaleTimeString('en-US', {
                 timeZone: 'Asia/Kolkata',
-                hour12: true, 
-                hour: '2-digit', 
-                minute: '2-digit' 
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit'
             });
             halfDayReasonText = `Late login beyond ${GRACE_PERIOD_MINUTES} min grace period (logged at ${clockInTimeStr}, ${lateMinutes} minutes late)`;
         } else {
@@ -210,7 +210,7 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
 
     const firstClockInSession = sessions[0];
     const clockInTime = new Date(firstClockInSession.startTime);
-    
+
     // Helper function to set time on a date (in IST)
     const setTime = (date, timeString) => {
         const [hours, minutes] = timeString.split(':').map(Number);
@@ -223,7 +223,7 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         newDate.setMinutes(newDate.getMinutes() + minutes);
         return newDate;
     };
-    
+
     // ============================================
     // Calculate total break minutes from breaks array (AUTHORITATIVE SOURCE)
     // CRITICAL: Aggregate from breaks array instead of database field
@@ -231,7 +231,7 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     // ============================================
     let paidBreakMinutesTaken = 0;
     let unpaidBreakMinutesTaken = 0;
-    
+
     // Aggregate break minutes from breaks array (source of truth)
     if (breaks && Array.isArray(breaks)) {
         breaks.forEach(breakItem => {
@@ -240,10 +240,10 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
                 const breakStart = new Date(breakItem.startTime);
                 const breakEnd = new Date(breakItem.endTime);
                 const durationMinutes = Math.round((breakEnd - breakStart) / (1000 * 60));
-                
+
                 // Handle both breakType and type for backward compatibility
                 const breakType = (breakItem.breakType || breakItem.type || 'Unpaid').toString().trim();
-                
+
                 // Match breakType exactly (case-sensitive) as stored in database
                 if (breakType === 'Paid') {
                     paidBreakMinutesTaken += durationMinutes;
@@ -253,14 +253,14 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
             }
         });
     }
-    
+
     // Fallback: If no breaks array provided or breaks array is empty, use database field (backward compatibility)
     // This ensures backward compatibility if breaks are not included in the query
     if ((!breaks || !Array.isArray(breaks) || breaks.length === 0) && paidBreakMinutesTaken === 0 && unpaidBreakMinutesTaken === 0) {
         paidBreakMinutesTaken = attendanceLog.paidBreakMinutesTaken || 0;
         unpaidBreakMinutesTaken = attendanceLog.unpaidBreakMinutesTaken || 0;
     }
-    
+
     // Include active break duration if present (for real-time calculation)
     if (activeBreak && activeBreak.startTime) {
         const { getISTNow } = require('../utils/istTime');
@@ -268,14 +268,14 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         const activeBreakStart = new Date(activeBreak.startTime);
         const activeBreakDurationMinutes = Math.floor((now - activeBreakStart) / (1000 * 60));
         const activeBreakType = (activeBreak.breakType || activeBreak.type || '').toString().trim();
-        
+
         if (activeBreakType === 'Paid') {
             paidBreakMinutesTaken += activeBreakDurationMinutes;
         } else if (activeBreakType === 'Unpaid' || activeBreakType === 'Extra') {
             unpaidBreakMinutesTaken += activeBreakDurationMinutes;
         }
     }
-    
+
     // DEBUG: Log calculated values
     console.log('[computeCalculatedLogoutTime] Aggregated break values:', {
         paidBreakMinutesTaken,
@@ -283,24 +283,31 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         breaksCount: breaks?.length || 0,
         clockInTime: clockInTime.toISOString()
     });
-    
+
     // ============================================
     // USE AUTHORITATIVE POLICY CALCULATION
     // Half-day leave: base work = 300 min; full day: shift working minutes
     // ============================================
     const baseWorkMinutes = approvedHalfDayLeave ? HALF_DAY_WORKING_MINUTES : SHIFT_WORKING_MINUTES;
-    const result = calculateRequiredLogoutTime(
-        clockInTime,
-        paidBreakMinutesTaken,
-        unpaidBreakMinutesTaken,
-        { workingMinutes: baseWorkMinutes }
-    );
     
+    // Get attendance date for boundary calculation
+    const { getISTDateString } = require('../utils/istTime');
+    const attendanceDate = getISTDateString(clockInTime);
+    
+    const result = calculateRequiredLogoutTime({
+        clockInTime,
+        totalPaidBreakMinutes: paidBreakMinutesTaken,
+        totalUnpaidBreakMinutes: unpaidBreakMinutesTaken,
+        shift: userShift,
+        attendanceDate,
+        timezone: 'Asia/Kolkata'
+    });
+
     if (!result) {
         console.log('[computeCalculatedLogoutTime] calculateRequiredLogoutTime returned null');
         return null;
     }
-    
+
     // DEBUG: Log calculation result
     console.log('[computeCalculatedLogoutTime] Calculation result:', {
         paidBreakMinutesTaken,
@@ -310,36 +317,9 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         requiredLogoutTime: result.requiredLogoutTime.toISOString(),
         requiredLogoutTimeIST: result.requiredLogoutTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
     });
-    
-    let requiredLogoutTime = result.requiredLogoutTime;
-    
-    // ============================================
-    // POLICY: 7:00 PM minimum logout
-    // - Fixed shift with end time 7 PM (19:00): enforce floor (format-agnostic)
-    // - Flexible shift: policy is standard day ends at 7 PM, so enforce floor
-    // ============================================
-    const parseEndTimeToHourMin = (endTime) => {
-        if (!endTime || typeof endTime !== 'string') return null;
-        const raw = endTime.trim();
-        const parts = raw.split(':').map(s => parseInt(String(s).replace(/\D/g, ''), 10));
-        const hour = parts[0];
-        const min = (parts[1] !== undefined && !Number.isNaN(parts[1])) ? parts[1] : 0;
-        if (Number.isNaN(hour)) return null;
-        const isPM = /pm|p\.m\./i.test(raw);
-        const hour24 = isPM && hour >= 1 && hour <= 12 ? hour + 12 : hour;
-        return { hour: hour24, min, isPM };
-    };
-    const endParsed = parseEndTimeToHourMin(userShift.endTime);
-    const shiftEndsAt7PM = endParsed && endParsed.min === 0 && (endParsed.hour === 19 || (endParsed.hour === 7 && endParsed.isPM));
-    const enforce7PMFloor = (userShift.shiftType === 'Fixed' && shiftEndsAt7PM) || (userShift.shiftType === 'Flexible');
-    
-    if (enforce7PMFloor) {
-        const sevenPM = setTime(clockInTime, '19:00');
-        if (requiredLogoutTime < sevenPM) {
-            requiredLogoutTime = sevenPM;
-        }
-    }
-    
+
+    const requiredLogoutTime = result.requiredLogoutTime;
+
     // Return both the time and breakdown for API responses
     return {
         requiredLogoutTime: requiredLogoutTime.toISOString(),
@@ -396,10 +376,10 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
     if (attendanceLog.clockInTime) {
         // First, try to get first session's startTime (most authoritative)
         try {
-            const firstSession = await AttendanceSession.findOne({ 
-                attendanceLog: attendanceLog._id 
+            const firstSession = await AttendanceSession.findOne({
+                attendanceLog: attendanceLog._id
             }).sort({ startTime: 1 }).select('startTime').lean();
-            
+
             if (firstSession && firstSession.startTime) {
                 firstCheckInTime = new Date(firstSession.startTime);
             } else {
@@ -412,7 +392,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
             firstCheckInTime = new Date(attendanceLog.clockInTime);
         }
     }
-    
+
     if (firstCheckInTime && response.shift && response.shift.startTime) {
         // Calculate elapsed shift time (clockOutTime - clockInTime) for new shift model
         // This includes breaks and is used for attendance status determination
@@ -421,7 +401,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
             const elapsedShiftMinutes = (new Date(attendanceLog.clockOutTime) - new Date(attendanceLog.clockInTime)) / (1000 * 60);
             elapsedShiftHours = elapsedShiftMinutes / 60;
         }
-        
+
         // Pass elapsed shift hours for accurate status determination
         // Only treat as true when explicitly true; missing/undefined/false => do not mark half-day for late
         const lateArrivalMarksHalfDay = user.featurePermissions?.lateArrivalMarksHalfDay === true;
@@ -437,7 +417,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
         response.attendanceLog.isHalfDay = recalculatedStatus.isHalfDay;
         response.attendanceLog.lateMinutes = recalculatedStatus.lateMinutes;
         response.attendanceLog.attendanceStatus = recalculatedStatus.attendanceStatus;
-        
+
         // Include half-day reason: Use persisted if admin overridden, otherwise use recalculated
         if (attendanceLog.overriddenByAdmin && attendanceLog.halfDayReasonText) {
             // Admin override takes precedence
@@ -455,7 +435,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
             response.attendanceLog.halfDayReasonText = attendanceLog.halfDayReasonText;
             response.attendanceLog.halfDaySource = attendanceLog.halfDaySource;
         }
-        
+
         // Include override fields
         response.attendanceLog.overriddenByAdmin = attendanceLog.overriddenByAdmin || false;
         response.attendanceLog.overriddenAt = attendanceLog.overriddenAt || null;
@@ -481,7 +461,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     if (resolvedOptions.includeSessions || resolvedOptions.includeBreaks || resolvedOptions.includeAutoBreak) {
         const batch2Promises = [];
-        
+
         if (resolvedOptions.includeSessions) {
             batch2Promises.push(
                 AttendanceSession.find({ attendanceLog: attendanceLog._id }).sort({ startTime: 1 }).lean()
@@ -511,7 +491,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
         }
 
         const [sessionsResult, breaksResult, autoBreakResult] = await Promise.all(batch2Promises);
-        
+
         sessions = sessionsResult;
         breaks = breaksResult;
         autoBreakDoc = autoBreakResult;
@@ -568,7 +548,7 @@ const getUserDailyStatus = async (userId, targetDate, options = {}) => {
 
     // Pass activeBreak to the calculation function
     const logoutCalculation = computeCalculatedLogoutTime(sessions, breaks, response.attendanceLog, response.shift, response.activeBreak);
-    
+
     if (logoutCalculation) {
         response.calculatedLogoutTime = logoutCalculation.requiredLogoutTime;
         response.logoutBreakdown = logoutCalculation.breakdown;

@@ -1,152 +1,131 @@
 // backend/config/shiftPolicy.js
+
 /**
- * SHIFT POLICY CONSTANTS - SINGLE SOURCE OF TRUTH
- * 
- * This file defines the authoritative policy for shift duration and break calculations.
- * All calculations MUST reference these constants to ensure consistency.
- * 
+ * SHIFT POLICY CONFIGURATION - PURE STATIC DEFINITIONS
+ *
+ * This file contains ONLY static configuration and constants.
+ * NO runtime logic, NO imports of moment/dayjs, NO calculations.
+ * All calculations are performed in backend/services/requiredLogoutService.js
+ *
  * POLICY DEFINITION:
  * - Shift working time: 8 hours 30 minutes (510 minutes)
  * - Allowed paid break: 30 minutes
- * - Shift total duration: 9 hours (540 minutes) = working time + paid break allowance
- * 
+ * - Shift total duration: 9 hours (540 minutes)
+ *
  * BREAK RULES:
  * 1. Paid breaks up to 30 minutes are included in the 9-hour shift
- * 2. Paid breaks beyond 30 minutes → excess is treated as unpaid and extends logout time
+ * 2. Paid breaks beyond 30 minutes → excess extends logout time
  * 3. All unpaid break time MUST extend required logout time
- * 
- * REQUIRED LOGOUT TIME CALCULATION:
- * requiredLogoutTime = clockInTime 
- *                     + requiredWorkingTime (8.5 hours)
- *                     + excessPaidBreak (paidBreak - 30min if > 30min)
- *                     + totalUnpaidBreak
  */
 
-// Core shift policy constants
-const SHIFT_WORKING_MINUTES = 8.5 * 60; // 510 minutes (8 hours 30 minutes)
-const SHIFT_PAID_BREAK_ALLOWANCE_MINUTES = 30; // 30 minutes paid break
-const SHIFT_TOTAL_MINUTES = 9 * 60; // 540 minutes (9 hours total)
+// --------------------
+// CORE SHIFT CONSTANTS
+// --------------------
+
+const SHIFT_WORKING_MINUTES = 510; // 8.5 hours
+const SHIFT_PAID_BREAK_ALLOWANCE_MINUTES = 30;
+const SHIFT_TOTAL_MINUTES = 540; // 9 hours
 
 // Break policy constants
-const PAID_BREAK_ALLOWANCE_MINUTES = 30; // Maximum paid break allowed
-const UNPAID_BREAK_ALLOWANCE_MINUTES = 10; // Allowance for unpaid breaks (for penalty tracking only)
-const EXTRA_BREAK_ALLOWANCE_MINUTES = 10; // Allowance for extra breaks (for penalty tracking only)
+const PAID_BREAK_ALLOWANCE_MINUTES = 30;
+const UNPAID_BREAK_ALLOWANCE_MINUTES = 10; // penalty tracking only
+const EXTRA_BREAK_ALLOWANCE_MINUTES = 10; // penalty tracking only
 
-// Minimum working hours policy (DEPRECATED - kept for backward compatibility)
-// NEW MODEL: Use elapsed shift time (clockOutTime - clockInTime) for attendance status
-const MINIMUM_WORKING_HOURS = 8.5; // 8 hours 30 minutes (510 minutes) - minimum required for full day
-const MINIMUM_WORKING_MINUTES = MINIMUM_WORKING_HOURS * 60; // 510 minutes
+// --------------------
+// LEGACY / COMPAT CONSTANTS
+// --------------------
 
-// Minimum to count as half-day: 4.5 hours worked + 0.5 hours break allowance = 5 total hours
-// Below 5 total hours (worked + break allowance) = Absent; 5 total hours (4.5 worked + 0.5 break) to < 8.5 worked hours = Half-day; >= 8.5 worked hours = Full day
-// Note: Break allowance (0.5 hours) is always added regardless of whether employee takes a break
-// DEPRECATED: Use MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY instead
-const MINIMUM_HOURS_FOR_HALF_DAY = 4.5; // 4.5 hours worked time (270 minutes) - below this = Absent
-const MINIMUM_MINUTES_FOR_HALF_DAY = MINIMUM_HOURS_FOR_HALF_DAY * 60; // 270 minutes worked time
+const MINIMUM_WORKING_HOURS = 8.5;
+const MINIMUM_WORKING_MINUTES = 510;
 
-// Total time threshold for half-day (worked time + break allowance)
-// DEPRECATED: Use MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY instead
-const MINIMUM_TOTAL_HOURS_FOR_HALF_DAY = 5; // 5 total hours (4.5 worked + 0.5 break)
-const MINIMUM_TOTAL_MINUTES_FOR_HALF_DAY = MINIMUM_TOTAL_HOURS_FOR_HALF_DAY * 60; // 300 minutes total
+const MINIMUM_HOURS_FOR_HALF_DAY = 4.5;
+const MINIMUM_MINUTES_FOR_HALF_DAY = 270;
 
-// NEW SHIFT MODEL: Elapsed shift time thresholds (includes paid breaks)
-// Attendance status is based on elapsedShiftTime = clockOutTime - clockInTime
-// Break duration does NOT reduce attendance thresholds
-const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY = 9; // 9 hours elapsed shift time = Full Day (Present)
-const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_FULL_DAY = MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY * 60; // 540 minutes
+const MINIMUM_TOTAL_HOURS_FOR_HALF_DAY = 5;
+const MINIMUM_TOTAL_MINUTES_FOR_HALF_DAY = 300;
 
-const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY = 5; // 5 hours elapsed shift time = Half Day
-const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_HALF_DAY = MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY * 60; // 300 minutes
+// --------------------
+// NEW ELAPSED SHIFT MODEL
+// --------------------
 
-// Below 5 hours elapsed shift time = Absent
+const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY = 9;
+const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_FULL_DAY = 540;
 
-// Half-day leave: required work = 4.5 hours (270 minutes) for approved half-day leave
+const MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY = 5;
+const MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_HALF_DAY = 300;
+
+// Half-day leave requirement
 const HALF_DAY_WORKING_MINUTES = 270;
 
+// ===================================================================
+// SHIFT DEFINITIONS (STATIC CONFIGURATION)
+// ===================================================================
+
 /**
- * Calculate required logout time based on policy rules
- * 
- * FORMULA:
- * requiredLogoutTime = clockInTime + requiredWorkingTime + excessPaidBreak + unpaidBreak
- * 
- * Where:
- * - requiredWorkingTime = 8.5 hours (510 minutes)
- * - excessPaidBreak = max(0, totalPaidBreak - 30 minutes)
- * - unpaidBreak = all unpaid break minutes
- * 
- * @param {Date} clockInTime - The clock-in time
- * @param {number} totalPaidBreakMinutes - Total paid break minutes taken
- * @param {number} totalUnpaidBreakMinutes - Total unpaid break minutes taken
- * @param {Object} shiftPolicy - Optional shift policy override (defaults to constants above)
- * @returns {Object} {
- *   requiredLogoutTime: Date,
- *   breakdown: {
- *     clockInTime: Date,
- *     requiredWorkingMinutes: number,
- *     paidBreakMinutes: number,
- *     excessPaidBreakMinutes: number,
- *     unpaidBreakMinutes: number,
- *     totalExtensionMinutes: number
- *   }
- * }
+ * Shift configuration for 10 AM shift (General Shift 1 / General Shift_1)
  */
-const calculateRequiredLogoutTime = (clockInTime, totalPaidBreakMinutes = 0, totalUnpaidBreakMinutes = 0, shiftPolicy = {}) => {
-    if (!clockInTime) {
-        return null;
-    }
-
-    const workingMinutes = shiftPolicy.workingMinutes || SHIFT_WORKING_MINUTES;
-    const paidBreakAllowance = shiftPolicy.paidBreakAllowance || PAID_BREAK_ALLOWANCE_MINUTES;
-
-    // Calculate excess paid break (beyond allowance) in whole minutes so checkout aligns with frontend
-    // Paid breaks up to 30 minutes are included in the shift, excess extends logout
-    const excessPaidBreak = Math.max(0, Math.floor(totalPaidBreakMinutes - paidBreakAllowance));
-
-    // Total extension = excess paid break + all unpaid break (whole minutes only)
-    const totalExtensionMinutes = excessPaidBreak + Math.floor(totalUnpaidBreakMinutes);
-
-    // Required logout time = clock-in + base shift duration + extensions
-    // Base shift duration = 9 hours (8.5 working + 0.5 paid break allowance)
-    // Extensions = excess paid break + unpaid break (floored so UI and server match)
-    const baseShiftMinutes = workingMinutes + paidBreakAllowance;
-    const requiredLogoutTime = new Date(clockInTime);
-    requiredLogoutTime.setMinutes(requiredLogoutTime.getMinutes() + baseShiftMinutes + totalExtensionMinutes);
-    
-    // DEBUG: Log policy calculation
-    console.log('[calculateRequiredLogoutTime] Policy calculation:', {
-        totalPaidBreakMinutes,
-        paidBreakAllowance,
-        excessPaidBreak,
-        totalUnpaidBreakMinutes,
-        totalExtensionMinutes,
-        baseShiftMinutes,
-        clockInTime: clockInTime.toISOString(),
-        requiredLogoutTime: requiredLogoutTime.toISOString(),
-        requiredLogoutTimeIST: requiredLogoutTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-    });
-
-    return {
-        requiredLogoutTime,
-        breakdown: {
-            clockInTime: new Date(clockInTime),
-            requiredWorkingMinutes: workingMinutes,
-            baseShiftMinutes: baseShiftMinutes,
-            paidBreakMinutes: totalPaidBreakMinutes,
-            excessPaidBreakMinutes: excessPaidBreak,
-            unpaidBreakMinutes: totalUnpaidBreakMinutes,
-            totalExtensionMinutes: totalExtensionMinutes
-        }
-    };
+const SHIFT_10AM_CONFIG = {
+    names: ['General Shift 1', 'General Shift_1', 'General_Shift_1'],
+    workHours: 9,
+    workMinutes: 540,
+    paidBreakMinutes: 30,
+    minRequiredLogoutHour: 19, // 7 PM (19:00)
+    minRequiredLogoutMinute: 0,
+    earlyCheckInAllowed: true,
+    enforceMinLogout: true, // HARD FLOOR - always enforce 7 PM minimum
+    description: '10:00 AM - 07:00 PM shift with hard 7 PM logout floor'
 };
 
+/**
+ * Shift configuration for 11 AM shift (General Shift 2 / General Shift_2)
+ */
+const SHIFT_11AM_CONFIG = {
+    names: ['General Shift 2', 'General Shift_2', 'General_Shift_2'],
+    workHours: 9,
+    workMinutes: 540,
+    paidBreakMinutes: 30,
+    flexibleLogicEnabled: true,
+    earlyBoundaryHour: 10, // 10:00 AM
+    earlyBoundaryMinute: 0,
+    minRequiredLogoutWhenEarlyHour: 19, // 7 PM (19:00)
+    minRequiredLogoutWhenEarlyMinute: 0,
+    description: '11:00 AM - 08:00 PM shift with conditional 7 PM floor (only if check-in < 10 AM)'
+};
+
+/**
+ * Pure helper function to normalize shift names for comparison
+ * (handles underscores, extra spaces, case variations)
+ */
+function normalizeShiftName(shiftName) {
+    if (!shiftName || typeof shiftName !== 'string') return '';
+    return shiftName.replace(/_/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * Pure helper function to check if a shift matches a configuration
+ */
+function isShiftMatch(shift, config) {
+    if (!shift || !shift.shiftName || !config || !config.names) return false;
+    const normalized = normalizeShiftName(shift.shiftName);
+    return config.names.some(name => 
+        normalizeShiftName(name) === normalized || shift.shiftName === name
+    );
+}
+
+// ===================================================================
+// EXPORTS (PURE CONFIGURATION ONLY)
+// ===================================================================
+
 module.exports = {
-    // Constants
+    // Core constants
     SHIFT_WORKING_MINUTES,
     SHIFT_PAID_BREAK_ALLOWANCE_MINUTES,
     SHIFT_TOTAL_MINUTES,
     PAID_BREAK_ALLOWANCE_MINUTES,
     UNPAID_BREAK_ALLOWANCE_MINUTES,
     EXTRA_BREAK_ALLOWANCE_MINUTES,
+
+    // Legacy / compatibility
     MINIMUM_WORKING_HOURS,
     MINIMUM_WORKING_MINUTES,
     MINIMUM_HOURS_FOR_HALF_DAY,
@@ -154,14 +133,18 @@ module.exports = {
     MINIMUM_TOTAL_HOURS_FOR_HALF_DAY,
     MINIMUM_TOTAL_MINUTES_FOR_HALF_DAY,
     HALF_DAY_WORKING_MINUTES,
-    
-    // New shift model: Elapsed shift time thresholds
+
+    // Elapsed shift model
     MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY,
     MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_FULL_DAY,
     MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY,
     MINIMUM_ELAPSED_SHIFT_MINUTES_FOR_HALF_DAY,
 
-    // Calculation function
-    calculateRequiredLogoutTime
-};
+    // Shift configurations
+    SHIFT_10AM_CONFIG,
+    SHIFT_11AM_CONFIG,
 
+    // Pure helper functions (no execution, no side effects)
+    normalizeShiftName,
+    isShiftMatch
+};

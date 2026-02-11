@@ -403,6 +403,7 @@ app.get('/medical-certificates/:fileId', (req, res, next) => {
 });
 app.use('/medical-certificates', express.static(path.join(__dirname, 'uploads/medical-certificates'), staticOptions));
 app.use('/public', express.static(path.join(__dirname, 'public'), staticOptions));
+app.use('/policies', express.static(path.join(__dirname, 'public/policies'), staticOptions));
 
 // Additional middleware to ensure static file routes are never processed by auth
 app.use((req, res, next) => {
@@ -487,6 +488,10 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/probation', probationRoutes);
+
+// Policies routes
+const policiesRoutes = require('./routes/policies');
+app.use('/api/policies', policiesRoutes);
 
 // Debug route registration
 console.log('Routes registered:');

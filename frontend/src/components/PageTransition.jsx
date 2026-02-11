@@ -8,20 +8,39 @@ import { Box } from '@mui/material';
 /**
  * Page Transition Wrapper
  * Provides fade + slide animation for page transitions
+ * 
+ * CRITICAL: Disabled for /profile and /leaves to prevent layout mutations
  */
 const PageTransition = ({ children }) => {
     const location = useLocation();
     const [displayLocation, setDisplayLocation] = useState(location);
     const [transitionStage, setTransitionStage] = useState('enter');
 
+    // CRITICAL FIX: Disable transitions for Profile and Leaves pages
+    // These pages have zero-mutation requirements
+    const NO_TRANSITION_ROUTES = ['/profile', '/leaves'];
+    const shouldDisableTransition = NO_TRANSITION_ROUTES.includes(location.pathname);
+
     useEffect(() => {
+        // Skip transition logic for protected routes
+        if (shouldDisableTransition) {
+            setDisplayLocation(location);
+            setTransitionStage('enter');
+            return;
+        }
+
         // Only animate if pathname actually changed
         if (location.pathname !== displayLocation.pathname) {
             setTransitionStage('exit');
         }
-    }, [location, displayLocation]);
+    }, [location, displayLocation, shouldDisableTransition]);
 
     useEffect(() => {
+        // Skip transition logic for protected routes
+        if (shouldDisableTransition) {
+            return;
+        }
+
         if (transitionStage === 'exit') {
             // Delay updating location until exit animation starts
             const timer = setTimeout(() => {
@@ -31,7 +50,12 @@ const PageTransition = ({ children }) => {
             
             return () => clearTimeout(timer);
         }
-    }, [transitionStage, location]);
+    }, [transitionStage, location, shouldDisableTransition]);
+
+    // CRITICAL: Return children directly for protected routes (no animation wrapper)
+    if (shouldDisableTransition) {
+        return <>{children}</>;
+    }
 
     return (
         <Box

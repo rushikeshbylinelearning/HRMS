@@ -44,6 +44,7 @@ const EmployeeMusterRollPage = lazy(() => import('./pages/EmployeeMusterRollPage
 const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
 const PayrollManagementPage = lazy(() => import('./pages/PayrollManagementPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const AdminPoliciesPage = lazy(() => import('./pages/AdminPoliciesPage'));
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
@@ -309,6 +310,11 @@ function App() {
                                                 <PermissionProtectedRoute requiredPermission="viewAnalytics">
                                                     <PayrollManagementPage />
                                                 </PermissionProtectedRoute>
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/policies" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <AdminPoliciesPage />
                                             </Suspense>
                                         } />
                                     </Route>

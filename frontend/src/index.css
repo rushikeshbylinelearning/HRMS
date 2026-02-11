@@ -1,3 +1,6 @@
+/* ROOT CAUSE FIX: Load layout lock CSS FIRST to prevent overrides */
+@import './styles/ProfileLayoutLock.css';
+
 :root {
   --accent-blue: #2563eb;
   --sidebar-bg: #1a237e;
