@@ -4761,4 +4761,247 @@ router.post('/attendance/recalculate', [authenticateToken, isAdminOrHr], async (
     }
 });
 
+// =================================================================
+// HALF-DAY LEAVE AUTO-CONVERSION ENDPOINTS
+// =================================================================
+
+/**
+ * POST /api/admin/leaves/run-halfday-validation
+ * Manually trigger half-day leave auto-conversion for a specific date.
+ * Used for testing, staging validation, and HR revalidation.
+ * 
+ * SAFETY: Requires Admin role and explicit date parameter
+ */
+router.post('/leaves/run-halfday-validation', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const { date } = req.body;
+        
+        if (!date) {
+            return res.status(400).json({
+                error: 'Date is required (format: YYYY-MM-DD).'
+            });
+        }
+        
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+            return res.status(400).json({
+                error: 'Invalid date format. Use YYYY-MM-DD.'
+            });
+        }
+        
+        // Validate date is in the past
+        const { parseISTDate, startOfISTDay } = require('../utils/istTime');
+        const targetDate = parseISTDate(date);
+        const today = startOfISTDay(new Date());
+        
+        if (targetDate >= today) {
+            return res.status(400).json({
+                error: 'Target date must be in the past. Cannot convert leaves for current or future dates.'
+            });
+        }
+        
+        const { autoConvertHalfDayLeaves } = require('../services/halfDayAutoConversionService');
+        
+        console.log(`[Admin] Manual half-day conversion triggered by ${req.user.userId} for date: ${date}`);
+        
+        const result = await autoConvertHalfDayLeaves(date);
+        
+        // Invalidate cache after conversion
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidatePendingLeaves(date);
+        cacheService.invalidateDashboard(date);
+        cacheService.invalidateLeaveAnalytics();
+        
+        res.json({
+            success: true,
+            message: 'Half-day leave validation completed.',
+            summary: {
+                targetDate: result.targetDate,
+                processed: result.processed,
+                converted: result.converted,
+                skipped: result.skipped,
+                errors: result.errors
+            },
+            details: result.details
+        });
+        
+    } catch (error) {
+        console.error('[Admin] Error in manual half-day validation:', error);
+        res.status(500).json({
+            error: 'Failed to run half-day validation.',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/admin/leaves/run-auto-revert-check
+ * Manually trigger auto-revert check for incorrectly converted leaves.
+ * Detects leaves that were converted to LOP but now have attendance data.
+ * 
+ * SAFETY: Requires Admin/HR role and explicit date parameter
+ */
+router.post('/leaves/run-auto-revert-check', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const { date } = req.body;
+        
+        if (!date) {
+            return res.status(400).json({
+                error: 'Date is required (format: YYYY-MM-DD).'
+            });
+        }
+        
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+            return res.status(400).json({
+                error: 'Invalid date format. Use YYYY-MM-DD.'
+            });
+        }
+        
+        const { autoRevertIncorrectConversions } = require('../services/halfDayAutoConversionService');
+        
+        console.log(`[Admin] Manual auto-revert check triggered by ${req.user.userId} for date: ${date}`);
+        
+        const result = await autoRevertIncorrectConversions(date);
+        
+        // Invalidate cache after revert
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidatePendingLeaves(date);
+        cacheService.invalidateDashboard(date);
+        cacheService.invalidateLeaveAnalytics();
+        
+        res.json({
+            success: true,
+            message: 'Auto-revert check completed.',
+            summary: {
+                targetDate: result.targetDate,
+                checked: result.checked,
+                reverted: result.reverted,
+                errors: result.errors
+            },
+            details: result.details
+        });
+        
+    } catch (error) {
+        console.error('[Admin] Error in auto-revert check:', error);
+        res.status(500).json({
+            error: 'Failed to run auto-revert check.',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/admin/leaves/revert-auto-conversion/:leaveId
+ * Revert an auto-converted leave back to its original state.
+ * Restores original leaveType/requestType, removes auto flags, resyncs attendance, logs revert event.
+ * SAFETY: Requires Admin role, validates leave was auto-converted
+ */
+router.post('/leaves/revert-auto-conversion/:leaveId', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const { leaveId } = req.params;
+
+        if (!leaveId) {
+            return res.status(400).json({ error: 'Leave ID is required.' });
+        }
+        if (!mongoose.Types.ObjectId.isValid(leaveId)) {
+            return res.status(400).json({ error: 'Invalid leave ID format.' });
+        }
+
+        const { revertAutoConversion } = require('../services/halfDayAutoConversionService');
+        const adminUserId = req.user.userId;
+
+        const result = await revertAutoConversion(leaveId, adminUserId);
+
+        res.json({
+            success: result.success,
+            message: result.message,
+            leave: {
+                _id: result.leave._id,
+                leaveType: result.leave.leaveType,
+                requestType: result.leave.requestType,
+                autoConvertedToLOP: result.leave.autoConvertedToLOP,
+            },
+        });
+    } catch (error) {
+        if (error.message === 'Leave request not found') {
+            return res.status(404).json({ error: 'Leave request not found.' });
+        }
+        if (error.message === 'Leave was not auto-converted') {
+            return res.status(400).json({ error: 'Leave was not auto-converted. Cannot revert.' });
+        }
+        console.error('[Admin] Error reverting auto-conversion:', error);
+        res.status(500).json({
+            error: 'Failed to revert auto-conversion.',
+            details: error.message,
+        });
+    }
+});
+
+/**
+ * GET /api/admin/leaves/auto-conversion-log
+ * Get history of auto-converted leaves for audit purposes.
+ * 
+ * Query params:
+ * - startDate: YYYY-MM-DD (optional)
+ * - endDate: YYYY-MM-DD (optional)
+ * - page: number (default: 1)
+ * - limit: number (default: 50)
+ */
+router.get('/leaves/auto-conversion-log', [authenticateToken, isAdminOrHr], async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+        const { startDate, endDate } = req.query;
+        
+        // Build query
+        const query = { autoConvertedToLOP: true };
+        
+        if (startDate || endDate) {
+            query.autoConversionDate = {};
+            if (startDate) {
+                const { parseISTDate, startOfISTDay } = require('../utils/istTime');
+                query.autoConversionDate.$gte = startOfISTDay(parseISTDate(startDate));
+            }
+            if (endDate) {
+                const { parseISTDate, endOfISTDay } = require('../utils/istTime');
+                query.autoConversionDate.$lte = endOfISTDay(parseISTDate(endDate));
+            }
+        }
+        
+        // Fetch converted leaves with employee details
+        const [conversions, totalCount] = await Promise.all([
+            LeaveRequest.find(query)
+                .populate('employee', 'fullName employeeCode email')
+                .select('employee leaveType requestType leaveDates autoConversionDate autoConversionReason originalLeaveType originalRequestType reason')
+                .sort({ autoConversionDate: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            LeaveRequest.countDocuments(query)
+        ]);
+        
+        res.json({
+            success: true,
+            conversions,
+            pagination: {
+                totalCount,
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                limit
+            }
+        });
+        
+    } catch (error) {
+        console.error('[Admin] Error fetching auto-conversion log:', error);
+        res.status(500).json({
+            error: 'Failed to fetch auto-conversion log.',
+            details: error.message
+        });
+    }
+});
+
 module.exports = router;

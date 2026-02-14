@@ -258,6 +258,79 @@ const startAutoLogoutJob = () => {
 };
 
 /**
+ * Half-day leave auto-conversion job - runs daily at 12:30 AM IST
+ * Converts approved half-day leaves to full-day LOP when employee has no check-in
+ * Also auto-reverts incorrectly converted leaves if attendance was added later
+ */
+const startHalfDayConversionJob = () => {
+    const { autoConvertHalfDayLeaves, autoRevertIncorrectConversions } = require('./halfDayAutoConversionService');
+    const { getISTDateString } = require('../utils/istTime');
+    
+    // Function to get yesterday's date in YYYY-MM-DD format
+    const getYesterdayDateString = () => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return getISTDateString(yesterday);
+    };
+    
+    // Combined function to run both conversion and auto-revert
+    const runDailyConversionChecks = async (dateStr) => {
+        try {
+            // First, convert half-day leaves with no check-in to full-day LOP
+            console.log(`[cronService] Running half-day conversion for ${dateStr}`);
+            await autoConvertHalfDayLeaves(dateStr);
+            
+            // Then, check for incorrectly converted leaves (where attendance was added later)
+            console.log(`[cronService] Running auto-revert check for ${dateStr}`);
+            await autoRevertIncorrectConversions(dateStr);
+        } catch (err) {
+            console.error(`[cronService] Error in daily conversion checks for ${dateStr}:`, err);
+        }
+    };
+    
+    // Run immediately on startup (with delay) for yesterday's data
+    setTimeout(() => {
+        const yesterday = getYesterdayDateString();
+        console.log(`[cronService] Running initial half-day conversion check for ${yesterday}`);
+        runDailyConversionChecks(yesterday);
+    }, 5000); // 5 second delay to ensure DB is ready
+    
+    // Schedule daily at 12:30 AM IST (00:30)
+    // Using setInterval for 24 hours
+    const CONVERSION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    
+    // Calculate time until next 12:30 AM IST
+    const now = new Date();
+    const nextRun = new Date(now);
+    nextRun.setHours(0, 30, 0, 0); // Set to 12:30 AM today
+    
+    // If we've passed 12:30 AM today, schedule for tomorrow
+    if (now > nextRun) {
+        nextRun.setDate(nextRun.getDate() + 1);
+    }
+    
+    const msUntilNextRun = nextRun.getTime() - now.getTime();
+    
+    // Schedule first run at 12:30 AM
+    setTimeout(() => {
+        const yesterday = getYesterdayDateString();
+        console.log(`[cronService] Running scheduled half-day conversion for ${yesterday}`);
+        runDailyConversionChecks(yesterday);
+        
+        // Then run every 24 hours
+        setInterval(() => {
+            const yesterday = getYesterdayDateString();
+            console.log(`[cronService] Running scheduled half-day conversion for ${yesterday}`);
+            runDailyConversionChecks(yesterday);
+        }, CONVERSION_INTERVAL_MS);
+    }, msUntilNextRun);
+    
+    console.log('✅ Half-day conversion job scheduled (runs daily at 12:30 AM IST)');
+    console.log(`   Initial check will run in 5 seconds for yesterday's data`);
+    console.log(`   Next scheduled run: ${nextRun.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+};
+
+/**
  * Starts the scheduled jobs for the application.
  */
 const startScheduledJobs = () => {
@@ -276,7 +349,10 @@ const startScheduledJobs = () => {
     // Auto-logout job (runs every 5 minutes)
     startAutoLogoutJob();
     
-    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout) have been started.');
+    // Half-day leave auto-conversion job (runs daily at 12:30 AM IST)
+    startHalfDayConversionJob();
+    
+    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout, half-day conversion) have been started.');
 };
 
 module.exports = { startScheduledJobs, checkProbationAndInternshipEndings };

@@ -1547,18 +1547,48 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 gracePeriodMinutes
             });
 
+            // ROBUST: Half-day leave with no check-in → treat as Full Day LOP for display and payable hours.
+            // Only show "Half Day" when there is an attendance log with a clock-in for that day.
+            // CRITICAL: Do NOT treat as "no check-in" when clock-in was voided due to leave approval (AUTO-VOID in notes).
+            // CRITICAL FIX: If employee has actual attendance data (check-in), show Half Day even if leave was converted to LOP
+            let effectiveLeaveInfo = statusInfo.leaveInfo;
+            const isHalfDayLeaveDoc = leaveRequest && (leaveRequest.leaveType === 'Half Day - First Half' || leaveRequest.leaveType === 'Half Day - Second Half');
+            const wasVoidedByLeaveApproval = log?.notes && String(log.notes).includes('AUTO-VOID');
+            const hasActualCheckIn = log && log.clockInTime != null && !wasVoidedByLeaveApproval;
+            const hasNoCheckIn = !log || (log.clockInTime == null && !wasVoidedByLeaveApproval);
+            
+            // Only convert to Full Day LOP if there's truly no check-in
+            // If employee has attendance data, respect the original half-day leave type
+            if (effectiveLeaveInfo && isHalfDayLeaveDoc && hasNoCheckIn) {
+                // No clock-in → effective Full Day LOP for display
+                effectiveLeaveInfo = {
+                    ...effectiveLeaveInfo,
+                    leaveType: 'Full Day',
+                    requestType: 'Loss of Pay',
+                };
+            } else if (effectiveLeaveInfo && isHalfDayLeaveDoc && hasActualCheckIn && leaveRequest.autoConvertedToLOP) {
+                // Employee has check-in but leave was auto-converted to LOP (should be reverted)
+                // Show original half-day type instead of converted Full Day LOP
+                effectiveLeaveInfo = {
+                    ...effectiveLeaveInfo,
+                    leaveType: leaveRequest.originalLeaveType || leaveRequest.leaveType,
+                    requestType: leaveRequest.originalRequestType || 'Planned',
+                };
+            }
+            const effectiveIsHalfDayLeave = effectiveLeaveInfo && (effectiveLeaveInfo.leaveType === 'Half Day - First Half' || effectiveLeaveInfo.leaveType === 'Half Day - Second Half');
+
             // Build the response object
             const result = {
                 attendanceDate,
                 // FINAL resolved status (backend is single source of truth)
                 attendanceStatus: statusInfo.status,
-                // Status flags
+                // Status flags (for leave days: use effective half-day so no-check-in half-day → full-day LOP)
                 isWorkingDay: statusInfo.isWorkingDay,
                 isHoliday: statusInfo.isHoliday,
                 isWeeklyOff: statusInfo.isWeeklyOff,
                 isLeave: statusInfo.isLeave,
                 isAbsent: statusInfo.isAbsent,
-                isHalfDay: statusInfo.isHalfDay,
+                isHalfDay: statusInfo.isLeave ? effectiveIsHalfDayLeave : statusInfo.isHalfDay,
                 // Status reasons (for display)
                 statusReason: statusInfo.statusReason || null,
                 halfDayReason: statusInfo.halfDayReason || null,
@@ -1569,9 +1599,9 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 overrideType: log?.overrideType || null,
                 adminOverride: log?.adminOverride || null,
                 leaveReason: statusInfo.leaveReason || null,
-                // Holiday/Leave info
+                // Holiday/Leave info (effective: half-day with no check-in → Full Day LOP)
                 holidayInfo: statusInfo.holidayInfo,
-                leaveInfo: statusInfo.leaveInfo,
+                leaveInfo: effectiveLeaveInfo,
                 // Attendance log data (if exists)
                 _id: log?._id || null,
                 clockInTime: log?.clockInTime || null,
@@ -1585,8 +1615,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 // Early checkout note (only when checkout before required logout and employee submitted a note)
                 earlyCheckoutNote: (log?.earlyCheckoutNote && String(log.earlyCheckoutNote).trim()) ? String(log.earlyCheckoutNote).trim() : null,
                 hasEarlyCheckoutNote: !!(log?.earlyCheckoutNote && String(log.earlyCheckoutNote).trim()),
-                // Half-day leave for date (from already-fetched leave; no per-cell fetch)
-                hasHalfDayLeave: !!(leaveRequest && (leaveRequest.leaveType === 'Half Day - First Half' || leaveRequest.leaveType === 'Half Day - Second Half')),
+                // Half-day leave for date (only when there is a clock-in; no check-in → effective full-day LOP)
+                hasHalfDayLeave: !!effectiveIsHalfDayLeave,
                 // Sessions and breaks
                 sessions: log?.sessions || [],
                 breaks: Array.isArray(log?.breaks) ? log.breaks : [],

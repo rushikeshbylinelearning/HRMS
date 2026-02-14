@@ -27,19 +27,22 @@ const DayCell = memo(({ day, onDayClick, holiday, leave }) => {
     const shouldPreventClick = isAbsentWeekOffOrWeekend && hasNoAttendanceData && !day.leave && !day.holiday;
     const isClickable = !(isFutureDate && hasNoAttendanceData && isNotHolidayOrLeave) && !shouldPreventClick;
 
-    // Determine if this is a half-day leave for UI rendering (UI-only; backend remains source of truth)
-    const isHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
-    // CRITICAL FIX: Get leave type from log.leaveInfo first, then fallback to leave prop
-    // Backend sends leaveInfo with requestType and leaveType fields
-    const leaveTypeText = day.log?.leaveInfo?.requestType
-        ? formatLeaveRequestType(day.log.leaveInfo.requestType)
-        : leave?.requestType
-            ? formatLeaveRequestType(leave.requestType)
-            : day.log?.leaveInfo?.leaveType
-                ? formatLeaveRequestType(day.log.leaveInfo.leaveType)
-                : leave?.leaveType
-                    ? formatLeaveRequestType(leave.leaveType)
-                    : 'Leave';
+    // ROBUST: Only show "Half Day" when there is an attendance log with a clock-in for that day.
+    // If half-day leave but no log or no clock-in → show Full Day (LOP). Backend may send effective leaveInfo; frontend is defensive.
+    // CRITICAL: Treat as "had check-in" when clock-in was voided by leave approval (AUTO-VOID in notes) so we don't show Full Day LOP incorrectly.
+    const rawHalfDayLeave = leave?.leaveType && leave.leaveType.startsWith('Half Day');
+    const hadClockInVoidedByLeave = day.log?.notes && String(day.log.notes).includes('AUTO-VOID');
+    const hasCheckInForLeaveDay = day.log?.clockInTime != null || hadClockInVoidedByLeave;
+    const isHalfDayLeave = rawHalfDayLeave && hasCheckInForLeaveDay;
+    const isEffectiveFullDayLOP = rawHalfDayLeave && !hasCheckInForLeaveDay;
+    // Use leaveInfo from backend (already applies effective Full Day LOP when no check-in); fallback to leave prop
+    const effectiveLeaveType = isEffectiveFullDayLOP ? 'Full Day' : (day.log?.leaveInfo?.leaveType || leave?.leaveType);
+    const effectiveRequestType = isEffectiveFullDayLOP ? 'Loss of Pay' : (day.log?.leaveInfo?.requestType || leave?.requestType);
+    const leaveTypeText = effectiveRequestType
+        ? formatLeaveRequestType(effectiveRequestType)
+        : effectiveLeaveType
+            ? formatLeaveRequestType(effectiveLeaveType)
+            : 'Leave';
 
     const lateMinutes = Number(day.log?.lateMinutes || 0);
     // halfDayReasonCode (LATE_LOGIN vs INSUFFICIENT_WORKING_HOURS) drives secondary label in summary

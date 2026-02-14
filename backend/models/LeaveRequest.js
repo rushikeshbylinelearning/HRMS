@@ -108,6 +108,12 @@ const leaveRequestSchema = new mongoose.Schema({
     // Backdated Leave balance deduction breakdown (for restore on reject/delete)
     backdatedSickDeducted: { type: Number, default: null },
     backdatedCasualDeducted: { type: Number, default: null },
+    // Auto-conversion tracking (Half-Day → Full-Day LOP when no check-in)
+    autoConvertedToLOP: { type: Boolean, default: false },
+    autoConversionDate: { type: Date },
+    autoConversionReason: { type: String },
+    originalLeaveType: { type: String }, // Store original type before conversion for revert
+    originalRequestType: { type: String }, // Store original request type before conversion for revert
 }, { timestamps: true });
 
 // Compound unique index to prevent duplicate Year-End requests
