@@ -10,8 +10,8 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'https://attendance.bylinelms.com',
-      'https://attendance.bylinelms.com', // Production AMS domain
+      'https://attendance.legatolxp.online',
+      'https://attendance.legatolxp.online', // Production AMS domain
       'https://sso.leagatolxp.online', // Production SSO domain
       'https://sso.bylinelms.com', // Production SSO portal
       process.env.FRONTEND_URL,

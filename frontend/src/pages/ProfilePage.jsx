@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
-import ProfileSidebar from '../components/Profile/ProfileSidebar';
+import socket from '../socket';
 import ProfileMain from '../components/Profile/ProfileMain';
 import ProfilePolicies from '../components/Profile/ProfilePolicies';
+import ProfileSidebar from '../components/Profile/ProfileSidebar';
 import CustomPdfViewer from '../components/CustomPdfViewer';
 import '../styles/ProfilePage.css';
 
@@ -16,6 +18,7 @@ import '../styles/ProfilePage.css';
 
 const ProfilePage = () => {
     const { user, refreshUserData } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [formData, setFormData] = useState({
         bloodGroup: '', phoneNumber: '', phoneCountryCode: '+91',
         emergencyContactName: '', emergencyContactNumber: '', emergencyContactCountryCode: '+91',
@@ -65,6 +68,29 @@ const ProfilePage = () => {
             try {
                 const { data } = await api.get('/policies');
                 setPolicies(data.policies || []);
+                
+                // Check if we need to open a specific policy from URL params
+                const section = searchParams.get('section');
+                const policyId = searchParams.get('policyId');
+                
+                if (section === 'policies' && policyId && data.policies) {
+                    const policy = data.policies.find(p => p._id === policyId);
+                    if (policy) {
+                        setSelectedPolicy(policy);
+                        setPolicyModalOpen(true);
+                        // Clear the URL params after opening
+                        setSearchParams({});
+                    }
+                } else if (section === 'policies') {
+                    // Just scroll to policies section if no specific policy
+                    setTimeout(() => {
+                        const policiesSection = document.querySelector('.profile-policies');
+                        if (policiesSection) {
+                            policiesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 300);
+                    setSearchParams({});
+                }
             } catch (e) {
                 console.error('Failed to load policies:', e);
             }
@@ -79,6 +105,66 @@ const ProfilePage = () => {
         
         loadInitialData();
     }, []); // Only run once on mount
+
+    // Listen for profile updates via Socket.IO
+    useEffect(() => {
+        if (!user) return;
+
+        const handleProfileUpdate = (data) => {
+            // Check if the update is for the current user
+            if (data.userId === user.id || data.userId === user._id) {
+                console.log('[ProfilePage] Received profile update event:', data);
+                // Refresh user data from server
+                refreshUserData().then(() => {
+                    console.log('[ProfilePage] User data refreshed after profile update');
+                    // Show notification if reporting person changed
+                    if (data.field === 'reportingPerson') {
+                        setSnackbar({ 
+                            open: true, 
+                            severity: 'info', 
+                            message: 'Your reporting person has been updated by admin' 
+                        });
+                    }
+                }).catch(err => {
+                    console.error('[ProfilePage] Failed to refresh user data:', err);
+                });
+            }
+        };
+
+        // Listen for user profile updates
+        socket.on('user_profile_updated', handleProfileUpdate);
+
+        // Cleanup listener on unmount
+        return () => {
+            socket.off('user_profile_updated', handleProfileUpdate);
+        };
+    }, [user, refreshUserData]);
+
+    // Update form data when user data changes (e.g., after socket update)
+    useEffect(() => {
+        if (!user || !initialLoadComplete.current) return;
+        
+        // Update form data with latest user data
+        setFormData({
+            bloodGroup: user.personalDetails?.bloodGroup || '',
+            phoneNumber: user.personalDetails?.phoneNumber || '',
+            phoneCountryCode: user.personalDetails?.phoneCountryCode || '+91',
+            emergencyContactName: user.personalDetails?.emergencyContactName || '',
+            emergencyContactNumber: user.personalDetails?.emergencyContactNumber || '',
+            emergencyContactCountryCode: user.personalDetails?.emergencyContactCountryCode || '+91',
+            personalEmail: user.personalDetails?.personalEmail || '',
+            addressFlat: user.personalDetails?.address?.flat || '',
+            addressArea: user.personalDetails?.address?.area || '',
+            addressCity: user.personalDetails?.address?.city || '',
+            addressState: user.personalDetails?.address?.state || '',
+            addressPincode: user.personalDetails?.address?.pincode || '',
+            aadhaarNumber: user.identityDetails?.aadhaarNumber || '',
+            panCardNumber: user.identityDetails?.panCardNumber || '',
+            bankName: user.identityDetails?.bankName || '',
+            accountNumber: user.identityDetails?.accountNumber || '',
+            ifscCode: user.identityDetails?.ifscCode || ''
+        });
+    }, [user?.personalDetails, user?.identityDetails, user?.reportingPerson]);
 
     const handleSave = useCallback(async () => {
         setSaving(true);
@@ -145,7 +231,7 @@ const ProfilePage = () => {
         if (import.meta.env.DEV) {
             return policy.fileUrl;
         } else {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com';
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online';
             return `${apiBaseUrl}${policy.fileUrl}`;
         }
     };
@@ -153,7 +239,7 @@ const ProfilePage = () => {
     // ROOT CAUSE FIX: Memoize sidebar to prevent re-renders
     const memoizedSidebar = useMemo(() => (
         <ProfileSidebar user={user} />
-    ), [user?.fullName, user?.employeeCode, user?.department, user?.joiningDate, user?.email]);
+    ), [user?.fullName, user?.employeeCode, user?.department, user?.joiningDate, user?.email, user?.profileImageUrl]);
 
     // ROOT CAUSE FIX: Memoize policies to prevent re-renders
     const memoizedPolicies = useMemo(() => (

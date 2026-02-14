@@ -401,8 +401,8 @@ const generateActivityLogsPdf = (logs, dateRange) => {
     doc.save(`Activity_Logs_${period}.pdf`);
 };
 
-const ReportCard = memo(({ title, description, icon, onPdfClick, onExcelClick, disabled, children }) => (
-    <Grid item xs={12} md={6} lg={4}>
+const ReportCard = memo(({ title, description, icon, onPdfClick, onExcelClick, disabled, children, xs = 12, md = 6, lg = 4 }) => (
+    <Grid item xs={xs} md={md} lg={lg}>
         <Card className="report-card" elevation={0}>
             <CardContent className="report-card-content">
                 <Box className="report-card-header">
@@ -603,7 +603,7 @@ const ReportsPage = () => {
             <Paper className="filter-card" elevation={0}>
                 <Box className="filter-card-header">
                     <Box className="filter-icon-wrapper">
-                        <AssessmentIcon sx={{ fontSize: 28 }} />
+                        <AssessmentIcon sx={{ fontSize: 24 }} />
                     </Box>
                     <Box>
                         <Typography variant="h5" className="filter-card-title">Report Filters</Typography>
@@ -611,7 +611,7 @@ const ReportsPage = () => {
                     </Box>
                 </Box>
                 <Divider className="filter-divider" />
-                <Grid container spacing={3} sx={{ mt: 0 }}>
+                <Grid container spacing={2} sx={{ mt: 0 }}>
                     <Grid item xs={12} sm={6} md={3}>
                         <LocalizationProvider dateAdapter={AdapterDateFns}>
                             <DatePicker 
@@ -859,7 +859,7 @@ const ReportsPage = () => {
                 </Grid>
             </Paper>
 
-            <Grid container spacing={3} className="reports-grid-container" sx={{ mt: 2 }}>
+            <Grid container spacing={2} className="reports-grid-container" sx={{ mt: 1.5 }}>
                 <ReportCard 
                     title="Attendance & Break Report" 
                     description="Detailed attendance logs with work hours and break times"
@@ -875,6 +875,7 @@ const ReportsPage = () => {
                     onPdfClick={handleLeavesPdfClick} 
                     onExcelClick={handleLeavesExcelClick} 
                     disabled={isDownloadDisabled}
+                    lg={6}
                 >
                     <FormControl fullWidth className="report-card-filter">
                         <InputLabel>Status</InputLabel>
@@ -901,6 +902,7 @@ const ReportsPage = () => {
                     onPdfClick={handleActivityLogsPdfClick} 
                     onExcelClick={handleActivityLogsExcelClick} 
                     disabled={isDownloadDisabled}
+                    lg={6}
                 />
             </Grid>
         </div>

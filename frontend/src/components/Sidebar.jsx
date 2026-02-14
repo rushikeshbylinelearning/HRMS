@@ -40,8 +40,7 @@ const Sidebar = ({ onNotificationClick }) => {
             roles: ['Employee', 'Intern', 'HR', 'Admin'] 
         },
         { text: 'Employees', icon: <PeopleIcon />, path: '/employees', roles: ['HR', 'Admin'] },
-        { text: 'Shift Management', icon: <TimelapseIcon />, path: '/shifts', roles: ['Admin'] },
-        { text: 'Office Locations', icon: <LocationOnIcon />, path: '/office-locations', roles: ['Admin'] },
+        { text: 'Scheduling', icon: <TimelapseIcon />, path: '/scheduling-management', roles: ['Admin'] },
         { text: 'Policies & CIF', icon: <PolicyIcon />, path: '/admin/policies', roles: ['Admin'] },
         { text: 'Manage Section', icon: <AdminPanelSettingsIcon />, path: '/manage-section', roles: ['Admin'] },
         { 

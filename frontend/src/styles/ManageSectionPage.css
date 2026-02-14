@@ -414,7 +414,7 @@
 }
 
 /* --- Button Styling --- */
-.MuiButton-contained.MuiButton-containedPrimary {
+.manage-section-page .MuiButton-contained.MuiButton-containedPrimary {
   background: linear-gradient(135deg, #e53935 0%, #d32f2f 100%) !important;
   border-radius: 25px !important;
   text-transform: none !important;
@@ -422,7 +422,7 @@
   box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3) !important;
 }
 
-.MuiButton-contained.MuiButton-containedPrimary:hover {
+.manage-section-page .MuiButton-contained.MuiButton-containedPrimary:hover {
   background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%) !important;
   box-shadow: 0 6px 16px rgba(229, 57, 53, 0.4) !important;
 }

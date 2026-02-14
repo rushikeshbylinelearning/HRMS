@@ -3,10 +3,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
-const multer = require('multer');
-const User = require('../models/User'); // Adjust path as needed
-const authenticateToken = require('../middleware/authenticateToken'); // Your primary authentication middleware
-const upload = require('../middleware/upload'); // Our new upload middleware
+const User = require('../models/User');
+const authenticateToken = require('../middleware/authenticateToken');
+const uploadAvatarGridFS = require('../middleware/uploadAvatarGridFS'); // NEW: Secure GridFS upload
 
 // @route   GET /api/users/profile
 // @desc    Get the current user's profile
@@ -190,7 +189,7 @@ router.get('/avatar/:id', async (req, res) => {
         
         // Set proper headers BEFORE streaming
         res.set('Content-Type', contentType);
-        res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+        res.set('Cache-Control', 'public, max-age=31536000, immutable'); // Cache for 1 year, immutable
         res.set('X-Content-Type-Options', 'nosniff');
         res.set('Content-Length', file.length);
         
@@ -219,51 +218,18 @@ router.get('/avatar/:id', async (req, res) => {
 });
 
 // @route   POST /api/users/upload-avatar
-// @desc    Upload or update a profile picture for the logged-in user
+// @desc    Upload or update a profile picture for the logged-in user (GridFS ONLY)
 // @access  Private
+// @security Rate limited (5 uploads/hour), image validation, compression, EXIF stripping
 router.post(
     '/upload-avatar',
-    authenticateToken, // 1. Authenticate user to get user details on `req.user`
-    (req, res, next) => {
-        // Multer error handler middleware
-        upload.single('profileImage')(req, res, (err) => {
-            if (err) {
-                console.error('Multer upload error:', err);
-                if (err instanceof multer.MulterError) {
-                    if (err.code === 'LIMIT_FILE_SIZE') {
-                        return res.status(400).json({ 
-                            error: 'File size exceeds the limit. Maximum allowed size is 5MB. Please choose a smaller image file.',
-                            code: 'FILE_SIZE_EXCEEDED',
-                            maxSize: '5MB'
-                        });
-                    }
-                    return res.status(400).json({ error: `Upload error: ${err.message}` });
-                }
-                if (err.message && err.message.includes('Images Only')) {
-                    return res.status(400).json({ error: 'Invalid file type. Only jpeg, jpg, png, gif, or webp are allowed.' });
-                }
-                if (err.message && err.message.includes('User authentication required')) {
-                    return res.status(401).json({ error: 'Authentication required. Please log in again.' });
-                }
-                return res.status(500).json({ error: 'File upload failed.', details: process.env.NODE_ENV === 'development' ? err.message : undefined });
-            }
-            next();
-        });
-    },
+    authenticateToken, // 1. Authenticate user
+    uploadAvatarGridFS, // 2. Process & upload to GridFS (replaces old filesystem upload)
     async (req, res) => {
         try {
-            // Check if user is authenticated
-            if (!req.user || !req.user.userId) {
-                return res.status(401).json({ error: 'Authentication required.' });
-            }
-
-            // Check for multer errors
-            if (req.fileValidationError) {
-                return res.status(400).json({ error: req.fileValidationError });
-            }
-
-            if (!req.file) {
-                return res.status(400).json({ error: 'File not provided or invalid file type. Please upload an image.' });
+            // uploadAvatarGridFS middleware attaches req.avatarUpload with GridFS file info
+            if (!req.avatarUpload || !req.avatarUpload.fileId) {
+                return res.status(500).json({ error: 'Avatar upload processing failed.' });
             }
 
             const user = await User.findById(req.user.userId);
@@ -271,35 +237,33 @@ router.post(
                 return res.status(404).json({ error: 'User not found.' });
             }
 
-            // --- THE FIX IS HERE ---
-            // Use an environment variable for the public URL in production.
-            // Fallback to the request's host for local development.
-            const baseUrl = process.env.BACKEND_PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-            const imageUrl = `${baseUrl}/avatars/${req.file.filename}`;
-
-            // Update the user's document with the new, correct image URL
+            // Store GridFS ObjectId as profileImageUrl
+            // Format: /api/users/avatar/{objectId}
+            const imageUrl = `/api/users/avatar/${req.avatarUpload.fileId}`;
+            
             user.profileImageUrl = imageUrl;
             await user.save();
 
+            console.log('[Avatar Upload] Success:', {
+                userId: req.user.userId,
+                fileId: req.avatarUpload.fileId,
+                size: req.avatarUpload.size,
+                originalSize: req.avatarUpload.metadata.originalSize,
+                reduction: `${((1 - req.avatarUpload.size / req.avatarUpload.metadata.originalSize) * 100).toFixed(1)}%`
+            });
+
             res.json({
                 message: 'Profile image uploaded successfully.',
-                imageUrl: user.profileImageUrl
+                imageUrl: user.profileImageUrl,
+                metadata: {
+                    size: req.avatarUpload.size,
+                    format: 'webp',
+                    compressed: true
+                }
             });
 
         } catch (error) {
-            console.error('Avatar Upload Error:', error);
-            console.error('Error stack:', error.stack);
-            
-            // Handle specific error types
-            if (error.message && error.message.includes('Images Only')) {
-                return res.status(400).json({ error: 'Invalid file type. Only jpeg, jpg, png, gif, or webp are allowed.' });
-            }
-            
-            if (error.message && error.message.includes('User authentication required')) {
-                return res.status(401).json({ error: 'Authentication required. Please log in again.' });
-            }
-
-            // Generic error response
+            console.error('[Avatar Upload] Route error:', error);
             res.status(500).json({ 
                 error: 'Server error while uploading image.',
                 details: process.env.NODE_ENV === 'development' ? error.message : undefined

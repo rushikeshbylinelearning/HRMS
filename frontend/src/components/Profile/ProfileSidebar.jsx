@@ -1,24 +1,27 @@
-import { memo } from 'react';
-import { Card, Avatar, Typography, Stack, Box, Chip, Divider } from '@mui/material';
+import { memo, useState, useRef } from 'react';
+import { Card, Typography, Stack, Box, Chip, Divider, IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 import BusinessIcon from '@mui/icons-material/Business';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import UserAvatar from '../common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
+import { useAuth } from '../../context/AuthContext';
+import api from '../../api/axios';
 
 /**
  * ROOT CAUSE FIX: Memoize ProfileSidebar to prevent unnecessary re-renders
  * This component should ONLY re-render when user data actually changes
  * 
  * REFACTORED: Modern UI with red accent color and improved vertical spacing
+ * UPDATED: Uses centralized UserAvatar component with GridFS support
+ * ENHANCED: Profile image upload with real-time updates across app
  */
 const ProfileSidebar = memo(({ user }) => {
-    const getInitials = (name) => {
-        if (!name) return 'U';
-        const parts = name.trim().split(' ');
-        return (parts.length >= 2 
-            ? parts[0][0] + parts[parts.length - 1][0] 
-            : name.substring(0, 2)
-        ).toUpperCase();
-    };
+    const { updateUserContext } = useAuth();
+    const [uploading, setUploading] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const fileInputRef = useRef(null);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'Not specified';
@@ -47,12 +50,109 @@ const ProfileSidebar = memo(({ user }) => {
         return 'Staff';
     };
 
-    // Debug: Log user data to check joiningDate
-    console.log('ProfileSidebar - User data:', {
-        joiningDate: user?.joiningDate,
-        fullName: user?.fullName,
-        department: user?.department
-    });
+    // Handle avatar upload
+    const handleAvatarClick = () => {
+        if (!uploading) {
+            fileInputRef.current?.click();
+        }
+    };
+
+    const handleFileSelect = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Reset input to allow re-uploading same file
+        event.target.value = '';
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            setSnackbar({
+                open: true,
+                message: 'Please select a valid image file (JPEG, PNG, GIF, or WebP)',
+                severity: 'error'
+            });
+            return;
+        }
+
+        // Validate file size (5MB limit)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            setSnackbar({
+                open: true,
+                message: 'File size exceeds 5MB limit. Please choose a smaller image.',
+                severity: 'error'
+            });
+            return;
+        }
+
+        // Upload file
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('profileImage', file);
+
+            const response = await api.post('/users/upload-avatar', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            console.log('[ProfileSidebar] Upload response:', response.data);
+
+            // Update user context with new avatar URL - triggers re-render across app
+            const newImageUrl = response.data.imageUrl;
+            console.log('[ProfileSidebar] New image URL:', newImageUrl);
+            
+            updateUserContext({ profileImageUrl: newImageUrl });
+
+            setSnackbar({
+                open: true,
+                message: 'Profile image updated successfully!',
+                severity: 'success'
+            });
+
+        } catch (error) {
+            console.error('[ProfileSidebar] Avatar upload error:', error);
+            const errorMessage = error.response?.data?.error || 'Failed to upload image. Please try again.';
+            setSnackbar({
+                open: true,
+                message: errorMessage,
+                severity: 'error'
+            });
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleRemoveAvatar = async () => {
+        if (uploading || !user?.profileImageUrl) return;
+
+        setUploading(true);
+        try {
+            // Update user context to remove avatar - triggers re-render across app
+            updateUserContext({ profileImageUrl: '' });
+
+            setSnackbar({
+                open: true,
+                message: 'Profile image removed successfully!',
+                severity: 'success'
+            });
+
+        } catch (error) {
+            console.error('[ProfileSidebar] Avatar removal error:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to remove image. Please try again.',
+                severity: 'error'
+            });
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     return (
         <Card 
@@ -82,7 +182,7 @@ const ProfileSidebar = memo(({ user }) => {
             />
 
             <Stack spacing={3.5} sx={{ p: 3.5 }}>
-                {/* Avatar with red gradient background */}
+                {/* Avatar with upload overlay */}
                 <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
                     <Box
                         sx={{
@@ -98,21 +198,128 @@ const ProfileSidebar = memo(({ user }) => {
                             }
                         }}
                     >
-                        <Avatar
+                        {/* Hidden file input */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
+                            disabled={uploading}
+                        />
+
+                        {/* Avatar with hover overlay */}
+                        <Box
                             sx={{
-                                width: 90,
-                                height: 90,
-                                fontSize: '2rem',
-                                fontWeight: 700,
-                                background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                                color: 'white',
-                                boxShadow: '0 4px 14px rgba(220, 38, 38, 0.3)',
                                 position: 'relative',
-                                zIndex: 1
+                                cursor: uploading ? 'not-allowed' : 'pointer',
+                                '&:hover .avatar-overlay': {
+                                    opacity: uploading ? 0 : 1
+                                }
                             }}
+                            onClick={handleAvatarClick}
                         >
-                            {getInitials(user?.fullName)}
-                        </Avatar>
+                            <UserAvatar
+                                user={user}
+                                size="lg"
+                                key={user?.profileImageUrl} // Force re-render on URL change
+                                sx={{
+                                    boxShadow: '0 4px 14px rgba(220, 38, 38, 0.3)',
+                                    position: 'relative',
+                                    zIndex: 1
+                                }}
+                            />
+
+                            {/* Upload overlay */}
+                            <Box
+                                className="avatar-overlay"
+                                sx={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    borderRadius: '50%',
+                                    background: 'rgba(0, 0, 0, 0.55)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: 0,
+                                    transition: 'opacity 0.3s ease',
+                                    zIndex: 2,
+                                    pointerEvents: 'none'
+                                }}
+                            >
+                                <CameraAltIcon sx={{ color: 'white', fontSize: 28, mb: 0.5 }} />
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        color: 'white',
+                                        fontWeight: 600,
+                                        fontSize: '0.7rem',
+                                        textAlign: 'center'
+                                    }}
+                                >
+                                    Change Photo
+                                </Typography>
+                            </Box>
+
+                            {/* Loading spinner */}
+                            {uploading && (
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        borderRadius: '50%',
+                                        background: 'rgba(0, 0, 0, 0.7)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 3
+                                    }}
+                                >
+                                    <CircularProgress
+                                        size={32}
+                                        sx={{
+                                            color: 'white'
+                                        }}
+                                    />
+                                </Box>
+                            )}
+                        </Box>
+
+                        {/* Remove avatar button (only if avatar exists) */}
+                        {user?.profileImageUrl && !uploading && (
+                            <IconButton
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveAvatar();
+                                }}
+                                sx={{
+                                    position: 'absolute',
+                                    bottom: -4,
+                                    right: -4,
+                                    bgcolor: 'white',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    width: 32,
+                                    height: 32,
+                                    zIndex: 3,
+                                    '&:hover': {
+                                        bgcolor: '#fee',
+                                        '& svg': {
+                                            color: '#dc2626'
+                                        }
+                                    }
+                                }}
+                                size="small"
+                            >
+                                <DeleteOutlineIcon sx={{ fontSize: 18, color: '#666' }} />
+                            </IconButton>
+                        )}
                     </Box>
                 </Box>
 
@@ -272,6 +479,22 @@ const ProfileSidebar = memo(({ user }) => {
                     </Box>
                 </Stack>
             </Stack>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Card>
     );
 });

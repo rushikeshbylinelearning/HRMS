@@ -112,7 +112,7 @@ const EmployeeAnalyticsModal = ({ open, onClose, employeeId, employeeName }) => 
     // Connect to Socket.IO server
     const socketUrl = import.meta.env.DEV 
       ? 'http://localhost:3001' 
-      : (import.meta.env.VITE_SOCKET_URL || 'https://attendance.bylinelms.com');
+      : (import.meta.env.VITE_SOCKET_URL || 'https://attendance.legatolxp.online');
     
 
     // A2 Hosting: Polling first for better compatibility

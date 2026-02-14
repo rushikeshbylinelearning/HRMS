@@ -51,9 +51,9 @@
 
 /* --- Enhanced Filter Card --- */
 .reports-page .filter-card {
-  padding: 32px;
-  border-radius: 20px;
-  margin-bottom: 32px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  margin-bottom: 24px;
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(229, 57, 53, 0.1);
@@ -67,14 +67,14 @@
 .reports-page .filter-card-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .reports-page .filter-icon-wrapper {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #E53935 0%, #d32f2f 100%);
   display: flex;
   align-items: center;
@@ -86,17 +86,17 @@
 .reports-page .filter-card-title {
   font-weight: 700 !important;
   color: #1a1a1a !important;
-  margin-bottom: 4px !important;
-  font-size: 1.5rem !important;
+  margin-bottom: 2px !important;
+  font-size: 1.25rem !important;
 }
 
 .reports-page .filter-card-subtitle {
   color: #666 !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
 }
 
 .reports-page .filter-divider {
-  margin: 24px 0 !important;
+  margin: 16px 0 !important;
   border-color: rgba(229, 57, 53, 0.1) !important;
 }
 
@@ -427,13 +427,15 @@
   width: 100%;
   box-sizing: border-box;
   align-items: stretch;
+  margin-left: -12px !important;
+  margin-right: -12px !important;
 }
 
 .reports-page .reports-grid-container > .MuiGrid-item {
   display: flex;
   box-sizing: border-box;
   margin: 0;
-  padding: 0;
+  padding: 12px !important;
   align-items: stretch;
 }
 

@@ -41,7 +41,7 @@ class NotificationService {
       let serverUrl;
       
       // Use environment variable for socket URL
-      serverUrl = import.meta.env.VITE_SOCKET_URL || 'https://attendance.bylinelms.com';
+      serverUrl = import.meta.env.VITE_SOCKET_URL || 'https://attendance.legatolxp.online';
       
       this.socket = io(serverUrl, {
         auth: (cb) => {

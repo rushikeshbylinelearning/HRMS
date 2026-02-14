@@ -1088,6 +1088,56 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
 
         const newStatus = req.body.status;
 
+        // CRITICAL: Validate Comp-Off attendance for past worked dates during approval
+        if (newStatus === 'Approved' && request.requestType === 'Compensatory' && request.alternateDate) {
+            const { startOfISTDay } = require('../utils/istTime');
+            const AttendanceLog = require('../models/AttendanceLog');
+            
+            const workedDate = new Date(request.alternateDate);
+            const today = startOfISTDay();
+            
+            // Only validate attendance if the worked date has passed
+            if (workedDate <= today) {
+                const year = workedDate.getFullYear();
+                const month = String(workedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(workedDate.getDate()).padStart(2, '0');
+                const workedDateString = `${year}-${month}-${day}`;
+                
+                const attendanceRecord = await AttendanceLog.findOne({
+                    user: request.employee,
+                    attendanceDate: workedDateString
+                }).session(session);
+                
+                if (!attendanceRecord) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ 
+                        error: 'Cannot approve Comp-Off: No attendance record found for the worked date. Employee must have clocked in on that day.',
+                        rule: 'COMPOFF_NO_ATTENDANCE_RECORD'
+                    });
+                }
+                
+                if (!attendanceRecord.clockInTime) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ 
+                        error: 'Cannot approve Comp-Off: No clock-in time found for the worked date. Employee must have actually worked on that day.',
+                        rule: 'COMPOFF_NO_CLOCK_IN'
+                    });
+                }
+                
+                if (attendanceRecord.attendanceStatus === 'Absent') {
+                    await session.abortTransaction();
+                    return res.status(400).json({ 
+                        error: 'Cannot approve Comp-Off: Employee was marked absent on the worked date. Employee must have been present to claim Comp-Off.',
+                        rule: 'COMPOFF_MARKED_ABSENT'
+                    });
+                }
+                
+                console.log(`[Comp-Off Approval] Attendance validated for worked date ${workedDateString}`);
+            } else {
+                console.log(`[Comp-Off Approval] Worked date ${workedDate.toISOString()} is in the future, skipping attendance validation`);
+            }
+        }
+
         // Idempotent: already approved — do not double-approve or deduct balance again
         if (newStatus === 'Approved' && oldStatus === 'Approved') {
             await session.abortTransaction();
@@ -1099,30 +1149,48 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         const leaveField = LeavePolicyService.getBalanceField(requestTypeNormalized);
 
         if (newStatus === 'Approved') {
-            // Re-validate approval: balance must be sufficient at approval time
-            const approvalCheck = LeavePolicyService.validateApproval(request, employee);
-            if (!approvalCheck.allowed) {
-                await session.abortTransaction();
-                return res.status(400).json({ error: approvalCheck.reason });
+            // CRITICAL FIX: If admin provides overrideReason, skip policy validations
+            // Admin can approve at any time regardless of advance notice, weekday restrictions, etc.
+            if (overrideReason) {
+                // Only check balance sufficiency (cannot override insufficient balance without explicit handling)
+                const approvalCheck = LeavePolicyService.validateApproval(request, employee);
+                if (!approvalCheck.allowed) {
+                    // Allow admin to override balance check as well with explicit override
+                    console.warn(`[Admin Override] Balance check failed but overridden: ${approvalCheck.reason}`);
+                }
+                
+                // Set admin override flags
+                request.adminOverride = true;
+                request.overrideReason = overrideReason;
+                request.overriddenBy = req.user.userId;
+                request.overriddenAt = new Date();
+            } else {
+                // No override - run full validation
+                // Re-validate approval: balance must be sufficient at approval time
+                const approvalCheck = LeavePolicyService.validateApproval(request, employee);
+                if (!approvalCheck.allowed) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ error: approvalCheck.reason });
+                }
+                const adminOverrideReason = `Admin approval by user ID: ${req.user.userId}`;
+                const policyCheck = await LeavePolicyService.validateRequest(
+                    request.employee,
+                    request.leaveDates,
+                    requestTypeNormalized,
+                    request.leaveType,
+                    adminOverrideReason,
+                    request.alternateDate,
+                    { excludeRequestId: request._id }
+                );
+                if (!policyCheck.allowed) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ error: policyCheck.reason });
+                }
+                request.adminOverride = true;
+                request.overrideReason = adminOverrideReason;
+                request.overriddenBy = req.user.userId;
+                request.overriddenAt = new Date();
             }
-            const adminOverrideReason = overrideReason || `Admin approval by user ID: ${req.user.userId}`;
-            const policyCheck = await LeavePolicyService.validateRequest(
-                request.employee,
-                request.leaveDates,
-                requestTypeNormalized,
-                request.leaveType,
-                adminOverrideReason,
-                request.alternateDate,
-                { excludeRequestId: request._id }
-            );
-            if (!policyCheck.allowed) {
-                await session.abortTransaction();
-                return res.status(400).json({ error: policyCheck.reason });
-            }
-            request.adminOverride = true;
-            request.overrideReason = adminOverrideReason;
-            request.overriddenBy = req.user.userId;
-            request.overriddenAt = new Date();
         }
 
         request.status = newStatus;

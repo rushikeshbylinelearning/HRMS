@@ -100,9 +100,22 @@ export const NewNotificationProvider = ({ children }) => {
         if (!notification.read) {
             setUnreadCount(prev => prev + 1);
         }
+        
+        // **FIX: Prevent desktop notifications for anonymous feedback on non-admin users**
+        // Anonymous feedback notifications should only show desktop notifications for Admin/HR
+        const isAdmin = user && (user.role === 'Admin' || user.role === 'HR');
+        const isAnonymousFeedback = notification.type === 'anonymous_feedback';
+        
+        // Skip desktop notification if:
+        // 1. It's anonymous feedback AND user is not Admin/HR
+        if (isAnonymousFeedback && !isAdmin) {
+            console.log('[Desktop Notification] Skipping anonymous feedback notification for non-admin user');
+            return;
+        }
+        
         const title = notification.category?.charAt(0).toUpperCase() + notification.category?.slice(1) || 'Notification';
         showNotification(title, notification.message, { data: notification });
-    }, [showNotification]);
+    }, [showNotification, user]);
 
     useEffect(() => {
         if (authLoading || !user || !token) {

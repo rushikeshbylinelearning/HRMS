@@ -1,17 +1,22 @@
 // frontend/src/pages/EmployeesPage.jsx
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField, TablePagination, Switch, Stack } from '@mui/material';
+import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Tooltip, IconButton, InputAdornment, OutlinedInput, TablePagination, Switch, Stack, Menu, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EmployeeForm from '../components/EmployeeForm';
 import AdminEmployeeProfileDialog from '../components/AdminEmployeeProfileDialog';
 import PageHeroHeader from '../components/PageHeroHeader';
+import UserAvatar from '../components/common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
 import socket from '../socket';
 import '../styles/EmployeesPage.css';
 
@@ -61,6 +66,7 @@ const headCells = [
 
 const EmployeesPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const [employees, setEmployees] = useState([]);
     const [allShifts, setAllShifts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -83,26 +89,40 @@ const EmployeesPage = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [order, setOrder] = useState('asc');
     const [orderBy, setOrderBy] = useState('fullName');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchQuery !== searchDebounceRef.current) {
+                searchDebounceRef.current = searchQuery;
+                setPage(0); // Reset to first page on search
+                fetchInitialData();
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const fetchInitialData = useCallback(async () => {
         const useInitialLoader = initialLoadRef.current;
+        const currentSearch = searchDebounceRef.current || '';
+        const isSearching = currentSearch.length > 0;
+        
         if (useInitialLoader) {
             setLoading(true);
-        } else {
+        } else if (!isSearching) {
             setIsRefreshing(true);
         }
+        
         try {
-            // If searching, fetch all employees for client-side filtering
-            // Otherwise, use server-side pagination
-            // includeInactive=true: deactivated employees MUST remain visible on Employees page (Admin)
-            const shouldFetchAll = debouncedSearchTerm.length > 0;
+            const shouldFetchAll = isSearching;
             
             const [empsRes, shiftsRes] = await Promise.all([
                 shouldFetchAll 
-                    ? api.get('/admin/employees?all=true&includeInactive=true')
-                    : api.get(`/admin/employees?page=${page + 1}&limit=${rowsPerPage}&includeInactive=true`),
+                    ? api.get('/admin/employees?all=true&status=active')
+                    : api.get(`/admin/employees?page=${page + 1}&limit=${rowsPerPage}&status=active`),
                 api.get('/admin/shifts'),
             ]);
             
@@ -145,7 +165,7 @@ const EmployeesPage = () => {
                 setIsRefreshing(false);
             }
         }
-    }, [page, rowsPerPage, debouncedSearchTerm]);
+    }, [page, rowsPerPage]);
 
     useEffect(() => {
         fetchInitialData();
@@ -241,34 +261,6 @@ const EmployeesPage = () => {
         }
     }, [searchParams, setSearchParams]);
 
-    // Debounce search term to avoid excessive API calls
-    useEffect(() => {
-        // Clear existing timeout
-        if (searchDebounceRef.current) {
-            clearTimeout(searchDebounceRef.current);
-        }
-
-        // If search is cleared, immediately update (no debounce needed)
-        if (searchTerm === '') {
-            setDebouncedSearchTerm('');
-            setPage(0);
-            return;
-        }
-
-        // Set new timeout for non-empty search terms
-        searchDebounceRef.current = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-            setPage(0); // Reset to first page when search changes
-        }, 400); // 400ms debounce delay
-
-        // Cleanup function
-        return () => {
-            if (searchDebounceRef.current) {
-                clearTimeout(searchDebounceRef.current);
-            }
-        };
-    }, [searchTerm]);
-
     const handleOpenForm = (employee = null) => {
         setSelectedEmployee(employee);
         setIsFormOpen(true);
@@ -276,6 +268,11 @@ const EmployeesPage = () => {
 
     const handleOpenProfileDialog = (employee, mode = 'view') => {
         setProfileDialog({ open: true, employee, mode });
+    };
+
+    const handleNavigateToCIF = (employee, event) => {
+        if (event && event.stopPropagation) event.stopPropagation();
+        navigate(`/admin/cif/employee/${employee._id}`);
     };
 
     const handleCloseProfileDialog = () => {
@@ -359,30 +356,122 @@ const EmployeesPage = () => {
     };
 
     const filteredEmployees = useMemo(() => {
-        // If no search term, return employees as-is
-        if (!searchTerm) return employees;
+        const currentSearch = searchDebounceRef.current || '';
+        if (!currentSearch) return employees;
         
-        // If we have all employees loaded (from search), filter from that ref for immediate response
-        // Otherwise, filter from current employees (paginated data)
         const sourceEmployees = allEmployeesRef.current.length > 0 ? allEmployeesRef.current : employees;
+        const searchLower = currentSearch.toLowerCase();
         
         return sourceEmployees.filter(employee =>
-            employee.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employee.employeeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employee.email?.toLowerCase().includes(searchTerm.toLowerCase())
+            employee.fullName?.toLowerCase().includes(searchLower) ||
+            employee.employeeCode?.toLowerCase().includes(searchLower) ||
+            employee.email?.toLowerCase().includes(searchLower)
         );
-    }, [employees, searchTerm]);
+    }, [employees]);
     
     const visibleRows = useMemo(() => {
         const sorted = stableSort(filteredEmployees, getComparator(order, orderBy));
+        const currentSearch = searchDebounceRef.current || '';
         
-        // If searching, apply client-side pagination (we have all employees)
-        // If not searching, data is already paginated from server, so don't slice
-        if (searchTerm) {
+        if (currentSearch) {
             return sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
         }
         return sorted;
-    }, [filteredEmployees, order, orderBy, page, rowsPerPage, searchTerm]);
+    }, [filteredEmployees, order, orderBy, page, rowsPerPage]);
+
+    const handleMenuOpen = (event) => {
+        setMenuAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setMenuAnchorEl(null);
+    };
+
+    const handleViewDeactivated = () => {
+        handleMenuClose();
+        navigate('/employees/deactivated');
+    };
+
+    const actionArea = useMemo(() => (
+        <Stack
+            direction="row"
+            spacing={1.5}
+            flexWrap="wrap"
+            alignItems="center"
+            className="header-actions"
+        >
+            <OutlinedInput
+                size="small"
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                startAdornment={
+                    <InputAdornment position="start">
+                        <SearchIcon sx={{ color: '#6c757d', fontSize: '1.2rem' }} />
+                    </InputAdornment>
+                }
+                endAdornment={
+                    searchQuery && (
+                        <InputAdornment position="end">
+                            <IconButton
+                                size="small"
+                                onClick={() => setSearchQuery('')}
+                                edge="end"
+                                sx={{ padding: '4px' }}
+                            >
+                                <ClearIcon sx={{ fontSize: '1rem' }} />
+                            </IconButton>
+                        </InputAdornment>
+                    )
+                }
+                sx={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    minWidth: '280px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#dee2e6',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#adb5bd',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#D32F2F',
+                        borderWidth: '2px',
+                    },
+                    '& input': {
+                        padding: '8px 8px 8px 0',
+                        fontSize: '0.9rem',
+                    }
+                }}
+            />
+            {isRefreshing && (
+                <SkeletonBox width="22px" height="22px" borderRadius="50%" />
+            )}
+            <Button 
+                variant="contained" 
+                onClick={() => handleOpenForm()} 
+                startIcon={<AddIcon />} 
+                className="add-button"
+            >
+                Add Employee
+            </Button>
+            <IconButton
+                onClick={handleMenuOpen}
+                sx={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    '&:hover': {
+                        backgroundColor: '#f8f9fa',
+                        borderColor: '#adb5bd',
+                    }
+                }}
+            >
+                <MoreVertIcon sx={{ fontSize: '1.2rem', color: '#495057' }} />
+            </IconButton>
+        </Stack>
+    ), [searchQuery, isRefreshing]);
 
     if (loading) return <div className="flex-center"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></div>;
 
@@ -392,32 +481,7 @@ const EmployeesPage = () => {
                 eyebrow="People Directory"
                 title="Manage Employees"
                 description="Search, onboard, and keep employee records accurate across shifts and departments."
-                actionArea={
-                    <Stack
-                        direction="row"
-                        spacing={1.5}
-                        flexWrap="wrap"
-                        alignItems="center"
-                        className="header-actions"
-                    >
-                        <TextField
-                            size="small"
-                            variant="outlined"
-                            placeholder="Search..."
-                            value={searchTerm}
-                            onChange={(e) => {
-                                setSearchTerm(e.target.value);
-                            }}
-                            className="search-field"
-                        />
-                        {isRefreshing && (
-                            <SkeletonBox width="22px" height="22px" borderRadius="50%" />
-                        )}
-                        <Button variant="contained" onClick={() => handleOpenForm()} startIcon={<AddIcon />} className="add-button">
-                            Add Employee
-                        </Button>
-                    </Stack>
-                }
+                actionArea={actionArea}
             />
 
             {error && <Alert severity="error" className="error-alert">{error}</Alert>}
@@ -446,7 +510,7 @@ const EmployeesPage = () => {
                                 <div className="grid-cell serial-number">{page * rowsPerPage + index + 1}</div>
                                 <div className="grid-cell employeeCode">{employee.employeeCode}</div>
                                 <div className="grid-cell fullName">
-                                    <Avatar>{employee.fullName.charAt(0)}</Avatar>
+                                    <UserAvatar user={employee} size="sm" lazy />
                                     <div className="employee-text-info">
                                         <div className="employee-name">{employee.fullName}</div>
                                         <div className="employee-email">{employee.email}</div>
@@ -476,6 +540,23 @@ const EmployeesPage = () => {
                                             <VisibilityOutlinedIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
+                                    <Tooltip title="View CIF Records">
+                                        <IconButton 
+                                            size="small" 
+                                            onClick={(e) => handleNavigateToCIF(employee, e)}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+                                                    '& svg': {
+                                                        color: '#DC2626'
+                                                    }
+                                                }
+                                            }}
+                                            aria-label="View CIF Records"
+                                        >
+                                            <DescriptionOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
                                     <Tooltip title="Edit Profile">
                                         <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenForm(employee); }}>
                                             <EditOutlinedIcon fontSize="small" />
@@ -493,7 +574,7 @@ const EmployeesPage = () => {
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
-                    count={searchTerm ? filteredEmployees.length : totalCount}
+                    count={(searchDebounceRef.current || '') ? filteredEmployees.length : totalCount}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}
@@ -524,6 +605,41 @@ const EmployeesPage = () => {
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
                 <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
             </Snackbar>
+
+            <Menu
+                anchorEl={menuAnchorEl}
+                open={Boolean(menuAnchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+                PaperProps={{
+                    sx: {
+                        mt: 1,
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        minWidth: '200px',
+                    }
+                }}
+            >
+                <MenuItem 
+                    onClick={handleViewDeactivated}
+                    sx={{
+                        py: 1.5,
+                        px: 2,
+                        '&:hover': {
+                            backgroundColor: 'rgba(211, 47, 47, 0.08)',
+                        }
+                    }}
+                >
+                    View Deactivated Employees
+                </MenuItem>
+            </Menu>
 
             <AdminEmployeeProfileDialog
                 open={profileDialog.open}

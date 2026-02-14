@@ -410,7 +410,12 @@ const AdminDashboardPage = () => {
         const originalRequests = [...pendingRequests];
         setPendingRequests(prevRequests => prevRequests.filter(req => req._id !== requestId));
         try {
-            await api.patch(`/admin/leaves/${requestId}/status`, { status });
+            // CRITICAL FIX: Pass overrideReason to allow admin to approve/reject at any time
+            // This bypasses policy validations (advance notice, weekday restrictions, etc.)
+            await api.patch(`/admin/leaves/${requestId}/status`, { 
+                status,
+                overrideReason: `Admin ${status.toLowerCase()} from dashboard by ${user?.fullName || 'admin'}`
+            });
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
             // Targeted refetch: summary + pending so "On Leave" count and list update immediately (no full fetchAllData)
             if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
@@ -808,7 +813,9 @@ const AdminDashboardPage = () => {
                     try {
                         await api.patch(`/admin/leaves/${requestId}/status`, { 
                             status,
-                            ...(rejectionNotes && { rejectionNotes })
+                            ...(rejectionNotes && { rejectionNotes }),
+                            // CRITICAL FIX: Pass overrideReason to allow admin to approve/reject at any time
+                            overrideReason: `Admin ${status.toLowerCase()} from dashboard modal by ${user?.fullName || 'admin'}`
                         });
                         setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
                         // Targeted refetch: pending leaves + summary only (no full fetchAllData)

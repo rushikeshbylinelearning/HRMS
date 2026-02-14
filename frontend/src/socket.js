@@ -6,7 +6,12 @@ import { io } from 'socket.io-client';
 // If frontend and backend are on same domain, using window.location.origin is correct
 const getSocketURL = () => {
     if (import.meta.env.DEV) {
-        return 'http://localhost:3001'; // Use local backend in development
+        // In development, use the Vite dev server origin (not backend directly)
+        // Vite proxy will forward /api/socket.io to backend
+        if (typeof window !== 'undefined') {
+            return window.location.origin; // e.g., http://localhost:5173
+        }
+        return 'http://localhost:5173'; // Fallback for dev
     }
     
     // If VITE_SOCKET_URL is explicitly set, use it
@@ -22,7 +27,7 @@ const getSocketURL = () => {
         return origin;
     }
     
-    return 'https://attendance.bylinelms.com'; // Fallback
+    return 'https://attendance.legatolxp.online'; // Fallback
 };
 
 const URL = getSocketURL();

@@ -22,6 +22,7 @@ import LiveClock from '../components/LiveClock';
 import SaturdaySchedule from '../components/SaturdaySchedule';
 import RecentActivityCard from '../components/RecentActivityCard';
 import ShiftProgressBar from '../components/ShiftProgressBar';
+import UserAvatar from '../components/common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
 import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, WeeklyTimeCardsSkeleton } from '../components/DashboardSkeletons';
 import { EmployeeDashboardSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
 import { getISTNow, formatISTDate } from '../utils/istTime';
@@ -860,11 +861,15 @@ const EmployeeDashboardPage = () => {
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base profile-card">
-                                <Avatar className="profile-avatar">
-                                    <Typography className="profile-avatar-letter">
-                                        {contextUser.name?.charAt(0) || contextUser.fullName?.charAt(0) || 'U'}
-                                    </Typography>
-                                </Avatar>
+                                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                                    <UserAvatar 
+                                        user={contextUser} 
+                                        size={80}
+                                        sx={{
+                                            boxShadow: '0 4px 14px rgba(220, 38, 38, 0.3)'
+                                        }}
+                                    />
+                                </Box>
                                 <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 700, mb: 0.5, letterSpacing: '0.025em', color: '#333333' }}>{contextUser.fullName || contextUser.name}</Typography>
                                 <Typography variant="body2" sx={{ color: '#666666', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
                                 <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />

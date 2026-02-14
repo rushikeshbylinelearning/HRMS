@@ -4,14 +4,14 @@
   align-items: stretch;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 32px;
+  gap: 24px;
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-radius: 24px;
-  padding: 32px;
+  border-radius: 20px;
+  padding: 24px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
   overflow: hidden;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .page-hero-header::before,
@@ -43,7 +43,7 @@
   flex: 1 1 340px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -63,19 +63,19 @@
 }
 
 .page-hero-header__icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: rgba(99, 102, 241, 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #4c1d95;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
 }
 
 .page-hero-header__title {
-  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
   font-weight: 700 !important;
   color: #0f172a;
 }
@@ -83,25 +83,26 @@
 .page-hero-header__description {
   max-width: 640px;
   color: #475569 !important;
+  font-size: 0.95rem !important;
 }
 
 .page-hero-header__stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .page-hero-header__stat {
-  padding: 16px 20px;
-  border-radius: 16px;
+  padding: 12px 16px;
+  border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(6px);
 }
 
 .page-hero-header__stat-value {
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: #0f172a;
   display: block;
@@ -155,8 +156,8 @@
 
 @media (max-width: 960px) {
   .page-hero-header {
-    padding: 24px;
-    gap: 24px;
+    padding: 20px;
+    gap: 20px;
   }
 
   .page-hero-header__actions {
@@ -167,12 +168,12 @@
 
 @media (max-width: 600px) {
   .page-hero-header {
-    padding: 20px;
+    padding: 16px;
   }
 
   .page-hero-header__icon {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 }
 

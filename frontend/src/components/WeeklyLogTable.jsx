@@ -1,6 +1,6 @@
 // frontend/src/components/WeeklyLogTable.jsx
 import React, { useState, useEffect, Fragment } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { Box, Typography, Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Alert, Chip, Collapse, IconButton } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -99,7 +99,7 @@ const WeeklyLogTable = () => {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const { data } = await axios.get('/api/attendance/my-weekly-log');
+                const { data } = await api.get('/attendance/my-weekly-log');
                 setLogs(data);
             } catch (err) {
                 setError('Could not fetch weekly logs.');

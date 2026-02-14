@@ -15,7 +15,7 @@ class NewNotificationService {
         // Get backend URL - use same origin if not specified (for same-domain deployments)
         // If VITE_SOCKET_URL is set, use it; otherwise use window.location.origin
         this.backendUrl = import.meta.env.VITE_SOCKET_URL || 
-            (typeof window !== 'undefined' ? window.location.origin : 'https://attendance.bylinelms.com');
+            (typeof window !== 'undefined' ? window.location.origin : 'https://attendance.legatolxp.online');
         
         console.log('[NewNotificationService] Backend URL:', this.backendUrl);
     }
@@ -182,6 +182,8 @@ class NewNotificationService {
             extra_break_request: 'Extra Break Request',
             extra_break_approval: 'Extra Break Approved',
             extra_break_rejection: 'Extra Break Rejected',
+            policy_added: 'New Policy Added',
+            policy_updated: 'Policy Updated',
             system: 'System Notification',
             info: 'Information',
             success: 'Success',
@@ -198,7 +200,10 @@ class NewNotificationService {
     playNotificationSound(notification) {
         try {
             // Determine sound type based on notification type and metadata
-            if (notification.type === 'leave_rejection') {
+            if (notification.type === 'policy_added' || notification.type === 'policy_updated') {
+                // Policy notifications get unique sound
+                soundService.playPolicyUpdateSound();
+            } else if (notification.type === 'leave_rejection') {
                 soundService.playLeaveRejectionSound();
             } else if (notification.type === 'leave_approval' || 
                       notification.type === 'leave_rejection' ||
@@ -219,6 +224,17 @@ class NewNotificationService {
      */
     handleNotificationClick(navigationData, notificationType, metadata) {
         if (!navigationData || !navigationData.page) return;
+        
+        // Handle POLICY notifications - navigate to profile page
+        if (notificationType === 'policy_added' || notificationType === 'policy_updated') {
+            const policyId = metadata?.policyId || navigationData?.params?.policyId;
+            if (policyId) {
+                window.location.href = `/profile?section=policies&policyId=${policyId}`;
+            } else {
+                window.location.href = '/profile?section=policies';
+            }
+            return;
+        }
         
         // Handle YEAR_END_LEAVE notifications - navigate to year-end tab
         // Check both explicit type and metadata type for compatibility
@@ -267,6 +283,17 @@ class NewNotificationService {
 
         let url = '/dashboard';
         switch (navigationData.page) {
+            case 'profile':
+                const section = navigationData.params?.section;
+                const policyId = navigationData.params?.policyId;
+                if (section === 'policies' && policyId) {
+                    url = `/profile?section=policies&policyId=${policyId}`;
+                } else if (section === 'policies') {
+                    url = '/profile?section=policies';
+                } else {
+                    url = '/profile';
+                }
+                break;
             case 'leaves':
                 url = isAdmin ? '/admin/leaves' : '/leaves';
                 break;

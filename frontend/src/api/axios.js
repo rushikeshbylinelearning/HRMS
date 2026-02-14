@@ -17,14 +17,14 @@ console.log('MODE:', import.meta.env.MODE);
 // Determine baseURL:
 // - Development: Use Vite proxy (/api)
 // - Production: Use VITE_API_BASE_URL if set, otherwise use full URL
-//   CRITICAL: In production, must use full URL: https://attendance.bylinelms.com/api
+//   CRITICAL: In production, must use full URL: https://attendance.legatolxp.online/api
 const baseURL = import.meta.env.DEV 
   ? '/api' // Use Vite proxy in development
   : (import.meta.env.VITE_API_BASE_URL 
       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
           ? import.meta.env.VITE_API_BASE_URL 
           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-      : 'https://attendance.bylinelms.com/api'); // Use full URL in production
+      : 'https://attendance.legatolxp.online/api'); // Use full URL in production
 
 const api = axios.create({
   baseURL: baseURL,
@@ -42,7 +42,7 @@ const api = axios.create({
 //       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
 //           ? import.meta.env.VITE_API_BASE_URL 
 //           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-//       : 'https://attendance.bylinelms.com/api'); // Use full URL in production
+//       : 'https://attendance.legatolxp.online/api'); // Use full URL in production
 
 // const api = axios.create({
 //   baseURL: baseURL,

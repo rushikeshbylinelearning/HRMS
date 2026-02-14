@@ -14,7 +14,7 @@ const init = (httpServer) => {
         path: '/api/socket.io/',
         cors: {
             origin: [
-                "https://attendance.bylinelms.com",
+                "https://attendance.legatolxp.online",
                 process.env.FRONTEND_URL,
                 // Development origins
                 "http://localhost:5173",
@@ -194,6 +194,38 @@ const init = (httpServer) => {
         if (['Admin', 'HR'].includes(socket.userRole)) {
             socket.join('admin_room');
         }
+
+        // Join announcements channel
+        socket.join('announcements');
+        console.log(`✅ User ${socket.userEmail} joined announcements channel`);
+
+        // Handle announcement messages
+        socket.on('sendAnnouncement', (data) => {
+            console.log(`📢 Broadcasting announcement from ${socket.userEmail}`);
+            // Broadcast to all users EXCEPT the sender
+            socket.to('announcements').emit('receiveAnnouncement', data);
+        });
+
+        // Handle announcement updates
+        socket.on('updateAnnouncement', (data) => {
+            console.log(`✏️ Broadcasting announcement update from ${socket.userEmail}`);
+            // Broadcast to all users including sender for updates
+            io.to('announcements').emit('announcementUpdated', data);
+        });
+
+        // Handle announcement deletions
+        socket.on('deleteAnnouncement', (data) => {
+            console.log(`🗑️ Broadcasting announcement deletion from ${socket.userEmail}`);
+            // Broadcast to all users including sender for deletions
+            io.to('announcements').emit('announcementDeleted', data);
+        });
+
+        // Handle announcement pin/unpin
+        socket.on('pinAnnouncement', (data) => {
+            console.log(`📌 Broadcasting announcement pin/unpin from ${socket.userEmail}`);
+            // Broadcast to all users including sender
+            io.to('announcements').emit('announcementPinned', data);
+        });
 
         // Handle disconnection
         socket.on('disconnect', () => {

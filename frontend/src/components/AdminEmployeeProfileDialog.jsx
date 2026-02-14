@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid, Stack, Avatar, Chip, TextField, Button, Snackbar, Alert, IconButton, MenuItem, Autocomplete } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import PersonOffIcon from '@mui/icons-material/PersonOff';
 import CountryCodeSelector from './CountryCodeSelector';
+import CIFSummaryCard from './CIF/CIFSummaryCard';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const roles = ['Admin', 'HR', 'Employee', 'Intern'];
@@ -10,9 +14,14 @@ const statusOptions = ['Active', 'Inactive'];
 
 const cardSx = {
     background: '#fff',
-    borderRadius: '16px',
+    borderRadius: '12px',
     padding: '24px',
-    boxShadow: '0 4px 14px rgba(0,0,0,0.08)'
+    border: '1px solid #e2e8f0',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+        borderColor: '#cbd5e0',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+    }
 };
 
 const textFieldSx = {
@@ -62,6 +71,7 @@ const AdminEmployeeProfileDialog = ({
     onSaved,
     onOpenAdvancedEditor
 }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState(defaultFormState);
     const [isEditing, setIsEditing] = useState(mode === 'edit');
     const [saving, setSaving] = useState(false);
@@ -259,10 +269,30 @@ const AdminEmployeeProfileDialog = ({
 
     const renderValue = (label, value) => (
         <Box>
-            <Typography variant="caption" sx={{ color: '#666', fontWeight: 600, textTransform: 'uppercase' }}>
+            <Typography 
+                variant="caption" 
+                sx={{ 
+                    color: '#718096', 
+                    fontWeight: 600, 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontSize: '11px',
+                    display: 'block',
+                    marginBottom: '6px'
+                }}
+            >
                 {label}
             </Typography>
-            <Typography variant="body1" sx={{ color: '#222', fontWeight: 600, mt: 0.5 }}>
+            <Typography 
+                variant="body1" 
+                sx={{ 
+                    color: value ? '#1a202c' : '#cbd5e0', 
+                    fontWeight: 500,
+                    fontSize: '14px',
+                    lineHeight: 1.5,
+                    fontStyle: value ? 'normal' : 'italic'
+                }}
+            >
                 {value || '—'}
             </Typography>
         </Box>
@@ -365,6 +395,11 @@ const AdminEmployeeProfileDialog = ({
                                 </Box>
                             </Stack>
                         </Box>
+
+                        {/* CIF Summary Card - Admin/HR Only */}
+                        {(user?.role === 'Admin' || user?.role === 'HR') && employee?._id && (
+                            <CIFSummaryCard employeeId={employee._id} />
+                        )}
 
                         <Box sx={cardSx}>
                             <Typography variant="h6" fontWeight={700} gutterBottom>

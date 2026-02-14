@@ -310,6 +310,49 @@ class NewNotificationService {
             }
         });
     }
+
+    /**
+     * Notify admins/HR about new anonymous feedback
+     * CRITICAL: This method ensures zero-trace anonymity by:
+     * - Not accepting or using any user identification parameters
+     * - Using hardcoded "Anonymous Employee" as the sender
+     * - Only including message preview and timestamp
+     */
+    static async notifyAnonymousFeedback(messagePreview, timestamp) {
+        try {
+            console.log('[SVC] Broadcasting anonymous feedback notification to admins/HR');
+            
+            // Truncate message for notification preview (max 100 chars)
+            const preview = messagePreview.length > 100 
+                ? messagePreview.substring(0, 97) + '...' 
+                : messagePreview;
+            
+            const message = `New anonymous feedback received: "${preview}"`;
+            
+            await this.broadcastToAdmins({
+                message,
+                type: 'anonymous_feedback',
+                category: 'admin',
+                priority: 'high',
+                navigationData: { 
+                    page: 'admin/policies',
+                    params: { section: 'anonymous-messages' }
+                },
+                metadata: {
+                    type: 'ANONYMOUS_FEEDBACK',
+                    timestamp: timestamp,
+                    // Explicitly mark as anonymous to prevent any accidental user linking
+                    isAnonymous: true,
+                    senderName: 'Anonymous Employee'
+                }
+            }, null); // null originatingUserId ensures no user is excluded
+            
+            console.log('[SVC] Anonymous feedback notification sent successfully');
+        } catch (error) {
+            console.error('[SVC] Error notifying anonymous feedback:', error);
+            // Don't throw - notification failure shouldn't block feedback submission
+        }
+    }
 }
 
 module.exports = NewNotificationService;

@@ -6,6 +6,8 @@ const fs = require('fs').promises;
 const Policy = require('../models/Policy');
 const AnonymousFeedback = require('../models/AnonymousFeedback');
 const requireAuth = require('../middleware/requireAuth');
+const NewNotificationService = require('../services/NewNotificationService');
+const User = require('../models/User');
 
 // Configure multer for PDF uploads
 const storage = multer.diskStorage({
@@ -117,10 +119,67 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
         });
 
         await policy.save();
+        console.log(`✅ Policy saved successfully: ${policy._id}`);
 
+        // Send response first to avoid blocking
         res.status(201).json({
             message: 'Policy uploaded successfully',
             policy
+        });
+
+        // Notify all active users about new policy (following the same pattern as check-in/break notifications)
+        // Run asynchronously after response is sent
+        setImmediate(async () => {
+            try {
+                console.log(`🔔 Starting notification process for policy: ${name}`);
+                const allUsers = await User.find({ status: 'Active' }).select('_id fullName');
+                console.log(`📋 Found ${allUsers.length} active users to notify about new policy: ${name}`);
+                
+                if (allUsers.length === 0) {
+                    console.warn('⚠️ No active users found to notify');
+                    return;
+                }
+                
+                // Send notification to each user using NewNotificationService
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (const user of allUsers) {
+                    try {
+                        console.log(`📤 Sending notification to user: ${user.fullName} (${user._id})`);
+                        await NewNotificationService.createAndEmitNotification({
+                            message: `New policy "${name}" (v${policyVersion}) has been added. Click to view.`,
+                            type: 'policy_added',
+                            userId: user._id,
+                            userName: user.fullName,
+                            recipientType: 'user',
+                            category: 'admin',
+                            priority: 'high',
+                            navigationData: {
+                                page: 'profile',
+                                params: { section: 'policies', policyId: policy._id.toString() }
+                            },
+                            metadata: {
+                                policyId: policy._id.toString(),
+                                policyName: name,
+                                policyVersion: policyVersion,
+                                fromAdmin: true
+                            }
+                        });
+                        successCount++;
+                        console.log(`✅ Notification sent successfully to ${user.fullName}`);
+                    } catch (err) {
+                        errorCount++;
+                        console.error(`❌ Error sending policy notification to user ${user.fullName} (${user._id}):`, err);
+                        console.error('Error stack:', err.stack);
+                    }
+                }
+                
+                console.log(`✅ Policy notifications complete: ${successCount} sent, ${errorCount} failed`);
+            } catch (notifError) {
+                console.error('❌ Critical error in notification process:', notifError);
+                console.error('Error stack:', notifError.stack);
+            }
         });
     } catch (error) {
         console.error('Error uploading policy:', error);
@@ -182,10 +241,68 @@ router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res)
         oldPolicy.status = 'Archived';
         oldPolicy.replacedBy = newPolicy._id;
         await oldPolicy.save();
+        console.log(`✅ Policy updated successfully: ${newPolicy._id}`);
 
+        // Send response first to avoid blocking
         res.json({
             message: 'Policy replaced successfully',
             policy: newPolicy
+        });
+
+        // Notify all active users about policy update (following the same pattern as check-in/break notifications)
+        // Run asynchronously after response is sent
+        setImmediate(async () => {
+            try {
+                console.log(`🔔 Starting notification process for policy update: ${newPolicy.name}`);
+                const allUsers = await User.find({ status: 'Active' }).select('_id fullName');
+                console.log(`📋 Found ${allUsers.length} active users to notify about policy update: ${newPolicy.name}`);
+                
+                if (allUsers.length === 0) {
+                    console.warn('⚠️ No active users found to notify');
+                    return;
+                }
+                
+                // Send notification to each user using NewNotificationService
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (const user of allUsers) {
+                    try {
+                        console.log(`📤 Sending update notification to user: ${user.fullName} (${user._id})`);
+                        await NewNotificationService.createAndEmitNotification({
+                            message: `Policy "${newPolicy.name}" has been updated to version ${policyVersion}. Click to view.`,
+                            type: 'policy_updated',
+                            userId: user._id,
+                            userName: user.fullName,
+                            recipientType: 'user',
+                            category: 'admin',
+                            priority: 'high',
+                            navigationData: {
+                                page: 'profile',
+                                params: { section: 'policies', policyId: newPolicy._id.toString() }
+                            },
+                            metadata: {
+                                policyId: newPolicy._id.toString(),
+                                policyName: newPolicy.name,
+                                policyVersion: policyVersion,
+                                oldVersion: oldPolicy.version,
+                                fromAdmin: true
+                            }
+                        });
+                        successCount++;
+                        console.log(`✅ Update notification sent successfully to ${user.fullName}`);
+                    } catch (err) {
+                        errorCount++;
+                        console.error(`❌ Error sending policy update notification to user ${user.fullName} (${user._id}):`, err);
+                        console.error('Error stack:', err.stack);
+                    }
+                }
+                
+                console.log(`✅ Policy update notifications complete: ${successCount} sent, ${errorCount} failed`);
+            } catch (notifError) {
+                console.error('❌ Critical error in notification process:', notifError);
+                console.error('Error stack:', notifError.stack);
+            }
         });
     } catch (error) {
         console.error('Error replacing policy:', error);
@@ -247,9 +364,26 @@ router.post('/anonymous-feedback', async (req, res) => {
         });
 
         await feedback.save();
+        console.log('✅ Anonymous feedback saved successfully');
 
+        // Send response immediately to avoid blocking the user
         res.status(201).json({
             message: 'Feedback submitted successfully'
+        });
+
+        // Notify admins/HR asynchronously after response is sent
+        // CRITICAL: Only pass message content and timestamp - NO user identification
+        setImmediate(async () => {
+            try {
+                console.log('🔔 Triggering anonymous feedback notification');
+                await NewNotificationService.notifyAnonymousFeedback(
+                    message.trim(),
+                    feedback.submittedAt
+                );
+            } catch (notifError) {
+                // Log error but don't fail the submission
+                console.error('❌ Error sending anonymous feedback notification:', notifError);
+            }
         });
     } catch (error) {
         console.error('Error submitting feedback:', error);
@@ -274,6 +408,30 @@ router.get('/anonymous-feedback', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error fetching feedback:', error);
         res.status(500).json({ error: 'Failed to fetch feedback' });
+    }
+});
+
+// Delete anonymous feedback (Admin only)
+router.delete('/anonymous-feedback/:id', requireAuth, async (req, res) => {
+    try {
+        // Check if user is admin
+        if (req.user.role !== 'Admin') {
+            return res.status(403).json({ error: 'Only admins can delete feedback' });
+        }
+
+        const { id } = req.params;
+        
+        const feedback = await AnonymousFeedback.findByIdAndDelete(id);
+        
+        if (!feedback) {
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+
+        console.log(`✅ Anonymous feedback deleted by admin: ${req.user.fullName}`);
+        res.json({ message: 'Feedback deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting feedback:', error);
+        res.status(500).json({ error: 'Failed to delete feedback' });
     }
 });
 

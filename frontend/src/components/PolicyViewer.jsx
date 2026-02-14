@@ -25,7 +25,7 @@ const PolicyViewer = ({ policy, onClose }) => {
             return policy.fileUrl; // e.g., /policies/policy-xxx.pdf
         } else {
             // Production: Use full backend URL
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com';
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online';
             return `${apiBaseUrl}${policy.fileUrl}`;
         }
     };

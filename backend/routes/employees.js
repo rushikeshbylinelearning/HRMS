@@ -74,16 +74,25 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
         const getAllEmployees = req.query.all === 'true';
         const includeInactive = req.query.includeInactive === 'true';
+        const statusFilter = req.query.status; // 'active' or 'inactive'
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
         const fieldsToSelect = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup department email leaveBalances leaveEntitlements isActive role joiningDate profileImageUrl employmentStatus probationStatus personalDetails identityDetails reportingPerson';
 
-        // Filter: Exclude Admin role; optionally include deactivated (e.g. Employees page shows all)
-        const employeeQuery = { 
-            role: { $ne: 'Admin' }, 
-            ...(includeInactive ? {} : { isActive: true })
-        };
+        // Filter: Exclude Admin role; handle status filtering
+        let employeeQuery = { role: { $ne: 'Admin' } };
+        
+        // Handle status filter (takes precedence over includeInactive)
+        if (statusFilter === 'active') {
+            employeeQuery.isActive = true;
+        } else if (statusFilter === 'inactive') {
+            employeeQuery.isActive = false;
+        } else if (!includeInactive) {
+            // Default behavior: show only active if no status filter and includeInactive is false
+            employeeQuery.isActive = true;
+        }
+        // If includeInactive is true and no status filter, show all (no isActive filter)
 
         if (getAllEmployees) {
             // First, get employees without populating reportingPerson to avoid CastError
@@ -291,6 +300,30 @@ router.put('/:id', [authenticateToken, isAdminOrHr], async (req, res) => {
 
         const result = await User.findByIdAndUpdate(id, updateData, { new: true });
         if (!result) { return res.status(404).json({ error: 'Employee not found.' });}
+
+        // Emit Socket.IO event if reporting person changed
+        if (currentEmployee.reportingPerson?.toString() !== reportingPerson?.toString()) {
+            try {
+                const { getIO } = require('../socketManager');
+                const io = getIO();
+                if (io) {
+                    io.emit('user_profile_updated', {
+                        userId: result._id,
+                        employeeCode: result.employeeCode,
+                        fullName: result.fullName,
+                        field: 'reportingPerson',
+                        oldValue: currentEmployee.reportingPerson,
+                        newValue: reportingPerson,
+                        updatedBy: req.user.userId,
+                        timestamp: new Date().toISOString(),
+                        message: 'Your reporting person has been updated'
+                    });
+                    console.log(`📡 Emitted user_profile_updated event for reporting person change - user ${result._id}`);
+                }
+            } catch (socketError) {
+                console.error('Failed to emit Socket.IO event:', socketError);
+            }
+        }
 
         if (currentEmployee.employmentStatus !== employmentStatus) {
             sendEmploymentStatusChangeNotification(result, currentEmployee.employmentStatus, employmentStatus)

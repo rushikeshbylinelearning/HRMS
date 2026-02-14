@@ -13,7 +13,8 @@ import {
     VolumeUp,
     VolumeOff,
     Notifications,
-    AdminPanelSettings
+    AdminPanelSettings,
+    Description
 } from '@mui/icons-material';
 import soundService from '../services/soundService';
 
@@ -44,6 +45,9 @@ const SoundSettings = () => {
                 break;
             case 'rejection':
                 soundService.playLeaveRejectionSound();
+                break;
+            case 'policy':
+                soundService.playPolicyUpdateSound();
                 break;
             default:
                 soundService.playNotificationSound();
@@ -204,6 +208,48 @@ const SoundSettings = () => {
                     <Tooltip title="Play test sound">
                         <IconButton
                             onClick={() => playTestSound('rejection')}
+                            disabled={!soundEnabled || isPlayingTest}
+                            size="small"
+                            sx={{ 
+                                color: '#dc3545',
+                                '&:hover': { bgcolor: 'rgba(220, 53, 69, 0.1)' }
+                            }}
+                        >
+                            <VolumeUp />
+                        </IconButton>
+                    </Tooltip>
+                </Paper>
+
+                {/* Policy Update Sound */}
+                <Paper sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    p: 2.5,
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 2,
+                    bgcolor: '#ffffff',
+                    borderLeft: '4px solid #dc3545',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                        boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)',
+                        transform: 'translateX(4px)',
+                    }
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Description sx={{ color: '#dc3545', fontSize: 28 }} />
+                        <Box>
+                            <Typography variant="body2" fontWeight="600" sx={{ color: '#1a1a1a' }}>
+                                Policy Update
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>
+                                When a policy is added or updated
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Tooltip title="Play test sound">
+                        <IconButton
+                            onClick={() => playTestSound('policy')}
                             disabled={!soundEnabled || isPlayingTest}
                             size="small"
                             sx={{ 

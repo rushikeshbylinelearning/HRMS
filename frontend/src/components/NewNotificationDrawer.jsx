@@ -8,7 +8,7 @@ import {
     Warning as WarningIcon, NotificationsOffOutlined as NotificationsOffOutlinedIcon,
     Login as LoginIcon, Logout as LogoutIcon, Coffee as CoffeeIcon, EventNote as EventNoteIcon,
     DeleteSweep as DeleteSweepIcon, MarkEmailRead as MarkEmailReadIcon, PlayArrow as StartBreakIcon,
-    Wifi as WifiIcon, Person as PersonIcon
+    Wifi as WifiIcon, Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon
 } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
 import api from '../api/axios';
@@ -51,6 +51,9 @@ const getNotificationIcon = (type) => {
         probation_warning: <WarningIcon className="notification-icon warning" />,
         half_day_marked: <WarningIcon className="notification-icon warning" />,
         profile_update: <PersonIcon className="notification-icon info" />,
+        policy_added: <DescriptionIcon className="notification-icon success" />,
+        policy_updated: <DescriptionIcon className="notification-icon warning" />,
+        anonymous_feedback: <MessageIcon className="notification-icon info" />,
         success: <CheckCircleIcon className="notification-icon success" />,
         error: <ErrorIcon className="notification-icon error" />,
         warning: <WarningIcon className="notification-icon warning" />,
@@ -77,8 +80,36 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
         });
         
         // Navigate first, then mark as read (non-blocking)
+        // Handle anonymous feedback notifications - navigate to admin policies page
+        if (notification.type === 'anonymous_feedback') {
+            console.log('[Notification] Anonymous feedback notification detected');
+            onNavigate(
+                { page: 'admin/policies', params: { section: 'anonymous-messages' } },
+                notification.type,
+                notification.metadata
+            );
+        }
+        // Handle policy notifications - navigate to profile page
+        else if (notification.type === 'policy_added' || notification.type === 'policy_updated') {
+            const policyId = notification.metadata?.policyId || 
+                            notification.navigationData?.params?.policyId;
+            console.log('[Notification] Policy notification detected, policyId:', policyId);
+            
+            if (policyId) {
+                onNavigate(
+                    { page: 'profile', params: { section: 'policies', policyId } },
+                    notification.type,
+                    notification.metadata
+                );
+            } else if (notification.navigationData) {
+                onNavigate(notification.navigationData, notification.type, notification.metadata);
+            } else {
+                // Fallback to profile page
+                onNavigate({ page: 'profile', params: { section: 'policies' } }, notification.type, notification.metadata);
+            }
+        }
         // For profile_update, always try to navigate even if navigationData is missing
-        if (notification.type === 'profile_update') {
+        else if (notification.type === 'profile_update') {
             const employeeId = notification.metadata?.employeeId || 
                               notification.navigationData?.params?.employeeId || 
                               notification.navigationData?.actionParams?.employeeId;
@@ -219,7 +250,32 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
 
         console.log('[Notification] Navigation triggered:', { notificationType, navigationData, metadata, isAdmin });
         
-        // Handle PROFILE_UPDATE notifications FIRST (most specific)
+        // Handle ANONYMOUS FEEDBACK notifications (Admin/HR only)
+        if (notificationType === 'anonymous_feedback') {
+            console.log('[Notification] Anonymous feedback notification - navigating to admin policies');
+            if (!isAdmin) {
+                console.warn('[Notification] Non-admin user attempted to access anonymous feedback');
+                navigate('/dashboard');
+                return;
+            }
+            navigate('/admin/policies');
+            return;
+        }
+        
+        // Handle POLICY notifications FIRST (most specific)
+        if (notificationType === 'policy_added' || notificationType === 'policy_updated') {
+            const policyId = metadata?.policyId || navigationData?.params?.policyId;
+            console.log('[Notification] Policy notification - policyId:', policyId);
+            // Navigate to profile page with policy section
+            if (policyId) {
+                navigate(`/profile?section=policies&policyId=${policyId}`);
+            } else {
+                navigate('/profile?section=policies');
+            }
+            return;
+        }
+        
+        // Handle PROFILE_UPDATE notifications
         if (notificationType === 'profile_update') {
             const employeeId = metadata?.employeeId || navigationData?.params?.employeeId || navigationData?.actionParams?.employeeId;
             console.log('[Notification] Profile update - employeeId:', employeeId);
@@ -272,7 +328,29 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
         // Default navigation handling
         const path = navigationData?.page;
         console.log('[Notification] Default navigation - path:', path);
-        if (path === 'leaves') navigate(isAdmin ? '/admin/leaves' : '/leaves');
+        
+        // Handle admin/policies path
+        if (path === 'admin/policies') {
+            if (!isAdmin) {
+                console.warn('[Notification] Non-admin user attempted to access admin policies');
+                navigate('/dashboard');
+                return;
+            }
+            navigate('/admin/policies');
+            return;
+        }
+        
+        if (path === 'profile') {
+            const section = navigationData?.params?.section;
+            const policyId = navigationData?.params?.policyId;
+            if (section === 'policies' && policyId) {
+                navigate(`/profile?section=policies&policyId=${policyId}`);
+            } else if (section === 'policies') {
+                navigate('/profile?section=policies');
+            } else {
+                navigate('/profile');
+            }
+        } else if (path === 'leaves') navigate(isAdmin ? '/admin/leaves' : '/leaves');
         else if (path === 'attendance') navigate(isAdmin ? '/admin/attendance-summary' : '/dashboard', { state: { refresh: true } });
         else if (path === 'admin/dashboard') navigate('/admin/dashboard', { state: { refresh: true } });
         else if (path === '/employees' || path === '/admin/employees' || path?.includes('employees')) {

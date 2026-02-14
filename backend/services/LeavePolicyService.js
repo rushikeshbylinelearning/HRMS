@@ -328,85 +328,275 @@ class LeavePolicyService {
      * 3. Must be submitted by Thursday of the same week
      * 4. Alternate date must be a Saturday or Sunday; Saturday must be a working Saturday per policy; Sunday is always allowed
      */
-    static async validateCompensatoryLeave(employee, leaveDates, leaveType, alternateDate) {
-        const today = parseISTDate(getISTDateString());
-        const dayOfWeek = today.getDay();
-        
-        // Rule 1: Must be submitted by Thursday of same week
-        if (dayOfWeek > 4) { // Friday, Saturday, Sunday
-            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            return {
-                allowed: false,
-                reason: `Comp-Off requests must be submitted by Thursday of the same week. Today is ${dayNames[dayOfWeek]}, which is past the deadline.`,
-                rule: 'COMPOFF_THURSDAY_DEADLINE'
-            };
+    /**
+         * Validate Compensatory (Comp-Off) leave requests
+         * 
+         * BUSINESS LOGIC:
+         * - Comp-Off is ALLOWED when employee works on a scheduled Week Off or Holiday
+         * - Comp-Off is REJECTED when the worked date was a regular Working Day
+         * 
+         * Rules:
+         * 1. Must be submitted by Thursday of the same week
+         * 2. Worked date must be from current month only
+         * 3. Worked date must be a Saturday or Sunday
+         * 4. Worked date must have been a scheduled Week Off or Holiday (NOT a working day)
+         * 5. Employee must have attendance record for that date
+         * 6. Max 2 Comp-Off requests per month
+         * 7. No duplicate Comp-Off claims for the same worked date
+         */
+        static async validateCompensatoryLeave(employee, leaveDates, leaveType, alternateDate) {
+            const today = parseISTDate(getISTDateString());
+            const dayOfWeek = today.getDay();
+
+            // Rule 1: Must be submitted by Thursday of same week
+            if (dayOfWeek > 4) { // Friday, Saturday, Sunday
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                return {
+                    allowed: false,
+                    reason: `Comp-Off requests must be submitted by Thursday of the same week. Today is ${dayNames[dayOfWeek]}, which is past the deadline.`,
+                    rule: 'COMPOFF_THURSDAY_DEADLINE'
+                };
+            }
+
+            if (!alternateDate) {
+                return {
+                    allowed: false,
+                    reason: 'Alternate date (worked Saturday or Sunday) is required for Comp-Off requests.',
+                    rule: 'COMPOFF_ALTERNATE_DATE_REQUIRED'
+                };
+            }
+
+            const workedDate = parseISTDate(alternateDate);
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            const workedDayOfWeek = workedDate.getDay();
+
+            // Rule 2: Worked date must be from current month only
+            if (workedDate.getMonth() !== currentMonth || workedDate.getFullYear() !== currentYear) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                   'July', 'August', 'September', 'October', 'November', 'December'];
+                return {
+                    allowed: false,
+                    reason: `Worked date (Saturday or Sunday) must be from the current month (${monthNames[currentMonth]} ${currentYear}). You cannot claim Comp-Off for weekend days from other months.`,
+                    rule: 'COMPOFF_CURRENT_MONTH_ONLY'
+                };
+            }
+
+            // Rule 3: Alternate date must be a Saturday or Sunday
+            if (workedDayOfWeek !== 6 && workedDayOfWeek !== 0) {
+                return {
+                    allowed: false,
+                    reason: 'Alternate date must be a Saturday or Sunday. Comp-Off can only be claimed for working on Saturdays or Sundays.',
+                    rule: 'COMPOFF_SATURDAY_OR_SUNDAY_ONLY'
+                };
+            }
+
+            // Rule 4: Validate eligibility using helper function
+            const eligibilityCheck = await this.validateCompOffEligibility(employee._id, workedDate, employee.alternateSaturdayPolicy);
+            if (!eligibilityCheck.eligible) {
+                return {
+                    allowed: false,
+                    reason: eligibilityCheck.reason,
+                    rule: eligibilityCheck.rule
+                };
+            }
+
+            // Rule 5: Max 2 Comp-Off requests per month
+            const monthStart = new Date(currentYear, currentMonth, 1);
+            const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+
+            const existingCompOffRequests = await LeaveRequest.find({
+                employee: employee._id,
+                requestType: 'Compensatory',
+                status: { $in: ['Pending', 'Approved'] },
+                createdAt: { $gte: monthStart, $lte: monthEnd }
+            });
+
+            if (existingCompOffRequests.length >= 2) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                   'July', 'August', 'September', 'October', 'November', 'December'];
+                return {
+                    allowed: false,
+                    reason: `You have already submitted ${existingCompOffRequests.length} Comp-Off requests for ${monthNames[currentMonth]} ${currentYear}. Maximum allowed is 2 per month.`,
+                    rule: 'COMPOFF_MONTHLY_LIMIT'
+                };
+            }
+
+            return { allowed: true };
         }
 
-        if (!alternateDate) {
-            return {
-                allowed: false,
-                reason: 'Alternate date (worked Saturday or Sunday) is required for Comp-Off requests.',
-                rule: 'COMPOFF_ALTERNATE_DATE_REQUIRED'
-            };
-        }
+        /**
+         * Helper function to validate Comp-Off eligibility for a specific worked date
+         *
+         * CORE LOGIC:
+         * - Comp-Off is ALLOWED when the worked date was a scheduled Week Off or Holiday
+         * - Comp-Off is REJECTED when the worked date was a regular Working Day
+         *
+         * @param {ObjectId} employeeId - Employee ID
+         * @param {Date} workedDate - The date employee claims to have worked
+         * @param {String} saturdayPolicy - Employee's Saturday policy
+         * @returns {Object} { eligible: boolean, reason?: string, rule?: string }
+         */
+        /**
+             * Helper function to validate Comp-Off eligibility for a specific worked date
+             * 
+             * CORE LOGIC:
+             * - Comp-Off is ALLOWED when the worked date was a scheduled Week Off or Holiday
+             * - Comp-Off is REJECTED when the worked date was a regular Working Day
+             * 
+             * @param {ObjectId} employeeId - Employee ID
+             * @param {Date} workedDate - The date employee claims to have worked
+             * @param {String} saturdayPolicy - Employee's Saturday policy
+             * @returns {Object} { eligible: boolean, reason?: string, rule?: string }
+             */
+            static async validateCompOffEligibility(employeeId, workedDate, saturdayPolicy) {
+                const Holiday = require('../models/Holiday');
+                const AttendanceLog = require('../models/AttendanceLog');
+                const LeaveRequest = require('../models/LeaveRequest');
 
-        const workedDate = parseISTDate(alternateDate);
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        const workedDayOfWeek = workedDate.getDay();
+                const workedDayOfWeek = workedDate.getDay();
 
-        // Rule 2: Worked date must be from current month only
-        if (workedDate.getMonth() !== currentMonth || workedDate.getFullYear() !== currentYear) {
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                               'July', 'August', 'September', 'October', 'November', 'December'];
-            return {
-                allowed: false,
-                reason: `Worked date (Saturday or Sunday) must be from the current month (${monthNames[currentMonth]} ${currentYear}). You cannot claim Comp-Off for weekend days from other months.`,
-                rule: 'COMPOFF_CURRENT_MONTH_ONLY'
-            };
-        }
+                // CRITICAL FIX: Format date correctly to avoid timezone issues
+                // Extract date components directly from the Date object instead of using toISOString()
+                // which converts to UTC and can shift the date
+                const year = workedDate.getFullYear();
+                const month = String(workedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(workedDate.getDate()).padStart(2, '0');
+                const workedDateString = `${year}-${month}-${day}`; // YYYY-MM-DD
 
-        // Rule 3: Alternate date must be a Saturday or Sunday
-        if (workedDayOfWeek !== 6 && workedDayOfWeek !== 0) {
-            return {
-                allowed: false,
-                reason: 'Alternate date must be a Saturday or Sunday. Comp-Off can only be claimed for working on Saturdays or Sundays.',
-                rule: 'COMPOFF_SATURDAY_OR_SUNDAY_ONLY'
-            };
-        }
+                // Debug logging (temporary)
+                console.log('[validateCompOffEligibility] Worked Date Object:', workedDate);
+                console.log('[validateCompOffEligibility] Worked Date String:', workedDateString);
+                console.log('[validateCompOffEligibility] Employee ID:', employeeId);
 
-        // Rule 4: Saturday must be a working Saturday based on employee policy; Sunday is always allowed
-        if (workedDayOfWeek === 6 && !this.isWorkingSaturday(workedDate, employee.alternateSaturdayPolicy)) {
-            return {
-                allowed: false,
-                reason: 'You cannot claim Comp-Off for this Saturday as it was already scheduled as a holiday according to your Saturday policy.',
-                rule: 'COMPOFF_NON_WORKING_SATURDAY'
-            };
-        }
+                // CRITICAL FIX: Skip attendance validation for future dates
+                // Employees can apply for Comp-Off in advance for future weekend work
+                // Attendance validation will happen during approval when the date has passed
+                const { startOfISTDay } = require('../utils/istTime');
+                const today = startOfISTDay();
+                const isFutureDate = workedDate > today;
 
-        // Rule 5: Max 2 Comp-Off requests per month
-        const monthStart = new Date(currentYear, currentMonth, 1);
-        const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
-        
-        const existingCompOffRequests = await LeaveRequest.find({
-            employee: employee._id,
-            requestType: 'Compensatory',
-            status: { $in: ['Pending', 'Approved'] },
-            createdAt: { $gte: monthStart, $lte: monthEnd }
-        });
+                console.log('[validateCompOffEligibility] Is Future Date:', isFutureDate);
 
-        if (existingCompOffRequests.length >= 2) {
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                               'July', 'August', 'September', 'October', 'November', 'December'];
-            return {
-                allowed: false,
-                reason: `You have already submitted ${existingCompOffRequests.length} Comp-Off requests for ${monthNames[currentMonth]} ${currentYear}. Maximum allowed is 2 per month.`,
-                rule: 'COMPOFF_MONTHLY_LIMIT'
-            };
-        }
+                // Only validate attendance for past or current dates
+                if (!isFutureDate) {
+                    // Check 1: Verify attendance record exists for the worked date
+                    const attendanceRecord = await AttendanceLog.findOne({
+                        user: employeeId,
+                        attendanceDate: workedDateString
+                    });
 
-        return { allowed: true };
-    }
+                    console.log('[validateCompOffEligibility] Attendance Record Found:', attendanceRecord ? 'YES' : 'NO');
+                    if (attendanceRecord) {
+                        console.log('[validateCompOffEligibility] Attendance Details:', {
+                            date: attendanceRecord.attendanceDate,
+                            clockInTime: attendanceRecord.clockInTime,
+                            status: attendanceRecord.attendanceStatus
+                        });
+                    }
+
+                    if (!attendanceRecord) {
+                        return {
+                            eligible: false,
+                            reason: 'No attendance record found for the worked date. You must have clocked in on that day to claim Comp-Off.',
+                            rule: 'COMPOFF_NO_ATTENDANCE_RECORD'
+                        };
+                    }
+
+                    // Check 2: Ensure employee actually worked (has clock-in time)
+                    if (!attendanceRecord.clockInTime) {
+                        return {
+                            eligible: false,
+                            reason: 'No clock-in time found for the worked date. You must have actually worked on that day to claim Comp-Off.',
+                            rule: 'COMPOFF_NO_CLOCK_IN'
+                        };
+                    }
+
+                    // Check 3: Verify attendance status is not "Absent"
+                    if (attendanceRecord.attendanceStatus === 'Absent') {
+                        return {
+                            eligible: false,
+                            reason: 'Attendance record found but employee was marked absent. You must have been present to claim Comp-Off.',
+                            rule: 'COMPOFF_MARKED_ABSENT'
+                        };
+                    }
+                } else {
+                    console.log('[validateCompOffEligibility] Skipping attendance validation for future date');
+                }
+
+                // Check 4: Prevent duplicate Comp-Off claims for the same worked date
+                const existingCompOffForDate = await LeaveRequest.findOne({
+                    employee: employeeId,
+                    requestType: 'Compensatory',
+                    alternateDate: workedDate, // Compare Date objects directly
+                    status: { $in: ['Pending', 'Approved'] }
+                });
+
+                if (existingCompOffForDate) {
+                    return {
+                        eligible: false,
+                        reason: 'You have already claimed Comp-Off for this worked date. Duplicate claims are not allowed.',
+                        rule: 'COMPOFF_DUPLICATE_CLAIM'
+                    };
+                }
+
+                // Check 5: Determine if the worked date was a scheduled Week Off or Holiday
+
+                // Check if it's a Holiday
+                const startOfDay = new Date(workedDate.getFullYear(), workedDate.getMonth(), workedDate.getDate(), 0, 0, 0, 0);
+                const endOfDay = new Date(workedDate.getFullYear(), workedDate.getMonth(), workedDate.getDate(), 23, 59, 59, 999);
+
+                const holiday = await Holiday.findOne({
+                    date: {
+                        $gte: startOfDay,
+                        $lte: endOfDay
+                    },
+                    isTentative: false
+                });
+
+                if (holiday) {
+                    // It's a holiday - Comp-Off is ALLOWED
+                    console.log('[validateCompOffEligibility] Result: ALLOWED (Holiday)');
+                    return { eligible: true };
+                }
+
+                // Check if it's a Sunday (always a week off)
+                if (workedDayOfWeek === 0) {
+                    // Sunday - Comp-Off is ALLOWED
+                    console.log('[validateCompOffEligibility] Result: ALLOWED (Sunday)');
+                    return { eligible: true };
+                }
+
+                // Check if it's a Saturday
+                if (workedDayOfWeek === 6) {
+                    const isWorkingDay = this.isWorkingSaturday(workedDate, saturdayPolicy);
+
+                    console.log('[validateCompOffEligibility] Saturday Policy:', saturdayPolicy);
+                    console.log('[validateCompOffEligibility] Is Working Saturday:', isWorkingDay);
+
+                    if (isWorkingDay) {
+                        // Saturday was a WORKING DAY - Comp-Off is REJECTED
+                        console.log('[validateCompOffEligibility] Result: REJECTED (Working Saturday)');
+                        return {
+                            eligible: false,
+                            reason: 'Comp-Off can only be claimed if you worked on a scheduled week off or holiday. This Saturday was a regular working day according to your Saturday policy.',
+                            rule: 'COMPOFF_WORKING_DAY'
+                        };
+                    } else {
+                        // Saturday was a WEEK OFF - Comp-Off is ALLOWED
+                        console.log('[validateCompOffEligibility] Result: ALLOWED (Week Off Saturday)');
+                        return { eligible: true };
+                    }
+                }
+
+                // If we reach here, it's a weekday (Mon-Fri) - should not happen due to earlier validation
+                return {
+                    eligible: false,
+                    reason: 'Comp-Off can only be claimed for Saturdays or Sundays.',
+                    rule: 'COMPOFF_INVALID_DAY'
+                };
+            }
+
 
     /**
      * Check if a Saturday is a working day based on employee policy

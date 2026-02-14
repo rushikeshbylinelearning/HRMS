@@ -7,7 +7,9 @@ class SoundService {
             // Admin-to-employee notification sound (distinct)
             adminNotification: '/sounds/admin-notification.mp3',
             // Leave rejection sound
-            leaveRejection: '/sounds/leave-rejection.mp3'
+            leaveRejection: '/sounds/leave-rejection.mp3',
+            // Policy update sound (unique for policy notifications)
+            policyUpdate: '/sounds/policy-update.mp3'
         };
         
         this.audioContext = null;
@@ -93,6 +95,11 @@ class SoundService {
     // Play leave rejection sound
     playLeaveRejectionSound() {
         this.playSound('leaveRejection');
+    }
+
+    // Play policy update sound
+    playPolicyUpdateSound() {
+        this.playSound('policyUpdate');
     }
 
     // Play regular notification sound

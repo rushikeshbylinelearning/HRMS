@@ -2691,18 +2691,32 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
                     <Tooltip title="View Details"><IconButton size="small" onClick={() => onViewDetails(request)}><InfoOutlinedIcon fontSize="small" /></IconButton></Tooltip>
                     <Tooltip title="Edit"><IconButton size="small" onClick={() => onEdit(request)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
                     {request.status === 'Pending' && (
-                        <Tooltip title="Reject">
-                            <IconButton 
-                                size="small" 
-                                color="error"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onStatusChange(request._id, 'Rejected', '');
-                                }}
-                            >
-                                <CancelIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <>
+                            <Tooltip title="Approve">
+                                <IconButton 
+                                    size="small" 
+                                    color="success"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onStatusChange(request._id, 'Approved', '');
+                                    }}
+                                >
+                                    <CheckCircleOutlineIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Reject">
+                                <IconButton 
+                                    size="small" 
+                                    color="error"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onStatusChange(request._id, 'Rejected', '');
+                                    }}
+                                >
+                                    <CancelIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        </>
                     )}
                     <Tooltip title="Delete"><IconButton size="small" onClick={() => onDelete(request)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
                 </div>
@@ -3032,6 +3046,10 @@ const AdminLeavesPage = () => {
             if (status === 'Rejected' && rejectionNotes) {
                 payload.rejectionNotes = rejectionNotes;
             }
+            // CRITICAL FIX: Pass overrideReason to allow admin to approve/reject at any time
+            // This bypasses policy validations (advance notice, weekday restrictions, etc.)
+            payload.overrideReason = `Admin ${status.toLowerCase()} from leaves page`;
+            
             await api.patch(`/admin/leaves/${requestId}/status`, payload);
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.`, severity: 'success' });
             invalidateLeavesCache('leaves:');

@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Avatar, Menu, MenuItem, Tooltip, IconButton, Badge } from '@mui/material';
-import { Search as SearchIcon, NotificationsNone as NotificationsNoneIcon } from '@mui/icons-material';
+import { Menu, MenuItem, Tooltip, IconButton, Badge } from '@mui/material';
+import { NotificationsNone as NotificationsNoneIcon } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
+import UserAvatar from './common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
+import AnnouncementDropdown from './AnnouncementDropdown';
 import '../styles/Topbar.css';
 
 const Topbar = ({ onNotificationClick }) => {
@@ -36,7 +38,7 @@ const Topbar = ({ onNotificationClick }) => {
                 <img src="/BL.svg" alt="Company Logo" className="topbar-logo-img" />
             </div>
             <div className="topbar-right">
-                <IconButton className="topbar-icon-btn"><SearchIcon /></IconButton>
+                <AnnouncementDropdown />
                 <IconButton className="topbar-icon-btn" onClick={onNotificationClick}>
                     <Badge badgeContent={Number(unreadCount) || 0} color="error" max={99}>
                         <NotificationsNoneIcon />
@@ -44,11 +46,10 @@ const Topbar = ({ onNotificationClick }) => {
                 </IconButton>
                 <Tooltip title="Account">
                     <IconButton onClick={handleMenu} sx={{ p: 0 }}>
-                        <Avatar 
-                            sx={{ bgcolor: '#212121' }}
-                        >
-                            {user?.name?.charAt(0) || user?.fullName?.charAt(0) || 'U'}
-                        </Avatar>
+                        <UserAvatar 
+                            user={user}
+                            size="sm"
+                        />
                     </IconButton>
                 </Tooltip>
                 <Menu 

@@ -29,6 +29,7 @@ import AnalyticsErrorBoundary from './components/AnalyticsErrorBoundary';
 const EmployeeDashboardPage = lazy(() => import('./pages/EmployeeDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage'));
+const DeactivatedEmployeesPage = lazy(() => import('./pages/DeactivatedEmployeesPage'));
 const ShiftsPage = lazy(() => import('./pages/ShiftsPage'));
 const LeavesPage = lazy(() => import('./pages/LeavesPage'));
 const AdminLeavesPage = lazy(() => import('./pages/AdminLeavesPage'));
@@ -45,6 +46,9 @@ const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
 const PayrollManagementPage = lazy(() => import('./pages/PayrollManagementPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AdminPoliciesPage = lazy(() => import('./pages/AdminPoliciesPage'));
+const CIFManagementPage = lazy(() => import('./pages/CIFManagement'));
+const EmployeeCIFDetailsPage = lazy(() => import('./pages/EmployeeCIFDetails'));
+const SchedulingManagementPage = lazy(() => import('./pages/SchedulingManagementPage'));
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
@@ -249,6 +253,11 @@ function App() {
                                                 <EmployeesPage />
                                             </Suspense>
                                         } />
+                                        <Route path="/employees/deactivated" element={
+                                            <Suspense fallback={<PageLoader type="table" />}>
+                                                <DeactivatedEmployeesPage />
+                                            </Suspense>
+                                        } />
                                         <Route path="/admin/leaves" element={
                                             <Suspense fallback={<PageLoader type="table" />}>
                                                 <AdminLeavesPage />
@@ -271,16 +280,13 @@ function App() {
                                                 <AdminAttendanceSummaryPage />
                                             </Suspense>
                                         } />
-                                        <Route path="/shifts" element={
+                                        <Route path="/scheduling-management" element={
                                             <Suspense fallback={<PageLoader />}>
-                                                <ShiftsPage />
+                                                <SchedulingManagementPage />
                                             </Suspense>
                                         } />
-                                        <Route path="/office-locations" element={
-                                            <Suspense fallback={<PageLoader />}>
-                                                <OfficeLocationsPage />
-                                            </Suspense>
-                                        } />
+                                        <Route path="/shifts" element={<Navigate to="/scheduling-management" replace />} />
+                                        <Route path="/office-locations" element={<Navigate to="/scheduling-management" replace />} />
                                         <Route path="/manage-section" element={
                                             <Suspense fallback={<PageLoader />}>
                                                 <ManageSectionPage />
@@ -315,6 +321,21 @@ function App() {
                                         <Route path="/admin/policies" element={
                                             <Suspense fallback={<PageLoader />}>
                                                 <AdminPoliciesPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/cif" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <CIFManagementPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/cif/employee/:employeeId" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <EmployeeCIFDetailsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/compliance/cif" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <CIFManagementPage />
                                             </Suspense>
                                         } />
                                     </Route>

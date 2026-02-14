@@ -30,10 +30,6 @@
     gap: 16px;
     align-items: center;
 }
-.employees-page .search-field .MuiOutlinedInput-root {
-    border-radius: 8px;
-    background-color: #ffffff;
-}
 .employees-page .add-button {
     background-color: #D32F2F !important;
     color: white !important;
@@ -62,26 +58,35 @@
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    overflow: hidden;
+}
+
+.employee-grid-body {
+    overflow-y: auto;
+    flex-grow: 1;
 }
 
 .employee-grid-header,
 .employee-grid-row {
     display: grid;
-    grid-template-columns: 60px 1fr 2.5fr 1fr 1fr 1fr 1fr; /* Grid layout for columns */
+    grid-template-columns: 60px 1fr 2fr 1fr 1fr 1fr 1fr; /* Equal spacing with flexible columns */
     align-items: center;
-    gap: 16px;
-    padding: 0 24px;
+    column-gap: 16px;
+    padding: 0 20px;
     border-bottom: 1px solid #eef2f6;
 }
 
 .employee-grid-header {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     background-color: #f8f9fa;
     font-weight: 600;
     color: #495057;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 .employee-grid-header .grid-cell {
     cursor: pointer;
@@ -98,9 +103,10 @@
 }
 
 .employee-grid-row {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     transition: background-color 0.2s ease;
+    min-height: 60px;
 }
 .employee-grid-row:hover {
     background-color: #f8f9fa;
@@ -109,26 +115,40 @@
 .grid-cell {
     display: flex;
     align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.grid-cell.actions, .grid-cell.isActive {
+.grid-cell.actions {
+    justify-content: center;
+    gap: 4px; /* Spacing between action buttons */
+}
+.grid-cell.isActive {
     justify-content: center;
 }
 .grid-cell.fullName {
-    gap: 16px; /* Space between avatar and text */
+    gap: 12px; /* Space between avatar and text */
 }
 
 .employee-text-info {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    flex: 1;
 }
 .employee-name {
     font-weight: 500;
     color: #212529;
     font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .employee-email {
     color: #6c757d;
     font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .empty-state {

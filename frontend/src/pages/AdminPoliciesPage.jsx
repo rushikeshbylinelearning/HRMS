@@ -73,6 +73,12 @@ const AdminPoliciesPage = () => {
         }
     };
 
+    const handleDeleteMessage = (messageId) => {
+        // Optimistically remove from UI
+        setAnonymousMessages(prev => prev.filter(msg => msg._id !== messageId));
+        setSnackbar({ open: true, message: 'Message deleted successfully', severity: 'success' });
+    };
+
     const handleUpload = async (formData) => {
         setSubmitting(true);
         try {
@@ -235,7 +241,8 @@ const AdminPoliciesPage = () => {
                         }}>
                             <AnonymousMessagesList 
                                 messages={anonymousMessages} 
-                                loading={messagesLoading} 
+                                loading={messagesLoading}
+                                onDelete={handleDeleteMessage}
                             />
                         </Box>
                     </Box>

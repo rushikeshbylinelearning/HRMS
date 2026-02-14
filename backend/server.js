@@ -70,7 +70,7 @@ const shiftRoutes = require('./routes/shifts');
 const leaveRoutes = require('./routes/leaves');
 const settingsRoutes = require('./routes/settingsRoutes');
 const reportsRoutes = require('./routes/reports');
-const userRoutes = require('./routes/users');
+const userRoutes = require('./routes/userRoutes'); // FIXED: Use GridFS-enabled router
 const newNotificationRoutes = require('./routes/newNotifications');
 const officeLocationRoutes = require('./routes/officeLocations');
 const manageRoutes = require('./routes/manage');
@@ -187,7 +187,7 @@ app.use(
         // Allow embedding from SSO portal - CRITICAL for iframe embedding
         'frame-ancestors': process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.bylinelms.com"],
+          : ["'self'", "https://attendance.legatolxp.online"],
       },
     },
     // Disable X-Frame-Options since we're using CSP frame-ancestors instead
@@ -271,12 +271,12 @@ app.use((req, res, next) => {
   // Production allowed origins for iframe embedding
   const allowedOrigins = process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.bylinelms.com"]
+          : ["'self'", "https://attendance.legatolxp.online"]
 
 
 
     // ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
+    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
   
   // If frame-ancestors is not in CSP, add it
   // If it exists but is different, replace it
@@ -358,7 +358,7 @@ const staticOptions = {
             // Set CSP frame-ancestors for HTML files to allow iframe embedding
             const allowedOrigins = process.env.NODE_ENV === 'development' 
               ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-              : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
+              : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
             const existingCSP = res.getHeader('Content-Security-Policy') || '';
             if (!existingCSP.includes('frame-ancestors')) {
               if (existingCSP) {
@@ -383,7 +383,9 @@ const staticOptions = {
 
 // Static file serving - MUST be before any authentication middleware
 // These routes are public and should never trigger authentication
-app.use('/avatars', express.static(path.join(__dirname, 'uploads/avatars'), staticOptions));
+// NOTE: Avatar serving removed - now served via GridFS at /api/users/avatar/:id
+// app.use('/avatars', express.static(...)) - REMOVED (GridFS only)
+
 // Medical certificates: serve GridFS by ID (24-char hex) first, then static for legacy filenames
 app.get('/medical-certificates/:fileId', (req, res, next) => {
     const id = req.params.fileId;
@@ -409,8 +411,8 @@ app.use('/policies', express.static(path.join(__dirname, 'public/policies'), sta
 app.use((req, res, next) => {
   // If this is a static file request and it reached here, the file doesn't exist
   // Return 404 instead of passing to auth middleware
-  if (req.path.startsWith('/avatars/') || 
-      req.path.startsWith('/medical-certificates/') || 
+  // NOTE: /avatars/ removed - avatars now served via /api/users/avatar/:id (GridFS)
+  if (req.path.startsWith('/medical-certificates/') || 
       req.path.startsWith('/public/')) {
     return res.status(404).json({ error: 'File not found' });
   }
@@ -488,6 +490,14 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/probation', probationRoutes);
+
+// Announcement routes
+const announcementRoutes = require('./routes/announcementRoutes');
+app.use('/api/announcements', announcementRoutes);
+
+// CIF routes
+const cifRoutes = require('./modules/cif/cif.routes');
+app.use('/api/admin/cif', cifRoutes);
 
 // Policies routes
 const policiesRoutes = require('./routes/policies');
@@ -726,7 +736,7 @@ app.use((req, res, next) => {
   
   const allowedOrigins = process.env.NODE_ENV === 'development' 
     ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
+    : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
   
   let existingCSP = res.getHeader('Content-Security-Policy') || '';
   

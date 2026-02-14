@@ -81,7 +81,8 @@ mkdir -p backend/dist
 cp -r backend/* backend/dist/
 rm -rf backend/dist/node_modules
 rm -rf backend/dist/logs/*
-rm -rf backend/dist/uploads/avatars/*
+# REMOVED: Avatar deletion - avatars now stored in GridFS (MongoDB), not filesystem
+# rm -rf backend/dist/uploads/avatars/*
 
 # Install production dependencies for backend
 cd backend/dist
