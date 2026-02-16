@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const AnnouncementMessage = require("../models/AnnouncementMessage");
+const AnnouncementRead = require("../models/AnnouncementRead");
 const authenticateToken = require("../middleware/authenticateToken");
 
 // Get last 50 messages
@@ -190,6 +191,43 @@ router.patch("/:id/pin", authenticateToken, async (req, res) => {
     res.json(msgObj);
   } catch (err) {
     console.error("[Announcements] Error pinning message:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Mark announcements as read (for cross-device sync)
+router.post("/mark-read", authenticateToken, async (req, res) => {
+  try {
+    const now = new Date();
+    
+    await AnnouncementRead.findOneAndUpdate(
+      { userId: req.user.userId },
+      { lastReadTime: now },
+      { upsert: true, new: true }
+    );
+
+    console.log(`[Announcements] User ${req.user.userId} marked as read at ${now.toISOString()}`);
+    
+    res.json({ 
+      success: true, 
+      lastReadTime: now.toISOString() 
+    });
+  } catch (err) {
+    console.error("[Announcements] Error marking as read:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get last read time (for cross-device sync)
+router.get("/last-read", authenticateToken, async (req, res) => {
+  try {
+    const record = await AnnouncementRead.findOne({ userId: req.user.userId });
+    
+    res.json({ 
+      lastReadTime: record?.lastReadTime?.toISOString() || null 
+    });
+  } catch (err) {
+    console.error("[Announcements] Error fetching last read time:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

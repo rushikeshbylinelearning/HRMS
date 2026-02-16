@@ -23,6 +23,7 @@
     "bcrypt": "^6.0.0",
     "busboy": "^1.6.0",
     "compression": "^1.7.4",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "exceljs": "^4.4.0",

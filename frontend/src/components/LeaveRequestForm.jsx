@@ -57,6 +57,32 @@ const getDayOfWeek = (d) => (d instanceof Date ? d : new Date(d)).getDay();
 const isSunday = (d) => getDayOfWeek(d) === 0;
 const isSaturday = (d) => getDayOfWeek(d) === 6;
 const isWeekend = (d) => { const day = getDayOfWeek(d); return day === 0 || day === 6; };
+
+/**
+ * Check if a Saturday is a working Saturday based on employee's policy
+ * @param {Date} date - The date to check
+ * @param {string} saturdayPolicy - Employee's alternateSaturdayPolicy
+ * @returns {boolean} - True if it's a working Saturday
+ */
+const isWorkingSaturday = (date, saturdayPolicy = 'All Saturdays Working') => {
+    if (!isSaturday(date)) return false;
+    
+    const weekNum = Math.ceil(date.getDate() / 7);
+    
+    switch (saturdayPolicy) {
+        case 'All Saturdays Working':
+            return true;
+        case 'All Saturdays Off':
+            return false;
+        case 'Week 1 & 3 Off':
+            return !(weekNum === 1 || weekNum === 3);
+        case 'Week 2 & 4 Off':
+            return !(weekNum === 2 || weekNum === 4);
+        default:
+            return true; // Default to working if policy is unclear
+    }
+};
+
 const isPastDate = (d) => {
     const date = d instanceof Date ? new Date(d.getTime()) : new Date(d);
     const today = new Date();
@@ -94,9 +120,42 @@ const shouldDisableWorkedDateCompOff = (date, holidays) => {
     if (!isFutureDate(date)) return false;
     return !isInCurrentMonth(date);
 };
-/** Regular Leave Dates: disable holidays, Saturdays, and Sundays (employees shouldn't apply leave on weekends/holidays) */
-const shouldDisableRegularLeaveDate = (date, holidays) => 
-    isHoliday(date, holidays) || isWeekend(date);
+
+/** 
+ * Regular Leave Dates: disable holidays and Sundays always
+ * For Casual and LOP: allow working Saturdays, block non-working Saturdays
+ * For other leave types: block all Saturdays
+ * CRITICAL: Block Monday after non-working Saturday (weekend clubbing prevention)
+ */
+const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPolicy) => {
+    // Always disable holidays and Sundays
+    if (isHoliday(date, holidays) || isSunday(date)) return true;
+    
+    // Handle Saturday logic based on leave type
+    if (isSaturday(date)) {
+        // For Casual and LOP, allow working Saturdays only
+        if (requestType === 'Casual' || requestType === 'Loss of Pay') {
+            return !isWorkingSaturday(date, saturdayPolicy);
+        }
+        // For all other leave types, block all Saturdays
+        return true;
+    }
+    
+    // CRITICAL: Block Monday after non-working Saturday for Casual/LOP (weekend clubbing prevention)
+    if (getDayOfWeek(date) === 1) { // Monday
+        if (requestType === 'Casual' || requestType === 'Loss of Pay') {
+            const saturdayBefore = new Date(date);
+            saturdayBefore.setDate(date.getDate() - 2);
+            
+            // If Saturday before is a non-working Saturday, block Monday
+            if (isSaturday(saturdayBefore) && !isWorkingSaturday(saturdayBefore, saturdayPolicy)) {
+                return true; // Block Monday after non-working Saturday
+            }
+        }
+    }
+    
+    return false;
+};
 
 const datePickerTextFieldSx = {
     '& .MuiInputLabel-root': { color: '#374151', fontSize: '13px', fontWeight: 500, '&.Mui-focused': { color: '#EF4444' }, '& .MuiFormLabel-asterisk': { color: '#EF4444' } },
@@ -900,7 +959,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                                     label="Leave date"
                                     value={formData.startDate}
                                     onChange={handleStartDateChange}
-                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays)}
+                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
                                     slotProps={{
                                         textField: { fullWidth: true, sx: datePickerTextFieldSx },
                                     }}
@@ -911,7 +970,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                                     onChange={handleEndDateChange}
                                     minDate={formData.startDate}
                                     disabled={!formData.startDate}
-                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays)}
+                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
                                     slotProps={{
                                         textField: { fullWidth: true, sx: datePickerTextFieldSx },
                                     }}

@@ -11,22 +11,18 @@ const PolicyViewer = ({ policy, onClose }) => {
 
     // Construct full URL for PDF
     const getPdfUrl = () => {
-        if (!policy.fileUrl) return '';
+        if (!policy._id) return '';
         
-        // If it's already a full URL, use it as is
-        if (policy.fileUrl.startsWith('http://') || policy.fileUrl.startsWith('https://')) {
-            return policy.fileUrl;
-        }
-        
-        // In development, use the Vite dev server proxy
-        // In production, use the full backend URL
+        // NEW: Use GridFS endpoint with policy ID
+        // This endpoint requires JWT authentication via Authorization header
         if (import.meta.env.DEV) {
             // Development: Vite proxy will forward to backend
-            return policy.fileUrl; // e.g., /policies/policy-xxx.pdf
+            return `/api/policies-gridfs/${policy._id}/file`;
         } else {
             // Production: Use full backend URL
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online';
-            return `${apiBaseUrl}${policy.fileUrl}`;
+            const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+            return `${baseUrl}/api/policies-gridfs/${policy._id}/file`;
         }
     };
 

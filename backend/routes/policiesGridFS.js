@@ -1,137 +1,26 @@
+// backend/routes/policiesGridFS.js
+// SECURE POLICY ROUTES - GridFS Implementation
+// Features:
+// - GridFS storage (no filesystem dependency)
+// - JWT-based authentication (Authorization header)
+// - Secure PDF streaming
+// - No cookie dependency
+// - Admin-only upload/delete
+// - All users can view
+
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
-const fsSync = require('fs'); // For streaming
 const Policy = require('../models/Policy');
 const AnonymousFeedback = require('../models/AnonymousFeedback');
-const requireAuth = require('../middleware/requireAuth');
+const authenticateToken = require('../middleware/authenticateToken');
+const uploadPolicyGridFS = require('../middleware/uploadPolicyGridFS');
 const NewNotificationService = require('../services/NewNotificationService');
 const User = require('../models/User');
-
-// Configure multer for PDF uploads - SECURITY: Store in protected directory
-const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../storage/policies');
-        try {
-            await fs.mkdir(uploadDir, { recursive: true });
-            cb(null, uploadDir);
-        } catch (error) {
-            cb(error);
-        }
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'policy-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const fileFilter = (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-        cb(null, true);
-    } else {
-        cb(new Error('Only PDF files are allowed'), false);
-    }
-};
-
-const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    }
-});
-
-// SECURITY: Authenticated PDF file serving with streaming and range support
-router.get('/file/:filename', requireAuth, async (req, res) => {
-    try {
-        // TEMPORARY: Debug logging for cookie troubleshooting
-        console.log('[PDF Route] Request received for:', req.params.filename);
-        console.log('[PDF Route] Cookies:', req.cookies);
-        console.log('[PDF Route] Authorization header:', req.headers.authorization ? 'present' : 'missing');
-        console.log('[PDF Route] User authenticated:', req.user ? req.user.email : 'NO USER');
-        
-        const { filename } = req.params;
-
-        // Prevent directory traversal attack
-        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-            console.warn(`⚠️ Directory traversal attempt blocked: ${filename}`);
-            return res.status(400).json({ error: 'Invalid file name' });
-        }
-
-        // Validate filename format (policy-timestamp-random.pdf)
-        if (!/^policy-\d+-\d+\.pdf$/.test(filename)) {
-            console.warn(`⚠️ Invalid filename format: ${filename}`);
-            return res.status(400).json({ error: 'Invalid file name format' });
-        }
-
-        const filePath = path.join(__dirname, '../storage/policies', filename);
-
-        // Check if file exists
-        if (!fsSync.existsSync(filePath)) {
-            console.error(`❌ File not found: ${filename}`);
-            return res.status(404).json({ error: 'File not found' });
-        }
-
-        // Get file stats for size and range support
-        const stat = fsSync.statSync(filePath);
-        const fileSize = stat.size;
-        const range = req.headers.range;
-
-        // Set security headers
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-        res.setHeader('Content-Security-Policy', "default-src 'self'");
-
-        // Support range requests for large PDFs (improves loading performance)
-        if (range) {
-            const parts = range.replace(/bytes=/, "").split("-");
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-            const chunksize = (end - start) + 1;
-
-            const file = fsSync.createReadStream(filePath, { start, end });
-
-            res.writeHead(206, {
-                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                'Accept-Ranges': 'bytes',
-                'Content-Length': chunksize,
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': 'inline',
-                'Cache-Control': 'private, no-store, no-cache, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            });
-
-            file.pipe(res);
-        } else {
-            // Full file response
-            res.writeHead(200, {
-                'Content-Length': fileSize,
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': 'inline',
-                'Accept-Ranges': 'bytes',
-                'Cache-Control': 'private, no-store, no-cache, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            });
-
-            const stream = fsSync.createReadStream(filePath);
-            stream.pipe(res);
-        }
-
-        console.log(`✅ PDF served successfully: ${filename} to user: ${req.user.fullName || req.user.userId}`);
-    } catch (error) {
-        console.error('❌ PDF serve error:', error);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to load PDF' });
-        }
-    }
-});
+const { getPolicyBucket } = require('../db');
+const mongoose = require('mongoose');
 
 // Get all policies (accessible by all authenticated users)
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
     try {
         const policies = await Policy.find()
             .sort({ effectiveFrom: -1, createdAt: -1 })
@@ -146,7 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // Get active policies only
-router.get('/active', requireAuth, async (req, res) => {
+router.get('/active', authenticateToken, async (req, res) => {
     try {
         const policies = await Policy.find({ status: 'Active' })
             .sort({ effectiveFrom: -1 })
@@ -160,16 +49,65 @@ router.get('/active', requireAuth, async (req, res) => {
     }
 });
 
-// Upload new policy (Admin only)
-router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
+// Stream policy PDF securely from GridFS
+router.get('/:id/file', authenticateToken, async (req, res) => {
     try {
-        // Check if user is admin
-        if (req.user.role !== 'Admin') {
-            return res.status(403).json({ error: 'Only admins can upload policies' });
+        console.log('[Policy PDF] Request received for policy:', req.params.id);
+        console.log('[Policy PDF] User authenticated:', req.user.email);
+        
+        const policy = await Policy.findById(req.params.id);
+        if (!policy) {
+            console.error('[Policy PDF] Policy not found:', req.params.id);
+            return res.status(404).json({ error: 'Policy not found' });
         }
+        
+        if (!policy.fileId) {
+            console.error('[Policy PDF] Policy has no fileId:', req.params.id);
+            return res.status(404).json({ error: 'Policy file not found' });
+        }
+        
+        const policyBucket = getPolicyBucket();
+        
+        // Set security headers
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Disposition', 'inline');
+        res.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('X-Frame-Options', 'SAMEORIGIN');
+        
+        // Stream from GridFS
+        const downloadStream = policyBucket.openDownloadStream(
+            new mongoose.Types.ObjectId(policy.fileId)
+        );
+        
+        downloadStream.on('error', (error) => {
+            console.error('[Policy PDF] Stream error:', error);
+            if (!res.headersSent) {
+                res.status(404).json({ error: 'File not found in storage' });
+            }
+        });
+        
+        downloadStream.on('end', () => {
+            console.log('[Policy PDF] Stream complete for:', policy.name);
+        });
+        
+        downloadStream.pipe(res);
+        
+    } catch (error) {
+        console.error('[Policy PDF] Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to load PDF' });
+        }
+    }
+});
 
-        if (!req.file) {
-            return res.status(400).json({ error: 'PDF file is required' });
+// Upload new policy (Admin only)
+router.post('/upload', authenticateToken, uploadPolicyGridFS, async (req, res) => {
+    try {
+        if (!req.policyUpload) {
+            return res.status(400).json({ error: 'File upload failed' });
         }
 
         const { name, version, effectiveFrom, department, status } = req.body;
@@ -193,48 +131,44 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
             }
         }
 
-        const fileUrl = `/api/policies/file/${req.file.filename}`;
-
         const policy = new Policy({
             name,
             version: policyVersion,
             effectiveFrom: new Date(effectiveFrom),
             department: department || '',
             status: status || 'Active',
-            fileUrl,
-            fileName: req.file.originalname,
-            uploadedBy: req.user.userId || req.user._id
+            fileId: req.policyUpload.fileId,
+            fileName: req.policyUpload.originalFilename,
+            fileSize: req.policyUpload.size,
+            uploadedBy: req.user.userId
         });
 
         await policy.save();
         console.log(`✅ Policy saved successfully: ${policy._id}`);
 
-        // Send response first to avoid blocking
+        // Send response first
         res.status(201).json({
             message: 'Policy uploaded successfully',
             policy
         });
 
-        // Notify all active users about new policy (following the same pattern as check-in/break notifications)
-        // Run asynchronously after response is sent
+        // Notify all active users asynchronously
         setImmediate(async () => {
             try {
                 console.log(`🔔 Starting notification process for policy: ${name}`);
                 const allUsers = await User.find({ status: 'Active' }).select('_id fullName');
-                console.log(`📋 Found ${allUsers.length} active users to notify about new policy: ${name}`);
+                console.log(`📋 Found ${allUsers.length} active users to notify`);
                 
                 if (allUsers.length === 0) {
                     console.warn('⚠️ No active users found to notify');
                     return;
                 }
                 
-                // Send notification to each user using NewNotificationService
                 let successCount = 0;
                 let errorCount = 0;
                 
                 for (const user of allUsers) {
                     try {
-                        console.log(`📤 Sending notification to user: ${user.fullName} (${user._id})`);
                         await NewNotificationService.createAndEmitNotification({
                             message: `New policy "${name}" (v${policyVersion}) has been added. Click to view.`,
                             type: 'policy_added',
@@ -255,44 +189,28 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
                             }
                         });
                         successCount++;
-                        console.log(`✅ Notification sent successfully to ${user.fullName}`);
                     } catch (err) {
                         errorCount++;
-                        console.error(`❌ Error sending policy notification to user ${user.fullName} (${user._id}):`, err);
-                        console.error('Error stack:', err.stack);
+                        console.error(`❌ Error sending notification to ${user.fullName}:`, err);
                     }
                 }
                 
-                console.log(`✅ Policy notifications complete: ${successCount} sent, ${errorCount} failed`);
+                console.log(`✅ Notifications complete: ${successCount} sent, ${errorCount} failed`);
             } catch (notifError) {
                 console.error('❌ Critical error in notification process:', notifError);
-                console.error('Error stack:', notifError.stack);
             }
         });
     } catch (error) {
         console.error('Error uploading policy:', error);
-        // Clean up uploaded file if database save fails
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (unlinkError) {
-                console.error('Error deleting file:', unlinkError);
-            }
-        }
         res.status(500).json({ error: 'Failed to upload policy' });
     }
 });
 
 // Replace policy (Admin only)
-router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res) => {
+router.post('/:id/replace', authenticateToken, uploadPolicyGridFS, async (req, res) => {
     try {
-        // Check if user is admin
-        if (req.user.role !== 'Admin') {
-            return res.status(403).json({ error: 'Only admins can replace policies' });
-        }
-
-        if (!req.file) {
-            return res.status(400).json({ error: 'PDF file is required' });
+        if (!req.policyUpload) {
+            return res.status(400).json({ error: 'File upload failed' });
         }
 
         const oldPolicy = await Policy.findById(req.params.id);
@@ -309,8 +227,6 @@ router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res)
             policyVersion = (versionNum + 0.1).toFixed(1);
         }
 
-        const fileUrl = `/api/policies/file/${req.file.filename}`;
-
         // Create new policy version
         const newPolicy = new Policy({
             name: name || oldPolicy.name,
@@ -318,9 +234,10 @@ router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res)
             effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
             department: department || oldPolicy.department,
             status: status || 'Active',
-            fileUrl,
-            fileName: req.file.originalname,
-            uploadedBy: req.user.userId || req.user._id
+            fileId: req.policyUpload.fileId,
+            fileName: req.policyUpload.originalFilename,
+            fileSize: req.policyUpload.size,
+            uploadedBy: req.user.userId
         });
 
         await newPolicy.save();
@@ -329,34 +246,38 @@ router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res)
         oldPolicy.status = 'Archived';
         oldPolicy.replacedBy = newPolicy._id;
         await oldPolicy.save();
+        
+        // Delete old file from GridFS
+        try {
+            const policyBucket = getPolicyBucket();
+            await policyBucket.delete(new mongoose.Types.ObjectId(oldPolicy.fileId));
+            console.log(`✅ Deleted old policy file from GridFS: ${oldPolicy.fileId}`);
+        } catch (deleteError) {
+            console.warn('⚠️ Could not delete old policy file:', deleteError.message);
+        }
+        
         console.log(`✅ Policy updated successfully: ${newPolicy._id}`);
 
-        // Send response first to avoid blocking
+        // Send response first
         res.json({
             message: 'Policy replaced successfully',
             policy: newPolicy
         });
 
-        // Notify all active users about policy update (following the same pattern as check-in/break notifications)
-        // Run asynchronously after response is sent
+        // Notify all active users asynchronously
         setImmediate(async () => {
             try {
-                console.log(`🔔 Starting notification process for policy update: ${newPolicy.name}`);
+                console.log(`🔔 Starting notification for policy update: ${newPolicy.name}`);
                 const allUsers = await User.find({ status: 'Active' }).select('_id fullName');
-                console.log(`📋 Found ${allUsers.length} active users to notify about policy update: ${newPolicy.name}`);
+                console.log(`📋 Found ${allUsers.length} active users to notify`);
                 
-                if (allUsers.length === 0) {
-                    console.warn('⚠️ No active users found to notify');
-                    return;
-                }
+                if (allUsers.length === 0) return;
                 
-                // Send notification to each user using NewNotificationService
                 let successCount = 0;
                 let errorCount = 0;
                 
                 for (const user of allUsers) {
                     try {
-                        console.log(`📤 Sending update notification to user: ${user.fullName} (${user._id})`);
                         await NewNotificationService.createAndEmitNotification({
                             message: `Policy "${newPolicy.name}" has been updated to version ${policyVersion}. Click to view.`,
                             type: 'policy_updated',
@@ -378,38 +299,26 @@ router.post('/:id/replace', requireAuth, upload.single('file'), async (req, res)
                             }
                         });
                         successCount++;
-                        console.log(`✅ Update notification sent successfully to ${user.fullName}`);
                     } catch (err) {
                         errorCount++;
-                        console.error(`❌ Error sending policy update notification to user ${user.fullName} (${user._id}):`, err);
-                        console.error('Error stack:', err.stack);
+                        console.error(`❌ Error sending update notification to ${user.fullName}:`, err);
                     }
                 }
                 
-                console.log(`✅ Policy update notifications complete: ${successCount} sent, ${errorCount} failed`);
+                console.log(`✅ Update notifications complete: ${successCount} sent, ${errorCount} failed`);
             } catch (notifError) {
                 console.error('❌ Critical error in notification process:', notifError);
-                console.error('Error stack:', notifError.stack);
             }
         });
     } catch (error) {
         console.error('Error replacing policy:', error);
-        // Clean up uploaded file if database save fails
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (unlinkError) {
-                console.error('Error deleting file:', unlinkError);
-            }
-        }
         res.status(500).json({ error: 'Failed to replace policy' });
     }
 });
 
 // Delete policy (Admin only)
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        // Check if user is admin
         if (req.user.role !== 'Admin') {
             return res.status(403).json({ error: 'Only admins can delete policies' });
         }
@@ -419,14 +328,13 @@ router.delete('/:id', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Policy not found' });
         }
 
-        // Delete file from filesystem (now in storage/policies)
-        const filename = path.basename(policy.fileUrl);
-        const filePath = path.join(__dirname, '../storage/policies', filename);
+        // Delete file from GridFS
         try {
-            await fs.unlink(filePath);
-            console.log(`✅ File deleted: ${filename}`);
+            const policyBucket = getPolicyBucket();
+            await policyBucket.delete(new mongoose.Types.ObjectId(policy.fileId));
+            console.log(`✅ Deleted policy file from GridFS: ${policy.fileId}`);
         } catch (error) {
-            console.error('Error deleting file:', error);
+            console.error('Error deleting file from GridFS:', error);
         }
 
         await Policy.findByIdAndDelete(req.params.id);
@@ -456,13 +364,10 @@ router.post('/anonymous-feedback', async (req, res) => {
         await feedback.save();
         console.log('✅ Anonymous feedback saved successfully');
 
-        // Send response immediately to avoid blocking the user
         res.status(201).json({
             message: 'Feedback submitted successfully'
         });
 
-        // Notify admins/HR asynchronously after response is sent
-        // CRITICAL: Only pass message content and timestamp - NO user identification
         setImmediate(async () => {
             try {
                 console.log('🔔 Triggering anonymous feedback notification');
@@ -471,7 +376,6 @@ router.post('/anonymous-feedback', async (req, res) => {
                     feedback.submittedAt
                 );
             } catch (notifError) {
-                // Log error but don't fail the submission
                 console.error('❌ Error sending anonymous feedback notification:', notifError);
             }
         });
@@ -482,9 +386,8 @@ router.post('/anonymous-feedback', async (req, res) => {
 });
 
 // Get all anonymous feedback (Admin only)
-router.get('/anonymous-feedback', requireAuth, async (req, res) => {
+router.get('/anonymous-feedback', authenticateToken, async (req, res) => {
     try {
-        // Check if user is admin
         if (req.user.role !== 'Admin') {
             return res.status(403).json({ error: 'Only admins can view feedback' });
         }
@@ -502,9 +405,8 @@ router.get('/anonymous-feedback', requireAuth, async (req, res) => {
 });
 
 // Delete anonymous feedback (Admin only)
-router.delete('/anonymous-feedback/:id', requireAuth, async (req, res) => {
+router.delete('/anonymous-feedback/:id', authenticateToken, async (req, res) => {
     try {
-        // Check if user is admin
         if (req.user.role !== 'Admin') {
             return res.status(403).json({ error: 'Only admins can delete feedback' });
         }
@@ -517,7 +419,7 @@ router.delete('/anonymous-feedback/:id', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Feedback not found' });
         }
 
-        console.log(`✅ Anonymous feedback deleted by admin: ${req.user.fullName}`);
+        console.log(`✅ Anonymous feedback deleted by admin: ${req.user.email}`);
         res.json({ message: 'Feedback deleted successfully' });
     } catch (error) {
         console.error('Error deleting feedback:', error);

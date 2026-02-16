@@ -651,7 +651,7 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
     
     // Debug: Log the date range and timezone info
     console.log('Analytics API - Date info:', {
-      serverTime: now.toISOString(),
+      serverTime: new Date().toISOString(),
       serverTimeIST: nowIST.toISOString(),
       startDate: start,
       endDate: end,

@@ -14,6 +14,7 @@ const CustomPdfViewer = ({ pdfUrl, title, version, effectiveDate, onClose }) => 
     const [scale, setScale] = useState(1.0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [pdfBlob, setPdfBlob] = useState(null);
     const modalRef = useRef(null);
     const contentRef = useRef(null);
     const pageRefs = useRef({}); // Store refs for each page
@@ -29,6 +30,47 @@ const CustomPdfViewer = ({ pdfUrl, title, version, effectiveDate, onClose }) => 
         setError('Failed to load PDF document');
         setLoading(false);
     }, []);
+
+    // Fetch PDF with authentication
+    useEffect(() => {
+        const fetchPdf = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                // Get token from sessionStorage (same as axios interceptor)
+                const amsToken = sessionStorage.getItem('ams_token');
+                const token = sessionStorage.getItem('token');
+                const tokenToUse = amsToken || token;
+
+                if (!tokenToUse) {
+                    throw new Error('Authentication token not found');
+                }
+
+                // Fetch PDF with Authorization header
+                const response = await fetch(pdfUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${tokenToUse}`
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                setPdfBlob(blob);
+            } catch (err) {
+                console.error('Error fetching PDF:', err);
+                setError(err.message || 'Failed to load PDF');
+                setLoading(false);
+            }
+        };
+
+        fetchPdf();
+    }, [pdfUrl]);
 
     // FIX: Lock body scroll when modal opens
     useEffect(() => {
@@ -280,9 +322,9 @@ const CustomPdfViewer = ({ pdfUrl, title, version, effectiveDate, onClose }) => 
                             </div>
                         )}
 
-                        {!error && (
+                        {!error && pdfBlob && (
                             <Document
-                                file={pdfUrl}
+                                file={pdfBlob}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 onLoadError={onDocumentLoadError}
                                 loading=""

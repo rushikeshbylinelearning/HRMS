@@ -50,7 +50,7 @@ const AdminPoliciesPage = () => {
     const loadPolicies = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/policies');
+            const { data } = await api.get('/policies-gridfs');
             setPolicies(data.policies || []);
         } catch (error) {
             console.error('Failed to load policies:', error);
@@ -82,7 +82,7 @@ const AdminPoliciesPage = () => {
     const handleUpload = async (formData) => {
         setSubmitting(true);
         try {
-            await api.post('/policies/upload', formData, {
+            await api.post('/policies-gridfs/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setSnackbar({ open: true, message: 'Policy uploaded successfully', severity: 'success' });
@@ -102,7 +102,7 @@ const AdminPoliciesPage = () => {
     const handleReplace = async (policyId, formData) => {
         setSubmitting(true);
         try {
-            await api.post(`/policies/${policyId}/replace`, formData, {
+            await api.post(`/policies-gridfs/${policyId}/replace`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setSnackbar({ open: true, message: 'Policy replaced successfully', severity: 'success' });
@@ -125,7 +125,7 @@ const AdminPoliciesPage = () => {
         if (!window.confirm('Are you sure you want to delete this policy?')) return;
 
         try {
-            await api.delete(`/policies/${policyId}`);
+            await api.delete(`/policies-gridfs/${policyId}`);
             setSnackbar({ open: true, message: 'Policy deleted successfully', severity: 'success' });
             loadPolicies();
         } catch (error) {

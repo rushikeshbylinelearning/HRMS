@@ -141,6 +141,27 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
 
         console.log('[Standalone Login] ✅ Login successful for:', user.email, 'via standalone route');
 
+        // Set secure HTTP-only cookie for JWT token
+        // CRITICAL FIX: Use domain attribute for cross-subdomain cookie sharing
+        // sameSite='none' required for cross-origin requests (with secure=true)
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
+            maxAge: sessionHours * 60 * 60 * 1000, // Convert hours to milliseconds
+            path: '/'
+        };
+
+        // Add domain attribute for production to enable cross-subdomain cookies
+        if (process.env.NODE_ENV === 'production') {
+            cookieOptions.domain = '.legatolxp.online'; // Leading dot allows all subdomains
+        }
+
+        res.cookie('token', token, cookieOptions);
+
+        // Also set as ams_token for backward compatibility
+        res.cookie('ams_token', token, cookieOptions);
+
         res.status(200).json({
             message: 'Login successful!',
             token,

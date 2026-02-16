@@ -66,7 +66,7 @@ const ProfilePage = () => {
 
             // Load policies asynchronously WITHOUT affecting layout
             try {
-                const { data } = await api.get('/policies');
+                const { data } = await api.get('/policies-gridfs');
                 setPolicies(data.policies || []);
                 
                 // Check if we need to open a specific policy from URL params
@@ -222,17 +222,16 @@ const ProfilePage = () => {
     }, []);
 
     const getPdfUrl = (policy) => {
-        if (!policy?.fileUrl) return '';
+        if (!policy?._id) return '';
         
-        if (policy.fileUrl.startsWith('http://') || policy.fileUrl.startsWith('https://')) {
-            return policy.fileUrl;
-        }
-        
+        // NEW: Use GridFS endpoint with policy ID
+        // This endpoint requires JWT authentication via Authorization header
         if (import.meta.env.DEV) {
-            return policy.fileUrl;
+            return `/api/policies-gridfs/${policy._id}/file`;
         } else {
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online';
-            return `${apiBaseUrl}${policy.fileUrl}`;
+            const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+            return `${baseUrl}/api/policies-gridfs/${policy._id}/file`;
         }
     };
 

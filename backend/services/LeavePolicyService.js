@@ -1024,13 +1024,42 @@ class LeavePolicyService {
         const saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+        // NEW: For Casual and LOP, check if leave span includes a working Saturday
+        const isCasualOrLOP = requestType === 'Casual' || requestType === 'Loss of Pay';
+        let hasWorkingSaturdayInSpan = false;
+        if (isCasualOrLOP) {
+            for (const dateStr of leaveDates) {
+                const date = parseISTDate(dateStr);
+                if (date.getDay() === 6 && this.isWorkingSaturday(date, saturdayPolicy)) {
+                    hasWorkingSaturdayInSpan = true;
+                    break;
+                }
+            }
+        }
+
         // Block Friday and Monday (unless already allowed above)
         for (const dateStr of leaveDates) {
             const date = parseISTDate(dateStr);
             const dayOfWeek = date.getDay();
             const dayName = dayNames[dayOfWeek];
 
-            // Block Friday (day 5) - EXCEPT Planned Leave when Saturday clubbing applies
+            // NEW: Allow Saturdays for Casual and LOP if it's a working Saturday
+            if (dayOfWeek === 6) { // Saturday
+                if (isCasualOrLOP) {
+                    if (!this.isWorkingSaturday(date, saturdayPolicy)) {
+                        const dateStrFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        return {
+                            allowed: false,
+                            reason: `Leave cannot be applied on non-working Saturday (${dateStrFormatted}). This Saturday is a week off according to your schedule.`,
+                            rule: 'NON_WORKING_SATURDAY_BLOCKED'
+                        };
+                    }
+                    // Working Saturday - allow for Casual/LOP
+                    continue;
+                }
+            }
+
+            // Block Friday (day 5) - EXCEPT Planned Leave when Saturday clubbing applies OR Casual/LOP with working Saturday
             if (dayOfWeek === 5) { // Friday
                 // Check if Planned Leave and Saturday is a week off (Saturday clubbing allowed)
                 if (requestType === 'Planned' && saturdayPolicy !== 'All Saturdays Working') {
@@ -1042,6 +1071,19 @@ class LeavePolicyService {
                         continue;
                     }
                 }
+
+                // NEW: Allow Friday for Casual/LOP if the Saturday after is a working Saturday in the leave span
+                if (isCasualOrLOP) {
+                    const saturdayAfterFriday = new Date(date);
+                    saturdayAfterFriday.setDate(saturdayAfterFriday.getDate() + 1);
+                    const saturdayDate = parseISTDate(getISTDateString(saturdayAfterFriday));
+                    const saturdayDateStr = getISTDateString(saturdayAfterFriday);
+                    
+                    // Check if Saturday is in leave span AND is a working Saturday
+                    if (leaveDates.includes(saturdayDateStr) && this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
+                        continue; // Allow Friday
+                    }
+                }
                 
                 const dateStrFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                 return {
@@ -1051,7 +1093,7 @@ class LeavePolicyService {
                 };
             }
             
-            // Block Monday (day 1) - EXCEPT Planned Leave when Saturday clubbing applies
+            // Block Monday (day 1) - EXCEPT Planned Leave when Saturday clubbing applies OR Casual/LOP with working Saturday
             if (dayOfWeek === 1) { // Monday
                 // Check if Planned Leave and Saturday is a week off (Saturday clubbing allowed)
                 if (requestType === 'Planned' && saturdayPolicy !== 'All Saturdays Working') {
@@ -1061,6 +1103,29 @@ class LeavePolicyService {
                     if (this.isSaturdayOff(saturdayDate, saturdayPolicy)) {
                         // Planned leave on Monday with Saturday week off - allow (Saturday will be clubbed)
                         continue;
+                    }
+                }
+
+                // NEW: For Casual/LOP, check Saturday before Monday
+                if (isCasualOrLOP) {
+                    const saturdayBeforeMonday = new Date(date);
+                    saturdayBeforeMonday.setDate(saturdayBeforeMonday.getDate() - 2);
+                    const saturdayDate = parseISTDate(getISTDateString(saturdayBeforeMonday));
+                    const saturdayDateStr = getISTDateString(saturdayBeforeMonday);
+                    
+                    // CRITICAL: Block Monday if Saturday before is a non-working Saturday (weekend clubbing prevention)
+                    if (!this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
+                        const dateStrFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        return {
+                            allowed: false,
+                            reason: `Monday (${dateStrFormatted}) leave cannot be applied as the Saturday before is a non-working day. This prevents weekend clubbing.`,
+                            rule: 'MONDAY_AFTER_NON_WORKING_SATURDAY_BLOCKED'
+                        };
+                    }
+                    
+                    // Allow Monday only if Saturday is in leave span AND is a working Saturday
+                    if (leaveDates.includes(saturdayDateStr) && this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
+                        continue; // Allow Monday
                     }
                 }
                 

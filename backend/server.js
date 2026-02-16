@@ -326,6 +326,9 @@ app.use(session({
 }));
 
 // --- Request Processing Middleware ---
+const cookieParser = require('cookie-parser');
+
+app.use(cookieParser()); // Parse cookies for JWT authentication
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(sanitizeInput); // Sanitize all inputs
@@ -405,15 +408,19 @@ app.get('/medical-certificates/:fileId', (req, res, next) => {
 });
 app.use('/medical-certificates', express.static(path.join(__dirname, 'uploads/medical-certificates'), staticOptions));
 app.use('/public', express.static(path.join(__dirname, 'public'), staticOptions));
-app.use('/policies', express.static(path.join(__dirname, 'public/policies'), staticOptions));
+// SECURITY FIX: Removed public static access to policies
+// PDFs now served through authenticated route: /api/policies/file/:filename
+// app.use('/policies', express.static(path.join(__dirname, 'public/policies'), staticOptions));
 
 // Additional middleware to ensure static file routes are never processed by auth
 app.use((req, res, next) => {
   // If this is a static file request and it reached here, the file doesn't exist
   // Return 404 instead of passing to auth middleware
   // NOTE: /avatars/ removed - avatars now served via /api/users/avatar/:id (GridFS)
+  // NOTE: /policies/ removed - policies now served via /api/policies/file/:filename (authenticated)
   if (req.path.startsWith('/medical-certificates/') || 
-      req.path.startsWith('/public/')) {
+      req.path.startsWith('/public/') ||
+      req.path.startsWith('/policies/')) {
     return res.status(404).json({ error: 'File not found' });
   }
   next();
@@ -499,9 +506,13 @@ app.use('/api/announcements', announcementRoutes);
 const cifRoutes = require('./modules/cif/cif.routes');
 app.use('/api/admin/cif', cifRoutes);
 
-// Policies routes
+// Policies routes (legacy filesystem-based)
 const policiesRoutes = require('./routes/policies');
 app.use('/api/policies', policiesRoutes);
+
+// Policies routes (GridFS-based - secure, no filesystem dependency)
+const policiesGridFSRoutes = require('./routes/policiesGridFS');
+app.use('/api/policies-gridfs', policiesGridFSRoutes);
 
 // Debug route registration
 console.log('Routes registered:');

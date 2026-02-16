@@ -1,41 +1,59 @@
 // backend/middleware/requireAuth.js
 /**
- * Authentication middleware that works with both regular JWT and SSO sessions
+ * JWT-ONLY Authentication Middleware
+ * 
+ * This middleware enforces JWT-based authentication across the backend.
+ * - NO SSO session support
+ * - NO redirects (returns JSON only)
+ * - Supports both cookie-based and header-based JWT tokens
+ * - Production-safe with proper error handling
  */
 const jwtUtils = require('../utils/jwtUtils');
 
 function requireAuth(req, res, next) {
-  // Check for SSO session first
-  if (req.session && req.session.user) {
-    req.user = req.session.user;
-    return next();
-  }
-
-  // Check for JWT token in Authorization header
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (token == null) {
-    const redirectUrl = process.env.NODE_ENV === 'production'
-      ? 'https://sso.bylinelms.com/login'
-      : 'http://localhost:3000/login';
-    return res.redirect(redirectUrl);
-  }
-
   try {
-    const user = jwtUtils.verify(token);
-    req.user = user; // Add the payload to the request object
+    // Extract token from multiple sources (priority order):
+    // 1. Cookie (most secure for browser requests)
+    // 2. Authorization header (for API clients)
+    const token = 
+      req.cookies?.token || 
+      req.cookies?.ams_token ||
+      (req.headers.authorization?.startsWith('Bearer ') 
+        ? req.headers.authorization.split(' ')[1] 
+        : null);
+
+    // No token found - return 401 JSON (never redirect)
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'NO_TOKEN'
+      });
+    }
+
+    // Verify JWT token
+    const decoded = jwtUtils.verify(token);
+    
+    // Attach user info to request
+    req.user = {
+      userId: decoded.userId || decoded._id,
+      _id: decoded.userId || decoded._id,
+      email: decoded.email,
+      role: decoded.role,
+      fullName: decoded.fullName || decoded.name
+    };
+
     next();
-  } catch (err) {
-    console.error('Token verification failed:', err.message);
-    const redirectUrl = process.env.NODE_ENV === 'production'
-      ? 'https://sso.bylinelms.com/login'
-      : 'http://localhost:3000/login';
-    return res.redirect(redirectUrl);
+  } catch (error) {
+    // Token verification failed - return 401 JSON (never redirect)
+    console.error('JWT verification failed:', error.message);
+    
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+      code: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN'
+    });
   }
 }
 
 module.exports = requireAuth;
-
-
-

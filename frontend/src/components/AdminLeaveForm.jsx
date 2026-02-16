@@ -1,6 +1,6 @@
 // src/components/AdminLeaveForm.jsx
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Divider, Box, Typography, Autocomplete, IconButton, Avatar } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Divider, Box, Typography, Autocomplete, IconButton, Avatar, Alert } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -16,11 +16,11 @@ const initialFormState = {
     leaveDates: [null],
     alternateDate: null,
     reason: '',
-    status: 'Pending',
-    appliedDate: null, // Employee applied date (only editable in admin edit mode)
+    status: 'Approved', // ✅ FIX: Admin-created leaves default to Approved to trigger balance deduction
+    appliedDate: new Date(), // Employee applied date - default to today for new requests
 };
 
-const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving }) => {
+const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving, error, onClearError }) => {
     const [formData, setFormData] = useState(initialFormState);
     const isEditing = !!request;
 
@@ -135,10 +135,51 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                     backgroundColor: '#FFFFFF',
                     boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
                     border: '1px solid #E5E7EB',
-                    overflow: 'hidden' // Keep overflow hidden on the container
+                    overflow: 'hidden', // Keep overflow hidden on the container
+                    position: 'relative' // For absolute positioning of error notification
                 } 
             }}
         >
+            {/* Error Notification - Top Right Inside Modal */}
+            {error && (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        zIndex: 1500, // Higher than modal content
+                        maxWidth: '350px',
+                        animation: 'slideInRight 0.3s ease-out',
+                        '@keyframes slideInRight': {
+                            '0%': {
+                                opacity: 0,
+                                transform: 'translateX(20px)',
+                            },
+                            '100%': {
+                                opacity: 1,
+                                transform: 'translateX(0)',
+                            },
+                        },
+                    }}
+                >
+                    <Alert 
+                        severity="error" 
+                        onClose={onClearError}
+                        sx={{ 
+                            width: '100%',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                            '& .MuiAlert-message': {
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                            }
+                        }}
+                        variant="filled"
+                    >
+                        {error}
+                    </Alert>
+                </Box>
+            )}
+
             {/* redesigned header UI – neutral theme */}
             <DialogTitle sx={{ 
                 backgroundColor: '#FFFFFF',
@@ -557,15 +598,16 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                             },
                         }}
                     />
-                    {/* Employee Applied Date - Admin only field, only visible when editing */}
-                    {isEditing && (
-                        <LocalizationProvider dateAdapter={AdapterDateFns}>
-                            <DatePicker 
-                                label="Employee Applied Date" 
-                                value={formData.appliedDate} 
-                                onChange={handleAppliedDateChange}
-                                slotProps={{
-                                    textField: {
+                    
+                    {/* Employee Applied Date - Admin only field, visible for both create and edit */}
+                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                        <DatePicker 
+                            label="Employee Applied Date" 
+                            value={formData.appliedDate} 
+                            onChange={handleAppliedDateChange}
+                            maxDate={new Date()} // Cannot be in the future
+                            slotProps={{
+                                textField: {
                                         fullWidth: true,
                                         placeholder: 'Select Date',
                                         sx: {
@@ -596,7 +638,6 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving })
                                 }}
                             />
                         </LocalizationProvider>
-                    )}
 
                     {/* Status Dropdown - Admin only field */}
                     <FormControl fullWidth required sx={{

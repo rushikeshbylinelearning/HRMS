@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 let isConnected = false;
+let policyBucket = null;
 
 const connectDB = async () => {
   // If already connected, return existing connection
@@ -46,6 +47,15 @@ const connectDB = async () => {
     console.log('📊 Database:', mongoose.connection.name);
     console.log('✅ MongoDB connected successfully');
     
+    // Initialize GridFS bucket for policy files
+    if (!policyBucket) {
+      policyBucket = new mongoose.mongo.GridFSBucket(
+        mongoose.connection.db,
+        { bucketName: 'policyFiles' }
+      );
+      console.log('✅ GridFS policy bucket initialized');
+    }
+    
     // Set up reconnection logic for disconnections
     mongoose.connection.on('disconnected', () => {
       console.warn('⚠️ MongoDB disconnected. Retrying in 5s...');
@@ -71,4 +81,11 @@ const connectDB = async () => {
   }
 };
 
+// Export both connectDB and getPolicyBucket
 module.exports = connectDB;
+module.exports.getPolicyBucket = () => {
+  if (!policyBucket) {
+    throw new Error('Policy bucket not initialized. Ensure MongoDB is connected.');
+  }
+  return policyBucket;
+};

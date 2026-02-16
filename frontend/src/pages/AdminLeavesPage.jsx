@@ -3017,13 +3017,14 @@ const AdminLeavesPage = () => {
                 status: formData.status,
             };
             
-            // Include createdAt (appliedDate) only when editing and if provided
+            // Include appliedDate for both create and edit
             // Set time to start of day (00:00:00) for consistency
-            if (formData._id && formData.appliedDate) {
+            if (formData.appliedDate) {
                 const appliedDate = new Date(formData.appliedDate);
                 appliedDate.setHours(0, 0, 0, 0); // Set to start of day
-                payload.createdAt = appliedDate.toISOString();
+                payload.appliedDate = appliedDate.toISOString();
             }
+            
             if (formData._id) {
                 await api.put(`/admin/leaves/${formData._id}`, payload);
                 setSnackbar({ open: true, message: 'Request updated successfully!', severity: 'success' });
@@ -3630,7 +3631,15 @@ const AdminLeavesPage = () => {
                 </Box>
             </Box>
 
-            {isFormOpen && <AdminLeaveForm open={isFormOpen} onClose={handleCloseForm} onSave={handleSaveRequest} request={selectedRequest} employees={employees} />}
+            {isFormOpen && <AdminLeaveForm 
+                open={isFormOpen} 
+                onClose={handleCloseForm} 
+                onSave={handleSaveRequest} 
+                request={selectedRequest} 
+                employees={employees}
+                error={snackbar.severity === 'error' && snackbar.open ? snackbar.message : ''}
+                onClearError={() => setSnackbar({ ...snackbar, open: false })}
+            />}
             
             
             <HrEmailManagerModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
@@ -3870,7 +3879,22 @@ const AdminLeavesPage = () => {
                 onDelete={handleDelete}
             />
 
-            <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}><Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }} variant="filled">{snackbar.message}</Alert></Snackbar>
+            <Snackbar 
+                open={snackbar.open && !isFormOpen} 
+                autoHideDuration={4000} 
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                sx={{ top: '24px !important' }}
+            >
+                <Alert 
+                    onClose={() => setSnackbar({ ...snackbar, open: false })} 
+                    severity={snackbar.severity} 
+                    sx={{ width: '100%' }} 
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
 
             {/* More Options Menu */}
             <Menu

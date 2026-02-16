@@ -371,7 +371,7 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
     session.startTransaction();
     
     try {
-        const { employee, requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate, adminOverrideReason, status } = req.body;
+        const { employee, requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate, adminOverrideReason, status, appliedDate } = req.body;
         
         if (!employee || !requestType || !leaveDates || !leaveType || !reason) {
             await session.abortTransaction();
@@ -423,6 +423,19 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
             });
         }
         
+        // Validate appliedDate if provided
+        let employeeAppliedDate = appliedDate ? new Date(appliedDate) : new Date();
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        
+        if (employeeAppliedDate > today) {
+            await session.abortTransaction();
+            return res.status(400).json({ 
+                error: 'Employee applied date cannot be in the future.',
+                errors: ['Employee applied date cannot be in the future.']
+            });
+        }
+        
         // Prepare leave request data (store normalized type for Comp-Off -> Compensatory)
         const leaveRequestData = {
             employee,
@@ -432,6 +445,7 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
             alternateDate: alternateDate ? parseISTDate(alternateDate) : null,
             reason,
             status: status || 'Pending',
+            createdAt: employeeAppliedDate, // Set the employee applied date
             adminOverride: !!adminOverrideReason,
             overrideReason: adminOverrideReason || `Admin-applied leave by user ID: ${req.user.userId}`,
             overriddenBy: req.user.userId,

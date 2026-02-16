@@ -55,6 +55,37 @@
   z-index: 1;
 }
 
+/* Pulsing animation for unread badge */
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.7);
+  }
+}
+
+.announcement-badge.pulse {
+  animation: badgePulse 1.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Icon color pulse for additional attention */
+@keyframes iconPulse {
+  0%, 100% {
+    color: #475569;
+  }
+  50% {
+    color: #DC2626;
+  }
+}
+
+.announcement-icon.has-unread {
+  animation: iconPulse 2s ease-in-out infinite;
+}
+
 /* Dropdown Panel - Corporate Design */
 .announcement-dropdown-panel {
   position: absolute;

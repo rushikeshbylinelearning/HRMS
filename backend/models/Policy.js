@@ -24,13 +24,20 @@ const policySchema = new mongoose.Schema({
         enum: ['Active', 'Archived'],
         default: 'Active'
     },
-    fileUrl: {
-        type: String,
+    fileId: {
+        type: mongoose.Schema.Types.ObjectId,
         required: true
     },
     fileName: {
         type: String,
         required: true
+    },
+    fileSize: {
+        type: Number
+    },
+    // Legacy field for backward compatibility
+    fileUrl: {
+        type: String
     },
     uploadedBy: {
         type: mongoose.Schema.Types.ObjectId,
