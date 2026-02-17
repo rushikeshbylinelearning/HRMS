@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const cifController = require('./cif.controller');
 const authenticateToken = require('../../middleware/authenticateToken');
-const uploadCIFAttachment = require('../../middleware/uploadCIFAttachment');
+const uploadCIFAttachmentGridFS = require('../../middleware/uploadCIFAttachmentGridFS');
 
 // Role check middleware - only Admin and HR
 const checkCIFAccess = (req, res, next) => {
@@ -45,7 +45,7 @@ router.get('/:id', cifController.getCIFById);
 router.get('/:id/audit', cifController.getAuditLogs);
 
 // Attachment routes
-router.post('/:cifId/attachments', uploadCIFAttachment, cifController.uploadAttachments);
+router.post('/:cifId/attachments', uploadCIFAttachmentGridFS, cifController.uploadAttachments);
 router.get('/:cifId/attachments', cifController.getAttachments);
 router.get('/attachments/:attachmentId/download', cifController.downloadAttachment);
 router.delete('/attachments/:attachmentId', cifController.deleteAttachment);

@@ -1,10 +1,11 @@
 // frontend/src/App.jsx
 
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BreakUIProvider } from './context/BreakUIContext';
 import { NewNotificationProvider } from './hooks/useNewNotifications.jsx'; // Corrected import path
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import { CssBaseline, ThemeProvider, Box } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import optimizedTheme from './theme/optimizedTheme';
@@ -17,13 +18,6 @@ import SSOLoginPage from './pages/SSOLoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionProtectedRoute from './components/PermissionProtectedRoute';
 import IdleDetectionProvider from './components/IdleDetectionProvider';
-
-// Lazy load pages for better performance
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
-
-// Import error boundary
-import AnalyticsErrorBoundary from './components/AnalyticsErrorBoundary';
 
 // Lazy load all pages
 const EmployeeDashboardPage = lazy(() => import('./pages/EmployeeDashboardPage'));
@@ -39,7 +33,6 @@ const AdminAttendanceSummaryPage = lazy(() => import('./pages/AdminAttendanceSum
 const NewActivityLogPage = lazy(() => import('./pages/NewActivityLogPage'));
 const OfficeLocationsPage = lazy(() => import('./pages/OfficeLocationsPage'));
 const ManageSectionPage = lazy(() => import('./pages/ManageSectionPage'));
-const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const SSOCallbackPage = lazy(() => import('./pages/SSOCallbackPage'));
 const EmployeeMusterRollPage = lazy(() => import('./pages/EmployeeMusterRollPage'));
 const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
@@ -49,6 +42,7 @@ const AdminPoliciesPage = lazy(() => import('./pages/AdminPoliciesPage'));
 const CIFManagementPage = lazy(() => import('./pages/CIFManagement'));
 const EmployeeCIFDetailsPage = lazy(() => import('./pages/EmployeeCIFDetails'));
 const SchedulingManagementPage = lazy(() => import('./pages/SchedulingManagementPage'));
+const ProbationPage = lazy(() => import('./pages/ProbationPage'));
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
@@ -292,14 +286,10 @@ function App() {
                                                 <ManageSectionPage />
                                             </Suspense>
                                         } />
-                                        <Route path="/analytics" element={
-                                            <AnalyticsErrorBoundary>
-                                                <Suspense fallback={<PageLoader />}>
-                                                    <PermissionProtectedRoute requiredPermission="viewAnalytics">
-                                                        <AnalyticsPage />
-                                                    </PermissionProtectedRoute>
-                                                </Suspense>
-                                            </AnalyticsErrorBoundary>
+                                        <Route path="/probation" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <ProbationPage />
+                                            </Suspense>
                                         } />
                                         <Route path="/employee-muster-roll" element={
                                             <Suspense fallback={<PageLoader />}>
@@ -309,13 +299,6 @@ function App() {
                                         <Route path="/admin/leaves/more-options/leaves-tracker" element={
                                             <Suspense fallback={<PageLoader />}>
                                                 <LeavesTrackerPage />
-                                            </Suspense>
-                                        } />
-                                        <Route path="/analytics/payroll_management" element={
-                                            <Suspense fallback={<PageLoader />}>
-                                                <PermissionProtectedRoute requiredPermission="viewAnalytics">
-                                                    <PayrollManagementPage />
-                                                </PermissionProtectedRoute>
                                             </Suspense>
                                         } />
                                         <Route path="/admin/policies" element={

@@ -124,7 +124,7 @@ class LeavePolicyService {
      * @returns {Object} Validation result with allowed flag and reason
      */
     static async validateRequest(employeeId, leaveDates, requestType, leaveType = 'Full Day', adminOverrideReason = null, alternateDate = null, options = {}) {
-        const { excludeRequestId, appliedDate } = options;
+        const { excludeRequestId, appliedDate, isAdminUpdate } = options;
         try {
             // Fetch employee details
             const employee = await User.findById(employeeId);
@@ -168,7 +168,8 @@ class LeavePolicyService {
 
             // PRIORITY 1: Leave type specific validation (includes advance notice checks)
             // Pass appliedDate to use for advance notice calculation (for admin edits)
-            const typeSpecificCheck = await this.validateLeaveTypeSpecific(employee, leaveDates, requestType, leaveType, alternateDate, appliedDate);
+            // Pass isAdminUpdate to bypass advance notice checks for admin operations
+            const typeSpecificCheck = await this.validateLeaveTypeSpecific(employee, leaveDates, requestType, leaveType, alternateDate, appliedDate, isAdminUpdate);
             if (!typeSpecificCheck.allowed) {
                 return typeSpecificCheck;
             }
@@ -881,7 +882,7 @@ class LeavePolicyService {
      * @param {Date} alternateDate - Optional alternate date
      * @param {Date} appliedDate - Optional applied date (createdAt). If provided, advance notice is calculated from this date instead of today.
      */
-    static async validateLeaveTypeSpecific(employee, leaveDates, requestType, leaveType, alternateDate = null, appliedDate = null) {
+    static async validateLeaveTypeSpecific(employee, leaveDates, requestType, leaveType, alternateDate = null, appliedDate = null, isAdminUpdate = false) {
         // Use applied date if provided (for admin edits), otherwise use today
         // appliedDate should be a Date object when passed from admin update
         const referenceDate = appliedDate 
@@ -899,6 +900,11 @@ class LeavePolicyService {
                         reason: `During ${employee.employmentStatus.toLowerCase()}, only Loss of Pay (LOP) leave is allowed. Casual leave will be available after confirmation.`,
                         rule: 'CASUAL_PERMANENT_ONLY'
                     };
+                }
+                
+                // Skip advance notice check for admin updates
+                if (isAdminUpdate) {
+                    return { allowed: true };
                 }
                 
                 // Base rule: Casual leave requires at least 4 days prior notice
@@ -921,6 +927,11 @@ class LeavePolicyService {
                         reason: `During ${employee.employmentStatus.toLowerCase()}, only Loss of Pay (LOP) leave is allowed. Planned leave will be available after confirmation.`,
                         rule: 'PLANNED_PERMANENT_ONLY'
                     };
+                }
+                
+                // Skip advance notice check for admin updates
+                if (isAdminUpdate) {
+                    return { allowed: true };
                 }
                 
                 // INTELLIGENT PLANNED LEAVE HANDLING: Calculate working days using IST (excludes holidays)
@@ -1043,9 +1054,14 @@ class LeavePolicyService {
             const dayOfWeek = date.getDay();
             const dayName = dayNames[dayOfWeek];
 
-            // NEW: Allow Saturdays for Casual and LOP if it's a working Saturday
+            // NEW: Allow Saturdays for Casual and LOP
             if (dayOfWeek === 6) { // Saturday
                 if (isCasualOrLOP) {
+                    // LOP: Allow both working and non-working Saturdays (no restrictions)
+                    if (requestType === 'Loss of Pay') {
+                        continue; // Allow all Saturdays for LOP
+                    }
+                    // Casual: Only allow working Saturdays
                     if (!this.isWorkingSaturday(date, saturdayPolicy)) {
                         const dateStrFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                         return {
@@ -1054,7 +1070,7 @@ class LeavePolicyService {
                             rule: 'NON_WORKING_SATURDAY_BLOCKED'
                         };
                     }
-                    // Working Saturday - allow for Casual/LOP
+                    // Working Saturday - allow for Casual
                     continue;
                 }
             }
@@ -1079,7 +1095,12 @@ class LeavePolicyService {
                     const saturdayDate = parseISTDate(getISTDateString(saturdayAfterFriday));
                     const saturdayDateStr = getISTDateString(saturdayAfterFriday);
                     
-                    // Check if Saturday is in leave span AND is a working Saturday
+                    // LOP: Allow Friday without restrictions
+                    if (requestType === 'Loss of Pay') {
+                        continue; // Allow Friday for LOP
+                    }
+                    
+                    // Casual: Check if Saturday is in leave span AND is a working Saturday
                     if (leaveDates.includes(saturdayDateStr) && this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
                         continue; // Allow Friday
                     }
@@ -1113,7 +1134,12 @@ class LeavePolicyService {
                     const saturdayDate = parseISTDate(getISTDateString(saturdayBeforeMonday));
                     const saturdayDateStr = getISTDateString(saturdayBeforeMonday);
                     
-                    // CRITICAL: Block Monday if Saturday before is a non-working Saturday (weekend clubbing prevention)
+                    // LOP: No Monday restrictions (allow Monday even after non-working Saturday)
+                    if (requestType === 'Loss of Pay') {
+                        continue; // Allow Monday for LOP
+                    }
+                    
+                    // Casual: Block Monday if Saturday before is a non-working Saturday (weekend clubbing prevention)
                     if (!this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
                         const dateStrFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                         return {
@@ -1669,7 +1695,7 @@ class LeavePolicyService {
      * @returns {Promise<{ allowed: boolean, reason?: string }>}
      */
     static async validateAdminUpdate(oldRequest, newRequest, employee, context = {}) {
-        const { adminOverrideReason } = context;
+        const { adminOverrideReason, isAdminUpdate } = context;
         const newDates = newRequest.leaveDates || oldRequest.leaveDates;
         const newRequestType = newRequest.requestType ?? oldRequest.requestType;
         const newLeaveType = newRequest.leaveType ?? oldRequest.leaveType;
@@ -1687,7 +1713,11 @@ class LeavePolicyService {
             newLeaveType,
             adminOverrideReason || `Admin update by admin`,
             newRequest.alternateDate ?? oldRequest.alternateDate,
-            { excludeRequestId: oldRequest._id, appliedDate }
+            { 
+                excludeRequestId: oldRequest._id, 
+                appliedDate,
+                isAdminUpdate // Pass the flag to bypass advance notice checks
+            }
         );
         if (!policyCheck.allowed) {
             return { allowed: false, reason: policyCheck.reason };

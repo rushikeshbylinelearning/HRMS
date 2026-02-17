@@ -123,9 +123,10 @@ const shouldDisableWorkedDateCompOff = (date, holidays) => {
 
 /** 
  * Regular Leave Dates: disable holidays and Sundays always
- * For Casual and LOP: allow working Saturdays, block non-working Saturdays
+ * For LOP: allow all Saturdays and Mondays (no clubbing restrictions)
+ * For Casual: allow working Saturdays, block non-working Saturdays
  * For other leave types: block all Saturdays
- * CRITICAL: Block Monday after non-working Saturday (weekend clubbing prevention)
+ * CRITICAL: Block Monday after non-working Saturday for Casual only (weekend clubbing prevention)
  */
 const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPolicy) => {
     // Always disable holidays and Sundays
@@ -133,17 +134,22 @@ const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPoli
     
     // Handle Saturday logic based on leave type
     if (isSaturday(date)) {
-        // For Casual and LOP, allow working Saturdays only
-        if (requestType === 'Casual' || requestType === 'Loss of Pay') {
+        // For LOP, allow all Saturdays (working and non-working)
+        if (requestType === 'Loss of Pay') {
+            return false; // Allow all Saturdays for LOP
+        }
+        // For Casual, allow working Saturdays only
+        if (requestType === 'Casual') {
             return !isWorkingSaturday(date, saturdayPolicy);
         }
         // For all other leave types, block all Saturdays
         return true;
     }
     
-    // CRITICAL: Block Monday after non-working Saturday for Casual/LOP (weekend clubbing prevention)
+    // CRITICAL: Block Monday after non-working Saturday for Casual only (weekend clubbing prevention)
+    // LOP has no Monday restrictions
     if (getDayOfWeek(date) === 1) { // Monday
-        if (requestType === 'Casual' || requestType === 'Loss of Pay') {
+        if (requestType === 'Casual') {
             const saturdayBefore = new Date(date);
             saturdayBefore.setDate(date.getDate() - 2);
             
@@ -152,6 +158,7 @@ const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPoli
                 return true; // Block Monday after non-working Saturday
             }
         }
+        // LOP: Allow Monday without restrictions
     }
     
     return false;

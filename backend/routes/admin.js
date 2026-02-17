@@ -371,10 +371,14 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
     session.startTransaction();
     
     try {
+        // 🔍 DEBUG: Log incoming request body
+        console.log("Incoming leave request body:", JSON.stringify(req.body, null, 2));
+        
         const { employee, requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate, adminOverrideReason, status, appliedDate } = req.body;
         
         if (!employee || !requestType || !leaveDates || !leaveType || !reason) {
             await session.abortTransaction();
+            console.error("Missing required fields:", { employee, requestType, leaveDates, leaveType, reason });
             return res.status(400).json({ error: 'Missing required fields: employee, requestType, leaveDates, leaveType, reason.' });
         }
 
@@ -411,7 +415,8 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
             requestTypeNorm,
             leaveType,
             adminOverrideReason || `Admin-applied leave by user ID: ${req.user.userId}`, // Auto-provide override for admin
-            alternateDate ? parseISTDate(alternateDate) : null
+            alternateDate ? parseISTDate(alternateDate) : null,
+            { isAdminUpdate: true } // Flag to bypass advance notice checks for admin-created leaves
         );
         
         if (!validation.allowed && !adminOverrideReason) {
@@ -683,7 +688,10 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
                 originalRequest,
                 adminPayload,
                 employee,
-                { adminOverrideReason: bodyToApply.overrideReason || bodyToApply.adminOverrideReason }
+                { 
+                    adminOverrideReason: bodyToApply.overrideReason || bodyToApply.adminOverrideReason || 'Admin update',
+                    isAdminUpdate: true // Flag to bypass advance notice checks
+                }
             );
             if (!policyResult.allowed) {
                 await session.abortTransaction();
@@ -2447,7 +2455,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
         const t2 = Date.now();
         const totalEmployeesPromise = User.countDocuments({ role: { $ne: 'Admin' }, isActive: true }).lean();
         const todayLogsPromise = AttendanceLog.find({ attendanceDate: today })
-            .select('isLate isHalfDay clockInTime attendanceDate')
+            .select('user isLate isHalfDay clockInTime attendanceDate')
             .lean();
 
         const whosInListPromise = AttendanceSession.aggregate([
@@ -2676,19 +2684,21 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
         const t4 = Date.now();
         let presentCount = 0;
         let lateCount = 0;
-        const GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
-        console.log(`[ADMIN_DASHBOARD_TIMING] getGracePeriodMinutes took ${Date.now() - t4}ms`);
+        console.log(`[ADMIN_DASHBOARD_TIMING] count_calculation_start took ${Date.now() - t4}ms`);
+        console.log(`[ADMIN_DASHBOARD_DEBUG] todayLogs.length=${(todayLogs || []).length}`);
 
+        // Count ALL employees who clocked in as present (both on-time and late)
+        // Late employees are a subset of present employees
         (todayLogs || []).forEach(log => {
             if (log?.clockInTime) {
-                const lateMinutes = log.lateMinutes ?? 0;
-                if (lateMinutes <= GRACE_PERIOD_MINUTES) {
-                    presentCount++;
-                } else {
-                    lateCount++;
+                presentCount++; // Count all clocked-in employees
+                if (log.isLate) {
+                    lateCount++; // Also count late employees separately
                 }
             }
         });
+        
+        console.log(`[ADMIN_DASHBOARD_DEBUG] After forEach: presentCount=${presentCount}, lateCount=${lateCount}`);
 
         if ((todayLogs || []).length === 0) {
             const logIds = await AttendanceLog.find({ attendanceDate: today }).select('_id').lean();
@@ -2837,19 +2847,11 @@ router.get('/dashboard-employees/:type', [authenticateToken, isAdminOrHr], async
 
         switch (type) {
             case 'present':
-                // Find employees who are present (clocked in and not late)
+                // Find ALL employees who are present (clocked in, including late employees)
                 // Filter: Exclude Admin role and inactive users (business rule: only active employees/interns should appear in lists)
                 const presentLogs = await AttendanceLog.find({
                     attendanceDate: today,
-                    clockInTime: { $exists: true, $ne: null },
-                    $or: [
-                        { isLate: { $ne: true } },
-                        { isLate: { $exists: false } }
-                    ],
-                    $and: [
-                        { isHalfDay: { $ne: true } },
-                        { isHalfDay: { $exists: false } }
-                    ]
+                    clockInTime: { $exists: true, $ne: null }
                 }).populate({
                     path: 'user',
                     match: { role: { $ne: 'Admin' }, isActive: true },

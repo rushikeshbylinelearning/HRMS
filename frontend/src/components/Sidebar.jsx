@@ -14,7 +14,6 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import Badge from '@mui/material/Badge';
 import useNewNotifications from '../hooks/useNewNotifications';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
 import PolicyIcon from '@mui/icons-material/Policy';
 
 import { useAuth } from '../context/AuthContext';
@@ -43,6 +42,7 @@ const Sidebar = ({ onNotificationClick }) => {
         { text: 'Scheduling', icon: <TimelapseIcon />, path: '/scheduling-management', roles: ['Admin'] },
         { text: 'Policies & CIF', icon: <PolicyIcon />, path: '/admin/policies', roles: ['Admin'] },
         { text: 'Manage Section', icon: <AdminPanelSettingsIcon />, path: '/manage-section', roles: ['Admin'] },
+        { text: 'Probation', icon: <AssessmentIcon />, path: '/probation', roles: ['Admin', 'HR'] },
         { 
             text: 'Leaves', 
             icon: <EventNoteIcon />, 
@@ -56,13 +56,6 @@ const Sidebar = ({ onNotificationClick }) => {
             path: '/reports', 
             roles: ['Admin', 'HR'],
             permissionCheck: () => canAccess.viewReports()
-        },
-        { 
-            text: 'Analytics', 
-            icon: <AnalyticsIcon />, 
-            path: '/analytics', 
-            roles: ['Employee', 'Intern', 'HR', 'Admin'],
-            permissionCheck: () => canAccess.viewAnalytics()
         },
         { text: 'Activity Log', icon: <AssessmentIcon />, path: '/activity-log', roles: ['Admin', 'HR', 'Manager'] },
     ];

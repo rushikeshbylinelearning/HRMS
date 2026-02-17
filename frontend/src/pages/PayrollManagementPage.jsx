@@ -62,7 +62,7 @@ const PayrollManagementPage = () => {
   };
 
   const handleBackToAnalytics = () => {
-    navigate('/analytics');
+    navigate('/admin/dashboard');
   };
 
   const handleSettingsUpdate = (newSettings) => {

@@ -1,9 +1,9 @@
 // Service Worker for caching critical resources
 // Supports 300ms performance budget through intelligent caching
 
-const CACHE_NAME = 'attendance-system-v1.0.0';
-const STATIC_CACHE = 'attendance-system-static-v1.0.0';
-const API_CACHE = 'attendance-system-api-v1.0.0';
+const CACHE_NAME = 'attendance-system-v1.0.1';
+const STATIC_CACHE = 'attendance-system-static-v1.0.1';
+const API_CACHE = 'attendance-system-api-v1.0.1';
 
 // Resources to cache immediately on install
 const STATIC_ASSETS = [

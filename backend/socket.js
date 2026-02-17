@@ -14,7 +14,7 @@ const init = (httpServer) => {
         path: '/api/socket.io/',
         cors: {
             origin: [
-                "https://attendance.legatolxp.online",
+                "https://attendance.bylinelms.com",
                 process.env.FRONTEND_URL,
                 // Development origins
                 "http://localhost:5173",

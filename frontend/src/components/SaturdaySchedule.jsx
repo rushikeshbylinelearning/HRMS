@@ -98,15 +98,53 @@ const SaturdaySchedule = ({ policy, requests = [], count = 4, variant }) => {
     }
 
     return (
-        <Stack spacing={2.5}>
+        <Stack spacing={1.25}>
             {schedule.map(({ date, status }) => {
                 const { text, Icon, avatarBg, iconColor } = getStatusProps(status);
                 return (
-                    <Box key={date.toISOString()} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ bgcolor: avatarBg, color: iconColor }}><Icon fontSize="small" /></Avatar>
-                        <Box>
-                            <Typography variant="body1" sx={{ fontWeight: 700, letterSpacing: '0.025em', color: '#333333' }}>{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 400, letterSpacing: '0.025em', color: '#666666' }}>{text}</Typography>
+                    <Box 
+                        key={date.toISOString()} 
+                        sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1.25,
+                            py: 0.5
+                        }}
+                    >
+                        <Avatar 
+                            sx={{ 
+                                bgcolor: avatarBg, 
+                                color: iconColor, 
+                                width: 32, 
+                                height: 32 
+                            }}
+                        >
+                            <Icon sx={{ fontSize: 16 }} />
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                    fontWeight: 600, 
+                                    color: '#111827', 
+                                    fontSize: '0.8125rem',
+                                    lineHeight: 1.4,
+                                    mb: 0.25
+                                }}
+                            >
+                                {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </Typography>
+                            <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                    fontWeight: 400, 
+                                    color: '#9ca3af', 
+                                    fontSize: '0.6875rem',
+                                    lineHeight: 1.3
+                                }}
+                            >
+                                {text}
+                            </Typography>
                         </Box>
                     </Box>
                 );

@@ -21,11 +21,35 @@ const getWeekDays = () => {
     return week;
 };
 
+// Check if a Saturday is a working day based on the employee's policy
+const isWorkingSaturday = (date, saturdayPolicy) => {
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek !== 6) return false; // Not a Saturday
+    
+    const weekNum = Math.ceil(date.getDate() / 7);
+    
+    switch (saturdayPolicy) {
+        case 'All Saturdays Working':
+            return true;
+        case 'All Saturdays Off':
+            return false;
+        case 'Week 1 & 3 Off':
+            return !(weekNum === 1 || weekNum === 3);
+        case 'Week 2 & 4 Off':
+            return !(weekNum === 2 || weekNum === 4);
+        default:
+            return true; // Default to working if policy is unclear
+    }
+};
+
 // --- COMPONENT LOGIC ---
 
-const WeeklyTimeCards = ({ logs, shift }) => {
+const WeeklyTimeCards = ({ logs, shift, user }) => {
     const todayDateString = getISTDateString(getISTNow());
     const weekDays = getWeekDays();
+    
+    // Get Saturday policy from shift, user, or default
+    const saturdayPolicy = shift?.alternateSaturdayPolicy || user?.alternateSaturdayPolicy || 'All Saturdays Working';
 
     const getStatusForDay = (day, dayOfWeek) => {
         const dateString = getISTDateString(day);
@@ -46,13 +70,17 @@ const WeeklyTimeCards = ({ logs, shift }) => {
     return (
         <Box sx={{ mt: 2 }}>
             <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, letterSpacing: '0.025em', color: '#333333' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.9375rem', color: '#111827' }}>
                     Your Week
                 </Typography>
                 <Grid container spacing={1}>
                     {weekDays.map((day, index) => {
                         const dayString = getISTDateString(day);
                         const isToday = dayString === todayDateString;
+                        const isSunday = index === 0; // Sunday is the first day (index 0)
+                        const isSaturday = index === 6; // Saturday is the last day (index 6)
+                        const isNonWorkingSaturday = isSaturday && !isWorkingSaturday(day, saturdayPolicy);
+                        const isWeekendDay = isSunday || isNonWorkingSaturday;
                         const status = getStatusForDay(day, index);
                         const parts = getISTDateParts(day);
 
@@ -64,25 +92,25 @@ const WeeklyTimeCards = ({ logs, shift }) => {
                                         p: 1.5,
                                         textAlign: 'center',
                                         borderRadius: '10px',
-                                        border: isToday ? '2px solid #3b82f6' : '2px solid transparent',
+                                        border: isToday ? '2px solid #3b82f6' : isWeekendDay ? '2px solid #fbbf24' : '2px solid transparent',
                                         transition: 'all 0.2s ease-in-out',
-                                        backgroundColor: isToday ? '#eff6ff' : '#ffffff',
+                                        backgroundColor: isToday ? '#eff6ff' : isWeekendDay ? '#fef3c7' : '#ffffff',
                                     }}
                                 >
-                                    <Typography variant="caption" sx={{ fontWeight: 400, letterSpacing: '0.025em', color: '#666666' }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 400, fontSize: '0.6875rem', color: isWeekendDay ? '#92400e' : '#9ca3af' }}>
                                         {formatISTDate(day, { weekday: 'short' })}
                                     </Typography>
-                                    <Typography variant="h6" sx={{ fontWeight: 700, my: 0.5, letterSpacing: '0.025em', color: '#333333' }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 600, my: 0.5, fontSize: '1.125rem', color: isWeekendDay ? '#78350f' : '#111827' }}>
                                         {parts.day}
                                     </Typography>
-                                    <status.Icon sx={{ color: status.color, fontSize: '1.25rem' }} />
+                                    <status.Icon sx={{ color: isWeekendDay ? '#f59e0b' : status.color, fontSize: '1.25rem' }} />
                                     <Typography 
                                         variant="caption" 
                                         display="block" 
                                         sx={{ 
                                             fontWeight: 400, 
-                                            letterSpacing: '0.025em',
-                                            color: isToday ? '#3b82f6' : '#666666'
+                                            fontSize: '0.6875rem',
+                                            color: isToday ? '#3b82f6' : isWeekendDay ? '#92400e' : '#9ca3af'
                                         }}
                                     >
                                         {status.text}

@@ -119,10 +119,10 @@ const ShiftProgressBar = ({
   return (
     <Box sx={{ width: '100%', mt: 2, mb: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-        <Typography variant="body2" sx={{ fontWeight: 700, color: '#333333' }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8125rem', color: '#111827' }}>
           Shift Progress
         </Typography>
-        <Typography variant="body2" color={hasExtension ? 'error' : 'textSecondary'}>
+        <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8125rem', color: hasExtension ? '#ef4444' : '#9ca3af' }}>
           {formatMinutesToHM(displayElapsed)} / {formatMinutesToHM(displayTotal)}
         </Typography>
       </Stack>

@@ -14,34 +14,11 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import api from '../../api/axios';
+import { CIF_CATEGORIES, CIF_SEVERITIES, CIF_STATUSES, STATUS_TRANSITIONS } from '../../constants/cifConstants';
 
-const CATEGORIES = [
-  { value: 'compliance_violation', label: 'Compliance Violation' },
-  { value: 'behavioral_warning', label: 'Behavioral Warning' },
-  { value: 'attendance_escalation', label: 'Attendance Escalation' },
-  { value: 'performance_concern', label: 'Performance Concern' },
-  { value: 'legal_notice', label: 'Legal Notice' },
-  { value: 'investigation', label: 'Investigation' },
-  { value: 'documentation_note', label: 'Documentation Note' },
-  { value: 'termination_related', label: 'Termination Related' }
-];
-
-const SEVERITIES = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' }
-];
-
-const STATUSES = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'open', label: 'Open' },
-  { value: 'under_review', label: 'Under Review' },
-  { value: 'escalated', label: 'Escalated' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'archived', label: 'Archived' }
-];
+const CATEGORIES = CIF_CATEGORIES;
+const SEVERITIES = CIF_SEVERITIES;
+const STATUSES = CIF_STATUSES;
 
 const CIFDrawer = ({ open, onClose, mode, record, onSaveSuccess, hideEmployeeField = false }) => {
   const [formData, setFormData] = useState({
@@ -134,9 +111,26 @@ const CIFDrawer = ({ open, onClose, mode, record, onSaveSuccess, hideEmployeeFie
     if (formData.incidentDate && formData.incidentDate > new Date()) {
       newErrors.incidentDate = 'Incident date cannot be in the future';
     }
+    
+    // Validate status transitions
+    if (isEdit && record?.status) {
+      const currentStatus = record.status;
+      const newStatus = formData.status;
+      const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || [];
+      
+      if (newStatus !== currentStatus && !allowedTransitions.includes(newStatus)) {
+        newErrors.status = `Cannot transition from ${currentStatus} to ${newStatus}`;
+      }
+    }
+    
+    // Require resolution notes when closing
+    if (formData.status === 'closed' && !formData.resolutionNotes?.trim()) {
+      newErrors.resolutionNotes = 'Resolution notes are required before closing the case';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData]);
+  }, [formData, isEdit, record?.status]);
 
   const handleSave = useCallback(async () => {
     if (!validate()) return;
@@ -181,6 +175,27 @@ const CIFDrawer = ({ open, onClose, mode, record, onSaveSuccess, hideEmployeeFie
   const selectedAssignee = useMemo(() => {
     return Array.isArray(employees) ? employees.find(emp => emp._id === formData.assignedTo) || null : null;
   }, [employees, formData.assignedTo]);
+
+  // Get available statuses based on current status and mode
+  const availableStatuses = useMemo(() => {
+    if (mode === 'create') {
+      // For new records, allow draft and open
+      return STATUSES.filter(s => ['draft', 'open'].includes(s.value));
+    }
+    
+    if (isEdit && record?.status) {
+      // For editing, show current status + allowed transitions
+      const currentStatus = record.status;
+      const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || [];
+      
+      return STATUSES.filter(s => 
+        s.value === currentStatus || allowedTransitions.includes(s.value)
+      );
+    }
+    
+    // Default: show all statuses
+    return STATUSES;
+  }, [mode, isEdit, record?.status]);
 
   return (
     <Drawer
@@ -323,7 +338,14 @@ const CIFDrawer = ({ open, onClose, mode, record, onSaveSuccess, hideEmployeeFie
             value={formData.resolutionNotes}
             onChange={(e) => setFormData({ ...formData, resolutionNotes: e.target.value })}
             disabled={isReadOnly}
-            helperText="Required before closing the case"
+            required={formData.status === 'closed'}
+            error={!!errors.resolutionNotes}
+            helperText={
+              errors.resolutionNotes || 
+              (formData.status === 'closed' 
+                ? 'Required before closing the case' 
+                : 'Optional - Add notes about resolution or actions taken')
+            }
           />
 
           {/* Assigned To */}
@@ -374,8 +396,15 @@ const CIFDrawer = ({ open, onClose, mode, record, onSaveSuccess, hideEmployeeFie
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             disabled={isReadOnly}
+            error={!!errors.status}
+            helperText={
+              errors.status ||
+              (isEdit && record?.status 
+                ? `Current: ${STATUSES.find(s => s.value === record.status)?.label || record.status}` 
+                : 'Select initial status')
+            }
           >
-            {STATUSES.map((status) => (
+            {availableStatuses.map((status) => (
               <MenuItem key={status.value} value={status.value}>
                 {status.label}
               </MenuItem>

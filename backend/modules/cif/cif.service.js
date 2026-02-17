@@ -20,11 +20,11 @@ const generateCIFId = async () => {
 // Status workflow transitions
 const STATUS_TRANSITIONS = {
   draft: ['open'],
-  open: ['under_review'],
-  under_review: ['escalated'],
-  escalated: ['resolved'],
-  resolved: ['closed'],
-  closed: ['archived'],
+  open: ['under_review', 'escalated', 'resolved', 'closed'], // Allow direct closure
+  under_review: ['open', 'escalated', 'resolved', 'closed'], // Allow going back or forward
+  escalated: ['under_review', 'resolved', 'closed'], // Allow going back or forward
+  resolved: ['under_review', 'closed'], // Allow reopening or closing
+  closed: ['under_review'], // Allow reopening (Admin/HR only)
   archived: []
 };
 

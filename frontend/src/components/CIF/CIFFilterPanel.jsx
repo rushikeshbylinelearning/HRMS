@@ -19,38 +19,12 @@ import {
   Clear as ClearIcon,
   ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
+import { CIF_SEVERITIES, CIF_STATUSES, CIF_CATEGORIES, CONFIDENTIAL_LEVELS } from '../../constants/cifConstants';
 
-const SEVERITY_OPTIONS = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' }
-];
-
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'open', label: 'Open' },
-  { value: 'under_review', label: 'Under Review' },
-  { value: 'escalated', label: 'Escalated' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'closed', label: 'Closed' }
-];
-
-const CATEGORY_OPTIONS = [
-  { value: 'compliance_violation', label: 'Compliance Violation' },
-  { value: 'behavioral_warning', label: 'Behavioral Warning' },
-  { value: 'attendance_escalation', label: 'Attendance Escalation' },
-  { value: 'performance_concern', label: 'Performance Concern' },
-  { value: 'legal_notice', label: 'Legal Notice' },
-  { value: 'investigation', label: 'Investigation' },
-  { value: 'documentation_note', label: 'Documentation Note' },
-  { value: 'termination_related', label: 'Termination Related' }
-];
-
-const CONFIDENTIAL_LEVEL_OPTIONS = [
-  { value: 'internal', label: 'Internal' },
-  { value: 'legal_hold', label: 'Legal Hold' }
-];
+const SEVERITY_OPTIONS = CIF_SEVERITIES;
+const STATUS_OPTIONS = CIF_STATUSES;
+const CATEGORY_OPTIONS = CIF_CATEGORIES;
+const CONFIDENTIAL_LEVEL_OPTIONS = CONFIDENTIAL_LEVELS;
 
 const CIFFilterPanel = ({ filters, onFilterChange, onClearFilters }) => {
   const [expanded, setExpanded] = useState(false);

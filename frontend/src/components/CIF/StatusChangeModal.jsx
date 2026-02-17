@@ -13,26 +13,7 @@ import {
   Typography
 } from '@mui/material';
 import api from '../../api/axios';
-
-const STATUS_TRANSITIONS = {
-  draft: ['open'],
-  open: ['under_review'],
-  under_review: ['escalated'],
-  escalated: ['resolved'],
-  resolved: ['closed'],
-  closed: ['archived'],
-  archived: []
-};
-
-const STATUS_LABELS = {
-  draft: 'Draft',
-  open: 'Open',
-  under_review: 'Under Review',
-  escalated: 'Escalated',
-  resolved: 'Resolved',
-  closed: 'Closed',
-  archived: 'Archived'
-};
+import { STATUS_TRANSITIONS, STATUS_LABELS } from '../../constants/cifConstants';
 
 const StatusChangeModal = ({ open, onClose, cif, onSuccess }) => {
   const [newStatus, setNewStatus] = useState('');
@@ -57,8 +38,9 @@ const StatusChangeModal = ({ open, onClose, cif, onSuccess }) => {
       return;
     }
 
-    if (newStatus === 'closed' && !cif.resolutionNotes) {
-      setError('Resolution notes must be added before closing the case. Please edit the CIF first.');
+    // Resolution notes are recommended but not required if reason is provided
+    if (newStatus === 'closed' && !cif.resolutionNotes && !reason.trim()) {
+      setError('Resolution notes or reason are required before closing the case');
       return;
     }
 

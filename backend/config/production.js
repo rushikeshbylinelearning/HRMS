@@ -54,7 +54,7 @@ const productionConfig = {
     
     // CORS settings
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://your-frontend-domain.com'],
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://attendance.bylinelms.com'],
       credentials: true,
       optionsSuccessStatus: 200,
     },

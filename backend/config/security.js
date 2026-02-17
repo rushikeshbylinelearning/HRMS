@@ -10,10 +10,10 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'https://attendance.legatolxp.online',
-      'https://attendance.legatolxp.online', // Production AMS domain
-      'https://sso.leagatolxp.online', // Production SSO domain
-      'https://sso.bylinelms.com', // Production SSO portal
+      'https://attendance.bylinelms.com', // Production AMS frontend domain
+      // REMOVED: 'https://attendance.legatolxp.online' - Not needed, frontend and backend are same domain
+      'https://sso.legatolxp.online', // Production SSO domain (for SSO integration)
+      'https://sso.bylinelms.com', // Production SSO portal (for SSO integration)
       process.env.FRONTEND_URL,
       // Development origins (only allow in development mode)
       ...(process.env.NODE_ENV === 'development' ? [

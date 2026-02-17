@@ -740,13 +740,13 @@ const EmployeeDashboardPage = () => {
                         <Stack spacing={3}>
                             <Paper className="dashboard-card-base action-card">
                                 <Box>
-                                    <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '0.025em' }} className="theme-text-black">Time Tracking</Typography>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.9375rem', color: '#111827' }} className="theme-text-black">Time Tracking</Typography>
                                     {timeTrackingReady ? (
-                                        <Typography variant="body2" sx={{ mb: 3, fontWeight: 400, letterSpacing: '0.025em', color: '#666666' }}>
+                                        <Typography variant="body2" sx={{ mb: 2.5, fontWeight: 400, color: '#9ca3af', fontSize: '0.8125rem', lineHeight: 1.4 }}>
                                             {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
                                         </Typography>
                                     ) : (
-                                        <Skeleton variant="text" width="80%" height={20} sx={{ mb: 3 }} />
+                                        <Skeleton variant="text" width="80%" height={20} sx={{ mb: 2.5 }} />
                                     )}
                                 </Box>
                                 {timeTrackingReady ? (
@@ -785,10 +785,10 @@ const EmployeeDashboardPage = () => {
                                                     variant="overline"
                                                     sx={{
                                                         mt: 1,
-                                                        color: 'var(--theme-black)',
+                                                        color: '#6b7280',
                                                         fontWeight: 500,
-                                                        fontSize: '0.75rem',
-                                                        letterSpacing: '0.025em'
+                                                        fontSize: '0.6875rem',
+                                                        letterSpacing: '0.05em'
                                                     }}
                                                 >
                                                     {isOnBreakUI ? 'BREAK TIME' : 'WORK DURATION'}
@@ -851,7 +851,7 @@ const EmployeeDashboardPage = () => {
                             </Paper>
                             <Paper className="dashboard-card-base weekly-view-card">
                                 {dataReady ? (
-                                    <MemoizedWeeklyTimeCards logs={weeklyLogs} shift={dailyData?.shift || contextUser?.shift} />
+                                    <MemoizedWeeklyTimeCards logs={weeklyLogs} shift={dailyData?.shift || contextUser?.shift} user={contextUser} />
                                 ) : (
                                     <WeeklyTimeCardsSkeleton />
                                 )}
@@ -870,15 +870,15 @@ const EmployeeDashboardPage = () => {
                                         }}
                                     />
                                 </Box>
-                                <Typography variant="h6" className="theme-text-black" sx={{ fontWeight: 700, mb: 0.5, letterSpacing: '0.025em', color: '#333333' }}>{contextUser.fullName || contextUser.name}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666666', mb: 1, fontWeight: 400, letterSpacing: '0.025em' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
+                                <Typography variant="subtitle1" className="theme-text-black" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1rem', color: '#111827' }}>{contextUser.fullName || contextUser.name}</Typography>
+                                <Typography variant="body2" sx={{ color: '#9ca3af', mb: 1, fontWeight: 400, fontSize: '0.8125rem' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
                                 <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />
-                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, letterSpacing: '0.025em' }} />
-                                <Typography variant="body2" sx={{ fontWeight: 400, color: '#666666', letterSpacing: '0.025em' }}>{formatISTDate(getISTNow(), { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
+                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, fontSize: '0.75rem' }} />
+                                <Typography variant="body2" sx={{ fontWeight: 400, color: '#9ca3af', fontSize: '0.8125rem' }}>{formatISTDate(getISTNow(), { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
                             </Paper>
                             <Paper className="dashboard-card-base shift-info-card">
-                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 700, letterSpacing: '0.025em' }}>Today's Shift</Typography>
-                                <Divider sx={{ mb: 2 }} />
+                                <Typography variant="subtitle2" className="theme-text-black" sx={{ fontWeight: 600, fontSize: '0.9375rem', mb: 1.25, color: '#111827' }}>Today's Shift</Typography>
+                                <Divider sx={{ mb: 1.5 }} />
                                 <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1, minHeight: 260 }}>
                                     {dataReady ? (
                                         <MemoizedShiftInfoDisplay
@@ -908,8 +908,8 @@ const EmployeeDashboardPage = () => {
                                 </Box>
                             </Paper>
                             <Paper className="dashboard-card-base saturday-schedule-card" sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" gutterBottom className="theme-text-black" sx={{ fontWeight: 700, letterSpacing: '0.025em' }}>Upcoming Saturdays</Typography>
-                                <Divider sx={{ mb: 2.5 }} />
+                                <Typography variant="subtitle2" className="theme-text-black" sx={{ fontWeight: 600, fontSize: '0.9375rem', mb: 1.25, color: '#111827' }}>Upcoming Saturdays</Typography>
+                                <Divider sx={{ mb: 1.5 }} />
                                 <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
                                     {dataReady ? (
                                         <MemoizedSaturdaySchedule policy={contextUser?.alternateSaturdayPolicy || 'All Saturdays Working'} requests={myRequests} />

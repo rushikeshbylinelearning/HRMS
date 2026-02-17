@@ -628,7 +628,7 @@ const ReportsPage = () => {
                         </LocalizationProvider>
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
-                        <LocalizationProvider dateAdapter={AdapterDateFns}>
+                        <LocalizationProvider dateAdapter={AdapterDateFns}>lizationProvider dateAdapter={AdapterDateFns}
                             <DatePicker 
                                 label="End Date" 
                                 value={endDate} 

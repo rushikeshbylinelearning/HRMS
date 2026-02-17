@@ -30,7 +30,7 @@ const SSOLoginPage = () => {
               ? 'http://localhost:3001/api'
               : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
                   ? import.meta.env.VITE_API_BASE_URL
-                  : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online'}/api`);
+                  : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
             const response = await fetch(`${apiUrl}/auth/me`, {
               method: 'GET',
               credentials: 'include',
@@ -65,7 +65,7 @@ const SSOLoginPage = () => {
           ? 'http://localhost:3001/api' 
           : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api') 
               ? import.meta.env.VITE_API_BASE_URL 
-              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online'}/api`);
+              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
         const response = await fetch(`${apiUrl}/auth/sso-login`, {
           method: 'POST',
           credentials: 'include',
@@ -96,7 +96,7 @@ const SSOLoginPage = () => {
             ? 'http://localhost:3001/api' 
             : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api') 
                 ? import.meta.env.VITE_API_BASE_URL 
-                : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online'}/api`);
+                : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
           const sessionResponse = await fetch(`${apiUrl}/auth/me`, {
             method: 'GET',
             credentials: 'include',

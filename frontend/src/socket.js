@@ -27,7 +27,7 @@ const getSocketURL = () => {
         return origin;
     }
     
-    return 'https://attendance.legatolxp.online'; // Fallback
+    return 'https://attendance.bylinelms.com'; // Fallback
 };
 
 const URL = getSocketURL();

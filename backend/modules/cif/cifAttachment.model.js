@@ -7,28 +7,33 @@ const cifAttachmentSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  fileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    comment: 'GridFS file ID'
+  },
   fileName: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    comment: 'Stored filename in GridFS'
   },
   originalName: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    comment: 'Original filename from upload'
   },
   fileType: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    comment: 'MIME type'
   },
   fileSize: {
     type: Number,
-    required: true
-  },
-  filePath: {
-    type: String,
-    required: true
+    required: true,
+    comment: 'File size in bytes'
   },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -41,5 +46,6 @@ const cifAttachmentSchema = new mongoose.Schema({
 
 // Index for efficient queries
 cifAttachmentSchema.index({ cifId: 1, createdAt: -1 });
+cifAttachmentSchema.index({ fileId: 1 });
 
 module.exports = mongoose.model('CIFAttachment', cifAttachmentSchema);

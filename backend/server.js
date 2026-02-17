@@ -74,9 +74,8 @@ const userRoutes = require('./routes/userRoutes'); // FIXED: Use GridFS-enabled 
 const newNotificationRoutes = require('./routes/newNotifications');
 const officeLocationRoutes = require('./routes/officeLocations');
 const manageRoutes = require('./routes/manage');
-const analyticsRoutes = require('./routes/analytics');
 const payrollRoutes = require('./routes/payrollRoutes');
-const probationRoutes = require('./routes/probationRoutes');
+const probationRoutes = require('./routes/probation');
 // TODO: Uncomment when yearEndLeaves route is implemented
 // const yearEndLeavesRoutes = require('./routes/yearEndLeaves');
 
@@ -187,7 +186,7 @@ app.use(
         // Allow embedding from SSO portal - CRITICAL for iframe embedding
         'frame-ancestors': process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.legatolxp.online"],
+          : ["'self'", "https://attendance.bylinelms.com"],
       },
     },
     // Disable X-Frame-Options since we're using CSP frame-ancestors instead
@@ -271,12 +270,12 @@ app.use((req, res, next) => {
   // Production allowed origins for iframe embedding
   const allowedOrigins = process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.legatolxp.online"]
+          : ["'self'", "https://attendance.bylinelms.com"]
 
 
 
     // ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
+    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
   
   // If frame-ancestors is not in CSP, add it
   // If it exists but is different, replace it
@@ -361,7 +360,7 @@ const staticOptions = {
             // Set CSP frame-ancestors for HTML files to allow iframe embedding
             const allowedOrigins = process.env.NODE_ENV === 'development' 
               ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-              : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
+              : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance.bylinelms.com";
             const existingCSP = res.getHeader('Content-Security-Policy') || '';
             if (!existingCSP.includes('frame-ancestors')) {
               if (existingCSP) {
@@ -493,10 +492,9 @@ app.use('/api/admin/settings', settingsRoutes);
 app.use('/api/admin/reports', reportsRoutes);
 app.use('/api/admin/office-locations', officeLocationRoutes);
 app.use('/api/admin/manage', manageRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/probation', probationRoutes); // Probation tracker (independent)
 app.use('/api/admin', adminRoutes);
 app.use('/api/payroll', payrollRoutes);
-app.use('/api/probation', probationRoutes);
 
 // Announcement routes
 const announcementRoutes = require('./routes/announcementRoutes');
@@ -747,7 +745,7 @@ app.use((req, res, next) => {
   
   const allowedOrigins = process.env.NODE_ENV === 'development' 
     ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.legatolxp.online";
+    : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance.bylinelms.com";
   
   let existingCSP = res.getHeader('Content-Security-Policy') || '';
   

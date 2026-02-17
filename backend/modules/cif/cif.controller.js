@@ -381,10 +381,11 @@ exports.changeStatus = async (req, res) => {
       });
     }
 
-    // Require resolution notes before closing
-    if (status === 'closed' && !cif.resolutionNotes) {
+    // Resolution notes are recommended but not required for closing
+    // (can be added during status change via reason field)
+    if (status === 'closed' && !cif.resolutionNotes && !reason) {
       return res.status(400).json({
-        error: 'Resolution notes are required before closing the case'
+        error: 'Resolution notes or reason are required before closing the case'
       });
     }
 
@@ -1003,8 +1004,7 @@ exports.archiveOldRecords = async (req, res) => {
 
 const CIFAttachment = require('./cifAttachment.model');
 const NewNotificationService = require('../../services/NewNotificationService');
-const path = require('path');
-const fs = require('fs');
+const { getBucket } = require('../../middleware/uploadCIFAttachmentGridFS');
 
 // Upload attachments to CIF
 exports.uploadAttachments = async (req, res) => {
@@ -1016,7 +1016,7 @@ exports.uploadAttachments = async (req, res) => {
     });
 
     const { cifId } = req.params;
-    const files = req.files; // Set by uploadCIFAttachment middleware
+    const files = req.files; // Set by uploadCIFAttachmentGridFS middleware
 
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -1025,11 +1025,15 @@ exports.uploadAttachments = async (req, res) => {
     // Verify CIF exists
     const cif = await CIF.findOne({ _id: cifId, isArchived: false });
     if (!cif) {
-      // Clean up uploaded files
-      files.forEach(file => {
-        const filepath = path.join(__dirname, '../../uploads/cif-attachments', file.filename);
-        try { fs.unlinkSync(filepath); } catch (_) {}
-      });
+      // Clean up uploaded GridFS files
+      const bucket = getBucket();
+      for (const file of files) {
+        try {
+          await bucket.delete(file.fileId);
+        } catch (err) {
+          console.error('Error deleting GridFS file:', err);
+        }
+      }
       return res.status(404).json({ error: 'CIF record not found' });
     }
 
@@ -1047,11 +1051,11 @@ exports.uploadAttachments = async (req, res) => {
       files.map(file => 
         CIFAttachment.create({
           cifId,
+          fileId: file.fileId,
           fileName: file.filename,
           originalName: file.originalName,
           fileType: file.mimetype,
           fileSize: file.size,
-          filePath: `/uploads/cif-attachments/${file.filename}`,
           uploadedBy: uploaderId
         })
       )
@@ -1144,16 +1148,28 @@ exports.downloadAttachment = async (req, res) => {
       return res.status(404).json({ error: 'Attachment not found' });
     }
 
-    const filepath = path.join(__dirname, '../../uploads/cif-attachments', attachment.fileName);
+    const bucket = getBucket();
     
-    if (!fs.existsSync(filepath)) {
-      return res.status(404).json({ error: 'File not found on server' });
-    }
-
-    res.download(filepath, attachment.originalName);
+    // Set response headers
+    res.set('Content-Type', attachment.fileType);
+    res.set('Content-Disposition', `attachment; filename="${attachment.originalName}"`);
+    
+    // Stream file from GridFS
+    const downloadStream = bucket.openDownloadStream(attachment.fileId);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming file from GridFS:', error);
+      if (!res.headersSent) {
+        res.status(404).json({ error: 'File not found in storage' });
+      }
+    });
+    
+    downloadStream.pipe(res);
   } catch (error) {
     console.error('Error downloading attachment:', error);
-    res.status(500).json({ error: 'Failed to download attachment' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to download attachment' });
+    }
   }
 };
 
@@ -1179,14 +1195,14 @@ exports.deleteAttachment = async (req, res) => {
       return res.status(403).json({ error: editCheck.reason });
     }
 
-    // Delete file from filesystem
-    const filepath = path.join(__dirname, '../../uploads/cif-attachments', attachment.fileName);
+    // Delete file from GridFS
+    const bucket = getBucket();
     try {
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
+      await bucket.delete(attachment.fileId);
+      console.log('Deleted file from GridFS:', attachment.fileId);
     } catch (err) {
-      console.error('Error deleting file:', err);
+      console.error('Error deleting file from GridFS:', err);
+      // Continue anyway - file might already be deleted
     }
 
     // Delete from database

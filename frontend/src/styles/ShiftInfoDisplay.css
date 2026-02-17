@@ -21,15 +21,16 @@
 }
 
 .info-label {
-    font-weight: 700;
-    color: #333333;
-    font-size: 0.875rem;
-    letter-spacing: 0.025em;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
 }
 
 .info-value {
     font-weight: 500;
-    color: #1f2937;
+    color: #111827;
+    font-size: 0.8125rem;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -82,18 +83,18 @@
 
 .clock-in-time-display {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.875rem;
     text-align: center;
     width: 100%;
 }
 
 .clock-in-time.late-highlight .clock-in-time-display {
-    color: #dc3545 !important; /* Red color for late clock-in time */
-    font-weight: bold !important;
+    color: #dc3545 !important;
+    font-weight: 600 !important;
 }
 
 .late-message-only {
-    font-size: 0.8rem;
+    font-size: 0.6875rem;
     color: #dc3545;
     font-weight: 500;
     font-style: italic;
@@ -113,12 +114,12 @@
 }
 
 .clock-in-time.half-day-highlight .clock-in-time-display {
-    color: #d32f2f !important; /* Red color for half-day clock-in time */
-    font-weight: bold !important;
+    color: #d32f2f !important;
+    font-weight: 600 !important;
 }
 
 .half-day-message {
-    font-size: 0.8rem;
+    font-size: 0.6875rem;
     color: #d32f2f;
     font-weight: 600;
     padding: 6px 10px;

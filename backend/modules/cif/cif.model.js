@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CIF_STATUSES, CIF_CATEGORIES, CIF_SEVERITIES, CONFIDENTIAL_LEVELS } = require('./cif.constants');
 
 const cifSchema = new mongoose.Schema({
   cifNumber: {
@@ -24,22 +25,13 @@ const cifSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: [
-      'compliance_violation',
-      'behavioral_warning',
-      'attendance_escalation',
-      'performance_concern',
-      'legal_notice',
-      'investigation',
-      'documentation_note',
-      'termination_related'
-    ],
+    enum: CIF_CATEGORIES,
     required: true,
     index: true
   },
   severity: {
     type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
+    enum: CIF_SEVERITIES,
     required: true,
     index: true
   },
@@ -54,7 +46,7 @@ const cifSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'open', 'under_review', 'escalated', 'resolved', 'closed', 'archived'],
+    enum: CIF_STATUSES,
     default: 'open',
     index: true
   },
@@ -70,7 +62,7 @@ const cifSchema = new mongoose.Schema({
   },
   confidentialLevel: {
     type: String,
-    enum: ['internal', 'legal_hold'],
+    enum: CONFIDENTIAL_LEVELS,
     default: 'internal',
     index: true
   },

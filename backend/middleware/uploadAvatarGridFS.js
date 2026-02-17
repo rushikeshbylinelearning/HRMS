@@ -15,6 +15,24 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
+// SAFE LAZY INITIALIZATION - GridFSBucket
+let bucket;
+
+function getBucket() {
+    if (!bucket) {
+        if (!mongoose.connection || !mongoose.connection.db) {
+            throw new Error("MongoDB not connected yet");
+        }
+        
+        bucket = new mongoose.mongo.GridFSBucket(
+            mongoose.connection.db,
+            { bucketName: "avatars" }
+        );
+    }
+    
+    return bucket;
+}
+
 // UUID generation function
 const uuidv4 = () => {
     if (crypto.randomUUID) {
@@ -173,7 +191,8 @@ async function uploadToGridFS(buffer, userId, metadata) {
             throw new Error('Database connection not available');
         }
         
-        const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'avatars' });
+        // Use lazy-initialized bucket
+        const bucket = getBucket();
         
         // Generate secure filename (UUID-based, no user input)
         const filename = `avatar-${userId}-${uuidv4()}.webp`;

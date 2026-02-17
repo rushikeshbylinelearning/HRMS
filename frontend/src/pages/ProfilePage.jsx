@@ -229,7 +229,7 @@ const ProfilePage = () => {
         if (import.meta.env.DEV) {
             return `/api/policies-gridfs/${policy._id}/file`;
         } else {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.legatolxp.online';
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com';
             const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
             return `${baseUrl}/api/policies-gridfs/${policy._id}/file`;
         }

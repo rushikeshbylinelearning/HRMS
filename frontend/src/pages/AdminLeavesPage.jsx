@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import { Typography, Button, Alert, Chip, Box, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination, Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton, Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -18,6 +19,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { eachDayOfInterval } from 'date-fns';
 import AdminLeaveForm from '../components/AdminLeaveForm';
 import EnhancedLeaveRequestModal from '../components/EnhancedLeaveRequestModal';
 import PageHeroHeader from '../components/PageHeroHeader';
@@ -2726,6 +2728,9 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
 });
 
 const AdminLeavesPage = () => {
+    // Auth context
+    const { user } = useAuth();
+    
     const [requests, setRequests] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -3003,18 +3008,32 @@ const AdminLeavesPage = () => {
 
     const handleSaveRequest = async (formData) => {
         try {
+            // 🔧 FIX: Expand date range to include all dates between start and end
+            let expandedLeaveDates = [];
+            if (formData.leaveDates && formData.leaveDates[0]) {
+                if (formData.leaveDates[1]) {
+                    // Date range: expand to include all dates
+                    const allDates = eachDayOfInterval({
+                        start: formData.leaveDates[0],
+                        end: formData.leaveDates[1]
+                    });
+                    expandedLeaveDates = allDates.map(d => toYYYYMMDD(d)).filter(Boolean);
+                } else {
+                    // Single date
+                    expandedLeaveDates = [toYYYYMMDD(formData.leaveDates[0])].filter(Boolean);
+                }
+            }
+            
             // Extract only the fields needed for the API, excluding _id and internal fields
             const payload = {
                 employee: formData.employee,
                 requestType: formData.requestType,
                 leaveType: formData.leaveType,
-                leaveDates: (formData.leaveDates || [])
-                    .filter(Boolean)
-                    .map((d) => toYYYYMMDD(d))
-                    .filter(Boolean),
+                leaveDates: expandedLeaveDates,
                 alternateDate: toYYYYMMDD(formData.alternateDate) || null,
                 reason: formData.reason,
                 status: formData.status,
+                adminOverrideReason: `Admin-applied leave by user ID: ${user?.id || user?._id}`, // ✅ FIX: Always provide override reason
             };
             
             // Include appliedDate for both create and edit
@@ -3024,6 +3043,9 @@ const AdminLeavesPage = () => {
                 appliedDate.setHours(0, 0, 0, 0); // Set to start of day
                 payload.appliedDate = appliedDate.toISOString();
             }
+            
+            // 🔍 DEBUG: Log payload before sending
+            console.log("Submitting leave payload:", payload);
             
             if (formData._id) {
                 await api.put(`/admin/leaves/${formData._id}`, payload);
@@ -3037,7 +3059,15 @@ const AdminLeavesPage = () => {
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
-            setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to save request.', severity: 'error' });
+            // 🔍 DEBUG: Log full error details
+            console.error("Save Leave Error:", err.response?.data || err);
+            
+            // Show detailed error message from backend
+            const errorMessage = err.response?.data?.error || 
+                                err.response?.data?.message || 
+                                err.message || 
+                                'Failed to save request.';
+            setSnackbar({ open: true, message: errorMessage, severity: 'error' });
         }
     };
 
