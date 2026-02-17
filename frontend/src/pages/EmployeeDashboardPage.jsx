@@ -12,6 +12,7 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useBreakUI } from '../context/BreakUIContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { useBreakWindowScheduler } from '../hooks/useBreakWindowScheduler';
 import { getCurrentLocation, getCachedLocationOnly } from '../services/locationService';
 import socket from '../socket';
 import WorkTimeTracker from '../components/WorkTimeTracker';
@@ -98,6 +99,7 @@ const EmployeeDashboardPage = () => {
     const [isSubmittingReason, setIsSubmittingReason] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '' });
     const [weeklyLateDialog, setWeeklyLateDialog] = useState({ open: false, lateCount: 0, lateDates: [] });
+    const [breakTriggerTick, setBreakTriggerTick] = useState(0); // Event-driven break window boundary trigger
     const breakActionInFlightRef = useRef(false);
     const clockInActionInFlightRef = useRef(false);
     const clockOutActionInFlightRef = useRef(false);
@@ -440,9 +442,18 @@ const EmployeeDashboardPage = () => {
     const hasPendingExtraBreak = !!dailyData?.pendingExtraBreakRequest;
     const hasApprovedExtraBreak = !!dailyData?.approvedExtraBreak;
     
-    const paidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Paid'), [breakLimits]);
-    const unpaidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Unpaid'), [breakLimits]);
-    const extraBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Extra'), [breakLimits]);
+    // Event-driven break window scheduler (NO polling/intervals)
+    // Automatically triggers re-evaluation at exact break window boundaries
+    useBreakWindowScheduler({
+        breakWindows: contextUser?.featurePermissions?.breakWindows,
+        isClockedIn: dailyData?.status === 'Clocked In',
+        onTrigger: () => setBreakTriggerTick(prev => prev + 1)
+    });
+    
+    // Break eligibility checks - re-evaluated on breakTriggerTick (scheduled timeout events)
+    const paidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Paid'), [breakLimits, breakTriggerTick]);
+    const unpaidBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Unpaid'), [breakLimits, breakTriggerTick]);
+    const extraBreakCheck = useMemo(() => breakLimits.canTakeBreakNow('Extra'), [breakLimits, breakTriggerTick]);
 
     const activeBreakOverride = useMemo(
         () => (isOnBreakUI && uiBreakState

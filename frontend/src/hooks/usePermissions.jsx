@@ -1,6 +1,7 @@
 // frontend/src/hooks/usePermissions.jsx
 import React, { useContext, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getISTNow } from '../utils/istTime';
 
 /**
  * Custom hook to check user permissions and feature access
@@ -131,7 +132,7 @@ export const usePermissions = () => {
           return { allowed: true };
         }
 
-        const now = new Date();
+        const now = getISTNow(); // Use IST timezone for consistency with backend
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
         // If no windows are defined at all, all breaks are allowed by default.
