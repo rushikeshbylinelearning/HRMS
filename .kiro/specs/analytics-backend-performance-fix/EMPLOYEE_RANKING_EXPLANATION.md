@@ -242,10 +242,4 @@ The analytics table typically shows:
 
 **Philosophy**: "Show up consistently first, work hard second"
 
-This ranking system prioritizes **reliability** (attendance) over **productivity** (hours), which is appropriate for most organizations where consistent presence is valued.
-
----
-
-**Documentation Date**: February 20, 2026  
-**Code Location**: `backend/services/AnalyticsService.js:148-159`  
-**Status**: Current Implementation
+This ranking system prioritizes **reliability** (attendance) over **productivity**

@@ -54,12 +54,14 @@ const AdminAttendanceSummaryPage = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '' });
     const [anchorEl, setAnchorEl] = useState(null);
     const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-    const [now, setNow] = useState(getISTNow());
     const [viewMode, setViewMode] = useState('timeline');
     const [holidays, setHolidays] = useState([]);
     // Track data freshness for debugging (internal only - not displayed to users)
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
     const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+
+    // Socket refresh debounce timer
+    const socketRefreshTimerRef = React.useRef(null);
 
     // Note: selectedHoliday and selectedLeave are used for modal display - kept for UI purposes
 
@@ -71,7 +73,7 @@ const AdminAttendanceSummaryPage = () => {
         const fetchEmployees = async () => {
             try {
                 // Do NOT pass includeInactive: deactivated employees must be hidden from attendance summary
-                const { data } = await api.get('/admin/employees?all=true');
+                const { data } = await api.get('/admin/employees?all=true&slim=true');
                 const activeEmployees = filterActiveEmployees(Array.isArray(data) ? data : []);
                 setEmployees(activeEmployees);
             } catch (err) {
@@ -81,12 +83,6 @@ const AdminAttendanceSummaryPage = () => {
             }
         };
         fetchEmployees();
-    }, []);
-
-    // Update now in IST every second
-    useEffect(() => {
-        const timerId = setInterval(() => setNow(getISTNow()), 1000);
-        return () => clearInterval(timerId);
     }, []);
 
     // Cleanup on unmount
@@ -198,11 +194,13 @@ const AdminAttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
-                // Refetch data to get latest status from backend
-                // Backend is single source of truth - we don't mutate logs directly
-                fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
-                    console.error('Failed to refresh after attendance update:', err);
-                });
+                // Debounce refresh to avoid multiple rapid updates
+                if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
+                socketRefreshTimerRef.current = setTimeout(() => {
+                    fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
+                        console.error('Failed to refresh after attendance update:', err);
+                    });
+                }, 3000);
             }
         };
 
@@ -215,10 +213,13 @@ const AdminAttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
-                // Refetch data to get updated leave status resolution from backend
-                fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
-                    console.error('Failed to refresh after leave update:', err);
-                });
+                // Debounce refresh to avoid multiple rapid updates
+                if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
+                socketRefreshTimerRef.current = setTimeout(() => {
+                    fetchLogsForWeek(currentDate, selectedEmployeeId).catch(err => {
+                        console.error('Failed to refresh after leave update:', err);
+                    });
+                }, 3000);
             }
         };
 
@@ -228,6 +229,7 @@ const AdminAttendanceSummaryPage = () => {
 
         // Cleanup on unmount or when dependencies change
         return () => {
+            if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
             socket.off('attendance_log_updated', handleAttendanceUpdate);
             socket.off('leave_request_updated', handleLeaveUpdate);
         };

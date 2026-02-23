@@ -4087,6 +4087,16 @@ router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr, in
             });
         }
 
+        // Block overrides on future dates
+        const { getISTDateString } = require('../utils/istTime');
+        const todayIST = getISTDateString();
+        if (log.attendanceDate > todayIST) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot override a future date. Overrides can only be applied to past or today\'s attendance.'
+            });
+        }
+
         // Get override reason from request body (required for audit trail)
         const { overrideReason, newStatus } = req.body;
 
@@ -4166,23 +4176,6 @@ router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr, in
             log.attendanceStatus = 'On-time';
             log.isLate = false;
             log.lateMinutes = 0;
-        }
-
-        // CRITICAL: Ensure log has required fields before saving
-        // If log doesn't have clockInTime, we need to set a default to prevent deletion
-        if (!log.clockInTime) {
-            // Set a default clock-in time based on attendance date
-            log.clockInTime = new Date(`${log.attendanceDate}T09:00:00`);
-        }
-
-        // Ensure log has attendanceDate
-        if (!log.attendanceDate) {
-            // This shouldn't happen, but add safety check
-            console.error('[Override Half-Day] Log missing attendanceDate:', log._id);
-            return res.status(400).json({
-                success: false,
-                error: 'Attendance log is missing required fields.'
-            });
         }
 
         // Save the updated log (DO NOT DELETE - just update status)
@@ -4463,8 +4456,8 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
     try {
         const { employeeScope, startDate, endDate, overrideType, overrideNote } = req.body;
 
-        if (!overrideType || !['fullday', 'halfday', 'holiday'].includes(overrideType)) {
-            return res.status(400).json({ success: false, error: 'overrideType is required and must be one of: fullday, halfday, holiday.' });
+        if (!overrideType || !['fullday', 'halfday', 'holiday', 'leave'].includes(overrideType)) {
+            return res.status(400).json({ success: false, error: 'overrideType is required and must be one of: fullday, halfday, holiday, leave.' });
         }
         if (!overrideNote || typeof overrideNote !== 'string' || overrideNote.trim().length === 0) {
             return res.status(400).json({ success: false, error: 'overrideNote is required and must be a non-empty string.' });
@@ -4481,35 +4474,70 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
             return res.status(400).json({ success: false, error: 'startDate must be before or equal to endDate.' });
         }
 
+        const { getISTDateString } = require('../utils/istTime');
+        const todayIST = getISTDateString();
+        if (start > todayIST) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot override future dates. startDate must be today or earlier.'
+            });
+        }
+        // Clamp end date to today if end > today (partial range is allowed)
+        const effectiveEnd = end > todayIST ? todayIST : end;
+
+        const MAX_OVERRIDE_DAYS = 31;
+        const { generateDateRange: countDates } = require('../utils/attendanceStatusResolver');
+        const dateCount = countDates(start, effectiveEnd).length;
+        if (dateCount > MAX_OVERRIDE_DAYS) {
+            return res.status(400).json({
+                success: false,
+                error: `Date range too large (${dateCount} days). Maximum allowed is ${MAX_OVERRIDE_DAYS} days per bulk override operation.`
+            });
+        }
+
+        const defaultShiftMinutes = 480;
         let employeeIds = [];
+        let shiftMinutesMap = new Map();
+        
         if (employeeScope === 'all') {
             const users = await User.find({ role: { $ne: 'Admin' }, isActive: true }).select('_id shiftGroup').populate('shiftGroup', 'durationHours').lean();
             employeeIds = users.map((u) => u._id);
+            // Build shiftMinutes lookup from the already-fetched data
+            users.forEach(u => {
+                const minutes = (u.shiftGroup?.durationHours != null)
+                    ? Math.round(Number(u.shiftGroup.durationHours) * 60)
+                    : defaultShiftMinutes;
+                shiftMinutesMap.set(u._id.toString(), minutes);
+            });
         } else if (Array.isArray(employeeScope) && employeeScope.length > 0) {
             const valid = employeeScope.filter((id) => mongoose.Types.ObjectId.isValid(id));
             const users = await User.find({ _id: { $in: valid }, role: { $ne: 'Admin' }, isActive: true }).select('_id shiftGroup').populate('shiftGroup', 'durationHours').lean();
             employeeIds = users.map((u) => u._id);
+            users.forEach(u => {
+                const minutes = (u.shiftGroup?.durationHours != null)
+                    ? Math.round(Number(u.shiftGroup.durationHours) * 60)
+                    : defaultShiftMinutes;
+                shiftMinutesMap.set(u._id.toString(), minutes);
+            });
         }
         if (employeeIds.length === 0) {
             return res.status(400).json({ success: false, error: 'At least one employee must be selected. Use employeeScope: "all" or an array of employee IDs.' });
         }
 
-        const dates = generateDateRange(start, end);
+        const dates = generateDateRange(start, effectiveEnd);
         const getIO = require('../socketManager').getIO;
         const io = getIO && getIO();
         const logAction = require('../services/logAction');
         const note = overrideNote.trim();
         const adminUserId = req.user.userId;
         let appliedCount = 0;
-        const defaultShiftMinutes = 480;
 
-        const adminOverrideLabel = overrideType === 'fullday' ? 'Override Full Day' : overrideType === 'holiday' ? 'Override Holiday' : 'Override Half Day';
+        const adminOverrideLabel = overrideType === 'fullday' ? 'Override Full Day' : overrideType === 'holiday' ? 'Override Holiday' : overrideType === 'leave' ? 'Override Leave' : 'Override Half Day';
         const isHalfDay = overrideType === 'halfday';
-        const status = isHalfDay ? 'Half-day' : 'On-time';
+        const status = overrideType === 'leave' ? 'Leave' : (isHalfDay ? 'Half-day' : 'On-time');
 
         for (const eid of employeeIds) {
-            const user = await User.findById(eid).select('shiftGroup').populate('shiftGroup', 'durationHours').lean();
-            const shiftMinutes = (user?.shiftGroup?.durationHours != null) ? Math.round(Number(user.shiftGroup.durationHours) * 60) : defaultShiftMinutes;
+            const shiftMinutes = shiftMinutesMap.get(eid.toString()) ?? defaultShiftMinutes;
 
             for (const dateStr of dates) {
                 let log = await AttendanceLog.findOne({ user: eid, attendanceDate: dateStr }).lean();
@@ -4540,6 +4568,49 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
                     appliedCount++;
                 } else {
                     const doc = await AttendanceLog.findById(log._id);
+
+                    // ─── LEAVE CONFLICT GUARD ────────────────────────────────
+                    // If this attendance record has a linked approved LeaveRequest
+                    // and the admin is NOT applying a 'leave' override (i.e. they
+                    // are converting a leave day to Present/Half-day/Holiday),
+                    // we must: (a) mark the LeaveRequest as Rejected/cancelled so
+                    // the leaves page stays in sync, and (b) restore the leave
+                    // balance that was deducted when the leave was approved.
+                    if (doc.leaveRequest && overrideType !== 'leave') {
+                        try {
+                            const LeaveRequest = require('../models/LeaveRequest');
+                            const User = require('../models/User');
+                            const leaveReq = await LeaveRequest.findById(doc.leaveRequest);
+                            if (leaveReq && leaveReq.status === 'Approved') {
+                                // Determine leave field and duration to restore
+                                const typeToField = {
+                                    'Planned': 'paid', 'Sick': 'sick', 'Casual': 'casual',
+                                    'Loss of Pay': 'lop', 'Compensatory': 'compensatory',
+                                    'Backdated Leave': 'paid', 'Comp-Off': 'compensatory',
+                                };
+                                const leaveField = typeToField[leaveReq.requestType];
+                                const leaveDuration = leaveReq.leaveType === 'Full Day' ? 1 : 0.5;
+                                if (leaveField) {
+                                    await User.updateOne(
+                                        { _id: leaveReq.employee },
+                                        { $inc: { [`leaveBalances.${leaveField}`]: leaveDuration } }
+                                    );
+                                }
+                                leaveReq.status = 'Rejected';
+                                leaveReq.rejectionNotes = `Admin bulk override on ${dateStr} changed attendance to '${overrideType}'. Leave auto-cancelled to prevent mismatch. Override reason: ${note}`;
+                                await leaveReq.save();
+                            }
+                            // Detach the leave reference from this attendance log
+                            doc.leaveRequest = null;
+                        } catch (leaveErr) {
+                            console.error(`[bulk-override] Failed to resolve leave conflict for log ${doc._id}:`, leaveErr.message);
+                        }
+                    }
+                    // If override type IS 'leave', we do not create a real LeaveRequest —
+                    // the attendance record itself carries the Leave status. The leaveRequest
+                    // ref stays null (admin-applied leave has no request document).
+                    // ────────────────────────────────────────────────────────────
+
                     doc.overriddenByAdmin = true;
                     doc.overrideType = overrideType;
                     doc.overrideReason = note;
@@ -4582,7 +4653,7 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
             await logAction(adminUserId, 'BULK_OVERRIDE', {
                 employeeScope: employeeScope === 'all' ? 'all' : employeeIds.length,
                 startDate: start,
-                endDate: end,
+                endDate: effectiveEnd,
                 overrideType,
                 overrideNote: note,
                 appliedCount,

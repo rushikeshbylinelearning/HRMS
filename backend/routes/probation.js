@@ -6,8 +6,12 @@ const express = require('express');
 const authenticateToken = require('../middleware/authenticateToken');
 const User = require('../models/User');
 const AttendanceSummaryService = require('../services/AttendanceSummaryService');
+const NodeCache = require('node-cache');
 
 const router = express.Router();
+
+// Short-lived cache: probation data is expensive to compute; cache for 1 minute
+const probationCache = new NodeCache({ stdTTL: 60, checkperiod: 30 });
 
 // GET /api/probation/tracker - Get probation tracker data for all employees on probation
 // COMPANY POLICY: Probation is 6 calendar months from joining date, extended by approved leaves AND absences.
@@ -20,12 +24,46 @@ router.get('/tracker', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Return cached result if available (cache key is role-agnostic; both Admin+HR see same data)
+    const cacheKey = 'probation_tracker';
+    const cached = probationCache.get(cacheKey);
+    if (cached) {
+      console.log('[Probation] Returning cached tracker data');
+      return res.json(cached);
+    }
+
     // Get all employees with status "Probation" and exclude Interns, Permanent, and inactive
     const probationEmployees = await User.find({
       employmentStatus: 'Probation',
       isActive: true,
       role: { $ne: 'Intern' }
     }).select('_id fullName employeeCode joiningDate email department designation').lean();
+
+    // PERFORMANCE FIX: Pre-fetch shared data ONCE for all employees.
+    // Previously, holidays and grace period were fetched inside each employee's call to
+    // AttendanceSummaryService — causing N separate DB queries for N employees.
+    const { getGracePeriodMinutes } = require('../utils/gracePeriod');
+    const { parseISTDate } = require('../utils/istTime');
+    const Holiday = require('../models/Holiday');
+
+    // Compute the widest possible date range across all employees so one holiday fetch covers all
+    const now = new Date();
+    const earliestJoining = probationEmployees.reduce((earliest, emp) => {
+      const d = new Date(emp.joiningDate);
+      return d < earliest ? d : earliest;
+    }, now);
+
+    const sharedHolidays = await Holiday.find({
+      date: { $gte: earliestJoining, $lte: now },
+      isTentative: { $ne: true }
+    }).sort({ date: 1 }).lean();
+
+    const sharedGracePeriodMinutes = await getGracePeriodMinutes();
+
+    const sharedData = {
+      holidays: sharedHolidays,
+      gracePeriodMinutes: sharedGracePeriodMinutes
+    };
 
     // Process each employee
     const employeesWithAnalytics = await Promise.all(
@@ -48,11 +86,12 @@ router.get('/tracker', authenticateToken, async (req, res) => {
           const baseProbationEndDateStr = `${baseProbationEndDate.getFullYear()}-${String(baseProbationEndDate.getMonth() + 1).padStart(2, '0')}-${String(baseProbationEndDate.getDate()).padStart(2, '0')}`;
 
           // STEP 3: Get Attendance Summary (SINGLE SOURCE OF TRUTH)
-          // Use AttendanceSummaryService to get resolved attendance data
+          // Pass pre-fetched sharedData to avoid re-querying holidays and grace period for each employee
           const attendanceSummary = await AttendanceSummaryService.getEmployeeAttendanceSummary(
             employee._id,
             probationStartDateStr,
-            new Date() // Today
+            new Date(), // Today
+            sharedData  // ← shared holidays + grace period pre-fetched once above
           );
 
           // STEP 4: Calculate Extensions Using Resolved Summary Data
@@ -150,10 +189,15 @@ router.get('/tracker', authenticateToken, async (req, res) => {
 
     const validEmployees = employeesWithAnalytics.filter(emp => emp !== null);
 
-    res.json({
+    const result = {
       employees: validEmployees,
       totalCount: validEmployees.length
-    });
+    };
+
+    // Cache result for 2 minutes to avoid rerunning expensive per-employee aggregates
+    probationCache.set('probation_tracker', result);
+
+    res.json(result);
 
   } catch (error) {
     console.error('Error fetching probation tracker data:', error);

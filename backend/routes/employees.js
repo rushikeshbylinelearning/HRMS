@@ -75,6 +75,7 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         const getAllEmployees = req.query.all === 'true';
         const includeInactive = req.query.includeInactive === 'true';
         const statusFilter = req.query.status; // 'active' or 'inactive'
+        const searchQuery = req.query.search || ''; // NEW: server-side search
         
         // --- START OF FIX: Ensure leave balances are always included ---
         // Both `all=true` and paginated requests now include these critical fields.
@@ -94,7 +95,27 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         }
         // If includeInactive is true and no status filter, show all (no isActive filter)
 
+        // NEW: Apply server-side search filter to avoid fetching all employees for client-side filtering
+        if (searchQuery) {
+            employeeQuery.$or = [
+                { fullName: { $regex: searchQuery, $options: 'i' } },
+                { employeeCode: { $regex: searchQuery, $options: 'i' } },
+                { email: { $regex: searchQuery, $options: 'i' } }
+            ];
+        }
+
         if (getAllEmployees) {
+            // Check for slim=true parameter for minimal field selection
+            if (req.query.slim === 'true') {
+                const slimFields = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup profileImageUrl isActive role';
+                const employees = await User.find(employeeQuery)
+                    .select(slimFields)
+                    .populate('shiftGroup', 'shiftName startTime endTime durationHours')
+                    .sort({ fullName: 1 })
+                    .lean();
+                return res.json(employees);
+            }
+            
             // First, get employees without populating reportingPerson to avoid CastError
             const employees = await User.find(employeeQuery)
                 .select(fieldsToSelect)

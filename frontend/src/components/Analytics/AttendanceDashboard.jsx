@@ -6,9 +6,11 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, TextField, InputAdornment, IconButton } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { fetchAttendanceAnalytics } from '../../services/analyticsService';
 import { getISTDateString, getISTNow } from '../../utils/istTime';
 import PageHeroHeader from '../PageHeroHeader';
@@ -24,7 +26,9 @@ function AttendanceDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const debounceRef = useRef(null);
+    const searchDebounceRef = useRef(null);
     const [filters, setFilters] = useState(() => {
         // Initialize with current month
         const now = getISTNow();
@@ -37,6 +41,7 @@ function AttendanceDashboard() {
             location: '',
             shiftType: '',
             employmentStatus: '',
+            search: '',
             page: 1,
             limit: 50
         };
@@ -108,6 +113,34 @@ function AttendanceDashboard() {
         setShowFilters(prev => !prev);
     };
     
+    // Handle search input change
+    const handleSearchChange = (event) => {
+        const value = event.target.value;
+        setSearchQuery(value);
+        
+        // Debounce search to avoid too many API calls
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => {
+            console.log('[AttendanceDashboard] Search query:', value);
+            setFilters(prev => ({
+                ...prev,
+                search: value,
+                page: 1 // Reset to first page when search changes
+            }));
+        }, 500);
+    };
+    
+    // Handle clear search
+    const handleClearSearch = () => {
+        setSearchQuery('');
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        setFilters(prev => ({
+            ...prev,
+            search: '',
+            page: 1
+        }));
+    };
+    
     return (
         <Box className="attendance-dashboard">
             <PageHeroHeader
@@ -115,27 +148,70 @@ function AttendanceDashboard() {
                 title="Attendance Analytics"
                 description="Comprehensive workforce attendance metrics and employee performance insights"
                 actionArea={
-                    <Button
-                        variant="contained"
-                        startIcon={<FilterListIcon />}
-                        onClick={handleToggleFilters}
-                        sx={{
-                            background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-                            color: 'white',
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            px: 3,
-                            py: 1,
-                            borderRadius: '10px',
-                            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-                            '&:hover': {
-                                background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
-                                boxShadow: '0 6px 20px rgba(239, 68, 68, 0.5)',
-                            }
-                        }}
-                    >
-                        Filter
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <TextField
+                            placeholder="Search employees..."
+                            value={searchQuery}
+                            onChange={handleSearchChange}
+                            size="small"
+                            sx={{
+                                minWidth: '280px',
+                                '& .MuiOutlinedInput-root': {
+                                    background: 'white',
+                                    borderRadius: '10px',
+                                    '& fieldset': {
+                                        borderColor: 'rgba(15, 23, 42, 0.12)',
+                                    },
+                                    '&:hover fieldset': {
+                                        borderColor: 'rgba(15, 23, 42, 0.24)',
+                                    },
+                                    '&.Mui-focused fieldset': {
+                                        borderColor: '#3b82f6',
+                                    },
+                                },
+                            }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: '#64748b' }} />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: searchQuery && (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            size="small"
+                                            onClick={handleClearSearch}
+                                            edge="end"
+                                            sx={{ color: '#64748b' }}
+                                        >
+                                            <ClearIcon fontSize="small" />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <Button
+                            variant="contained"
+                            startIcon={<FilterListIcon />}
+                            onClick={handleToggleFilters}
+                            sx={{
+                                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                                color: 'white',
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                px: 3,
+                                py: 1,
+                                borderRadius: '10px',
+                                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                                '&:hover': {
+                                    background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+                                    boxShadow: '0 6px 20px rgba(239, 68, 68, 0.5)',
+                                }
+                            }}
+                        >
+                            Filter
+                        </Button>
+                    </Box>
                 }
             />
             

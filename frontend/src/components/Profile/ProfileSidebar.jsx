@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from 'react';
+import { memo, useState, useRef, useCallback } from 'react';
 import { Card, Typography, Stack, Box, Chip, Divider, IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -18,7 +18,7 @@ import api from '../../api/axios';
  * ENHANCED: Profile image upload with real-time updates across app
  */
 const ProfileSidebar = memo(({ user }) => {
-    const { updateUserContext } = useAuth();
+    const { updateUserContext, refreshUserData } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const fileInputRef = useRef(null);
@@ -91,19 +91,25 @@ const ProfileSidebar = memo(({ user }) => {
             const formData = new FormData();
             formData.append('profileImage', file);
 
-            const response = await api.post('/users/upload-avatar', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
+            // IMPORTANT: Do NOT set Content-Type manually for FormData.
+            // The browser/axios automatically sets 'multipart/form-data; boundary=...'
+            // Setting it manually strips the boundary parameter and breaks parsing.
+            const response = await api.post('/users/upload-avatar', formData);
 
             console.log('[ProfileSidebar] Upload response:', response.data);
 
-            // Update user context with new avatar URL - triggers re-render across app
+            // Immediately update local context for instant UI feedback
             const newImageUrl = response.data.imageUrl;
             console.log('[ProfileSidebar] New image URL:', newImageUrl);
-            
             updateUserContext({ profileImageUrl: newImageUrl });
+
+            // Also refresh from server to sync cache (backend invalidates user cache after upload)
+            try {
+                await refreshUserData();
+            } catch (refreshErr) {
+                // Non-fatal: local context already updated above
+                console.warn('[ProfileSidebar] Could not refresh user data:', refreshErr);
+            }
 
             setSnackbar({
                 open: true,
@@ -124,13 +130,23 @@ const ProfileSidebar = memo(({ user }) => {
         }
     };
 
-    const handleRemoveAvatar = async () => {
+    const handleRemoveAvatar = useCallback(async () => {
         if (uploading || !user?.profileImageUrl) return;
 
         setUploading(true);
         try {
-            // Update user context to remove avatar - triggers re-render across app
+            // Call backend to clear profileImageUrl in DB
+            await api.delete('/users/remove-avatar');
+
+            // Update local context immediately for instant UI feedback
             updateUserContext({ profileImageUrl: '' });
+
+            // Refresh from server to ensure cache is synced
+            try {
+                await refreshUserData();
+            } catch (refreshErr) {
+                console.warn('[ProfileSidebar] Could not refresh user data after removal:', refreshErr);
+            }
 
             setSnackbar({
                 open: true,
@@ -142,13 +158,13 @@ const ProfileSidebar = memo(({ user }) => {
             console.error('[ProfileSidebar] Avatar removal error:', error);
             setSnackbar({
                 open: true,
-                message: 'Failed to remove image. Please try again.',
+                message: error.response?.data?.error || 'Failed to remove image. Please try again.',
                 severity: 'error'
             });
         } finally {
             setUploading(false);
         }
-    };
+    }, [uploading, user?.profileImageUrl, updateUserContext, refreshUserData]);
 
     const handleCloseSnackbar = () => {
         setSnackbar({ ...snackbar, open: false });

@@ -13,4 +13,10 @@ const breakLogSchema = new mongoose.Schema({
   isAutoBreak: { type: Boolean, default: false },
 }, { timestamps: true });
 
+// Index for $lookup joins in attendance summary aggregate
+breakLogSchema.index({ attendanceLog: 1 }, { background: true });
+
+// Index for userId-based queries (used in break management routes)
+breakLogSchema.index({ userId: 1 }, { background: true });
+
 module.exports = mongoose.model('BreakLog', breakLogSchema);

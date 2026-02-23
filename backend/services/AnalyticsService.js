@@ -297,6 +297,17 @@ function buildUserFilterQuery(filters) {
         query.isActive = filters.employmentStatus === 'Active';
     }
     
+    // Add search functionality for employee name or employee code
+    if (filters.search) {
+        const searchRegex = new RegExp(filters.search, 'i'); // Case-insensitive search
+        query.$or = [
+            { fullName: searchRegex },
+            { employeeCode: searchRegex }
+        ];
+        console.log('[AnalyticsService] Search filter applied:', filters.search);
+    }
+    
+    console.log('[AnalyticsService] Built user query:', JSON.stringify(query));
     return query;
 }
 

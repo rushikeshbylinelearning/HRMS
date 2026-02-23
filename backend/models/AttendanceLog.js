@@ -31,11 +31,11 @@ const attendanceLogSchema = new mongoose.Schema({
   totalWorkingHours: { type: Number, default: 0 }, // in hours
   adminOverride: { 
     type: String, 
-    enum: ['None', 'Override Half Day', 'Override Late', 'Override Full Day', 'Override Holiday'], 
+    enum: ['None', 'Override Half Day', 'Override Late', 'Override Full Day', 'Override Holiday', 'Override Leave'], 
     default: 'None' 
   },
   overrideReason: { type: String, default: '' },
-  overrideType: { type: String, enum: ['fullday', 'halfday', 'holiday'], default: null },
+  overrideType: { type: String, enum: ['fullday', 'halfday', 'holiday', 'leave'], default: null },
   // Half-day reason tracking (structured)
   halfDayReasonCode: {
     type: String,

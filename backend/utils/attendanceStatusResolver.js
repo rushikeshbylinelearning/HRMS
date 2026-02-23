@@ -249,6 +249,34 @@ function resolveAttendanceStatus({
     
     // Check attendance log (if exists)
     if (attendanceLog) {
+        // OVERRIDE GUARD: When admin has explicitly overridden this log, trust the stored
+        // status unconditionally. Never recalculate from sessions. The stored attendanceStatus,
+        // isHalfDay, overrideType, and overrideReason are the source of truth.
+        if (attendanceLog.overriddenByAdmin === true) {
+            return {
+                status: attendanceLog.attendanceStatus || 'On-time',
+                statusReason: attendanceLog.overrideReason
+                    ? `Admin override: ${attendanceLog.overrideReason}`
+                    : 'Admin override applied',
+                halfDayReason: attendanceLog.isHalfDay
+                    ? (attendanceLog.halfDayReasonText || attendanceLog.overrideReason || 'Admin override')
+                    : null,
+                halfDayReasonCode: attendanceLog.isHalfDay
+                    ? (attendanceLog.halfDayReasonCode || 'MANUAL_ADMIN')
+                    : null,
+                halfDaySource: attendanceLog.halfDaySource || null,
+                overriddenByAdmin: true,
+                isWorkingDay: true,
+                isHoliday: false,
+                isWeeklyOff: false,
+                isLeave: false,
+                isAbsent: attendanceLog.attendanceStatus === 'Absent',
+                isHalfDay: attendanceLog.isHalfDay || false,
+                holidayInfo: null,
+                leaveInfo: null
+            };
+        }
+        
         // hasSessions already checked above (line 207-209), reuse it
         
         // Check if log has sessions OR if it's an override case (log exists but might not have sessions yet)

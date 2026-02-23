@@ -141,4 +141,7 @@ leaveRequestSchema.index(
 leaveRequestSchema.index({ status: 1, requestType: 1 }, { background: true });
 leaveRequestSchema.index({ status: 1, leaveDates: 1 }, { background: true });
 
+// Compound index for attendance summary query: approved leaves for a specific employee
+leaveRequestSchema.index({ employee: 1, status: 1, leaveDates: 1 }, { background: true });
+
 module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);

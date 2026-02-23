@@ -17,4 +17,7 @@ const attendanceSessionSchema = new mongoose.Schema({
 // Index for "who's in" and dashboard queries: match active sessions (endTime: null)
 attendanceSessionSchema.index({ endTime: 1 }, { background: true });
 
+// Index for $lookup joins in attendance summary aggregate
+attendanceSessionSchema.index({ attendanceLog: 1 }, { background: true });
+
 module.exports = mongoose.model('AttendanceSession', attendanceSessionSchema);

@@ -115,7 +115,13 @@ function uploadAvatarGridFS(req, res, next) {
         res.status(status).json({ error: message });
     }
 
-    const bb = busboy({ headers: { 'content-type': contentType } });
+    let bb;
+    try {
+        bb = busboy({ headers: { 'content-type': contentType } });
+    } catch (bbErr) {
+        // busboy throws synchronously if Content-Type is malformed (e.g. missing boundary)
+        return res.status(400).json({ error: 'Invalid multipart request: ' + bbErr.message });
+    }
 
     bb.on('file', (fieldname, file, info) => {
         if (fieldname !== 'profileImage') { file.resume(); return; }

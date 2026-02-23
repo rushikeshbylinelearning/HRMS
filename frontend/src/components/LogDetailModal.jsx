@@ -83,13 +83,181 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, onRefresh, 
         }
     }, [log, open, isAdmin]);
 
+    // --- ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS ---
+    // This ensures hooks are called in the same order on every render
+    
     const timelineEvents = useMemo(() => {
         if (!log) return [];
         const sessions = (log.sessions || []).map(s => ({ ...s, eventType: 'session' }));
         const breaks = (Array.isArray(log.breaks) ? log.breaks : []).map(b => ({ ...b, eventType: 'break' }));
         return [...sessions, ...breaks].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
     }, [log]);
-    
+
+    // --- Hooks hoisted from ReadOnlyView to comply with Rules of Hooks ---
+    // useMemo must not be called inside a nested function/component defined within render.
+    const calculateStats = useMemo(() => {
+        if (!log) return { 
+            totalWorkMinutes: 0, 
+            totalBreakMinutes: 0, 
+            paidBreakMinutes: 0,
+            firstCheckIn: null,
+            lastCheckOut: null
+        };
+        
+        const sessions = log.sessions || [];
+        const breaks = Array.isArray(log.breaks) ? log.breaks : [];
+        
+        const totalWorkMinutes = sessions.reduce((acc, session) => {
+            if (session.startTime || session.start_time) {
+                const start = new Date(session.startTime || session.start_time);
+                const end = session.endTime || session.end_time ? 
+                    new Date(session.endTime || session.end_time) : new Date();
+                return acc + (end - start) / (1000 * 60);
+            }
+            return acc;
+        }, 0);
+        
+        const totalBreakMinutes = breaks.reduce((acc, breakItem) => {
+            if (breakItem.startTime || breakItem.start_time) {
+                const start = new Date(breakItem.startTime || breakItem.start_time);
+                const end = breakItem.endTime || breakItem.end_time ? 
+                    new Date(breakItem.endTime || breakItem.end_time) : new Date();
+                return acc + (end - start) / (1000 * 60);
+            }
+            return acc;
+        }, 0);
+        
+        const paidBreakMinutes = breaks
+            .filter(b => (b.breakType || b.type || '').toLowerCase() === 'paid')
+            .reduce((acc, breakItem) => {
+                if (breakItem.startTime || breakItem.start_time) {
+                    const start = new Date(breakItem.startTime || breakItem.start_time);
+                    const end = breakItem.endTime || breakItem.end_time ? 
+                        new Date(breakItem.endTime || breakItem.end_time) : new Date();
+                    return acc + (end - start) / (1000 * 60);
+                }
+                return acc;
+            }, 0);
+        
+        // Get first check-in and last check-out
+        const firstCheckIn = sessions.length > 0 ? 
+            (sessions[0].startTime || sessions[0].start_time) : null;
+        
+        const lastCheckOut = sessions.length > 0 && sessions[sessions.length - 1].endTime ? 
+            (sessions[sessions.length - 1].endTime || sessions[sessions.length - 1].end_time) : 
+            (log.clockOutTime || null);
+        
+        return {
+            totalWorkMinutes: Math.max(0, totalWorkMinutes - totalBreakMinutes),
+            totalBreakMinutes,
+            paidBreakMinutes,
+            firstCheckIn,
+            lastCheckOut
+        };
+    }, [log]);
+
+    const processedTimeline = useMemo(() => {
+        if (!log) return [];
+        
+        const sessions = (log.sessions || [])
+            .filter(s => s && (s.startTime || s.start_time))
+            .map(s => ({
+                type: 'session',
+                startTime: s.startTime || s.start_time,
+                endTime: s.endTime || s.end_time,
+                location: s.location || s.address || null
+            }));
+        
+        const breaks = (log.breaks || [])
+            .filter(b => b && (b.startTime || b.start_time))
+            .map(b => ({
+                type: 'break',
+                startTime: b.startTime || b.start_time,
+                endTime: b.endTime || b.end_time,
+                breakType: b.breakType || b.type || 'Break',
+                location: b.location || b.address || null
+            }));
+        
+        const timeline = [];
+        
+        for (const session of sessions) {
+            const sessionStart = new Date(session.startTime);
+            const sessionEnd = session.endTime ? new Date(session.endTime) : null;
+            
+            const breaksInSession = breaks.filter(breakItem => {
+                const breakStart = new Date(breakItem.startTime);
+                const breakEnd = breakItem.endTime ? new Date(breakItem.endTime) : null;
+                return breakStart >= sessionStart && 
+                       (!sessionEnd || (breakEnd && breakEnd <= sessionEnd));
+            }).sort((a, b) => {
+                return new Date(a.startTime) - new Date(b.startTime);
+            });
+            
+            if (breaksInSession.length === 0) {
+                timeline.push(session);
+            } else {
+                let currentStart = sessionStart;
+                
+                for (let i = 0; i < breaksInSession.length; i++) {
+                    const breakItem = breaksInSession[i];
+                    const breakStart = new Date(breakItem.startTime);
+                    const breakEnd = breakItem.endTime ? new Date(breakItem.endTime) : null;
+                    
+                    if (currentStart < breakStart) {
+                        timeline.push({
+                            type: 'session',
+                            startTime: currentStart.toISOString(),
+                            endTime: breakStart.toISOString(),
+                            location: session.location
+                        });
+                    }
+                    
+                    timeline.push(breakItem);
+                    currentStart = breakEnd || breakStart;
+                }
+                
+                if (sessionEnd && currentStart < sessionEnd) {
+                    timeline.push({
+                        type: 'session',
+                        startTime: currentStart.toISOString(),
+                        endTime: sessionEnd.toISOString(),
+                        location: session.location
+                    });
+                } else if (!sessionEnd && currentStart > sessionStart) {
+                    timeline.push({
+                        type: 'session',
+                        startTime: currentStart.toISOString(),
+                        endTime: null,
+                        location: session.location
+                    });
+                }
+            }
+        }
+        
+        for (const breakItem of breaks) {
+            const breakStart = new Date(breakItem.startTime);
+            const isInSession = sessions.some(session => {
+                const sessionStart = new Date(session.startTime);
+                const sessionEnd = session.endTime ? new Date(session.endTime) : null;
+                return breakStart >= sessionStart && 
+                       (!sessionEnd || breakStart <= sessionEnd);
+            });
+            
+            if (!isInSession) {
+                timeline.push(breakItem);
+            }
+        }
+        
+        timeline.sort((a, b) => {
+            const timeA = new Date(a.startTime);
+            const timeB = new Date(b.startTime);
+            return timeA - timeB;
+        });
+        
+        return timeline;
+    }, [log]);
+
+    // --- CONDITIONAL RETURNS AFTER ALL HOOKS ---
     // Allow modal to open even without log if there's holiday or leave info
     // CRITICAL FIX: Prevent opening modal for absent/week-off/weekend when there's no log
     if (!date) return null;
@@ -397,7 +565,57 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, onRefresh, 
         // Also show leave info when log exists but it's a leave day (no sessions)
         const isLeaveDay = leave || log?.isLeave || log?.attendanceStatus === 'Leave' || log?.leaveInfo;
         const hasNoSessions = !log?.sessions || log.sessions.length === 0;
-        if ((!log && (holiday || leave)) || (isLeaveDay && hasNoSessions && !holiday)) {
+
+        // Shared override note block — reused in both the early-return branch and the main view
+        const overrideNoteText = (typeof log?.overrideReason === 'string' && log.overrideReason.trim().length > 0)
+            ? log.overrideReason.trim()
+            : (typeof log?.adminOverride === 'string' && log.adminOverride !== 'None' && log.adminOverride.trim().length > 0)
+                ? log.adminOverride.trim()
+                : null;
+        const hasValidOverrideNote = log?.overriddenByAdmin === true && overrideNoteText !== null;
+
+        const OverrideNoteBlock = hasValidOverrideNote ? (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fff8e1', borderRadius: 1, border: '1px solid #ffc107' }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#856404', display: 'block', mb: 0.5 }}>
+                    Overridden by Admin
+                </Typography>
+                <Typography variant="body2" color="text.primary" sx={{ mb: 0.5 }}>
+                    {overrideNoteText}
+                </Typography>
+                {log?.overriddenAt && (
+                    <Typography variant="caption" sx={{ color: '#856404', display: 'block', mt: 0.5 }}>
+                        Applied: {new Date(log.overriddenAt).toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata',
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        })}
+                    </Typography>
+                )}
+            </Box>
+        ) : null;
+
+        const isAdminOverriddenNoSessions = !isLeaveDay && !holiday && hasNoSessions && hasValidOverrideNote;
+
+        if ((!log && (holiday || leave)) || (isLeaveDay && hasNoSessions && !holiday) || isAdminOverriddenNoSessions) {
+            // For pure admin-override records with no sessions, show a dedicated override-only card
+            if (isAdminOverriddenNoSessions) {
+                return (
+                    <DialogContent className="dialog-content audit-dialog-content">
+                        <Box className="audit-timeline-container">
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                <Typography variant="body2">
+                                    This day has no clock-in record. Attendance status was set directly by admin override.
+                                </Typography>
+                            </Alert>
+                            {OverrideNoteBlock}
+                        </Box>
+                    </DialogContent>
+                );
+            }
             return (
                 <DialogContent className="dialog-content audit-dialog-content">
                     <Box className="audit-timeline-container">
@@ -505,192 +723,17 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, onRefresh, 
                                 </Box>
                             ) : null}
                         </Alert>
+                        {/* ── OVERRIDE NOTE ── Always show when admin has overridden this day,
+                            even if it's a leave day or has no sessions. This was previously
+                            missing from this early-return branch. */}
+                        {OverrideNoteBlock}
                     </Box>
                 </DialogContent>
             );
         }
 
-        const calculateStats = useMemo(() => {
-            if (!log) return { 
-                totalWorkMinutes: 0, 
-                totalBreakMinutes: 0, 
-                paidBreakMinutes: 0,
-                firstCheckIn: null,
-                lastCheckOut: null
-            };
-            
-            const sessions = log.sessions || [];
-            const breaks = Array.isArray(log.breaks) ? log.breaks : [];
-            
-            const totalWorkMinutes = sessions.reduce((acc, session) => {
-                if (session.startTime || session.start_time) {
-                    const start = new Date(session.startTime || session.start_time);
-                    const end = session.endTime || session.end_time ? 
-                        new Date(session.endTime || session.end_time) : new Date();
-                    return acc + (end - start) / (1000 * 60);
-                }
-                return acc;
-            }, 0);
-            
-            const totalBreakMinutes = breaks.reduce((acc, breakItem) => {
-                if (breakItem.startTime || breakItem.start_time) {
-                    const start = new Date(breakItem.startTime || breakItem.start_time);
-                    const end = breakItem.endTime || breakItem.end_time ? 
-                        new Date(breakItem.endTime || breakItem.end_time) : new Date();
-                    return acc + (end - start) / (1000 * 60);
-                }
-                return acc;
-            }, 0);
-            
-            const paidBreakMinutes = breaks
-                .filter(b => (b.breakType || b.type || '').toLowerCase() === 'paid')
-                .reduce((acc, breakItem) => {
-                    if (breakItem.startTime || breakItem.start_time) {
-                        const start = new Date(breakItem.startTime || breakItem.start_time);
-                        const end = breakItem.endTime || breakItem.end_time ? 
-                            new Date(breakItem.endTime || breakItem.end_time) : new Date();
-                        return acc + (end - start) / (1000 * 60);
-                    }
-                    return acc;
-                }, 0);
-            
-            // Get first check-in and last check-out
-            const firstCheckIn = sessions.length > 0 ? 
-                (sessions[0].startTime || sessions[0].start_time) : null;
-            
-            const lastCheckOut = sessions.length > 0 && sessions[sessions.length - 1].endTime ? 
-                (sessions[sessions.length - 1].endTime || sessions[sessions.length - 1].end_time) : 
-                (log.clockOutTime || null);
-            
-            return {
-                totalWorkMinutes: Math.max(0, totalWorkMinutes - totalBreakMinutes),
-                totalBreakMinutes,
-                paidBreakMinutes,
-                firstCheckIn,
-                lastCheckOut
-            };
-        }, [log]);
-
-        // Process sessions and breaks into timeline
-        // Breaks separate work sessions - split sessions at break boundaries
-        const processedTimeline = useMemo(() => {
-            if (!log) return [];
-            
-            const sessions = (log.sessions || [])
-                .filter(s => s && (s.startTime || s.start_time))
-                .map(s => ({
-                    type: 'session',
-                    startTime: s.startTime || s.start_time,
-                    endTime: s.endTime || s.end_time,
-                    location: s.location || s.address || null
-                }));
-            
-            const breaks = (log.breaks || [])
-                .filter(b => b && (b.startTime || b.start_time))
-                .map(b => ({
-                    type: 'break',
-                    startTime: b.startTime || b.start_time,
-                    endTime: b.endTime || b.end_time,
-                    breakType: b.breakType || b.type || 'Break',
-                    location: b.location || b.address || null
-                }));
-            
-            // Split sessions at break boundaries
-            // Example: Session 9am-5pm with break 12pm-1pm becomes:
-            // Session 9am-12pm, Break 12pm-1pm, Session 1pm-5pm
-            const timeline = [];
-            
-            for (const session of sessions) {
-                const sessionStart = new Date(session.startTime);
-                const sessionEnd = session.endTime ? new Date(session.endTime) : null;
-                
-                // Find all breaks that occur within this session
-                const breaksInSession = breaks.filter(breakItem => {
-                    const breakStart = new Date(breakItem.startTime);
-                    const breakEnd = breakItem.endTime ? new Date(breakItem.endTime) : null;
-                    
-                    // Break is within session if:
-                    // - Break starts after session starts
-                    // - Break ends before session ends (or session has no end)
-                    return breakStart >= sessionStart && 
-                           (!sessionEnd || (breakEnd && breakEnd <= sessionEnd));
-                }).sort((a, b) => {
-                    return new Date(a.startTime) - new Date(b.startTime);
-                });
-                
-                if (breaksInSession.length === 0) {
-                    // No breaks in this session, add it as-is
-                    timeline.push(session);
-                } else {
-                    // Split session at break boundaries
-                    let currentStart = sessionStart;
-                    
-                    for (let i = 0; i < breaksInSession.length; i++) {
-                        const breakItem = breaksInSession[i];
-                        const breakStart = new Date(breakItem.startTime);
-                        const breakEnd = breakItem.endTime ? new Date(breakItem.endTime) : null;
-                        
-                        // Add work session before this break
-                        if (currentStart < breakStart) {
-                            timeline.push({
-                                type: 'session',
-                                startTime: currentStart.toISOString(),
-                                endTime: breakStart.toISOString(),
-                                location: session.location
-                            });
-                        }
-                        
-                        // Add the break
-                        timeline.push(breakItem);
-                        
-                        // Update current start to after the break
-                        currentStart = breakEnd || breakStart;
-                    }
-                    
-                    // Add remaining work session after last break
-                    if (sessionEnd && currentStart < sessionEnd) {
-                        timeline.push({
-                            type: 'session',
-                            startTime: currentStart.toISOString(),
-                            endTime: sessionEnd.toISOString(),
-                            location: session.location
-                        });
-                    } else if (!sessionEnd && currentStart > sessionStart) {
-                        // Session has no end time, add remaining portion
-                        timeline.push({
-                            type: 'session',
-                            startTime: currentStart.toISOString(),
-                            endTime: null,
-                            location: session.location
-                        });
-                    }
-                }
-            }
-            
-            // Add any breaks that don't fall within any session
-            for (const breakItem of breaks) {
-                const breakStart = new Date(breakItem.startTime);
-                const isInSession = sessions.some(session => {
-                    const sessionStart = new Date(session.startTime);
-                    const sessionEnd = session.endTime ? new Date(session.endTime) : null;
-                    return breakStart >= sessionStart && 
-                           (!sessionEnd || breakStart <= sessionEnd);
-                });
-                
-                if (!isInSession) {
-                    timeline.push(breakItem);
-                }
-            }
-            
-            // Sort timeline chronologically
-            timeline.sort((a, b) => {
-                const timeA = new Date(a.startTime);
-                const timeB = new Date(b.startTime);
-                return timeA - timeB;
-            });
-            
-            return timeline;
-        }, [log]);
+        // calculateStats and processedTimeline are defined at the parent component level
+        // (above ReadOnlyView) to comply with React Rules of Hooks.
 
         // Get shift time range for header
         const getShiftTimeRange = () => {
@@ -794,17 +837,8 @@ const LogDetailModal = ({ open, onClose, log, date, isAdmin, onSave, onRefresh, 
                         </Grid>
                     </Grid>
 
-                    {/* Admin override note: strict check — overrideReason required */}
-                    {log?.overriddenByAdmin === true && typeof log?.overrideReason === 'string' && log.overrideReason.trim().length > 0 && (
-                        <Box sx={{ mt: 2, mb: 2, p: 1.5, bgcolor: '#fff8e1', borderRadius: 1, border: '1px solid #ffc107' }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#856404', display: 'block', mb: 0.5 }}>
-                                Overridden
-                            </Typography>
-                            <Typography variant="body2" color="text.primary">
-                                {log.overrideReason.trim()}
-                            </Typography>
-                        </Box>
-                    )}
+                    {/* Admin override note — uses shared OverrideNoteBlock defined at top of ReadOnlyView */}
+                    {OverrideNoteBlock}
 
                     {/* Early Checkout Reason (synced with notes; editable from Admin Notes section) */}
                     {(() => {

@@ -23,6 +23,7 @@ const analyticsCacheService = require('../services/analyticsCacheService');
  * - location: string (optional)
  * - shiftType: string (optional, 'Fixed' | 'Flexible')
  * - employmentStatus: string (optional, 'Active' | 'Inactive')
+ * - search: string (optional, search by employee name or code)
  * - page: number (optional, default: 1)
  * - limit: number (optional, default: 50, max: 1000)
  * 
@@ -43,9 +44,12 @@ async function getAttendanceAnalytics(req, res) {
             location,
             shiftType,
             employmentStatus,
+            search,
             page,
             limit
         } = req.query;
+        
+        console.log('[analyticsController] Received query params:', { startDate, endDate, department, location, shiftType, employmentStatus, search, page, limit });
         
         // Validate required parameters
         if (!startDate || !endDate) {
@@ -124,6 +128,7 @@ async function getAttendanceAnalytics(req, res) {
         if (location) filters.location = location;
         if (shiftType) filters.shiftType = shiftType;
         if (employmentStatus) filters.employmentStatus = employmentStatus;
+        if (search) filters.search = search;
         
         // CHECK CACHE FIRST
         const cachedResult = await analyticsCacheService.getCachedAnalytics(filters);

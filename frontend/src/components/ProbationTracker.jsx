@@ -1,7 +1,7 @@
 // frontend/src/components/ProbationTracker.jsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Alert, Tooltip, IconButton, TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem, Grid, Collapse, Stack, OutlinedInput } from '@mui/material';
+import { Box, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Alert, Tooltip, IconButton, TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem, Grid, Collapse, Stack, OutlinedInput, Skeleton } from '@mui/material';
 import {
   Refresh,
   Info,
@@ -274,23 +274,9 @@ const ProbationTracker = () => {
         <Box sx={{ mb: 3 }}>
           <Card sx={{ borderRadius: '8px', backgroundColor: 'white', border: '1px solid #E5E7EB' }}>
             <CardContent sx={{ p: 0 }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Box key={i} sx={{ p: 2, borderBottom: '1px solid #F3F4F6' }}>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <SkeletonBox width="40px" height="40px" borderRadius="50%" />
-                    <Box sx={{ flex: 1 }}>
-                      <SkeletonBox width="200px" height="16px" sx={{ mb: 1 }} />
-                      <SkeletonBox width="100px" height="12px" />
-                    </Box>
-                    <SkeletonBox width="100px" height="16px" />
-                    <SkeletonBox width="100px" height="16px" />
-                    <SkeletonBox width="100px" height="16px" />
-                    <SkeletonBox width="80px" height="24px" borderRadius="12px" />
-                    <SkeletonBox width="60px" height="16px" />
-                    <SkeletonBox width="60px" height="16px" />
-                    <SkeletonBox width="32px" height="32px" borderRadius="50%" />
-                  </Box>
-                </Box>
+              <Skeleton variant="rectangular" height={56} sx={{ mb: 2, borderRadius: 1 }} />
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} variant="rectangular" height={52} sx={{ mb: 1, borderRadius: 1 }} />
               ))}
             </CardContent>
           </Card>

@@ -57,7 +57,18 @@ const UserAvatar = memo(({ user, size = 'md', className = '', lazy = false, sx =
     const avatarSize = typeof size === 'number' ? size : SIZE_PRESETS[size] || SIZE_PRESETS.md;
 
     // Extract image URL from user object
+    // CRITICAL: Reset imageError when the URL itself changes so a new URL is always tried
+    const prevProfileUrlRef = useRef(null);
     useEffect(() => {
+        const newUrl = user?.profileImageUrl || null;
+        if (newUrl !== prevProfileUrlRef.current) {
+            prevProfileUrlRef.current = newUrl;
+            if (imageError) {
+                setImageError(false); // URL changed — clear stale error so image retries
+                return; // The next render cycle will re-run this effect with imageError=false
+            }
+        }
+
         console.log('[UserAvatar] User data:', user);
         console.log('[UserAvatar] profileImageUrl:', user?.profileImageUrl);
         console.log('[UserAvatar] imageError:', imageError);

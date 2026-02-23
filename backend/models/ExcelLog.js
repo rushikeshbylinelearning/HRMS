@@ -17,7 +17,7 @@ const excelLogSchema = new mongoose.Schema({
             'AUTO_LOGOUT', // Auto logout when employee forgets to log out
             'LEAVE_REQUEST_SUBMITTED', 'LEAVE_REQUEST_APPROVED', 'LEAVE_REQUEST_REJECTED',
             'MARK_HALF_DAY', 'UNMARK_HALF_DAY',
-            'UPDATE_OVERRIDE', 'REMOVE_OVERRIDE', 'BULK_OVERRIDE'
+            'OVERRIDE_HALF_DAY', 'UPDATE_OVERRIDE', 'REMOVE_OVERRIDE', 'BULK_OVERRIDE'
             // Add more types as needed
         ],
         index: true

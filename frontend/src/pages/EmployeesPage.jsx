@@ -98,7 +98,7 @@ const EmployeesPage = () => {
             if (searchQuery !== searchDebounceRef.current) {
                 searchDebounceRef.current = searchQuery;
                 setPage(0); // Reset to first page on search
-                fetchInitialData();
+                // fetchInitialData will be triggered by page change or via the main effect below
             }
         }, 300);
 
@@ -108,52 +108,32 @@ const EmployeesPage = () => {
     const fetchInitialData = useCallback(async () => {
         const useInitialLoader = initialLoadRef.current;
         const currentSearch = searchDebounceRef.current || '';
-        const isSearching = currentSearch.length > 0;
         
         if (useInitialLoader) {
             setLoading(true);
-        } else if (!isSearching) {
+        } else {
             setIsRefreshing(true);
         }
         
         try {
-            const shouldFetchAll = isSearching;
+            // PERFORMANCE FIX: Always use paginated endpoint with server-side search.
+            // Previously, any search triggered ?all=true fetching the entire employee list.
+            // Now we pass the search term to the backend and always get a paginated slice.
+            const searchParam = currentSearch ? `&search=${encodeURIComponent(currentSearch)}` : '';
+            const empsRes = await api.get(
+                `/admin/employees?page=${page + 1}&limit=${rowsPerPage}&status=active${searchParam}`
+            );
             
-            const [empsRes, shiftsRes] = await Promise.all([
-                shouldFetchAll 
-                    ? api.get('/admin/employees?all=true&status=active')
-                    : api.get(`/admin/employees?page=${page + 1}&limit=${rowsPerPage}&status=active`),
-                api.get('/admin/shifts'),
-            ]);
-            
-            // Handle paginated or all employees response
-            if (shouldFetchAll) {
-                // When fetching all, response is just an array
-                const allEmps = Array.isArray(empsRes.data) ? empsRes.data : [];
-                setEmployees(allEmps);
-                allEmployeesRef.current = allEmps;
-                setTotalCount(allEmps.length);
+            let emps = [];
+            if (empsRes.data.employees) {
+                emps = Array.isArray(empsRes.data.employees) ? empsRes.data.employees : [];
+                setTotalCount(empsRes.data.totalCount || 0);
             } else {
-                // When paginated, response has employees and totalCount
-                let emps = [];
-                if (empsRes.data.employees) {
-                    emps = Array.isArray(empsRes.data.employees) ? empsRes.data.employees : [];
-                    setTotalCount(empsRes.data.totalCount || 0);
-                } else {
-                    emps = Array.isArray(empsRes.data) ? empsRes.data : [];
-                    setTotalCount(emps.length);
-                }
-                setEmployees(emps);
-                // Clear all employees ref when not searching
-                allEmployeesRef.current = [];
+                emps = Array.isArray(empsRes.data) ? empsRes.data : [];
+                setTotalCount(emps.length);
             }
-            
-            // Handle paginated response for shifts
-            if (shiftsRes.data.shifts) {
-                setAllShifts(Array.isArray(shiftsRes.data.shifts) ? shiftsRes.data.shifts : []);
-            } else {
-                setAllShifts(Array.isArray(shiftsRes.data) ? shiftsRes.data : []);
-            }
+            setEmployees(emps);
+            allEmployeesRef.current = []; // No longer needed with server-side search
         } catch (err) {
             setError('Failed to fetch initial page data.');
             console.error(err);
@@ -166,6 +146,19 @@ const EmployeesPage = () => {
             }
         }
     }, [page, rowsPerPage]);
+
+    // Fetch shifts ONCE on mount — they rarely change so no need to refetch on every data refresh
+    useEffect(() => {
+        api.get('/admin/shifts').then(shiftsRes => {
+            if (shiftsRes.data.shifts) {
+                setAllShifts(Array.isArray(shiftsRes.data.shifts) ? shiftsRes.data.shifts : []);
+            } else {
+                setAllShifts(Array.isArray(shiftsRes.data) ? shiftsRes.data : []);
+            }
+        }).catch(err => {
+            console.error('[EmployeesPage] Failed to fetch shifts:', err);
+        });
+    }, []); // Empty deps: run once on mount only
 
     useEffect(() => {
         fetchInitialData();
@@ -355,29 +348,14 @@ const EmployeesPage = () => {
         setPage(0);
     };
 
-    const filteredEmployees = useMemo(() => {
-        const currentSearch = searchDebounceRef.current || '';
-        if (!currentSearch) return employees;
-        
-        const sourceEmployees = allEmployeesRef.current.length > 0 ? allEmployeesRef.current : employees;
-        const searchLower = currentSearch.toLowerCase();
-        
-        return sourceEmployees.filter(employee =>
-            employee.fullName?.toLowerCase().includes(searchLower) ||
-            employee.employeeCode?.toLowerCase().includes(searchLower) ||
-            employee.email?.toLowerCase().includes(searchLower)
-        );
-    }, [employees]);
+    // With server-side search and pagination, employees already contain the correct filtered/paged slice.
+    // filteredEmployees is kept for TablePagination count purposes.
+    const filteredEmployees = employees;
     
     const visibleRows = useMemo(() => {
-        const sorted = stableSort(filteredEmployees, getComparator(order, orderBy));
-        const currentSearch = searchDebounceRef.current || '';
-        
-        if (currentSearch) {
-            return sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-        }
-        return sorted;
-    }, [filteredEmployees, order, orderBy, page, rowsPerPage]);
+        // Sort client-side (within the current page) for instant column sort feel
+        return stableSort(employees, getComparator(order, orderBy));
+    }, [employees, order, orderBy]);
 
     const handleMenuOpen = (event) => {
         setMenuAnchorEl(event.currentTarget);
@@ -574,7 +552,7 @@ const EmployeesPage = () => {
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
-                    count={(searchDebounceRef.current || '') ? filteredEmployees.length : totalCount}
+                    count={totalCount}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}

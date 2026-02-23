@@ -18,6 +18,7 @@ import { cachedApiCall } from '../utils/apiCache';
  * @param {string} [filters.location] - Location filter
  * @param {string} [filters.shiftType] - Shift type filter
  * @param {string} [filters.employmentStatus] - Employment status filter
+ * @param {string} [filters.search] - Search query for employee name/ID
  * @param {number} [filters.page] - Page number
  * @param {number} [filters.limit] - Records per page
  * 
@@ -34,8 +35,11 @@ export async function fetchAttendanceAnalytics(filters) {
         if (filters.location) params.append('location', filters.location);
         if (filters.shiftType) params.append('shiftType', filters.shiftType);
         if (filters.employmentStatus) params.append('employmentStatus', filters.employmentStatus);
+        if (filters.search) params.append('search', filters.search);
         if (filters.page) params.append('page', filters.page);
         if (filters.limit) params.append('limit', filters.limit);
+        
+        console.log('[analyticsService] Fetching with filters:', Object.fromEntries(params));
         
         // Make API request using centralized axios instance with caching
         const response = await cachedApiCall(

@@ -1598,6 +1598,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 overrideReason: log?.overrideReason || null,
                 overrideType: log?.overrideType || null,
                 adminOverride: log?.adminOverride || null,
+                overriddenAt: log?.overriddenAt || null,
+                overriddenBy: log?.overriddenBy || null,
                 leaveReason: statusInfo.leaveReason || null,
                 // Holiday/Leave info (effective: half-day with no check-in → Full Day LOP)
                 holidayInfo: statusInfo.holidayInfo,
@@ -1665,7 +1667,32 @@ router.get('/summary', authenticateToken, async (req, res) => {
                 
                 if (sortedSessions[0]?.startTime) {
                     result.firstIn = sortedSessions[0].startTime;
-                    
+                }
+                
+                const sessionsWithEnd = sortedSessions.filter(s => s.endTime);
+                if (sessionsWithEnd.length > 0) {
+                    const lastSession = sessionsWithEnd[sessionsWithEnd.length - 1];
+                    result.lastOut = lastSession.endTime;
+                }
+                
+                // RULE: Today + no checkout -> do not mark half-day; show Present (On-time) in all views
+                const todayIST = getISTDateString();
+                const noCheckout = sessionsWithEnd.length === 0;
+                if (attendanceDate === todayIST && noCheckout && (result.isHalfDay || result.attendanceStatus === 'Half-day')) {
+                    result.attendanceStatus = 'On-time';
+                    result.isHalfDay = false;
+                    result.halfDayReasonCode = null;
+                    result.halfDayReasonText = null;
+                    result.halfDayReason = null;
+                    result.halfDaySource = null;
+                    const { SHIFT_WORKING_MINUTES } = require('../config/shiftPolicy');
+                    result.payableMinutes = SHIFT_WORKING_MINUTES; // full day
+                }
+                
+                // STATUS RECALCULATION: Only run when NOT overridden
+                // For overridden logs, firstIn and lastOut are still populated above (timeline display works),
+                // but status fields retain what was set during result construction from statusInfo
+                if (!log.overriddenByAdmin) {
                     // CRITICAL: Recalculate lateMinutes from FIRST check-in time
                     // This ensures we always use the actual first check-in, even if stored lateMinutes is wrong
                     // Use userWithShift fetched above (already populated with shiftGroup)
@@ -1751,25 +1778,6 @@ router.get('/summary', authenticateToken, async (req, res) => {
                     } else {
                         console.warn(`[Attendance Summary] ⚠️ Cannot recalculate lateMinutes for log ${log._id}: Missing user or shiftGroup data. log.user: ${!!log.user}, userWithShift: ${!!userWithShift}`);
                     }
-                }
-                
-                const sessionsWithEnd = sortedSessions.filter(s => s.endTime);
-                if (sessionsWithEnd.length > 0) {
-                    const lastSession = sessionsWithEnd[sessionsWithEnd.length - 1];
-                    result.lastOut = lastSession.endTime;
-                }
-                // RULE: Today + no checkout -> do not mark half-day; show Present (On-time) in all views
-                const todayIST = getISTDateString();
-                const noCheckout = sessionsWithEnd.length === 0;
-                if (attendanceDate === todayIST && noCheckout && (result.isHalfDay || result.attendanceStatus === 'Half-day')) {
-                    result.attendanceStatus = 'On-time';
-                    result.isHalfDay = false;
-                    result.halfDayReasonCode = null;
-                    result.halfDayReasonText = null;
-                    result.halfDayReason = null;
-                    result.halfDaySource = null;
-                    const { SHIFT_WORKING_MINUTES } = require('../config/shiftPolicy');
-                    result.payableMinutes = SHIFT_WORKING_MINUTES; // full day
                 }
             }
 

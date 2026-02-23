@@ -53,6 +53,9 @@ const AttendanceSummaryPage = () => {
     // Track data freshness for debugging (internal only - not displayed to users)
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
+    // Socket refresh debounce timer
+    const socketRefreshTimerRef = useRef(null);
+
     const fetchLogsForWeekRef = useRef(null);
     
     // Create stable fetch function using IST utilities
@@ -129,12 +132,15 @@ const AttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
-                // Refetch so calendar reflects approval, rejection, or deletion (no stale leave data)
-                if (fetchLogsForWeekRef.current) {
-                    fetchLogsForWeekRef.current(currentDate).catch(err => {
-                        console.error('Failed to refresh after leave update:', err);
-                    });
-                }
+                // Debounce refresh to avoid multiple rapid updates
+                if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
+                socketRefreshTimerRef.current = setTimeout(() => {
+                    if (fetchLogsForWeekRef.current) {
+                        fetchLogsForWeekRef.current(currentDate).catch(err => {
+                            console.error('Failed to refresh after leave update:', err);
+                        });
+                    }
+                }, 3000);
             }
         };
 
@@ -149,13 +155,15 @@ const AttendanceSummaryPage = () => {
             );
 
             if (isRelevantUpdate) {
-                // Refetch to get latest data from backend (includes admin overrides)
-                // Backend is single source of truth - we trust its resolved status
-                if (fetchLogsForWeekRef.current) {
-                    fetchLogsForWeekRef.current(currentDate).catch(err => {
-                        console.error('Failed to refresh after attendance update:', err);
-                    });
-                }
+                // Debounce refresh to avoid multiple rapid updates
+                if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
+                socketRefreshTimerRef.current = setTimeout(() => {
+                    if (fetchLogsForWeekRef.current) {
+                        fetchLogsForWeekRef.current(currentDate).catch(err => {
+                            console.error('Failed to refresh after attendance update:', err);
+                        });
+                    }
+                }, 3000);
             }
         };
 
@@ -163,6 +171,7 @@ const AttendanceSummaryPage = () => {
         socket.on('attendance_log_updated', handleAttendanceUpdate);
 
         return () => {
+            if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
             socket.off('leave_request_updated', handleLeaveUpdate);
             socket.off('attendance_log_updated', handleAttendanceUpdate);
         };

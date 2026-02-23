@@ -6,6 +6,7 @@ const router = express.Router();
 const User = require('../models/User');
 const authenticateToken = require('../middleware/authenticateToken');
 const uploadAvatarGridFS = require('../middleware/uploadAvatarGridFS'); // NEW: Secure GridFS upload
+const cacheService = require('../services/cacheService');
 
 // @route   GET /api/users/profile
 // @desc    Get the current user's profile
@@ -244,6 +245,30 @@ router.post(
             user.profileImageUrl = imageUrl;
             await user.save();
 
+            // CRITICAL FIX: Invalidate user cache so /auth/me returns fresh data immediately
+            // Without this, the cached user object (5-min TTL) is served with the OLD profileImageUrl
+            cacheService.invalidateUser(req.user.userId);
+
+            // Emit socket event so other open pages (Topbar, admin views) update in real time
+            try {
+                const { getIO } = require('../socketManager');
+                const io = getIO();
+                if (io) {
+                    io.emit('user_profile_updated', {
+                        userId: user._id,
+                        employeeCode: user.employeeCode,
+                        fullName: user.fullName,
+                        field: 'profileImageUrl',
+                        newValue: imageUrl,
+                        updatedBy: req.user.userId,
+                        timestamp: new Date().toISOString(),
+                        message: 'Profile image updated'
+                    });
+                }
+            } catch (socketErr) {
+                console.warn('[Avatar Upload] Could not emit socket event:', socketErr.message);
+            }
+
             console.log('[Avatar Upload] Success:', {
                 userId: req.user.userId,
                 fileId: req.avatarUpload.fileId,
@@ -269,5 +294,61 @@ router.post(
         }
     }
 );
+
+// @route   DELETE /api/users/remove-avatar
+// @desc    Remove the current user's profile picture (clears URL in DB + GridFS file)
+// @access  Private
+router.delete('/remove-avatar', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Delete the file from GridFS if it exists
+        if (user.profileImageUrl) {
+            try {
+                const oldIdMatch = user.profileImageUrl.match(/\/avatar\/([a-f0-9]{24})/i);
+                if (oldIdMatch) {
+                    const { getAvatarBucket } = require('../db');
+                    const avatarBucket = getAvatarBucket();
+                    await avatarBucket.delete(new mongoose.Types.ObjectId(oldIdMatch[1]));
+                    console.log('[Avatar Remove] Deleted GridFS file:', oldIdMatch[1]);
+                }
+            } catch (e) {
+                console.warn('[Avatar Remove] Could not delete GridFS file:', e.message);
+            }
+        }
+
+        user.profileImageUrl = '';
+        await user.save();
+
+        // Invalidate user cache so /auth/me immediately returns the cleared URL
+        cacheService.invalidateUser(req.user.userId);
+
+        // Notify other open sessions via socket
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('user_profile_updated', {
+                    userId: user._id,
+                    field: 'profileImageUrl',
+                    newValue: '',
+                    updatedBy: req.user.userId,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        } catch (socketErr) {
+            console.warn('[Avatar Remove] Could not emit socket event:', socketErr.message);
+        }
+
+        res.json({ message: 'Profile image removed successfully.' });
+
+    } catch (error) {
+        console.error('[Avatar Remove] Error:', error);
+        res.status(500).json({ error: 'Failed to remove profile image.' });
+    }
+});
 
 module.exports = router;

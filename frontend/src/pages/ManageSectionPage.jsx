@@ -132,10 +132,6 @@ const ManageSectionPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
   const fetchGracePeriod = useCallback(async () => {
     try {
       const response = await api.get('/analytics/late-grace-settings');
@@ -147,9 +143,14 @@ const ManageSectionPage = () => {
     }
   }, []);
 
+  // PERFORMANCE FIX: Fire all initial fetches in parallel with a single useEffect
+  // Previously these were separate useEffects, causing sequential loading waterfall
   useEffect(() => {
-    fetchGracePeriod();
-  }, [fetchGracePeriod]);
+    Promise.all([
+      fetchUsers(),
+      fetchGracePeriod(),
+    ]).catch(err => console.error('[ManageSectionPage] Initial load error:', err));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchEnforceLogoutSetting = useCallback(async () => {
     try {
