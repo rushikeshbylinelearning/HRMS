@@ -28,6 +28,14 @@ import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, We
 import { EmployeeDashboardSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
 import { getISTNow, formatISTDate } from '../utils/istTime';
 import { getUnifiedShiftTimeState } from '../utils/shiftTimeCalculation';
+import {
+  getEmployeeDashboardCache,
+  isEmployeeDashboardCacheFresh,
+  isEmployeeDashboardCacheServable,
+  setEmployeeDashboardCache,
+  invalidateEmployeeDashboardCache,
+  EMPLOYEE_DASHBOARD_CACHE_TTL_MS,
+} from '../utils/apiCache';
 import '../styles/EmployeeDashboardPage.css';
 
 // Icons
@@ -70,7 +78,7 @@ const getLocalDateString = (date = new Date()) => {
 
 
 const EmployeeDashboardPage = () => {
-    const { user: contextUser, updateUserContext } = useAuth();
+    const { user: contextUser, updateUserContext, loading: authLoading } = useAuth();
     const { uiBreakState, startUiBreak, endUiBreak, setUiBreakState, reconcileFromBackend } = useBreakUI();
     const { canAccess, breakLimits, privilegeLevel } = usePermissions();
     const location = useLocation();
@@ -106,6 +114,7 @@ const EmployeeDashboardPage = () => {
     const fetchInFlightRef = useRef(false);
     // When we last received calculatedLogoutTime from the server (used for real-time projection during break).
     const lastLogoutBaselineReceivedAtRef = useRef(0);
+    const lastFetchTimeRef = useRef(0);
 
     const isOnBreakUI = !!uiBreakState;
     // NOTE: Break UI is intentionally driven by uiBreakState (optimistic + single authority).
@@ -156,55 +165,95 @@ const EmployeeDashboardPage = () => {
 
     // Create stable fetch function
     // PHASE 5: Use aggregate endpoint - single call instead of 3
-    fetchAllDataRef.current = async (isInitialLoad = false) => {
+    
+    const _applyDashboardPayload = (data, isInitialLoad) => {
+        const {
+            dailyStatus,
+            weeklyLogs,
+            leaveRequests: leaveRequestsRaw,
+            requiredLogoutAt: reqLogoutAt,
+            canCheckout: canCheckoutFromServer,
+            remainingTime: remTime,
+            hasHalfDayLeave: halfDay,
+            requiredWorkMinutes: reqWorkMins,
+            requireAdminApprovalForEarlyCheckout: reqApproval,
+            pendingEarlyCheckoutRequest: pendingReq,
+        } = data;
+
+        const wLogs = Array.isArray(weeklyLogs) ? weeklyLogs : [];
+        const lRequests = Array.isArray(leaveRequestsRaw) ? leaveRequestsRaw : [];
+
+        setRequiredLogoutAt(reqLogoutAt ?? null);
+        setCanCheckout(canCheckoutFromServer !== false);
+        setRemainingTime(remTime != null ? remTime * 60 : null);
+        setHasHalfDayLeave(!!halfDay);
+        setRequiredWorkMinutes(reqWorkMins ?? 510);
+        setRequireAdminApprovalForEarlyCheckout(!!reqApproval);
+        setPendingEarlyCheckoutRequest(pendingReq && pendingReq._id ? pendingReq : null);
+
+        // Fingerprint comparison (only skip setState on background/non-initial refreshes)
+        if (!isInitialLoad && dailyData) {
+            const newFp = dashboardFingerprint(dailyStatus, wLogs, lRequests);
+            const curFp = dashboardFingerprint(dailyData, weeklyLogs, myRequests);
+            if (newFp === curFp) return;
+        }
+
+        setDailyData(dailyStatus);
+        reconcileFromBackend(dailyStatus);
+        setWeeklyLogs(wLogs);
+        setMyRequests(lRequests);
+        lastLogoutBaselineReceivedAtRef.current = Date.now();
+
+        if (isInitialLoad) {
+            setLoading(false);
+            setHasInitialLoadFinished(true);
+        }
+    };
+    
+    fetchAllDataRef.current = async (isInitialLoad = false, forceRefresh = false) => {
         const localDate = getLocalDateString();
+
+        // --- Cache check (only for non-forced calls) ---
+        if (!forceRefresh) {
+            const cached = getEmployeeDashboardCache();
+            const fresh = isEmployeeDashboardCacheFresh();
+            const servable = isEmployeeDashboardCacheServable();
+
+            if (cached && fresh) {
+                // Fresh cache: apply immediately, skip network call
+                _applyDashboardPayload(cached.data, isInitialLoad);
+                return;
+            }
+
+            if (cached && servable) {
+                // Stale-but-servable: show data immediately, then refresh in background
+                _applyDashboardPayload(cached.data, isInitialLoad);
+                // Fall through to background fetch (do NOT return)
+            }
+            // If no servable cache: fall through to fetch with loading state
+        }
 
         if (fetchInFlightRef.current && !isInitialLoad) return;
         fetchInFlightRef.current = true;
 
-        if (isInitialLoad) {
+        if (isInitialLoad && !getEmployeeDashboardCache()) {
+            // Only show loading spinner if we have no cached data to show
             setLoading(true);
         }
 
         try {
             const dashboardRes = await api.get(`/attendance/dashboard/employee?date=${localDate}`);
-            const { dailyStatus, weeklyLogs, leaveRequests, requiredLogoutAt: reqLogoutAt, canCheckout: canCheckoutFromServer, remainingTime: remTime, hasHalfDayLeave, requiredWorkMinutes, requireAdminApprovalForEarlyCheckout: reqApproval, pendingEarlyCheckoutRequest: pendingReq } = dashboardRes.data;
-            const wLogs = Array.isArray(weeklyLogs) ? weeklyLogs : [];
-            const lRequests = Array.isArray(leaveRequests) ? leaveRequests : [];
+            const payload = dashboardRes.data;
 
-            setRequiredLogoutAt(reqLogoutAt ?? null);
-            setCanCheckout(canCheckoutFromServer !== false);
-            // Convert server remainingTime (minutes) to seconds for consistency with real-time calculation
-            setRemainingTime(remTime != null ? remTime * 60 : null);
-            setHasHalfDayLeave(!!hasHalfDayLeave);
-            setRequiredWorkMinutes(requiredWorkMinutes ?? 510);
-            setRequireAdminApprovalForEarlyCheckout(!!reqApproval);
-            setPendingEarlyCheckoutRequest(pendingReq && pendingReq._id ? pendingReq : null);
+            // Write fresh data to cache
+            setEmployeeDashboardCache(payload);
+            lastFetchTimeRef.current = Date.now();
 
-            if (!isInitialLoad && dailyData) {
-                const newFp = dashboardFingerprint(dailyStatus, wLogs, lRequests);
-                const curFp = dashboardFingerprint(dailyData, weeklyLogs, myRequests);
-                if (newFp === curFp) {
-                    if (isInitialLoad) setLoading(false);
-                    fetchInFlightRef.current = false;
-                    return;
-                }
-            }
-
-            setDailyData(dailyStatus);
-            reconcileFromBackend(dailyStatus);
-            setWeeklyLogs(wLogs);
-            setMyRequests(lRequests);
-            // Record when we received the baseline logout time so ShiftInfoDisplay can project in real time during break.
-            lastLogoutBaselineReceivedAtRef.current = Date.now();
-
-            if (isInitialLoad) {
-                setLoading(false);
-                setHasInitialLoadFinished(true);
-            }
+            _applyDashboardPayload(payload, isInitialLoad);
         } catch (err) {
             console.error("Dashboard fetch error:", err);
-            if (isInitialLoad) {
+            if (isInitialLoad && !getEmployeeDashboardCache()) {
+                // Only show error if we have nothing at all to display
                 setError('Failed to load dashboard data. Please refresh the page.');
                 setLoading(false);
                 setHasInitialLoadFinished(true);
@@ -218,51 +267,44 @@ const EmployeeDashboardPage = () => {
         return fetchAllDataRef.current?.(isInitialLoad);
     }, []);
 
-    // Guard ref for React StrictMode duplicate execution prevention
-    const dataFetchedRef = useRef(false);
-    const { loading: authLoading } = useAuth();
-
-    // AUDIT: Initial data fetch - ONE call on load. Guards: authLoading + contextUser. Cleanup: visibility + dataFetchedRef.
+    // AUDIT: Initial data fetch - ONE call on load. Guards: authLoading + contextUser. Cleanup: visibility + timestamp cooldown.
     useEffect(() => {
         if (authLoading || !contextUser) {
             return;
         }
 
         let mounted = true;
+        const STRICT_MODE_COOLDOWN_MS = 500;
+        const now = Date.now();
+
+        // Prevent StrictMode double-fire only (not legitimate revisits)
+        if (now - lastFetchTimeRef.current < STRICT_MODE_COOLDOWN_MS) return;
 
         const loadData = async () => {
-            // Prevent duplicate execution in React StrictMode
-            if (dataFetchedRef.current) {
-                console.log('[EmployeeDashboard] Data fetch already in progress, skipping duplicate call');
-                return;
-            }
-            dataFetchedRef.current = true;
-            
+            if (!mounted) return;
             if (fetchAllDataRef.current) {
-                await fetchAllDataRef.current(true);
+                await fetchAllDataRef.current(true, false);
             }
-            // POLLING REMOVED: Socket events + mutation refetch provide real-time updates
-            // Socket listener for attendance_log_updated is already in place (lines 228-262)
-            // Visibility change fallback added below for socket disconnect scenarios
         };
-        
+
         loadData();
-        
-        // Fallback: Refresh on visibility change (socket disconnect recovery)
+
         const handleVisibilityChange = () => {
             if (!document.hidden && mounted && fetchAllDataRef.current) {
-                // Only refresh if socket is disconnected (fallback safety)
-                if (socket.disconnected) {
-                    console.log('[EmployeeDashboard] Socket disconnected, refreshing data on visibility change');
-                    fetchAllDataRef.current(false);
+                const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+                // Refetch on revisit if data is older than the cache TTL
+                // This fires regardless of socket state — socket handles real-time
+                // while this handles the case of returning after a long absence
+                if (timeSinceLastFetch > EMPLOYEE_DASHBOARD_CACHE_TTL_MS) {
+                    fetchAllDataRef.current(false, false);
                 }
             }
         };
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             mounted = false;
-            dataFetchedRef.current = false; // Reset on unmount
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
      }, [contextUser?.id, contextUser?._id, authLoading]); // Depend on user IDs (stable) and authLoading to trigger when auth is ready
@@ -281,7 +323,8 @@ const EmployeeDashboardPage = () => {
         if (location.state?.refresh) {
             console.log("Dashboard received refresh signal, refetching data...");
             if (fetchAllDataRef.current) {
-                fetchAllDataRef.current(false);
+                invalidateEmployeeDashboardCache();
+                fetchAllDataRef.current(false, true);
             }
             window.history.replaceState({}, document.title);
         }
@@ -511,6 +554,7 @@ const EmployeeDashboardPage = () => {
                 }
 
                 // Refresh data from server (non-blocking for UI)
+                invalidateEmployeeDashboardCache();
                 if (fetchAllDataRef.current) {
                     fetchAllDataRef.current(false).catch(err => {
                         console.error('Failed to refresh data after clock-in:', err);
@@ -541,6 +585,7 @@ const EmployeeDashboardPage = () => {
         setSnackbar({ open: true, message: 'Checked out successfully!' });
         try {
             await api.post('/attendance/clock-out');
+            invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) fetchAllDataRef.current(false).catch(() => {});
         } catch (err) {
             setDailyData(previousDailyData);
@@ -580,6 +625,7 @@ const EmployeeDashboardPage = () => {
             setSnackbar({ open: true, message: 'Early checkout request sent for admin approval.' });
             setPendingEarlyCheckoutRequest(prev => prev || { status: 'Pending', _id: 'pending' });
             setCanCheckout(false);
+            invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) fetchAllDataRef.current(false).catch(() => {});
         } catch (err) {
             setError(err.response?.data?.error || 'Failed. Please try again.');
@@ -633,6 +679,7 @@ const EmployeeDashboardPage = () => {
                 });
             }
             // Refresh data from server (non-blocking for UI)
+            invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) {
                 fetchAllDataRef.current(false).catch(err => {
                     console.error('Failed to refresh data after break start:', err);
@@ -670,6 +717,7 @@ const EmployeeDashboardPage = () => {
             } else {
                 await api.post('/breaks/end');
             }
+            invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) {
                 fetchAllDataRef.current(false).catch(err => {
                     console.error('Failed to refresh data after break end:', err);
@@ -692,6 +740,7 @@ const EmployeeDashboardPage = () => {
             await api.post('/breaks/request-extra', { reason: breakReason });
             setSnackbar({ open: true, message: 'Request sent for approval.' });
             handleCloseReasonModal();
+            invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) {
                 await fetchAllDataRef.current(false);
             }
@@ -729,7 +778,7 @@ const EmployeeDashboardPage = () => {
                         onClose={() => setError('')}
                         sx={{ mb: 3 }}
                         action={
-                            <Button color="inherit" size="small" onClick={() => { setError(''); fetchAllDataRef.current?.(true); }}>
+                            <Button color="inherit" size="small" onClick={() => { setError(''); invalidateEmployeeDashboardCache(); fetchAllDataRef.current?.(true, true); }}>
                                 Retry
                             </Button>
                         }

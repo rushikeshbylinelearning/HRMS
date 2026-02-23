@@ -60,6 +60,9 @@ body, html {
 .main-content {
     margin-left: var(--sidebar-width); /* Static margin */
     padding: 88px 32px 32px;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 /* --- DYNAMIC STYLES BASED ON PARENT CLASS --- */
@@ -125,6 +128,9 @@ body, html {
 .admin-view .main-content {
     margin-left: var(--sidebar-width-admin);
     padding: 88px 32px 32px;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 
@@ -136,4 +142,7 @@ body, html {
     padding: 0; /* Remove padding to allow dashboard to fill the space */
     width: calc(100% - var(--sidebar-width-employee));
     min-height: 100vh;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }

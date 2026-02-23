@@ -9,7 +9,6 @@ const API_CACHE = 'attendance-system-api-v1.0.1';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
-    '/manifest.json',
     '/favicon.ico',
     // Add critical CSS/JS bundles here when available
 ];
@@ -100,25 +99,23 @@ self.addEventListener('fetch', (event) => {
 
 async function handleApiRequest(request) {
     const cache = await caches.open(API_CACHE);
-
     try {
-        // Try network first
         const networkResponse = await fetch(request);
         if (networkResponse.ok) {
-            // Cache successful responses
             cache.put(request, networkResponse.clone());
         }
         return networkResponse;
     } catch (error) {
-        // Network failed, try cache
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
-            console.log('[SW] Serving API response from cache:', request.url);
+            console.log('[SW] Serving from cache:', request.url);
             return cachedResponse;
         }
-
-        // No cache available
-        throw error;
+        // ✅ Return a proper Response instead of throwing
+        return new Response(JSON.stringify({ error: 'Network unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
 

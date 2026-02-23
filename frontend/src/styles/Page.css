@@ -147,7 +147,7 @@
 }
 
 body, html {
-  overflow-x: hidden !important;
+  overflow-x: hidden;
 } 
 .shift-card-container {
   display: flex;

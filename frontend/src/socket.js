@@ -27,7 +27,7 @@ const getSocketURL = () => {
         return origin;
     }
     
-    return 'https://attendance.bylinelms.com'; // Fallback
+    return 'https://attendance-test.bylinelms.com'; // Fallback
 };
 
 const URL = getSocketURL();
@@ -161,7 +161,10 @@ socket.on('reconnect', (attemptNumber) => {
 socket.on('reconnect_attempt', (attemptNumber) => {
     console.log('[Socket] 🔄 Reconnection attempt', attemptNumber);
     // Update token in case it was refreshed during disconnection
-    const currentToken = localStorage.getItem('token') || localStorage.getItem('ams_token');
+    // Check sessionStorage first (tab-specific), then localStorage (persistence)
+    const currentToken =
+        sessionStorage.getItem('token') || sessionStorage.getItem('ams_token') ||
+        localStorage.getItem('token') || localStorage.getItem('ams_token');
     if (currentToken) {
         socket.auth = { token: currentToken };
     }

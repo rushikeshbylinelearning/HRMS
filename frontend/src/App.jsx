@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BreakUIProvider } from './context/BreakUIContext';
+import { ActiveYearProvider } from './context/ActiveYearContext';
 import { NewNotificationProvider } from './hooks/useNewNotifications.jsx'; // Corrected import path
 import { CssBaseline, ThemeProvider, Box } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -37,15 +38,20 @@ const SSOCallbackPage = lazy(() => import('./pages/SSOCallbackPage'));
 const EmployeeMusterRollPage = lazy(() => import('./pages/EmployeeMusterRollPage'));
 const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
 const PayrollManagementPage = lazy(() => import('./pages/PayrollManagementPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const EmployeeDetailedAnalyticsPage = lazy(() => import('./pages/EmployeeDetailedAnalyticsPage'));
+// FIX: Static import to prevent skeleton flash during auth resolution
+import ProfilePage from './pages/ProfilePage';
 const AdminPoliciesPage = lazy(() => import('./pages/AdminPoliciesPage'));
 const CIFManagementPage = lazy(() => import('./pages/CIFManagement'));
 const EmployeeCIFDetailsPage = lazy(() => import('./pages/EmployeeCIFDetails'));
 const SchedulingManagementPage = lazy(() => import('./pages/SchedulingManagementPage'));
 const ProbationPage = lazy(() => import('./pages/ProbationPage'));
+const HolidayManagementPage = lazy(() => import('./pages/admin/HolidayManagementPage'));
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
+import ProfilePageSkeleton from './components/Profile/ProfilePageSkeleton';
 
 // Import prefetch utilities
 import { setupPrefetchListeners, routePrefetchMap } from './utils/prefetch';
@@ -176,7 +182,7 @@ function App() {
 
     // Register service worker for caching
     useEffect(() => {
-        if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+        if ('serviceWorker' in navigator && import.meta.env.PROD) {
             navigator.serviceWorker
                 .register('/sw.js')
                 .then((registration) => {
@@ -194,10 +200,11 @@ function App() {
                 <CssBaseline />
                 <Router>
                     <AuthProvider>
-                        <BreakUIProvider>
-                            <NewNotificationProvider> {/* <-- CORRECT NESTING */}
-                                <IdleDetectionProvider>
-                                    <Routes>
+                        <ActiveYearProvider>
+                            <BreakUIProvider>
+                                <NewNotificationProvider> {/* <-- CORRECT NESTING */}
+                                    <IdleDetectionProvider>
+                                        <Routes>
                                     {/* Public routes - accessible without authentication */}
                                     <Route path="/login" element={<LoginPage />} />
                                     <Route path="/sso-login" element={<SSOLoginPage />} />
@@ -230,11 +237,7 @@ function App() {
                                                 <AttendanceSummaryPage />
                                             </Suspense>
                                         } />
-                                        <Route path="/profile" element={
-                                            <Suspense fallback={<PageLoader />}>
-                                                <ProfilePage />
-                                            </Suspense>
-                                        } />
+                                        <Route path="/profile" element={<ProfilePage />} />
                                         
                                         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
                                         <Route path="/admin/dashboard" element={
@@ -321,6 +324,21 @@ function App() {
                                                 <CIFManagementPage />
                                             </Suspense>
                                         } />
+                                        <Route path="/analytics/attendance" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <AnalyticsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/analytics/employee/:employeeId" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <EmployeeDetailedAnalyticsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/admin/holidays" element={
+                                            <Suspense fallback={<PageLoader />}>
+                                                <HolidayManagementPage />
+                                            </Suspense>
+                                        } />
                                     </Route>
 
                                     {/* Catch-all route - redirect to login for unknown routes */}
@@ -329,8 +347,9 @@ function App() {
                             </IdleDetectionProvider>
                         </NewNotificationProvider>
                     </BreakUIProvider>
-                </AuthProvider>
-            </Router>
+                </ActiveYearProvider>
+            </AuthProvider>
+        </Router>
         </ThemeProvider>
     </LocalizationProvider>
 );

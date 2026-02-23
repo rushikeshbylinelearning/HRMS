@@ -9,6 +9,7 @@ const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 // Reason: All probation calculations now use /api/analytics/probation-tracker endpoint
 const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
+const { executeLeaveAccrual } = require('../cron/leaveAccrualCron');
 
 // --- CONFIGURATION (from .env) ---
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
@@ -352,7 +353,42 @@ const startScheduledJobs = () => {
     // Half-day leave auto-conversion job (runs daily at 12:30 AM IST)
     startHalfDayConversionJob();
     
-    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout, half-day conversion) have been started.');
+    // Monthly leave accrual job (runs on 1st of every month at 00:05 IST)
+    startLeaveAccrualJob();
+    
+    console.log('✅ Scheduled jobs (probation reminders, probation completions, weekly late warnings, auto-logout, half-day conversion, leave accrual) have been started.');
 };
 
-module.exports = { startScheduledJobs, checkProbationAndInternshipEndings };
+/**
+ * Start monthly leave accrual job
+ * Runs on 1st of every month at 00:05 IST
+ */
+const startLeaveAccrualJob = () => {
+    console.log('[CRON] Starting leave accrual job scheduler');
+    
+    // Check every hour if it's time to run accrual
+    const checkAndRunAccrual = async () => {
+        try {
+            const now = getISTNow();
+            const { day, hour, minute } = getISTDateParts(now);
+            
+            // Run on 1st of month at 00:05 IST (with 10-minute window)
+            if (day === 1 && hour === 0 && minute >= 5 && minute < 15) {
+                console.log('[CRON] Triggering monthly leave accrual');
+                await executeLeaveAccrual();
+            }
+        } catch (error) {
+            console.error('[CRON] Error in leave accrual job:', error);
+        }
+    };
+    
+    // Run immediately if it's the 1st of the month
+    checkAndRunAccrual();
+    
+    // Check every hour
+    setInterval(checkAndRunAccrual, 60 * 60 * 1000);
+    
+    console.log('[CRON] Leave accrual job scheduler started (runs 1st of month at 00:05 IST)');
+};
+
+module.exports = { startScheduledJobs, checkProbationAndInternshipEndings, startLeaveAccrualJob };

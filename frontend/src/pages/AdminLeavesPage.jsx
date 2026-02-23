@@ -1,6 +1,6 @@
 // src/pages/AdminLeavesPage.jsx
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Typography, Button, Alert, Chip, Box, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination, Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton, Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse } from '@mui/material';
@@ -48,6 +48,9 @@ import {
   setLeavesCache,
   invalidateLeavesCache,
   LEAVES_REFETCH_COOLDOWN_MS,
+  isLeavesCacheEntryFresh,
+  getAnalyticsCountsCacheKey,
+  getWorkDaysCacheKey,
 } from '../utils/leavesCache';
 // --- Shared DatePicker SlotProps for Microsoft Calendar Style ---
 const datePickerSlotProps = {
@@ -230,7 +233,7 @@ const datePickerSlotProps = {
 // --- Leave Count Summary Tab Component ---
 // Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
 // refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
-const LeaveCountSummaryTab = memo(({ refetchRef }) => {
+const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
@@ -269,9 +272,25 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
         if (!employees.length) return;
         setLoading(true);
         setError('');
+        
+        const month = selectedMonth.getMonth() + 1;
+        const year = selectedMonth.getFullYear();
+        const cacheKey = getAnalyticsCountsCacheKey('Employee', year, month, selectedLeaveType || '');
+        const cached = getLeavesCache(cacheKey);
+        const isFresh = isLeavesCacheEntryFresh(cacheKey);
+        
+        // Apply cached data immediately if available (fresh or stale)
+        if (cached?.data !== undefined) {
+            setAnalyticsCounts(Array.isArray(cached.data) ? cached.data : []);
+            setAllLeaveRequests([]);
+            if (isFresh) {
+                setLoading(false);
+                return; // Fresh — no network call needed
+            }
+            // Stale — show cached data but refresh in background
+        }
+        
         try {
-            const month = selectedMonth.getMonth() + 1;
-            const year = selectedMonth.getFullYear();
             const params = { month, year, role: 'Employee' };
             if (selectedLeaveType) params.leaveType = selectedLeaveType;
             if (dateRange.start && dateRange.end) {
@@ -279,8 +298,10 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
                 params.endDate = dateRange.end;
             }
             const res = await api.get('/admin/leaves/analytics/counts', { params });
-            setAnalyticsCounts(Array.isArray(res.data) ? res.data : []);
+            const responseData = Array.isArray(res.data) ? res.data : [];
+            setAnalyticsCounts(responseData);
             setAllLeaveRequests([]);
+            setLeavesCache(cacheKey, responseData, 2 * 60 * 1000); // 2 minutes TTL
         } catch (e) {
             if (process.env.NODE_ENV !== 'production') {
                 console.warn('Leave analytics endpoint failed, using legacy fetch', e);
@@ -306,6 +327,7 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
                 }
             }
             setAllLeaveRequests(allLeaves);
+            // Do NOT cache legacy fallback results
         } finally {
             setLoading(false);
         }
@@ -322,6 +344,14 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
         setLoading(true);
         setError('');
         try {
+            // If employees prop is provided and populated, use it instead of fetching
+            if (employeesProp.length > 0) {
+                const employeesOnly = filterEmployeesByRole(employeesProp, 'Employee');
+                setEmployees(employeesOnly);
+                return;
+            }
+            
+            // Fallback: fetch employees if prop is empty
             // Do NOT pass includeInactive: deactivated employees hidden from Leave page
             const empRes = await api.get('/admin/employees?all=true');
             const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
@@ -333,7 +363,7 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
             setLoading(false);
         }
         // Do not set loading false here; loadLeaveCounts will run next and set it when leave counts are ready
-    }, []);
+    }, [employeesProp]);
     
     // Fetch actual worked days data using attendance summary API
     const fetchAnalyticsData = useCallback(async (startDate, endDate) => {
@@ -344,6 +374,41 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
             const month = targetDate.getMonth() + 1; // API uses 1-12 format
             const year = targetDate.getFullYear();
             
+            const cacheKey = getWorkDaysCacheKey(year, month);
+            const cached = getLeavesCache(cacheKey);
+            const isFresh = isLeavesCacheEntryFresh(cacheKey);
+            
+            // Apply cached data immediately if available (fresh or stale)
+            if (cached?.data !== undefined) {
+                // Create a set of employee IDs from the filtered employees list
+                const employeeIdSet = new Set(employees.map(emp => emp._id?.toString()));
+                
+                // Extract actual worked days per employee (only include employees in our filtered list)
+                const analyticsMap = {};
+                
+                const workDaysData = Array.isArray(cached.data) 
+                    ? cached.data 
+                    : [cached.data];
+                
+                workDaysData.forEach(item => {
+                    if (item && item.employeeId && item.actualWorkedDays !== undefined) {
+                        // Only include employees that are in our filtered employees list
+                        if (employeeIdSet.has(item.employeeId)) {
+                            analyticsMap[item.employeeId] = {
+                                actualWorkedDays: item.actualWorkedDays || 0
+                            };
+                        }
+                    }
+                });
+                
+                setAnalyticsData(analyticsMap);
+                
+                if (isFresh) {
+                    return; // Fresh — no network call needed
+                }
+                // Stale — data already applied, refresh in background
+            }
+            
             // Call the actual-work-days endpoint (returns data for all employees)
             const actualWorkDaysRes = await api.get('/attendance/actual-work-days', {
                 params: {
@@ -351,6 +416,9 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
                     year: year
                 }
             });
+            
+            // Cache the raw response data
+            setLeavesCache(cacheKey, actualWorkDaysRes.data, 5 * 60 * 1000); // 5 minutes TTL
             
             // Create a set of employee IDs from the filtered employees list
             const employeeIdSet = new Set(employees.map(emp => emp._id?.toString()));
@@ -607,7 +675,7 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
     }
     
     return (
-        <Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
                     {error}
@@ -1007,14 +1075,17 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
             </Paper>
             
             {/* Employee Leave List */}
-            <div className="requests-card">
+            <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Paper 
                     elevation={0} 
                     sx={{ 
                         borderRadius: 0, 
                         overflow: 'hidden',
                         border: 'none',
-                        boxShadow: 'none'
+                        boxShadow: 'none',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column'
                     }}
                 >
                     <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
@@ -1025,7 +1096,7 @@ const LeaveCountSummaryTab = memo(({ refetchRef }) => {
                             {filteredData.length} employee{filteredData.length !== 1 ? 's' : ''} found
                         </Typography>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
+                    <TableContainer component={Paper} elevation={0} className="table-container">
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
@@ -1265,7 +1336,7 @@ LeaveCountSummaryTab.displayName = 'LeaveCountSummaryTab';
 // --- Intern Leave Count Summary Tab Component ---
 // Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
 // refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
-const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
+const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
@@ -1310,9 +1381,25 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
         if (!employees.length) return;
         setLoading(true);
         setError('');
+        
+        const month = selectedMonth.getMonth() + 1;
+        const year = selectedMonth.getFullYear();
+        const cacheKey = getAnalyticsCountsCacheKey('Intern', year, month, selectedLeaveType || '');
+        const cached = getLeavesCache(cacheKey);
+        const isFresh = isLeavesCacheEntryFresh(cacheKey);
+        
+        // Apply cached data immediately if available (fresh or stale)
+        if (cached?.data !== undefined) {
+            setAnalyticsCounts(Array.isArray(cached.data) ? cached.data : []);
+            setAllLeaveRequests([]);
+            if (isFresh) {
+                setLoading(false);
+                return; // Fresh — no network call needed
+            }
+            // Stale — show cached data but refresh in background
+        }
+        
         try {
-            const month = selectedMonth.getMonth() + 1;
-            const year = selectedMonth.getFullYear();
             const params = { month, year, role: 'Intern' };
             if (selectedLeaveType) params.leaveType = selectedLeaveType;
             if (dateRange.start && dateRange.end) {
@@ -1320,8 +1407,10 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
                 params.endDate = dateRange.end;
             }
             const res = await api.get('/admin/leaves/analytics/counts', { params });
-            setAnalyticsCounts(Array.isArray(res.data) ? res.data : []);
+            const responseData = Array.isArray(res.data) ? res.data : [];
+            setAnalyticsCounts(responseData);
             setAllLeaveRequests([]);
+            setLeavesCache(cacheKey, responseData, 2 * 60 * 1000); // 2 minutes TTL
         } catch (e) {
             if (process.env.NODE_ENV !== 'production') console.warn('Leave analytics endpoint failed (Intern), using legacy fetch', e);
             setAnalyticsCounts(null);
@@ -1345,6 +1434,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
                 }
             }
             setAllLeaveRequests(allLeaves);
+            // Do NOT cache legacy fallback results
         } finally {
             setLoading(false);
         }
@@ -1360,6 +1450,14 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
         setLoading(true);
         setError('');
         try {
+            // If employees prop is provided and populated, use it instead of fetching
+            if (employeesProp.length > 0) {
+                const interns = filterEmployeesByRole(employeesProp, 'Intern');
+                setEmployees(interns);
+                return;
+            }
+            
+            // Fallback: fetch employees if prop is empty
             // Do NOT pass includeInactive: deactivated interns hidden from Leave page
             const empRes = await api.get('/admin/employees?all=true');
             const allEmps = Array.isArray(empRes.data) ? empRes.data : (empRes.data?.employees || []);
@@ -1370,7 +1468,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
             setError('Unable to load data');
             setLoading(false);
         }
-    }, []);
+    }, [employeesProp]);
     
     useEffect(() => {
         fetchData();
@@ -1389,6 +1487,41 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
             const month = targetDate.getMonth() + 1; // API uses 1-12 format
             const year = targetDate.getFullYear();
             
+            const cacheKey = getWorkDaysCacheKey(year, month);
+            const cached = getLeavesCache(cacheKey);
+            const isFresh = isLeavesCacheEntryFresh(cacheKey);
+            
+            // Apply cached data immediately if available (fresh or stale)
+            if (cached?.data !== undefined) {
+                // Create a set of employee IDs from the filtered employees list (interns only)
+                const employeeIdSet = new Set(employees.map(emp => emp._id?.toString()));
+                
+                // Extract actual worked days per employee (only include employees in our filtered list)
+                const analyticsMap = {};
+                
+                const workDaysData = Array.isArray(cached.data) 
+                    ? cached.data 
+                    : [cached.data];
+                
+                workDaysData.forEach(item => {
+                    if (item && item.employeeId && item.actualWorkedDays !== undefined) {
+                        // Only include employees that are in our filtered employees list (interns)
+                        if (employeeIdSet.has(item.employeeId)) {
+                            analyticsMap[item.employeeId] = {
+                                actualWorkedDays: item.actualWorkedDays || 0
+                            };
+                        }
+                    }
+                });
+                
+                setAnalyticsData(analyticsMap);
+                
+                if (isFresh) {
+                    return; // Fresh — no network call needed
+                }
+                // Stale — data already applied, refresh in background
+            }
+            
             // Call the actual-work-days endpoint (returns data for all employees)
             const actualWorkDaysRes = await api.get('/attendance/actual-work-days', {
                 params: {
@@ -1396,6 +1529,9 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
                     year: year
                 }
             });
+            
+            // Cache the raw response data
+            setLeavesCache(cacheKey, actualWorkDaysRes.data, 5 * 60 * 1000); // 5 minutes TTL
             
             // Create a set of employee IDs from the filtered employees list (interns only)
             const employeeIdSet = new Set(employees.map(emp => emp._id?.toString()));
@@ -1424,11 +1560,6 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
             setAnalyticsData({});
         }
     }, [employees]);
-    
-    useEffect(() => {
-        fetchData();
-        fetchMonthlyContextSettings();
-    }, [fetchData, fetchMonthlyContextSettings]);
     
     // Fetch analytics when date range changes (for actual worked days per employee)
     useEffect(() => {
@@ -1602,7 +1733,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
     }
     
     return (
-        <Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
                     {error}
@@ -2002,14 +2133,17 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
             </Paper>
             
             {/* Intern Leave List */}
-            <div className="requests-card">
+            <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Paper 
                     elevation={0} 
                     sx={{ 
                         borderRadius: 0, 
                         overflow: 'hidden',
                         border: 'none',
-                        boxShadow: 'none'
+                        boxShadow: 'none',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column'
                     }}
                 >
                     <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
@@ -2020,7 +2154,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef }) => {
                             {filteredData.length} intern{filteredData.length !== 1 ? 's' : ''} found
                         </Typography>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
+                    <TableContainer component={Paper} elevation={0} className="table-container">
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
@@ -2730,6 +2864,7 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
 const AdminLeavesPage = () => {
     // Auth context
     const { user } = useAuth();
+    const navigate = useNavigate();
     
     const [requests, setRequests] = useState([]);
     const [employees, setEmployees] = useState([]);
@@ -2741,7 +2876,6 @@ const AdminLeavesPage = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [deleteDialog, setDeleteDialog] = useState({ open: false, request: null });
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-    const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
     const [moreMenuOpen, setMoreMenuOpen] = useState(false);
     
@@ -2796,7 +2930,7 @@ const AdminLeavesPage = () => {
         }
 
         const cached = !forceRefresh ? getLeavesCache(cacheKey) : null;
-        const cacheFresh = cached && (now - cached.timestamp < cached.ttlMs);
+        const cacheFresh = cached && isLeavesCacheEntryFresh(cacheKey);
 
         if (cacheFresh) {
             applyInitialData(cached.data);
@@ -2805,7 +2939,8 @@ const AdminLeavesPage = () => {
             return;
         }
 
-        if (cached && cached.data) {
+        if (cached?.data) {
+            // Stale: show immediately while refreshing in background
             applyInitialData(cached.data);
             setIsInitialLoading(false);
             setIsBackgroundRefreshing(true);
@@ -2974,6 +3109,8 @@ const AdminLeavesPage = () => {
         if (!socket) return;
         const handleLeaveUpdate = () => {
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             if (fetchInitialDataRef.current) fetchInitialDataRef.current(true);
         };
         socket.on('leave_request_updated', handleLeaveUpdate);
@@ -3056,6 +3193,8 @@ const AdminLeavesPage = () => {
             }
             handleCloseForm();
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3084,6 +3223,8 @@ const AdminLeavesPage = () => {
             await api.patch(`/admin/leaves/${requestId}/status`, payload);
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.`, severity: 'success' });
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3125,6 +3266,8 @@ const AdminLeavesPage = () => {
             setSnackbar({ open: true, message: 'Year-End request approved successfully!', severity: 'success' });
             fetchYearEndActions();
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3143,6 +3286,8 @@ const AdminLeavesPage = () => {
             setYearEndRejectDialog({ open: false, action: null, notes: '' });
             fetchYearEndActions();
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3175,6 +3320,8 @@ const AdminLeavesPage = () => {
             setYearEndDeleteDialog({ open: false, action: null, isApproved: false });
             fetchYearEndActions();
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3197,6 +3344,8 @@ const AdminLeavesPage = () => {
             setSnackbar({ open: true, message: 'Request deleted!', severity: 'success' });
             setDeleteDialog({ open: false, request: null });
             invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            invalidateLeavesCache('leaves:workdays:');
             fetchInitialData(true);
             setLeaveCountsDirty(true);
         } catch (err) {
@@ -3266,7 +3415,7 @@ const AdminLeavesPage = () => {
                         <Button 
                             variant="contained" 
                             startIcon={<CalendarMonthIcon />} 
-                            onClick={() => setIsHolidayModalOpen(true)}
+                            onClick={() => navigate('/admin/holidays')}
                             sx={{ 
                                 bgcolor: '#dc3545', 
                                 '&:hover': { bgcolor: '#c82333' } 
@@ -3343,8 +3492,11 @@ const AdminLeavesPage = () => {
             <Box
                 sx={{
                     position: 'relative',
-                    minHeight: '400px', // Prevent layout collapse
+                    flex: 1,
                     width: '100%',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
                 {/* Leave Requests Tab - Always mounted, visibility toggled */}
@@ -3354,6 +3506,7 @@ const AdminLeavesPage = () => {
                         top: 0,
                         left: 0,
                         right: 0,
+                        bottom: 0,
                         opacity: currentTab === 0 ? 1 : 0,
                         transform: currentTab === 0 ? 'translateY(0)' : 'translateY(8px)',
                         pointerEvents: currentTab === 0 ? 'auto' : 'none',
@@ -3361,10 +3514,13 @@ const AdminLeavesPage = () => {
                         willChange: currentTab === 0 ? 'auto' : 'opacity, transform',
                         zIndex: currentTab === 0 ? 1 : 0,
                         visibility: currentTab === 0 ? 'visible' : 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
                     }}
                 >
                     <div className="requests-card">
-                        <TableContainer component={Paper} elevation={0} className="table-container" sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
+                        <TableContainer component={Paper} elevation={0} className="table-container">
                             <Table stickyHeader aria-label="leave requests table">
                                 <TableHead className="requests-table-head">
                                     <TableRow>
@@ -3412,6 +3568,7 @@ const AdminLeavesPage = () => {
                         top: 0,
                         left: 0,
                         right: 0,
+                        bottom: 0,
                         opacity: currentTab === 1 ? 1 : 0,
                         transform: currentTab === 1 ? 'translateY(0)' : 'translateY(8px)',
                         pointerEvents: currentTab === 1 ? 'auto' : 'none',
@@ -3419,6 +3576,9 @@ const AdminLeavesPage = () => {
                         willChange: currentTab === 1 ? 'auto' : 'opacity, transform',
                         zIndex: currentTab === 1 ? 1 : 0,
                         visibility: currentTab === 1 ? 'visible' : 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
                     }}
                 >
                     <div className="requests-card">
@@ -3452,7 +3612,7 @@ const AdminLeavesPage = () => {
                             <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                         </Box>
                     ) : (
-                        <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
+                        <TableContainer component={Paper} elevation={0} className="table-container">
                             <Table stickyHeader>
                                 <TableHead>
                                     <TableRow>
@@ -3629,6 +3789,7 @@ const AdminLeavesPage = () => {
                         top: 0,
                         left: 0,
                         right: 0,
+                        bottom: 0,
                         opacity: currentTab === 2 ? 1 : 0,
                         transform: currentTab === 2 ? 'translateY(0)' : 'translateY(8px)',
                         pointerEvents: currentTab === 2 ? 'auto' : 'none',
@@ -3636,9 +3797,12 @@ const AdminLeavesPage = () => {
                         willChange: currentTab === 2 ? 'auto' : 'opacity, transform',
                         zIndex: currentTab === 2 ? 1 : 0,
                         visibility: currentTab === 2 ? 'visible' : 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
                     }}
                 >
-                    <LeaveCountSummaryTab refetchRef={refetchLeaveCountTab2Ref} />
+                    <LeaveCountSummaryTab refetchRef={refetchLeaveCountTab2Ref} employees={employees} />
                 </Box>
                 
                 {/* Intern Leave Count Summary Tab - Always mounted, visibility toggled */}
@@ -3648,6 +3812,7 @@ const AdminLeavesPage = () => {
                         top: 0,
                         left: 0,
                         right: 0,
+                        bottom: 0,
                         opacity: currentTab === 3 ? 1 : 0,
                         transform: currentTab === 3 ? 'translateY(0)' : 'translateY(8px)',
                         pointerEvents: currentTab === 3 ? 'auto' : 'none',
@@ -3655,9 +3820,12 @@ const AdminLeavesPage = () => {
                         willChange: currentTab === 3 ? 'auto' : 'opacity, transform',
                         zIndex: currentTab === 3 ? 1 : 0,
                         visibility: currentTab === 3 ? 'visible' : 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
                     }}
                 >
-                    <InternLeaveCountSummaryTab refetchRef={refetchLeaveCountTab3Ref} />
+                    <InternLeaveCountSummaryTab refetchRef={refetchLeaveCountTab3Ref} employees={employees} />
                 </Box>
             </Box>
 
@@ -3673,7 +3841,6 @@ const AdminLeavesPage = () => {
             
             
             <HrEmailManagerModal open={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} />
-            <HolidayManagerModal open={isHolidayModalOpen} onClose={() => setIsHolidayModalOpen(false)} />
 
             <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, request: null })}><DialogTitle>Confirm Deletion</DialogTitle><DialogContent>Are you sure you want to delete this leave request?</DialogContent><DialogActions><Button onClick={() => setDeleteDialog({ open: false, request: null })}>Cancel</Button><Button onClick={confirmDelete} color="error" variant="contained">Delete</Button></DialogActions></Dialog>
             

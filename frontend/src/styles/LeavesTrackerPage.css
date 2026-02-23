@@ -1,311 +1,245 @@
-/* LeavesTrackerPage.css */
+/* Employee Leaves Tracker - Full-Width Layout */
 
-/* Saturday Schedule Manager Enhancements - White & Black with Red Borders */
-.saturday-schedule-overview {
-    background: white;
-    border: 2px solid #000;
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 24px;
-    color: #000;
-    box-shadow: none;
+.leaves-tracker-container {
+  max-width: 1600px;
+  width: 100%;
+  margin: 0;
+  margin-left: auto;
+  padding: 1.5rem 2rem;
+  background-color: #f5f5f5;
+  min-height: 100vh;
 }
 
-.schedule-stat-box {
-    text-align: center;
-    padding: 16px;
-    border-radius: 8px;
-    border: 2px solid #dc3545;
-    background: white;
-    transition: all 0.3s ease;
+.leaves-tracker-breadcrumb {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.schedule-stat-box:hover {
-    background: #f8f9fa;
-    transform: translateY(-4px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.leaves-tracker-breadcrumb a {
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s ease;
 }
 
-.schedule-stat-number {
-    font-size: 2.5rem;
-    font-weight: bold;
-    margin-bottom: 8px;
+.leaves-tracker-breadcrumb a:hover {
+  color: #dc3545;
 }
 
-.schedule-stat-label {
-    font-size: 0.9rem;
-    opacity: 0.9;
+.leaves-tracker-breadcrumb span {
+  color: #333;
+  font-weight: 500;
 }
 
-.employee-chip-enhanced {
-    height: auto !important;
-    padding: 8px 12px !important;
-    margin: 6px 6px 12px 0 !important;
-    border-radius: 8px !important;
-    border: 2px solid #dc3545 !important;
-    background: white !important;
-    transition: all 0.3s ease !important;
-    cursor: pointer !important;
+.leaves-tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.employee-chip-enhanced:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+.leaves-tracker-header-left h1 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #000;
+  margin: 0 0 4px 0;
 }
 
-.schedule-category-card {
-    border-radius: 8px !important;
-    border: 2px solid #dc3545 !important;
-    background: white !important;
-    box-shadow: none !important;
-    transition: all 0.3s ease !important;
-    overflow: hidden;
+.leaves-tracker-header-left p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
 }
 
-.schedule-category-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+.leaves-tracker-header-right {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.schedule-category-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 16px;
-    padding: 12px 16px;
-    border-radius: 8px;
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
+.leaves-tracker-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
-.schedule-category-icon {
-    margin-right: 12px;
-    font-size: 24px;
+.leaves-tracker-summary-card {
+  background: white;
+  border: 1px solid #f1f1f1;
+  border-radius: 10px;
+  padding: 20px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
-.department-section {
-    margin-bottom: 24px;
-    border-radius: 8px;
-    border: 2px solid #000;
-    background: white;
-    box-shadow: none;
-    overflow: hidden;
+.leaves-tracker-summary-card:hover {
+  border-color: #dc3545;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.department-header {
-    padding: 20px 24px;
-    background: white;
-    border-bottom: 2px solid #e0e0e0;
+.leaves-tracker-summary-card h3 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 8px 0;
 }
 
-.department-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #000;
-    margin: 0;
+.leaves-tracker-summary-card p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
 }
 
-.employee-count-badge {
-    margin-left: 12px;
-    padding: 4px 12px;
-    background: #dc3545;
-    color: white;
-    font-weight: bold;
-    border-radius: 8px;
-    border: 1px solid #dc3545;
+.leaves-tracker-filters {
+  background: white;
+  border: 1px solid #f1f1f1;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
 }
 
-.view-toggle-buttons {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
+.leaves-tracker-table-container {
+  background: white;
+  border: 1px solid #f1f1f1;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-.view-toggle-btn {
-    flex: 1;
-    min-width: 120px;
+.leaves-tracker-table-header {
+  padding: 20px;
+  border-bottom: 1px solid #f1f1f1;
 }
 
-.filter-section {
-    background: white;
-    border-radius: 8px;
-    border: 2px solid #e0e0e0;
-    padding: 20px;
-    margin-bottom: 24px;
-    box-shadow: none;
+.leaves-tracker-table-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+  margin: 0 0 4px 0;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: #6c757d;
+.leaves-tracker-table-header p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
 }
 
-.empty-state-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
+/* Table Improvements */
+.leaves-tracker-table {
+  width: 100%;
+  table-layout: auto;
 }
 
-.schedule-grid-container {
-    margin-top: 24px;
+.leaves-tracker-table thead th {
+  background-color: #fafafa;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f1f1;
+  text-align: left;
+  white-space: nowrap;
 }
 
-/* Animations */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.leaves-tracker-table tbody tr {
+  transition: background-color 0.15s ease;
 }
 
-.animated-enter {
-    animation: fadeIn 0.4s ease-out;
+.leaves-tracker-table tbody tr:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
 }
 
-/* Responsive adjustments */
+.leaves-tracker-table tbody td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f1f1;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .leaves-tracker-container {
+    max-width: 100%;
+    margin-left: 0;
+    padding: 1.25rem 1.5rem;
+  }
+  
+  .leaves-tracker-summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-    .schedule-stat-number {
-        font-size: 2rem;
-    }
-    
-    .schedule-stat-label {
-        font-size: 0.8rem;
-    }
-    
-    .view-toggle-buttons {
-        flex-direction: column;
-    }
-    
-    .view-toggle-btn {
-        width: 100%;
-        min-width: auto;
-    }
-    
-    .department-title {
-        font-size: 1.2rem;
-    }
+  .leaves-tracker-container {
+    padding: 1rem;
+    margin-left: 0;
+  }
+  
+  .leaves-tracker-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .leaves-tracker-summary-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .leaves-tracker-table-container {
+    overflow-x: auto;
+  }
 }
 
-/* Custom scrollbar for employee lists */
-.employee-list-container::-webkit-scrollbar {
-    width: 8px;
+/* Tabs Styling */
+.leaves-tracker-tabs {
+  background: white;
+  border: 1px solid #f1f1f1;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  overflow: hidden;
 }
 
-.employee-list-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
+/* Action Buttons */
+.leaves-tracker-action-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: none;
 }
 
-.employee-list-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
+.leaves-tracker-action-btn-primary {
+  background-color: #dc3545;
+  color: white;
 }
 
-.employee-list-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
+.leaves-tracker-action-btn-primary:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
 }
 
-/* Tooltip enhancements */
-.schedule-tooltip {
-    background: rgba(0, 0, 0, 0.9) !important;
-    font-size: 0.875rem !important;
-    padding: 8px 12px !important;
-    border-radius: 8px !important;
+.leaves-tracker-action-btn-secondary {
+  background-color: white;
+  color: #dc3545;
+  border: 1px solid #dc3545;
 }
 
-/* Color scheme for different categories - White & Black with Red Borders */
-.category-week-1-3 {
-    background: white;
-    border: 2px solid #dc3545;
-    border-left: 4px solid #dc3545;
+.leaves-tracker-action-btn-secondary:hover {
+  background-color: #dc3545;
+  color: white;
 }
-
-.category-week-2-4 {
-    background: white;
-    border: 2px solid #dc3545;
-    border-left: 4px solid #dc3545;
-}
-
-.category-all-working {
-    background: white;
-    border: 2px solid #dc3545;
-    border-left: 4px solid #dc3545;
-}
-
-.category-all-off {
-    background: white;
-    border: 2px solid #dc3545;
-    border-left: 4px solid #dc3545;
-}
-
-/* Drag and Drop Effects */
-.employee-chip-dragging {
-    opacity: 0.4;
-    cursor: grabbing !important;
-}
-
-.employee-chip-draggable {
-    cursor: grab;
-    transition: all 0.3s ease;
-    background: white;
-    border: 2px solid #dc3545;
-}
-
-.employee-chip-draggable:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
-}
-
-.drop-zone-active {
-    border: 3px dashed #dc3545 !important;
-    background: #f8f9fa !important;
-    transform: scale(1.02);
-}
-
-.drop-zone-hover {
-    background: #f8f9fa;
-    border-color: #dc3545 !important;
-}
-
-.drop-indicator {
-    position: relative;
-}
-
-.drop-indicator::after {
-    content: '⬇ Drop Here';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #dc3545;
-    font-weight: bold;
-    font-size: 1.2rem;
-    pointer-events: none;
-    animation: pulse 1s infinite;
-}
-
-/* Loading state */
-.schedule-loading {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 400px;
-}
-
-/* Success state for swap actions */
-.swap-success {
-    animation: pulse 0.6s ease;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.05);
-    }
-}
-

@@ -53,7 +53,10 @@ require('./models/ExtraBreakRequest');
 require('./models/EarlyCheckoutRequest');
 require('./models/NewNotification'); // <-- THIS IS THE FIX
 require('./models/Holiday');
+require('./models/LeaveYear');
 require('./models/OfficeLocation');
+require('./models/LeaveLedger');
+require('./models/LeaveAccrualLock');
 // TODO: Uncomment when these models are implemented
 // require('./models/LeaveYearEndAction');
 // require('./models/LeaveEncashment');
@@ -76,6 +79,10 @@ const officeLocationRoutes = require('./routes/officeLocations');
 const manageRoutes = require('./routes/manage');
 const payrollRoutes = require('./routes/payrollRoutes');
 const probationRoutes = require('./routes/probation');
+const analyticsRoutes = require('./routes/analytics');
+const leaveYearRoutes = require('./routes/leaveYearRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
+const datasetRoutes = require('./routes/datasetRoutes');
 // TODO: Uncomment when yearEndLeaves route is implemented
 // const yearEndLeavesRoutes = require('./routes/yearEndLeaves');
 
@@ -186,7 +193,7 @@ app.use(
         // Allow embedding from SSO portal - CRITICAL for iframe embedding
         'frame-ancestors': process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.bylinelms.com"],
+          : ["'self'", "https://attendance-test.bylinelms.com"],
       },
     },
     // Disable X-Frame-Options since we're using CSP frame-ancestors instead
@@ -270,12 +277,12 @@ app.use((req, res, next) => {
   // Production allowed origins for iframe embedding
   const allowedOrigins = process.env.NODE_ENV === 'development' 
           ? ["'self'", "http://localhost:5173"]
-          : ["'self'", "https://attendance.bylinelms.com"]
+          : ["'self'", "https://attendance-test.bylinelms.com"]
 
 
 
     // ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance.bylinelms.com";
+    // : "https://sso.legatolxp.online https://sso.bylinelms.com https://sso.leagatolxp.online https://attendance-test.bylinelms.com";
   
   // If frame-ancestors is not in CSP, add it
   // If it exists but is different, replace it
@@ -360,7 +367,7 @@ const staticOptions = {
             // Set CSP frame-ancestors for HTML files to allow iframe embedding
             const allowedOrigins = process.env.NODE_ENV === 'development' 
               ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-              : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance.bylinelms.com";
+              : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance-test.bylinelms.com https://attendance.bylinelms.com";
             const existingCSP = res.getHeader('Content-Security-Policy') || '';
             if (!existingCSP.includes('frame-ancestors')) {
               if (existingCSP) {
@@ -493,8 +500,18 @@ app.use('/api/admin/reports', reportsRoutes);
 app.use('/api/admin/office-locations', officeLocationRoutes);
 app.use('/api/admin/manage', manageRoutes);
 app.use('/api/probation', probationRoutes); // Probation tracker (independent)
+app.use('/api/analytics', analyticsRoutes); // Analytics dashboard
 app.use('/api/admin', adminRoutes);
 app.use('/api/payroll', payrollRoutes);
+
+// Leave Year and Holiday Management routes
+app.use('/api/admin/leave-years', leaveYearRoutes);
+app.use('/api/holidays', holidayRoutes);
+app.use('/api/admin/holiday-dataset', datasetRoutes);
+
+// Leave Accrual Management routes
+const leaveAccrualRoutes = require('./routes/leaveAccrual');
+app.use('/api/admin/leave-accrual', leaveAccrualRoutes);
 
 // Announcement routes
 const announcementRoutes = require('./routes/announcementRoutes');
@@ -519,6 +536,8 @@ console.log('- /api/breaks (breakRoutes)');
 console.log('- /api/leaves (leaveRoutes)');
 console.log('- /api/admin/manage (manageRoutes)');
 console.log('- /api/admin (adminRoutes)');
+console.log('- /api/admin/leave-years (leaveYearRoutes)');
+console.log('- /api/holidays (holidayRoutes)');
 console.log('✅ AMS SSO Auto-Login route initialized at /api/auto-login/launch/:appId');
 
 // Health check endpoint
@@ -629,47 +648,9 @@ app.use('/api', (req, res, next) => {
   });
 });
 
-// Global error handling middleware
-app.use((err, req, res, next) => {
-  // Track error in performance monitor
-  performanceMonitor.trackError(err, {
-    url: req.url,
-    method: req.method,
-    body: req.body,
-    params: req.params,
-    query: req.query
-  });
-
-  logError(err, {
-    url: req.url,
-    method: req.method,
-    body: req.body,
-    params: req.params,
-    query: req.query,
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
-  });
-
-  // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
-  // Determine status code
-  const statusCode = err.status || err.statusCode || 500;
-  
-  // Prepare error response
-  const errorResponse = {
-    error: isDevelopment ? err.message : 'Internal Server Error',
-    ...(isDevelopment && { 
-      stack: err.stack,
-      details: err.details 
-    }),
-    ...(statusCode === 500 && !isDevelopment && {
-      requestId: req.id || Date.now().toString(36) // Simple request ID for tracking
-    })
-  };
-  
-  res.status(statusCode).json(errorResponse);
-});
+// Global error handling middleware - use centralized error handler
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Serve static files from the React app build directory (after API routes)
 // Use optimized settings for production
@@ -745,7 +726,7 @@ app.use((req, res, next) => {
   
   const allowedOrigins = process.env.NODE_ENV === 'development' 
     ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance.bylinelms.com";
+    : "https://sso.legatolxp.online https://sso.bylinelms.com https://attendance-test.bylinelms.com https://attendance.bylinelms.com";
   
   let existingCSP = res.getHeader('Content-Security-Policy') || '';
   
@@ -823,6 +804,12 @@ const startServer = async () => {
     // Start scheduled jobs after database is ready
     startScheduledJobs();
     console.log('✅ Scheduled jobs started');
+    
+    // Initialize active year cache and attendance sync
+    const activeYearCache = require('./services/activeYearCache');
+    require('./services/attendanceSync'); // Initialize event listeners
+    await activeYearCache.warmUp();
+    console.log('✅ Active year cache initialized');
     
     // Initialize SSO service (only if SSO_PUBLIC_KEY_URL is configured)
     // Note: SSO_SECRET is not used for RS256/JWKS verification, only for legacy HS256

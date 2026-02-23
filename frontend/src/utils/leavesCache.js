@@ -29,15 +29,39 @@ export function getAdminLeavesCacheKey(page = 1, limit = 10) {
 }
 
 /**
- * Get cached value if present and not expired.
- * @returns {{ data: any, timestamp: number } | null}
+ * Build a stable cache key for the leave analytics counts endpoint.
+ * Key format: leaves:analytics:{role}:{year}:{month}:{leaveType}
+ */
+export function getAnalyticsCountsCacheKey(role, year, month, leaveType = '') {
+  return `leaves:analytics:${role}:${year}:${month}:${leaveType}`;
+}
+
+/**
+ * Build a stable cache key for the actual-work-days attendance endpoint.
+ * Key format: leaves:workdays:{year}:{month}
+ */
+export function getWorkDaysCacheKey(year, month) {
+  return `leaves:workdays:${year}:${month}`;
+}
+
+/**
+ * Get cached value if present (returns stale entries too).
+ * Returns the cache entry whether fresh or stale. Returns null only if key is absent.
+ * @returns {{ data: any, timestamp: number, ttlMs: number } | null}
  */
 export function getLeavesCache(key) {
+  return cache.get(key) ?? null;
+}
+
+/**
+ * Check if cache entry exists and is still within TTL (fresh).
+ * Returns true only if entry exists AND is within TTL.
+ * @returns {boolean}
+ */
+export function isLeavesCacheEntryFresh(key) {
   const entry = cache.get(key);
-  if (!entry) return null;
-  const age = Date.now() - entry.timestamp;
-  if (age >= entry.ttlMs) return null;
-  return entry;
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < entry.ttlMs;
 }
 
 /**

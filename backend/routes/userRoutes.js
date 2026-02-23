@@ -247,9 +247,7 @@ router.post(
             console.log('[Avatar Upload] Success:', {
                 userId: req.user.userId,
                 fileId: req.avatarUpload.fileId,
-                size: req.avatarUpload.size,
-                originalSize: req.avatarUpload.metadata.originalSize,
-                reduction: `${((1 - req.avatarUpload.size / req.avatarUpload.metadata.originalSize) * 100).toFixed(1)}%`
+                size: req.avatarUpload.size
             });
 
             res.json({

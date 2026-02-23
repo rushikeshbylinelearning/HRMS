@@ -15,7 +15,7 @@ class NewNotificationService {
         // Get backend URL - use same origin if not specified (for same-domain deployments)
         // If VITE_SOCKET_URL is set, use it; otherwise use window.location.origin
         this.backendUrl = import.meta.env.VITE_SOCKET_URL || 
-            (typeof window !== 'undefined' ? window.location.origin : 'https://attendance.bylinelms.com');
+            (typeof window !== 'undefined' ? window.location.origin : 'https://attendance-test.bylinelms.com');
         
         console.log('[NewNotificationService] Backend URL:', this.backendUrl);
     }

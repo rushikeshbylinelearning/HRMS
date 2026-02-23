@@ -1075,61 +1075,117 @@ const LeavesTrackerPage = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-        {/* UPGRADED: Clean header with better responsiveness */}
-        <Paper elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Box sx={{ p: 2, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
-            <Box display="flex" alignItems="center" gap={1.5}>
-              <IconButton onClick={handleBack} size="small" sx={{ color: 'primary.main' }}>
-                <ArrowBack />
-              </IconButton>
-              <Typography variant="h5" component="h1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                Employee Leaves Tracker
-              </Typography>
-            </Box>
-            <Box display="flex" gap={1.5} flexWrap="wrap">
-              <Button 
-                variant="contained" 
-                size="small"
-                startIcon={<Add />} 
-                onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }}
-                sx={{ textTransform: 'none' }}
-              >
-                Assign Leave
-              </Button>
-              <Button 
-                variant="contained" 
-                size="small"
-                startIcon={<Assignment />} 
-                onClick={() => setShowAllocateDialog(true)}
-                color="info"
-                sx={{ textTransform: 'none' }}
-              >
-                Allocate
-              </Button>
-              <Button 
-                variant="contained" 
-                size="small"
-                startIcon={<Group />} 
-                onClick={() => setShowBulkAllocateDialog(true)}
-                color="secondary"
-                sx={{ textTransform: 'none' }}
-              >
-                Bulk Allocate
-              </Button>
-            </Box>
+      <Box className="leaves-tracker-container">
+        {/* Breadcrumb */}
+        <Box className="leaves-tracker-breadcrumb">
+          <a href="#" onClick={(e) => { e.preventDefault(); navigate('/leaves'); }}>Leaves</a>
+          <span>/</span>
+          <span>Employee Leave Tracker</span>
+        </Box>
+
+        {/* Header Section */}
+        <Box className="leaves-tracker-header">
+          <Box className="leaves-tracker-header-left">
+            <h1>Employee Leave Tracker</h1>
+            <p>Track and manage employee leave balances and usage</p>
           </Box>
-        </Paper>
+          <Box className="leaves-tracker-header-right">
+            <Button 
+              variant="contained" 
+              size="medium"
+              startIcon={<Add />} 
+              onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }}
+              sx={{ 
+                textTransform: 'none',
+                bgcolor: '#dc3545',
+                '&:hover': { bgcolor: '#c82333' },
+                borderRadius: '8px',
+                px: 2
+              }}
+            >
+              Assign Leave
+            </Button>
+            <Button 
+              variant="outlined" 
+              size="medium"
+              startIcon={<Assignment />} 
+              onClick={() => setShowAllocateDialog(true)}
+              sx={{ 
+                textTransform: 'none',
+                borderColor: '#dc3545',
+                color: '#dc3545',
+                '&:hover': { 
+                  borderColor: '#c82333',
+                  bgcolor: 'rgba(220, 53, 69, 0.04)'
+                },
+                borderRadius: '8px',
+                px: 2
+              }}
+            >
+              Allocate
+            </Button>
+            <Button 
+              variant="outlined" 
+              size="medium"
+              startIcon={<Group />} 
+              onClick={() => setShowBulkAllocateDialog(true)}
+              sx={{ 
+                textTransform: 'none',
+                borderColor: '#dc3545',
+                color: '#dc3545',
+                '&:hover': { 
+                  borderColor: '#c82333',
+                  bgcolor: 'rgba(220, 53, 69, 0.04)'
+                },
+                borderRadius: '8px',
+                px: 2
+              }}
+            >
+              Bulk Allocate
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Summary Cards */}
+        <Box className="leaves-tracker-summary-cards">
+          <Box className="leaves-tracker-summary-card">
+            <h3>{employees.length}</h3>
+            <p>Total Employees</p>
+          </Box>
+          <Box className="leaves-tracker-summary-card">
+            <h3>{leaveData.reduce((sum, d) => sum + (d.balances?.totalEntitlement || 0), 0)}</h3>
+            <p>Total Leave Balance</p>
+          </Box>
+          <Box className="leaves-tracker-summary-card">
+            <h3>{leaveData.reduce((sum, d) => sum + (d.balances?.totalUsed || 0), 0)}</h3>
+            <p>Leaves Used</p>
+          </Box>
+          <Box className="leaves-tracker-summary-card">
+            <h3>{leaveRequests.filter(r => r.status === 'Pending').length}</h3>
+            <p>Pending Requests</p>
+          </Box>
+        </Box>
         
-        {/* UPGRADED: Tabs with cleaner styling */}
-        <Paper elevation={0} sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+        {/* Tabs */}
+        <Paper elevation={0} className="leaves-tracker-tabs">
           <Tabs 
             value={activeTab} 
             onChange={(e, newValue) => setActiveTab(newValue)} 
             sx={{ 
               borderBottom: 1, 
               borderColor: 'divider',
-              '& .MuiTab-root': { textTransform: 'none', fontWeight: 500 }
+              '& .MuiTab-root': { 
+                textTransform: 'none', 
+                fontWeight: 500,
+                fontSize: '14px',
+                minHeight: '48px'
+              },
+              '& .Mui-selected': {
+                color: '#dc3545'
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#dc3545'
+              }
             }}
           >
             <Tab label="Leave Balances" />
@@ -1138,10 +1194,10 @@ const LeavesTrackerPage = () => {
           </Tabs>
         </Paper>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '8px' }}>{error}</Alert>}
 
-        {/* UPGRADED: Cleaner filters card */}
-        <Paper elevation={0} sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+        {/* Filters */}
+        <Box className="leaves-tracker-filters">
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={3}>
               <TextField 
@@ -1151,13 +1207,23 @@ const LeavesTrackerPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)} 
                 placeholder="Name or code..."
                 InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }} 
-                size="small" 
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '8px'
+                  }
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Department</InputLabel>
-                <Select value={selectedDepartment} label="Department" onChange={(e) => setSelectedDepartment(e.target.value)}>
+                <Select 
+                  value={selectedDepartment} 
+                  label="Department" 
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  sx={{ borderRadius: '8px' }}
+                >
                   <MenuItem value="">All Departments</MenuItem>
                   {departments.map((dept) => (<MenuItem key={dept} value={dept}>{dept}</MenuItem>))}
                 </Select>
@@ -1166,7 +1232,12 @@ const LeavesTrackerPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Employee</InputLabel>
-                <Select value={selectedEmployee} label="Employee" onChange={(e) => setSelectedEmployee(e.target.value)}>
+                <Select 
+                  value={selectedEmployee} 
+                  label="Employee" 
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  sx={{ borderRadius: '8px' }}
+                >
                   <MenuItem value="">All Employees</MenuItem>
                   {employees.map((emp) => (<MenuItem key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</MenuItem>))}
                 </Select>
@@ -1175,28 +1246,29 @@ const LeavesTrackerPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Year</InputLabel>
-                <Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value)}>
+                <Select 
+                  value={selectedYear} 
+                  label="Year" 
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  sx={{ borderRadius: '8px' }}
+                >
                   {[2023, 2024, 2025, 2026].map((year) => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
                 </Select>
               </FormControl>
             </Grid>
           </Grid>
-        </Paper>
+        </Box>
         
-    {/* UPGRADED: Modern Leave Balances table with pagination */}
+    {/* Leave Balances Table */}
         {activeTab === 0 && (
-            <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                        Leave Balances Overview
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {filteredLeaveData.length} employee{filteredLeaveData.length !== 1 ? 's' : ''} found
-                    </Typography>
+            <Box className="leaves-tracker-table-container">
+                <Box className="leaves-tracker-table-header">
+                    <h2>Leave Balances Overview</h2>
+                    <p>{filteredLeaveData.length} employee{filteredLeaveData.length !== 1 ? 's' : ''} found</p>
                 </Box>
                 
                 {loading ? (
-                    <Box sx={{ p: 2 }}>
+                    <Box sx={{ p: 3 }}>
                         {[...Array(5)].map((_, index) => (
                             <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 1 }} />
                         ))}
@@ -1212,18 +1284,18 @@ const LeavesTrackerPage = () => {
                     </Box>
                 ) : (
                     <>
-                        <TableContainer sx={{ maxHeight: { xs: '60vh', md: '70vh' } }}>
-                            <Table stickyHeader size="small">
+                        <TableContainer>
+                            <Table stickyHeader size="medium" className="leaves-tracker-table">
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', py: 1.5 }}>Employee</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Department</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Total (Used/Total)</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Sick</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Casual</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Planned</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>LOP</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', textAlign: 'center' }}>Actions</TableCell>
+                                        <TableCell>Employee</TableCell>
+                                        <TableCell>Department</TableCell>
+                                        <TableCell>Total (Used/Total)</TableCell>
+                                        <TableCell>Sick</TableCell>
+                                        <TableCell>Casual</TableCell>
+                                        <TableCell>Planned</TableCell>
+                                        <TableCell>LOP</TableCell>
+                                        <TableCell align="center">Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -1236,11 +1308,6 @@ const LeavesTrackerPage = () => {
                                             <TableRow 
                                                 key={employee._id} 
                                                 hover 
-                                                sx={{ 
-                                                    cursor: 'pointer',
-                                                    '&:hover': { bgcolor: 'action.hover' },
-                                                    '& td': { py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
-                                                }}
                                                 onClick={() => {
                                                     setDialogEmployee(employee);
                                                     setSelectedRequest(null);
@@ -1373,20 +1440,23 @@ const LeavesTrackerPage = () => {
                         />
                     </>
                 )}
-            </Paper>
+            </Box>
         )}
-        {/* UPGRADED: Leave Requests Tab */}
+        {/* Leave Requests Tab */}
         {activeTab === 1 && (
-            <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
-                        Leave Requests
-                    </Typography>
-                    <Grid container spacing={2} alignItems="center">
+            <Box className="leaves-tracker-table-container">
+                <Box className="leaves-tracker-table-header">
+                    <h2>Leave Requests</h2>
+                    <Grid container spacing={2} alignItems="center" sx={{ mt: 1 }}>
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Month</InputLabel>
-                                <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value)}>
+                                <Select 
+                                  value={selectedMonth} 
+                                  label="Month" 
+                                  onChange={(e) => setSelectedMonth(e.target.value)}
+                                  sx={{ borderRadius: '8px' }}
+                                >
                                     <MenuItem value="">All Months</MenuItem>
                                     {[...Array(12)].map((_, i) => (
                                         <MenuItem key={i} value={i}>{new Date(0, i).toLocaleString(undefined, { month: 'long' })}</MenuItem>
@@ -1397,32 +1467,37 @@ const LeavesTrackerPage = () => {
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Week</InputLabel>
-                                <Select value={selectedWeek} label="Week" onChange={(e) => setSelectedWeek(e.target.value)}>
+                                <Select 
+                                  value={selectedWeek} 
+                                  label="Week" 
+                                  onChange={(e) => setSelectedWeek(e.target.value)}
+                                  sx={{ borderRadius: '8px' }}
+                                >
                                     <MenuItem value="">All Weeks</MenuItem>
                                     {[1,2,3,4,5].map(w => (<MenuItem key={w} value={w}>{`Week ${w}`}</MenuItem>))}
                                 </Select>
                             </FormControl>
                         </Grid>
                         <Grid item xs={12} md={6}>
-                            <Typography variant="caption" color="text.secondary">
-                                Filters apply to first leave date. {filteredLeaveRequests.length} request{filteredLeaveRequests.length !== 1 ? 's' : ''} found.
+                            <Typography variant="body2" color="text.secondary">
+                                {filteredLeaveRequests.length} request{filteredLeaveRequests.length !== 1 ? 's' : ''} found
                             </Typography>
                         </Grid>
                     </Grid>
                 </Box>
 
-                <TableContainer sx={{ maxHeight: { xs: '60vh', md: '70vh' } }}>
-                    <Table stickyHeader size="small">
+                <TableContainer>
+                    <Table stickyHeader size="medium" className="leaves-tracker-table">
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50', py: 1.5 }}>Employee</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Department</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Type</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Leave Type</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Dates</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Days</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Status</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>Applied On</TableCell>
+                                <TableCell>Employee</TableCell>
+                                <TableCell>Department</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell>Leave Type</TableCell>
+                                <TableCell>Dates</TableCell>
+                                <TableCell>Days</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Applied On</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -1449,16 +1524,11 @@ const LeavesTrackerPage = () => {
                                         <TableRow 
                                             key={req._id} 
                                             hover 
-                                            sx={{ 
-                                                cursor: 'pointer',
-                                                '&:hover': { bgcolor: 'action.hover' },
-                                                '& td': { py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
-                                            }} 
                                             onClick={() => { setDialogEmployee(emp); setSelectedRequest(req); setShowEmployeeDialog(true); }}
                                         >
                                             <TableCell>
                                                 <Box display="flex" alignItems="center" gap={1.5}>
-                                                    <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem', bgcolor: 'primary.main' }}>
+                                                    <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem', bgcolor: '#dc3545' }}>
                                                         {(emp.fullName || '').charAt(0)}
                                                     </Avatar>
                                                     <Box>
@@ -1517,7 +1587,7 @@ const LeavesTrackerPage = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
-            </Paper>
+            </Box>
         )}
 
         {activeTab === 2 && (

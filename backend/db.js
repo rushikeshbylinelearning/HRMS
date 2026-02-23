@@ -4,6 +4,7 @@ require('dotenv').config();
 
 let isConnected = false;
 let policyBucket = null;
+let avatarBucket = null;
 
 const connectDB = async () => {
   // If already connected, return existing connection
@@ -56,6 +57,15 @@ const connectDB = async () => {
       console.log('✅ GridFS policy bucket initialized');
     }
     
+    // Initialize GridFS bucket for avatars
+    if (!avatarBucket) {
+      avatarBucket = new mongoose.mongo.GridFSBucket(
+        mongoose.connection.db,
+        { bucketName: 'avatars' }
+      );
+      console.log('✅ GridFS avatar bucket initialized');
+    }
+    
     // Set up reconnection logic for disconnections
     mongoose.connection.on('disconnected', () => {
       console.warn('⚠️ MongoDB disconnected. Retrying in 5s...');
@@ -88,4 +98,10 @@ module.exports.getPolicyBucket = () => {
     throw new Error('Policy bucket not initialized. Ensure MongoDB is connected.');
   }
   return policyBucket;
+};
+module.exports.getAvatarBucket = () => {
+  if (!avatarBucket) {
+    throw new Error('Avatar bucket not initialized. Ensure MongoDB is connected.');
+  }
+  return avatarBucket;
 };

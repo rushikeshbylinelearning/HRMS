@@ -11,7 +11,7 @@ const corsOptions = {
     
     const allowedOrigins = [
       'https://attendance.bylinelms.com', // Production AMS frontend domain
-      // REMOVED: 'https://attendance.legatolxp.online' - Not needed, frontend and backend are same domain
+      'https://attendance-test.bylinelms.com', //Not needed, frontend and backend are same domain
       'https://sso.legatolxp.online', // Production SSO domain (for SSO integration)
       'https://sso.bylinelms.com', // Production SSO portal (for SSO integration)
       process.env.FRONTEND_URL,

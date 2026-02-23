@@ -12,7 +12,12 @@
     "seed:office": "node seedOfficeLocations.js",
     "migrate:permissions": "node scripts/migrate-feature-permissions.js",
     "build": "echo \"Backend build complete\"",
-    "prod": "NODE_ENV=production node server.js"
+    "prod": "NODE_ENV=production node server.js",
+    "create-indexes": "node scripts/create-leave-indexes.js",
+    "accrual:dry-run": "node -e \"require('./cron/leaveAccrualCron').executeLeaveAccrual({ dryRun: true }).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\"",
+    "accrual:run": "node -e \"require('./cron/leaveAccrualCron').executeLeaveAccrual().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\"",
+    "init:leave-system": "node scripts/initialize-leave-accrual-system.js",
+    "init:leave-system:full": "node scripts/initialize-leave-accrual-system.js --run-accrual --live"
   },
   "keywords": [],
   "author": "",

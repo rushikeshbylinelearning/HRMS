@@ -17,14 +17,14 @@ console.log('MODE:', import.meta.env.MODE);
 // Determine baseURL:
 // - Development: Use Vite proxy (/api)
 // - Production: Use VITE_API_BASE_URL if set, otherwise use full URL
-//   CRITICAL: In production, must use full URL: https://attendance.bylinelms.com/api
+//   CRITICAL: In production, must use full URL: https://attendance-test.bylinelms.com/api
 const baseURL = import.meta.env.DEV 
   ? '/api' // Use Vite proxy in development
   : (import.meta.env.VITE_API_BASE_URL 
       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
           ? import.meta.env.VITE_API_BASE_URL 
           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-      : 'https://attendance.bylinelms.com/api'); // Use full URL in production
+      : 'https://attendance-test.bylinelms.com/api'); // Use full URL in production
 
 const api = axios.create({
   baseURL: baseURL,
@@ -33,25 +33,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-
-
-// const baseURL = import.meta.env.DEV 
-//   ? '/api' // Use Vite proxy in development
-//   : (import.meta.env.VITE_API_BASE_URL 
-//       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
-//           ? import.meta.env.VITE_API_BASE_URL 
-//           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-//       : 'https://attendance.bylinelms.com/api'); // Use full URL in production
-
-// const api = axios.create({
-//   baseURL: baseURL,
-//   withCredentials: true, // Enable credentials for cross-origin requests
-//   headers: {
-//     'Content-Type': 'application/json',
-//   },
-// });
-
 
 // Debug: Log the actual baseURL being used
 console.log('Axios baseURL:', api.defaults.baseURL);
@@ -100,10 +81,15 @@ api.interceptors.request.use(
     }
     
     // Add timestamp to prevent browser caching of GET requests.
-    // Skip cache-busting for Leaves endpoints so frontend leaves cache can work (stable keys).
-    const isLeavesGet = config.method?.toUpperCase() === 'GET' &&
-      (config.url && (config.url.includes('/leaves') || config.url.includes('/admin/leaves')));
-    if (config.method?.toUpperCase() === 'GET' && !config.params?._t && !isLeavesGet) {
+    // Skip cache-busting for Leaves and Dashboard endpoints so frontend caching can work (stable keys).
+    const isExemptFromCacheBust = config.method?.toUpperCase() === 'GET' && config.url && (
+      config.url.includes('/leaves') ||
+      config.url.includes('/admin/leaves') ||
+      config.url.includes('/admin/dashboard-summary') ||
+      config.url.includes('/admin/dashboard-pending-leaves') ||
+      config.url.includes('/attendance/dashboard/employee')
+    );
+    if (config.method?.toUpperCase() === 'GET' && !config.params?._t && !isExemptFromCacheBust) {
       config.params = { ...config.params, _t: Date.now() };
     }
 

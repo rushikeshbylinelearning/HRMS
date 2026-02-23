@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 # Test 1: Backend Health Check
 echo "Test 1: Backend Health Check"
 echo "----------------------------"
-HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://attendance.bylinelms.com/api/health)
+HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://attendance-test.bylinelms.com/api/health)
 if [ "$HEALTH_RESPONSE" = "200" ]; then
     echo -e "${GREEN}✓ Backend is running (HTTP $HEALTH_RESPONSE)${NC}"
 else
@@ -29,7 +29,7 @@ echo ""
 echo "Test 2: CORS Headers Check"
 echo "----------------------------"
 echo "Testing /api/auth/me endpoint..."
-CORS_HEADERS=$(curl -s -I -H "Origin: https://attendance.bylinelms.com" https://attendance.bylinelms.com/api/auth/me)
+CORS_HEADERS=$(curl -s -I -H "Origin: https://attendance-test.bylinelms.com" https://attendance-test.bylinelms.com/api/auth/me)
 if echo "$CORS_HEADERS" | grep -q "Access-Control-Allow-Origin"; then
     echo -e "${YELLOW}⚠ CORS headers present (may not be needed for same-origin)${NC}"
     echo "$CORS_HEADERS" | grep "Access-Control"
@@ -55,13 +55,13 @@ echo ""
 echo "Test 4: Environment Variables Check"
 echo "------------------------------------"
 echo "Checking backend .env..."
-if grep -q "FRONTEND_URL=https://attendance.bylinelms.com" backend/.env; then
+if grep -q "FRONTEND_URL=https://attendance-test.bylinelms.com" backend/.env; then
     echo -e "${GREEN}✓ FRONTEND_URL is correct${NC}"
 else
     echo -e "${RED}✗ FRONTEND_URL is incorrect${NC}"
 fi
 
-if grep -q "BACKEND_PUBLIC_URL=https://attendance.bylinelms.com" backend/.env; then
+if grep -q "BACKEND_PUBLIC_URL=https://attendance-test.bylinelms.com" backend/.env; then
     echo -e "${GREEN}✓ BACKEND_PUBLIC_URL is correct${NC}"
 else
     echo -e "${RED}✗ BACKEND_PUBLIC_URL is incorrect${NC}"
@@ -69,7 +69,7 @@ fi
 
 echo ""
 echo "Checking frontend .env..."
-if grep -q "VITE_API_BASE_URL=https://attendance.bylinelms.com" frontend/.env; then
+if grep -q "VITE_API_BASE_URL=https://attendance-test.bylinelms.com" frontend/.env; then
     echo -e "${GREEN}✓ VITE_API_BASE_URL is correct${NC}"
 else
     echo -e "${RED}✗ VITE_API_BASE_URL is incorrect${NC}"
@@ -104,7 +104,7 @@ echo ""
 echo "Next Steps:"
 echo "1. Test login in browser (incognito mode)"
 echo "2. Check browser DevTools for CORS errors"
-echo "3. Verify all API calls go to attendance.bylinelms.com"
+echo "3. Verify all API calls go to attendance-test.bylinelms.com"
 echo "4. Test SSO integration"
 echo ""
 echo "If all tests pass, deployment is successful!"

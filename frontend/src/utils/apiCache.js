@@ -141,6 +141,112 @@ export const clearPendingRequests = () => {
   pendingRequests.clear();
 };
 
+// --- Dashboard-specific cache (separate namespace from generic responseCache) ---
+const dashboardCache = new Map();
+
+/** TTL for the full dashboard summary (matches backend dashboardCache TTL of 60s). */
+export const DASHBOARD_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+/** TTL for pending leaves only (matches backend pendingLeaves TTL of 45s). */
+export const DASHBOARD_PENDING_TTL_MS = 45 * 1000; // 45 seconds
+
+/** Stale window — data older than TTL but within this window is served instantly
+ *  while a background refresh runs. */
+export const DASHBOARD_STALE_WINDOW_MS = 30 * 1000; // 30 extra seconds stale window
+
+export const DASHBOARD_CACHE_KEYS = {
+  summary: 'dashboard:summary',
+  pending: 'dashboard:pending',
+};
+
+/**
+ * Get dashboard cache entry. Returns the entry (fresh or stale) or null if absent.
+ * Caller must use isDashboardCacheFresh() to decide whether to serve or refresh.
+ */
+export function getDashboardCache(key) {
+  return dashboardCache.get(key) ?? null;
+}
+
+/** Returns true only if the entry exists and is within its TTL. */
+export function isDashboardCacheFresh(key) {
+  const entry = dashboardCache.get(key);
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < entry.ttlMs;
+}
+
+/** Returns true if entry is stale but still within the stale-serve window. */
+export function isDashboardCacheServable(key) {
+  const entry = dashboardCache.get(key);
+  if (!entry) return false;
+  const age = Date.now() - entry.timestamp;
+  return age < entry.ttlMs + DASHBOARD_STALE_WINDOW_MS;
+}
+
+/** Store a dashboard cache entry. */
+export function setDashboardCache(key, data, ttlMs = DASHBOARD_CACHE_TTL_MS) {
+  dashboardCache.set(key, { data, timestamp: Date.now(), ttlMs });
+}
+
+/** Invalidate all dashboard cache entries (call after any mutation). */
+export function invalidateDashboardCache() {
+  dashboardCache.clear();
+}
+
+// --- Employee Dashboard-specific cache ---
+const employeeDashboardCache = new Map();
+
+/** TTL: 45 seconds — matches the backend employee_dashboard cache TTL exactly. */
+export const EMPLOYEE_DASHBOARD_CACHE_TTL_MS = 45 * 1000;
+
+/**
+ * Stale window beyond TTL. Data older than TTL but within TTL + stale window
+ * is served instantly while a background refresh is in flight.
+ * Keep short (20s) because employee dashboard data is real-time-sensitive.
+ */
+export const EMPLOYEE_DASHBOARD_STALE_WINDOW_MS = 20 * 1000;
+
+export const EMPLOYEE_DASHBOARD_CACHE_KEY = 'employee:dashboard';
+
+/**
+ * Get the employee dashboard cache entry.
+ * Returns the raw entry (fresh or stale) or null if absent.
+ */
+export function getEmployeeDashboardCache() {
+  return employeeDashboardCache.get(EMPLOYEE_DASHBOARD_CACHE_KEY) ?? null;
+}
+
+/** Returns true only if the entry exists and is within TTL. */
+export function isEmployeeDashboardCacheFresh() {
+  const entry = employeeDashboardCache.get(EMPLOYEE_DASHBOARD_CACHE_KEY);
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < EMPLOYEE_DASHBOARD_CACHE_TTL_MS;
+}
+
+/** Returns true if entry exists and is within TTL + stale window (safe to serve). */
+export function isEmployeeDashboardCacheServable() {
+  const entry = employeeDashboardCache.get(EMPLOYEE_DASHBOARD_CACHE_KEY);
+  if (!entry) return false;
+  const age = Date.now() - entry.timestamp;
+  return age < EMPLOYEE_DASHBOARD_CACHE_TTL_MS + EMPLOYEE_DASHBOARD_STALE_WINDOW_MS;
+}
+
+/** Store the employee dashboard payload in cache. */
+export function setEmployeeDashboardCache(data) {
+  employeeDashboardCache.set(EMPLOYEE_DASHBOARD_CACHE_KEY, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Invalidate the employee dashboard cache.
+ * Call immediately after any mutation (clock-in, clock-out, break, etc.)
+ * so the next fetch always writes fresh data.
+ */
+export function invalidateEmployeeDashboardCache() {
+  employeeDashboardCache.delete(EMPLOYEE_DASHBOARD_CACHE_KEY);
+}
+
 
 
 

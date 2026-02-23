@@ -14,7 +14,7 @@ const init = (httpServer) => {
         path: '/api/socket.io/',
         cors: {
             origin: [
-                "https://attendance.bylinelms.com",
+                "https://attendance-test.bylinelms.com",
                 process.env.FRONTEND_URL,
                 // Development origins
                 "http://localhost:5173",

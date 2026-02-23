@@ -120,10 +120,47 @@
     display: flex;
     flex-direction: column;
     background-color: white;
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    border: 1px solid #eef2f6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f3f4f6;
+}
+
+.activity-table-wrapper {
+    overflow-x: auto;
+    overflow-y: scroll;
+    max-height: 600px;
+    border-radius: 16px;
+}
+
+/* Custom scrollbar styling - Always visible */
+.activity-table-wrapper::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+}
+
+.activity-table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.activity-table-wrapper::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 7px;
+    border: 3px solid #f1f1f1;
+}
+
+.activity-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.activity-table-wrapper::-webkit-scrollbar-corner {
+    background: #f1f1f1;
+}
+
+/* Firefox scrollbar */
+.activity-table-wrapper {
+    scrollbar-width: auto;
+    scrollbar-color: #888 #f1f1f1;
 }
 
 .activity-logs-container .MuiTableContainer-root {
@@ -131,9 +168,18 @@
 }
 
 .activity-logs-container .MuiTableHead-root .MuiTableCell-root {
-    background-color: #f8f9fa;
+    background-color: #f9fafb;
     font-weight: 600;
-    color: #495057;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.activity-logs-container .MuiTableBody-root .MuiTableRow-root {
+    transition: background-color 0.2s;
+}
+
+.activity-logs-container .MuiTableBody-root .MuiTableRow-root:hover {
+    background-color: #f0f9ff !important;
 }
 
 .activity-progress-bar {

@@ -15,6 +15,15 @@ const Topbar = ({ onNotificationClick }) => {
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState(null);
     const { unreadCount } = useNewNotifications();
+    const [scrolled, setScrolled] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 10);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const handleMenu = (event) => setAnchorEl(event.currentTarget);
     const handleClose = () => setAnchorEl(null);
@@ -33,7 +42,7 @@ const Topbar = ({ onNotificationClick }) => {
     };
 
     return (
-        <header className="topbar">
+        <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
             <div className="topbar-left">
                 <img src="/BL.svg" alt="Company Logo" className="topbar-logo-img" />
             </div>

@@ -521,7 +521,7 @@ router.get('/callback', async (req, res) => {
 
         // For SSO, we need to redirect to frontend with token
         // The frontend will handle setting the token in sessionStorage
-        const frontendUrl = process.env.FRONTEND_URL || 'https://attendance.bylinelms.com';
+        const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-test.bylinelms.com';
         const redirectUrl = `${frontendUrl}/auth/sso-callback?token=${encodeURIComponent(amsToken)}&user=${encodeURIComponent(JSON.stringify(userData))}`;
         
         res.redirect(redirectUrl);
@@ -530,7 +530,7 @@ router.get('/callback', async (req, res) => {
         console.error('[SSO] SSO callback error:', error.message);
         
         // Redirect to login page with error
-        const frontendUrl = process.env.FRONTEND_URL || 'https://attendance.bylinelms.com';
+        const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-test.bylinelms.com';
         const errorMessage = encodeURIComponent(error.message);
         res.redirect(`${frontendUrl}/login?error=sso_error&message=${errorMessage}`);
     }

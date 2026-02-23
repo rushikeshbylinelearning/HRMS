@@ -489,203 +489,354 @@ const privilegeOptions = useMemo(() => {
       safeFeaturePermissions.extraFeatures
     ].filter(Boolean).length;
     const quickStats = [
-      { label: 'Privilege Level', value: (safeFeaturePermissions.privilegeLevel || 'normal').toUpperCase() },
-      { label: 'Break Windows', value: breakWindowCount },
-      { label: 'Core Features Enabled', value: `${enabledCoreFeatures}/3` },
+      { 
+        label: 'Privilege', 
+        value: (safeFeaturePermissions.privilegeLevel || 'normal').toUpperCase(),
+        icon: <SecurityIcon sx={{ fontSize: 16 }} />,
+        bgColor: '#FEE2E2',
+        iconColor: '#EF4444'
+      },
+      { 
+        label: 'Break Windows', 
+        value: breakWindowCount,
+        icon: <AccessTimeIcon sx={{ fontSize: 16 }} />,
+        bgColor: '#F0FDF4',
+        iconColor: '#10B981'
+      },
+      { 
+        label: 'Core Features', 
+        value: `${enabledCoreFeatures}/2`,
+        icon: <SettingsIcon sx={{ fontSize: 16 }} />,
+        bgColor: '#FEF3C7',
+        iconColor: '#F59E0B'
+      },
       { 
         label: 'Auto Break', 
         value: safeFeaturePermissions.autoBreakOnInactivity 
-          ? `${safeFeaturePermissions.inactivityThresholdMinutes || 5} min`
-          : 'Disabled' 
+          ? `${safeFeaturePermissions.inactivityThresholdMinutes || 5}m`
+          : 'Off',
+        icon: <ScheduleIcon sx={{ fontSize: 16 }} />,
+        bgColor: safeFeaturePermissions.autoBreakOnInactivity ? '#DBEAFE' : '#F3F4F6',
+        iconColor: safeFeaturePermissions.autoBreakOnInactivity ? '#3B82F6' : '#9CA3AF'
       }
     ];
 
     return (
       <>
+        {/* ROW 1: Employee Header - Full Width */}
         <Paper
           elevation={0}
           sx={{
             mb: 3,
             p: 3,
-            borderRadius: '24px',
-            background: 'linear-gradient(135deg, #e53935 0%, #b71c1c 100%)',
-            boxShadow: '0 30px 60px rgba(183, 28, 28, 0.35)',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,0.2)'
+            borderRadius: '16px',
+            background: '#FFFFFF',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            border: '1px solid #E5E7EB',
+            borderLeft: '4px solid #EF4444'
           }}
         >
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            {/* Left: Avatar + Info */}
             <Avatar
               sx={{
-                width: 72,
-                height: 72,
-                fontSize: '1.75rem',
-                fontWeight: 700,
-                backgroundColor: 'rgba(255,255,255,0.2)'
+                width: 56,
+                height: 56,
+                fontSize: '1.25rem',
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                border: '2px solid rgba(239, 68, 68, 0.1)'
               }}
             >
               {currentUser.fullName.charAt(0).toUpperCase()}
             </Avatar>
 
-            <Box sx={{ flex: 1, minWidth: 220 }}>
-              <Typography variant="overline" sx={{ letterSpacing: 1.5, opacity: 0.8 }}>
-                MANAGE PERMISSIONS
+            <Box sx={{ flex: '0 0 auto' }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  letterSpacing: 0.5, 
+                  color: '#6B7280',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  textTransform: 'uppercase',
+                  mb: 0.5
+                }}
+              >
+                Employee Permissions
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#111827', fontSize: '18px', mb: 0.25 }}>
                 {currentUser.fullName}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.85 }}>
+              <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
                 {currentUser.employeeCode} • {currentUser.role}
               </Typography>
             </Box>
 
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={2}
-              sx={{ flex: 1, minWidth: 240 }}
-            >
+            {/* Right: Stat Pills - Equal Height */}
+            <Box sx={{ flex: 1, display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'stretch' }}>
               {quickStats.map((stat) => (
                 <Box
                   key={stat.label}
                   sx={{
-                    flex: 1,
-                    borderRadius: '18px',
-                    padding: '12px 16px',
-                    backgroundColor: 'rgba(255,255,255,0.18)',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    backdropFilter: 'blur(6px)'
+                    minWidth: 110,
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    backgroundColor: stat.bgColor,
+                    border: '1px solid rgba(0,0,0,0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 0.5
                   }}
                 >
-                  <Typography variant="caption" sx={{ letterSpacing: 1, opacity: 0.8 }}>
-                    {stat.label}
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: stat.iconColor }}>
+                    {stat.icon}
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        lineHeight: 1
+                      }}
+                    >
+                      {stat.label}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '16px', lineHeight: 1 }}>
                     {stat.value}
                   </Typography>
                 </Box>
               ))}
-            </Stack>
-
-            <Chip
-              label={safeFeaturePermissions.canViewAnalytics ? 'Analytics Enabled' : 'Analytics Disabled'}
-              color={safeFeaturePermissions.canViewAnalytics ? 'success' : 'default'}
-              sx={{
-                px: 2,
-                height: 36,
-                fontWeight: 600,
-                backgroundColor: safeFeaturePermissions.canViewAnalytics
-                  ? 'rgba(76, 175, 80, 0.2)'
-                  : 'rgba(255,255,255,0.2)',
-                color: '#fff',
-                borderRadius: '18px',
-                textTransform: 'uppercase',
-                letterSpacing: 0.5
-              }}
-            />
+            </Box>
           </Box>
         </Paper>
 
-        <Grid container spacing={3}>
-        {/* Core Features */}
-        <Grid xs={12} md={6}>
-          <Paper 
-            elevation={0} 
-            sx={createCardStyles('rgba(229, 57, 53, 0.14)')}
-          >
-            <Typography 
-              variant="h6" 
-              gutterBottom 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1,
-                color: '#e53935',
-                fontWeight: 700,
-                borderBottom: '2px solid rgba(229, 57, 53, 0.2)',
-                paddingBottom: 1,
-                marginBottom: 2,
-                letterSpacing: 0.5
+        {/* ROW 2: Core Features (4 cols) + Break Timing Configuration (8 cols) */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3, mb: 3 }}>
+          {/* Core Features - 4 columns */}
+          <Box sx={{ gridColumn: 'span 4' }}>
+            <Paper 
+              elevation={0} 
+              sx={{
+                p: '20px',
+                borderRadius: '16px',
+                border: '1px solid #E5E7EB',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
               }}
             >
-              <SettingsIcon sx={{ color: '#e53935' }} />
-              Core Features
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Leaves Section</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.leaves}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'leaves', e.target.checked)}
-                />
+              {/* Fixed Height Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, height: 40 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    border: '1px solid rgba(239, 68, 68, 0.1)'
+                  }}
+                >
+                  <SettingsIcon sx={{ color: '#EF4444', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1
+                  }}
+                >
+                  Core Features
+                </Typography>
               </Box>
               
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Breaks Section</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.breaks}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'breaks', e.target.checked)}
-                />
+              {/* Content with equal spacing */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Leaves Section
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.leaves}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'leaves', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#EF4444',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#EF4444',
+                      },
+                    }}
+                  />
+                </Box>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Breaks Section
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.breaks}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'breaks', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#EF4444',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#EF4444',
+                      },
+                    }}
+                  />
+                </Box>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Extra Features
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.extraFeatures}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'extraFeatures', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#EF4444',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#EF4444',
+                      },
+                    }}
+                  />
+                </Box>
               </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Extra Features</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.extraFeatures}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'extraFeatures', e.target.checked)}
-                />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
+            </Paper>
+          </Box>
 
-        {/* Break Timing Configuration */}
-        <Grid xs={12} md={6}>
-          <Paper 
-            elevation={0} 
-            sx={createCardStyles('rgba(33, 150, 243, 0.16)')}
-          >
-            <Typography 
-              variant="h6" 
-              gutterBottom 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1,
-                color: '#0d47a1',
-                fontWeight: 700,
-                borderBottom: '2px solid rgba(13, 71, 161, 0.2)',
-                paddingBottom: 1,
-                marginBottom: 2,
-                letterSpacing: 0.5
+          {/* Break Timing Configuration - 8 columns */}
+          <Box sx={{ gridColumn: 'span 8' }}>
+            <Paper 
+              elevation={0} 
+              sx={{
+                p: '20px',
+                borderRadius: '16px',
+                border: '1px solid #E5E7EB',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
               }}
             >
-              <AccessTimeIcon sx={{ color: '#0d47a1' }} />
-              Break Timing Configuration
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {safeFeaturePermissions.breakWindows?.map((window, index) => (
-                <Box key={index} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="subtitle2">Break Window {index + 1}</Typography>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => {
-                        const newWindows = [...(safeFeaturePermissions.breakWindows || [])];
-                        newWindows.splice(index, 1);
-                        handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
-                      }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                  
-                  <Grid container spacing={2}>
-                    <Grid xs={6}>
-                      {/* --- MODIFIED: Break Type Dropdown --- */}
+              {/* Fixed Height Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, height: 40 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: '#DBEAFE',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <AccessTimeIcon sx={{ color: '#3B82F6', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1
+                  }}
+                >
+                  Break Timing Configuration
+                </Typography>
+              </Box>
+              
+              {/* Content */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+                {safeFeaturePermissions.breakWindows?.map((window, index) => (
+                  <Box 
+                    key={index} 
+                    sx={{ 
+                      p: 2, 
+                      border: '1px solid #E5E7EB', 
+                      borderRadius: '12px',
+                      background: '#F9FAFB',
+                      position: 'relative'
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
+                        Break Window {index + 1}
+                      </Typography>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => {
+                          const newWindows = [...(safeFeaturePermissions.breakWindows || [])];
+                          newWindows.splice(index, 1);
+                          handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
+                        }}
+                        sx={{
+                          color: '#EF4444',
+                          width: 28,
+                          height: 28,
+                          '&:hover': {
+                            background: '#FEE2E2'
+                          }
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Box>
+                    
+                    {/* 4-column grid for inputs */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
                       <FormControl fullWidth size="small">
-                        <InputLabel>Break Type</InputLabel>
+                        <InputLabel sx={{ fontSize: '13px' }}>Break Type</InputLabel>
                         <Select
                           value={window.type || 'Paid'}
                           label="Break Type"
@@ -694,27 +845,57 @@ const privilegeOptions = useMemo(() => {
                             newWindows[index] = { ...window, type: e.target.value };
                             handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
                           }}
+                          sx={{
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#D1D5DB'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#4F46E5'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#4F46E5',
+                              borderWidth: '2px'
+                            }
+                          }}
                         >
                           <MenuItem value="Paid">Paid Break</MenuItem>
                           <MenuItem value="Unpaid">Unpaid Break</MenuItem>
                           <MenuItem value="Extra">Extra Break</MenuItem>
                         </Select>
                       </FormControl>
-                    </Grid>
-                    <Grid xs={6}>
+                      
                       <TextField
                         fullWidth
                         size="small"
-                        label="Window Name (e.g. Lunch)"
+                        label="Window Name"
+                        placeholder="e.g. Lunch"
                         value={window.name || ''}
                         onChange={(e) => {
                           const newWindows = [...(safeFeaturePermissions.breakWindows || [])];
                           newWindows[index] = { ...window, name: e.target.value };
                           handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
                         }}
+                        InputLabelProps={{ sx: { fontSize: '13px' } }}
+                        inputProps={{ sx: { fontSize: '13px' } }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '12px',
+                            '& fieldset': {
+                              borderColor: '#D1D5DB'
+                            },
+                            '&:hover fieldset': {
+                              borderColor: '#4F46E5'
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: '#4F46E5',
+                              borderWidth: '2px'
+                            }
+                          }
+                        }}
                       />
-                    </Grid>
-                    <Grid xs={6}>
+                      
                       <TextField
                         fullWidth
                         size="small"
@@ -726,9 +907,25 @@ const privilegeOptions = useMemo(() => {
                           newWindows[index] = { ...window, startTime: e.target.value };
                           handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
                         }}
+                        InputLabelProps={{ sx: { fontSize: '13px' }, shrink: true }}
+                        inputProps={{ sx: { fontSize: '13px' } }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '12px',
+                            '& fieldset': {
+                              borderColor: '#D1D5DB'
+                            },
+                            '&:hover fieldset': {
+                              borderColor: '#4F46E5'
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: '#4F46E5',
+                              borderWidth: '2px'
+                            }
+                          }
+                        }}
                       />
-                    </Grid>
-                    <Grid xs={6}>
+                      
                       <TextField
                         fullWidth
                         size="small"
@@ -740,269 +937,551 @@ const privilegeOptions = useMemo(() => {
                           newWindows[index] = { ...window, endTime: e.target.value };
                           handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
                         }}
+                        InputLabelProps={{ sx: { fontSize: '13px' }, shrink: true }}
+                        inputProps={{ sx: { fontSize: '13px' } }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '12px',
+                            '& fieldset': {
+                              borderColor: '#D1D5DB'
+                            },
+                            '&:hover fieldset': {
+                              borderColor: '#4F46E5'
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: '#4F46E5',
+                              borderWidth: '2px'
+                            }
+                          }
+                        }}
                       />
-                    </Grid>
-                  </Grid>
-                </Box>
-              ))}
-              
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  const newWindows = [...(safeFeaturePermissions.breakWindows || []), {
-                    type: 'Paid',
-                    name: 'New Break Window',
-                    startTime: '09:00',
-                    endTime: '17:00',
-                    isActive: true
-                  }];
-                  handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
-                }}
-                sx={{ mt: 1 }}
-              >
-                Add Break Window
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* UI Controls */}
-        <Grid xs={12} md={6}>
-          <Paper 
-            elevation={0} 
-            sx={createCardStyles('rgba(244, 143, 177, 0.18)')}
-          >
-            <Typography 
-              variant="h6" 
-              gutterBottom 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1,
-                color: '#e53935',
-                fontWeight: 600,
-                borderBottom: '2px solid #e53935',
-                paddingBottom: 1,
-                marginBottom: 2
-              }}
-            >
-              <SettingsIcon sx={{ color: '#e53935' }} />
-              UI Controls
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Can Check In</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.canCheckIn}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'canCheckIn', e.target.checked)}
-                />
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Can Check Out</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.canCheckOut}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'canCheckOut', e.target.checked)}
-                />
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2">Can Take Break</Typography>
-                <Switch
-                  checked={safeFeaturePermissions.canTakeBreak}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'canTakeBreak', e.target.checked)}
-                />
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    Can View Analytics
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Access to analytics dashboard and reports
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={safeFeaturePermissions.canViewAnalytics}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'canViewAnalytics', e.target.checked)}
-                />
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Auto-Break on Inactivity */}
-        <Grid xs={12} md={6}>
-          <Paper 
-            elevation={0} 
-            sx={createCardStyles('rgba(76, 175, 80, 0.18)')}
-          >
-            <Typography 
-              variant="h6" 
-              gutterBottom 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1,
-                color: '#e53935',
-                fontWeight: 600,
-                borderBottom: '2px solid #e53935',
-                paddingBottom: 1,
-                marginBottom: 2
-              }}
-            >
-              <AccessTimeIcon sx={{ color: '#e53935' }} />
-              Auto-Break on Inactivity
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    Enable Auto-Unpaid-Break
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Automatically place user on unpaid break after inactivity
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={safeFeaturePermissions.autoBreakOnInactivity || false}
-                  onChange={(e) => handlePermissionChange(currentUser._id, 'autoBreakOnInactivity', e.target.checked)}
-                />
-              </Box>
-              
-              {safeFeaturePermissions.autoBreakOnInactivity && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      Inactivity Threshold (minutes)
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Time of inactivity before auto-break triggers
-                    </Typography>
+                    </Box>
                   </Box>
-                  <TextField
-                    size="small"
-                    type="number"
-                    value={safeFeaturePermissions.inactivityThresholdMinutes || 5}
-                    onChange={(e) => {
-                      const value = Math.max(1, Math.min(60, parseInt(e.target.value) || 5));
-                      handlePermissionChange(currentUser._id, 'inactivityThresholdMinutes', value);
+                ))}
+                
+                {/* Add Break Button - Full Width, Centered */}
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    const newWindows = [...(safeFeaturePermissions.breakWindows || []), {
+                      type: 'Paid',
+                      name: 'New Break Window',
+                      startTime: '09:00',
+                      endTime: '17:00',
+                      isActive: true
+                    }];
+                    handlePermissionChange(currentUser._id, 'breakWindows', newWindows);
+                  }}
+                  fullWidth
+                  sx={{ 
+                    mt: 'auto',
+                    borderRadius: '12px',
+                    borderColor: '#4F46E5',
+                    color: '#4F46E5',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '13px',
+                    py: 1,
+                    '&:hover': {
+                      borderColor: '#4338CA',
+                      background: '#EEF2FF'
+                    }
+                  }}
+                >
+                  Add Break Window
+                </Button>
+              </Box>
+            </Paper>
+          </Box>
+        </Box>
+
+        {/* ROW 3: UI Controls (4 cols) + Auto Break (4 cols) + Privilege Level (4 cols) */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3, mb: 3 }}>
+          {/* UI Controls - 4 columns */}
+          <Box sx={{ gridColumn: 'span 4' }}>
+            <Paper 
+              elevation={0} 
+              sx={{
+                p: '20px',
+                borderRadius: '16px',
+                border: '1px solid #E5E7EB',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
+              }}
+            >
+              {/* Fixed Height Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, height: 40 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: '#F0FDF4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <CheckCircleIcon sx={{ color: '#10B981', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1
+                  }}
+                >
+                  UI Controls
+                </Typography>
+              </Box>
+              
+              {/* Content with equal spacing */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Can Check In
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.canCheckIn}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canCheckIn', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
                     }}
-                    inputProps={{ min: 1, max: 60 }}
-                    sx={{ width: 80 }}
                   />
                 </Box>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Can Check Out
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.canCheckOut}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canCheckOut', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, fontSize: '13px' }}>
+                    Can Take Break
+                  </Typography>
+                  <Switch
+                    checked={safeFeaturePermissions.canTakeBreak}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canTakeBreak', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Can View Analytics
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      Dashboard access
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.canViewAnalytics}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canViewAnalytics', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Paper>
+          </Box>
 
-        {/* Privilege Level */}
-        <Grid xs={12} md={6}>
-          <Paper 
-            elevation={0} 
-            sx={createCardStyles('rgba(255, 193, 7, 0.18)')}
-          >
-            <Typography 
-              variant="h6" 
-              gutterBottom 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1,
-                color: '#e53935',
-                fontWeight: 600,
-                borderBottom: '2px solid #e53935',
-                paddingBottom: 1,
-                marginBottom: 2
+          {/* Auto-Break on Inactivity - 4 columns */}
+          <Box sx={{ gridColumn: 'span 4' }}>
+            <Paper 
+              elevation={0} 
+              sx={{
+                p: '20px',
+                borderRadius: '16px',
+                border: '1px solid #E5E7EB',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
               }}
             >
-              <SecurityIcon sx={{ color: '#e53935' }} />
-              Privilege Level
-            </Typography>
-            
-            <FormControl fullWidth size="small">
-              <InputLabel>Privilege Level</InputLabel>
-              <Select
-                value={safeFeaturePermissions.privilegeLevel || 'normal'}
-                onChange={(e) => handlePermissionChange(currentUser._id, 'privilegeLevel', e.target.value)}
-                disabled={saving[currentUser._id]}
-                label="Privilege Level"
-              >
-                <MenuItem value="restricted">Restricted</MenuItem>
-                <MenuItem value="normal">Normal</MenuItem>
-                <MenuItem value="advanced">Advanced</MenuItem>
-              </Select>
-            </FormControl>
-          </Paper>
-        </Grid>
+              {/* Fixed Height Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, height: 40 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: '#FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <ScheduleIcon sx={{ color: '#F59E0B', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1
+                  }}
+                >
+                  Auto-Break
+                </Typography>
+              </Box>
+              
+              {/* Content */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Enable Auto-Break
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      On inactivity
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.autoBreakOnInactivity || false}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'autoBreakOnInactivity', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+                
+                {safeFeaturePermissions.autoBreakOnInactivity && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    py: 1.5,
+                    borderTop: '1px solid #F3F4F6'
+                  }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                        Threshold
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                        Minutes
+                      </Typography>
+                    </Box>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={safeFeaturePermissions.inactivityThresholdMinutes || 5}
+                      onChange={(e) => {
+                        const value = Math.max(1, Math.min(60, parseInt(e.target.value) || 5));
+                        handlePermissionChange(currentUser._id, 'inactivityThresholdMinutes', value);
+                      }}
+                      inputProps={{ min: 1, max: 60 }}
+                      InputProps={{ sx: { fontSize: '13px' } }}
+                      sx={{ 
+                        width: 70,
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '8px',
+                          '& fieldset': {
+                            borderColor: '#D1D5DB'
+                          },
+                          '&:hover fieldset': {
+                            borderColor: '#4F46E5'
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#4F46E5',
+                            borderWidth: '2px'
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          </Box>
+
+          {/* Privilege Level - 4 columns */}
+          <Box sx={{ gridColumn: 'span 4' }}>
+            <Paper 
+              elevation={0} 
+              sx={{
+                p: '20px',
+                borderRadius: '16px',
+                border: '1px solid #E5E7EB',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                borderTop: '2px solid #FEE2E2',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
+              }}
+            >
+              {/* Fixed Height Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, height: 40 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    border: '1px solid rgba(239, 68, 68, 0.1)'
+                  }}
+                >
+                  <SecurityIcon sx={{ color: '#EF4444', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1
+                  }}
+                >
+                  Privilege Level
+                </Typography>
+              </Box>
+              
+              {/* Content */}
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ fontSize: '13px' }}>Select Level</InputLabel>
+                <Select
+                  value={safeFeaturePermissions.privilegeLevel || 'normal'}
+                  onChange={(e) => handlePermissionChange(currentUser._id, 'privilegeLevel', e.target.value)}
+                  disabled={saving[currentUser._id]}
+                  label="Select Level"
+                  sx={{
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#D1D5DB'
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#4F46E5'
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#4F46E5',
+                      borderWidth: '2px'
+                    }
+                  }}
+                >
+                  <MenuItem value="restricted" sx={{ fontSize: '13px' }}>Restricted</MenuItem>
+                  <MenuItem value="normal" sx={{ fontSize: '13px' }}>Normal</MenuItem>
+                  <MenuItem value="advanced" sx={{ fontSize: '13px' }}>Advanced</MenuItem>
+                </Select>
+              </FormControl>
+            </Paper>
+          </Box>
+        </Box>
 
         {/* Restricted Features */}
         {safeFeaturePermissions.privilegeLevel === 'restricted' && (
           <Grid xs={12}>
             <Paper 
               elevation={0} 
-              sx={createCardStyles('rgba(255, 167, 38, 0.2)')}
+              sx={{
+                p: 3,
+                borderRadius: '16px',
+                border: '1px solid #FEE2E2',
+                background: '#FEF2F2',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
+              }}
             >
-              <Typography 
-                variant="h6" 
-                gutterBottom 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  color: '#e53935',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #e53935',
-                  paddingBottom: 1,
-                  marginBottom: 2
-                }}
-              >
-                <WarningIcon sx={{ color: '#e53935' }} />
-                Restricted Features
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: '#FEE2E2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <WarningIcon sx={{ color: '#EF4444', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em'
+                  }}
+                >
+                  Restricted Features
+                </Typography>
+              </Box>
               
               <Grid container spacing={2}>
                 <Grid xs={12} sm={6}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can View Reports</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Can View Reports</Typography>
                     <Switch
                       checked={safeFeaturePermissions.restrictedFeatures.canViewReports}
                       onChange={(e) => handlePermissionChange(currentUser._id, 'restrictedFeatures.canViewReports', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 
                 <Grid xs={12} sm={6}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can View Other Logs</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Can View Other Logs</Typography>
                     <Switch
                       checked={safeFeaturePermissions.restrictedFeatures.canViewOtherLogs}
                       onChange={(e) => handlePermissionChange(currentUser._id, 'restrictedFeatures.canViewOtherLogs', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 
                 <Grid xs={12} sm={6}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can Edit Profile</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Can Edit Profile</Typography>
                     <Switch
                       checked={safeFeaturePermissions.restrictedFeatures.canEditProfile}
                       onChange={(e) => handlePermissionChange(currentUser._id, 'restrictedFeatures.canEditProfile', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 
                 <Grid xs={12} sm={6}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can Request Extra Break</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Can Request Extra Break</Typography>
                     <Switch
                       checked={safeFeaturePermissions.restrictedFeatures.canRequestExtraBreak}
                       onChange={(e) => handlePermissionChange(currentUser._id, 'restrictedFeatures.canRequestExtraBreak', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
@@ -1016,43 +1495,79 @@ const privilegeOptions = useMemo(() => {
           <Grid xs={12}>
             <Paper 
               elevation={0} 
-              sx={createCardStyles('rgba(57, 73, 171, 0.18)')}
+              sx={{
+                p: 3,
+                borderRadius: '16px',
+                border: '1px solid #DBEAFE',
+                background: '#EFF6FF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transform: 'translateY(-2px)'
+                }
+              }}
             >
-              <Typography 
-                variant="h6" 
-                gutterBottom 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  color: '#e53935',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #e53935',
-                  paddingBottom: 1,
-                  marginBottom: 2
-                }}
-              >
-                <SecurityIcon sx={{ color: '#e53935' }} />
-                Advanced Features
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                <Box 
+                  sx={{ 
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: '#DBEAFE',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <SecurityIcon sx={{ color: '#3B82F6', fontSize: 20 }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: '#111827',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    letterSpacing: '-0.01em'
+                  }}
+                >
+                  Advanced Features
+                </Typography>
+              </Box>
               
               <Grid container spacing={2}>
                 <Grid xs={12} sm={4}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Bulk Actions</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Bulk Actions</Typography>
                     <Switch
                       checked={safeFeaturePermissions.advancedFeatures.canBulkActions}
                       onChange={(e) => handlePermissionChange(currentUser._id, 'advancedFeatures.canBulkActions', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 
                 <Grid xs={12} sm={4}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Export Data</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>Export Data</Typography>
                     <Switch
                       checked={safeFeaturePermissions.advancedFeatures.canExportData}
-                      onChange={(e) => handlePermissionChange(currentUser._id, 'advancedFeatures.canExportData', e.target.checked)}
+                      onChange={(e) => handlePermissionChange(currentUser._id, 'advancedFeatures.canBulkActions', e.target.checked)}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#4F46E5',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#4F46E5',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
@@ -1062,7 +1577,7 @@ const privilegeOptions = useMemo(() => {
             </Paper>
           </Grid>
         )}
-        </Grid>
+        
       </>
     );
   }, [users, handlePermissionChange, saving]);
@@ -1374,24 +1889,38 @@ const privilegeOptions = useMemo(() => {
           }
         }}
       >
-        {/* Custom Header with Red Background */}
+        {/* Custom Header with Clean White Background */}
         <Box 
           sx={{ 
-            background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-            color: 'white',
+            background: '#FFFFFF',
+            color: '#111827',
             padding: '20px 24px',
             display: 'flex',
             alignItems: 'center',
             gap: 2,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            borderBottom: '1px solid #E5E7EB',
+            borderTop: '3px solid #EF4444'
           }}
         >
-          <PersonIcon sx={{ fontSize: 28 }} />
+          <Box 
+            sx={{ 
+              width: 40,
+              height: 40,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(239, 68, 68, 0.1)'
+            }}
+          >
+            <PersonIcon sx={{ fontSize: 20, color: '#EF4444' }} />
+          </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, margin: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, margin: 0, color: '#111827' }}>
               Manage Permissions
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9, margin: 0 }}>
+            <Typography variant="body2" sx={{ color: '#6B7280', margin: 0, fontSize: '12px' }}>
               {userModal.user?.fullName}
             </Typography>
           </Box>
@@ -1400,8 +1929,11 @@ const privilegeOptions = useMemo(() => {
             <IconButton
               onClick={() => setResetDialog({ open: true, userId: userModal.user?._id, userName: userModal.user?.fullName })}
               sx={{ 
-                color: 'white',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                color: '#6B7280',
+                '&:hover': { 
+                  backgroundColor: '#F3F4F6',
+                  color: '#111827'
+                }
               }}
             >
               <RefreshIcon />
@@ -1409,9 +1941,9 @@ const privilegeOptions = useMemo(() => {
           </Tooltip>
         </Box>
 
-        <DialogContent sx={{ padding: 0, backgroundColor: '#f8f9fa' }}>
+        <DialogContent sx={{ padding: 0, backgroundColor: '#F3F4F6' }}>
           {userModal.user && (
-            <Box sx={{ padding: '24px' }}>
+            <Box sx={{ padding: '32px' }}>
               {renderUserPermissions(userModal.user)}
             </Box>
           )}
@@ -1420,18 +1952,22 @@ const privilegeOptions = useMemo(() => {
         <DialogActions sx={{ 
           padding: '20px 24px', 
           backgroundColor: 'white',
-          borderTop: '1px solid #e0e0e0',
+          borderTop: '1px solid #E5E7EB',
           gap: 2
         }}>
           <Button 
             onClick={() => setUserModal({ open: false, user: null })}
             variant="outlined"
             sx={{ 
-              borderColor: '#bdbdbd',
-              color: '#757575',
+              borderRadius: '12px',
+              borderColor: '#D1D5DB',
+              color: '#6B7280',
+              textTransform: 'none',
+              fontWeight: 500,
+              padding: '8px 20px',
               '&:hover': {
-                borderColor: '#9e9e9e',
-                backgroundColor: '#f5f5f5'
+                borderColor: '#9CA3AF',
+                backgroundColor: '#F9FAFB'
               }
             }}
           >
@@ -1444,18 +1980,21 @@ const privilegeOptions = useMemo(() => {
               onClick={() => saveUserPermissions(userModal.user._id)}
               disabled={saving[userModal.user._id]}
               sx={{
-                background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-                borderRadius: '25px',
+                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                borderRadius: '12px',
                 padding: '8px 24px',
                 fontWeight: 600,
                 textTransform: 'none',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
+                boxShadow: '0 2px 4px 0 rgba(239, 68, 68, 0.2)',
+                transition: 'all 0.2s ease-in-out',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)',
-                  boxShadow: '0 6px 16px rgba(229, 57, 53, 0.4)',
+                  background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+                  boxShadow: '0 4px 8px 0 rgba(239, 68, 68, 0.3)',
+                  transform: 'translateY(-1px)'
                 },
                 '&:disabled': {
-                  background: '#bdbdbd',
+                  background: '#E5E7EB',
+                  color: '#9CA3AF',
                   boxShadow: 'none'
                 }
               }}

@@ -53,6 +53,7 @@ const NewActivityLogPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({ type: '', category: '', priority: '', startDate: null, endDate: null });
     const [viewDialog, setViewDialog] = useState({ open: false, log: null });
+    const [showFilters, setShowFilters] = useState(false);
     const fetchLogsRef = useRef(null);
 
     const fetchLogs = useCallback(async () => {
@@ -219,12 +220,12 @@ const NewActivityLogPage = () => {
                 description="Monitor every clock-in, leave request, and system alert in one consolidated event stream."
                 actionArea={
                     <Button
-                        variant="outlined"
+                        variant="contained"
+                        color="secondary"
                         startIcon={<RefreshIcon />}
-                        onClick={fetchLogs}
-                        disabled={loading}
+                        onClick={() => setShowFilters(!showFilters)}
                     >
-                        Refresh
+                        Filter
                     </Button>
                 }
             />
@@ -247,31 +248,34 @@ const NewActivityLogPage = () => {
                         </Card>
                     ))}
                 </div>
-                <Paper className="quick-filter-panel">
-                    <Box className="quick-filter-header">
-                        <Typography variant="subtitle2">Quick filters</Typography>
-                        {filters.category && (
-                            <Button size="small" onClick={() => handleFilterChange('category', '')} startIcon={<ClearIcon />}>
-                                Reset
-                            </Button>
-                        )}
-                    </Box>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                        {quickCategoryFilters.map((filter) => (
-                            <Chip
-                                key={filter.label}
-                                label={filter.label}
-                                clickable
-                                color={filters.category === filter.value ? 'primary' : 'default'}
-                                variant={filters.category === filter.value ? 'filled' : 'outlined'}
-                                onClick={() => handleFilterChange('category', filter.value)}
-                            />
-                        ))}
-                    </Stack>
-                </Paper>
+                {showFilters && (
+                    <Paper className="quick-filter-panel">
+                        <Box className="quick-filter-header">
+                            <Typography variant="subtitle2">Quick filters</Typography>
+                            {filters.category && (
+                                <Button size="small" onClick={() => handleFilterChange('category', '')} startIcon={<ClearIcon />}>
+                                    Reset
+                                </Button>
+                            )}
+                        </Box>
+                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {quickCategoryFilters.map((filter) => (
+                                <Chip
+                                    key={filter.label}
+                                    label={filter.label}
+                                    clickable
+                                    color={filters.category === filter.value ? 'primary' : 'default'}
+                                    variant={filters.category === filter.value ? 'filled' : 'outlined'}
+                                    onClick={() => handleFilterChange('category', filter.value)}
+                                />
+                            ))}
+                        </Stack>
+                    </Paper>
+                )}
             </section>
 
-            <Paper className="search-filters-container">
+            {showFilters && (
+                <Paper className="search-filters-container">
                 <Grid container spacing={2} alignItems="center">
                     <Grid item xs={12} md={12}><TextField fullWidth size="small" variant="outlined" placeholder="Search user name, code, or message..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }} /></Grid>
                     <Grid item xs={12} sm={6} md={3}>
@@ -289,89 +293,333 @@ const NewActivityLogPage = () => {
                     <Grid item xs={12} sm={4} md={2}><Button variant="outlined" startIcon={<ClearIcon />} onClick={clearFilters} fullWidth>Clear Filters</Button></Grid>
                 </Grid>
             </Paper>
+            )}
 
             <div className="activity-logs-container">
-                {loading && <LinearProgress className="activity-progress-bar" />}
-                <TableContainer>
-                    <Table>
-                        <TableHead><TableRow><TableCell>Timestamp</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Message</TableCell><TableCell>Category</TableCell><TableCell>Status</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
-                        <TableBody>
-                            {loading ? (
-                                <TableRow><TableCell colSpan={7} align="center" sx={{p:4}}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></TableCell></TableRow>
-                            ) : logs.map((log) => (
-                                <TableRow key={log.id || log._id} hover className={!log.read ? 'activity-row-unread' : ''}>
-                                    <TableCell><Typography variant="body2">{formatDate(log.createdAt)}</Typography></TableCell>
-                                    <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Avatar sx={{ width: 32, height: 32 }}>{log.userName ? log.userName.charAt(0).toUpperCase() : '?'}</Avatar><Typography variant="body2">{log.userName || 'System'}</Typography></Box></TableCell>
-                                    <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{getActionIcon(log.type)}<Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{log.type?.replace(/_/g, ' ') || 'Unknown'}</Typography></Box></TableCell>
-                                    <TableCell className="message-cell">
-                                        <Tooltip title={log.message}>
-                                            <Typography variant="body2" className="message-truncate">
-                                                {log.message}
-                                            </Typography>
-                                        </Tooltip>
-                                    </TableCell>
-                                    <TableCell><Chip label={log.category || 'N/A'} size="small" color={getCategoryColor(log.category)} /></TableCell>
-                                    <TableCell><Chip label={log.read ? 'Read' : 'Unread'} size="small" color={log.read ? 'default' : 'primary'} variant="outlined" /></TableCell>
-                                    <TableCell>
-                                        <Tooltip title="View Details">
-                                            <IconButton size="small" onClick={() => setViewDialog({ open: true, log })}>
-                                                <ViewIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Delete">
-                                            <IconButton size="small" color="error" onClick={() => handleDeleteLog(log._id || log.id)}>
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
+                {loading && <LinearProgress className="activity-progress-bar" sx={{ bgcolor: '#fee2e2', '& .MuiLinearProgress-bar': { bgcolor: '#dc004e' } }} />}
+                <div className="activity-table-wrapper">
+                    <TableContainer>
+                        <Table stickyHeader>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'left', paddingLeft: '24px' }}>Timestamp</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>User</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>Action</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>Message</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'center' }}>Category</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'center' }}>Status</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 600, color: '#374151', borderBottom: '2px solid #e5e7eb', textAlign: 'center' }}>Actions</TableCell>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                {logs.length === 0 && !loading && <div className="empty-state"><Info /><Typography variant="h6">No Activity Logs Found</Typography><Typography>Try adjusting your search or filter criteria.</Typography></div>}
-                <TablePagination component="div" count={totalCount} page={page} onPageChange={(e, newPage) => setPage(newPage)} rowsPerPage={rowsPerPage} onRowsPerPageChange={e => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }} />
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow><TableCell colSpan={7} align="center" sx={{p:4}}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></TableCell></TableRow>
+                                ) : logs.map((log, index) => (
+                                    <TableRow 
+                                        key={log.id || log._id} 
+                                        hover 
+                                        sx={{
+                                            bgcolor: index % 2 === 0 ? 'white' : '#fafbfc',
+                                            borderBottom: '1px solid #f3f4f6',
+                                            '&:hover': { bgcolor: '#f0f9ff' },
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                    >
+                                        <TableCell sx={{ textAlign: 'left', color: '#4b5563', fontSize: '14px', padding: '14px 16px', paddingLeft: '24px' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                                                {formatDate(log.createdAt)}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'left', padding: '14px 16px' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Avatar sx={{ width: 32, height: 32, bgcolor: '#dc004e' }}>
+                                                    {log.userName ? log.userName.charAt(0).toUpperCase() : '?'}
+                                                </Avatar>
+                                                <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                                                    {log.userName || 'System'}
+                                                </Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'left', padding: '14px 16px' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {getActionIcon(log.type)}
+                                                <Typography variant="body2" sx={{ textTransform: 'capitalize', color: '#4b5563' }}>
+                                                    {log.type?.replace(/_/g, ' ') || 'Unknown'}
+                                                </Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'left', maxWidth: 300, padding: '14px 16px' }}>
+                                            <Tooltip title={log.message}>
+                                                <Typography 
+                                                    variant="body2" 
+                                                    sx={{ 
+                                                        color: '#4b5563',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    {log.message}
+                                                </Typography>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'center', padding: '14px 16px' }}>
+                                            <Chip 
+                                                label={log.category || 'N/A'} 
+                                                size="small" 
+                                                sx={{
+                                                    bgcolor: log.category === 'attendance' ? '#d1fae5' : 
+                                                            log.category === 'leave' ? '#fed7aa' : 
+                                                            log.category === 'break' ? '#dbeafe' : '#e5e7eb',
+                                                    color: log.category === 'attendance' ? '#065f46' : 
+                                                           log.category === 'leave' ? '#9a3412' : 
+                                                           log.category === 'break' ? '#1e40af' : '#374151',
+                                                    fontWeight: 600,
+                                                    fontSize: '12px'
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'center', padding: '14px 16px' }}>
+                                            <Chip 
+                                                label={log.read ? 'Read' : 'Unread'} 
+                                                size="small" 
+                                                sx={{
+                                                    bgcolor: log.read ? '#e5e7eb' : '#fee2e2',
+                                                    color: log.read ? '#374151' : '#991b1b',
+                                                    fontWeight: 600,
+                                                    fontSize: '12px',
+                                                    border: log.read ? 'none' : '1px solid #fecaca'
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ textAlign: 'center', padding: '14px 16px' }}>
+                                            <Tooltip title="View Details">
+                                                <IconButton size="small" onClick={() => setViewDialog({ open: true, log })} sx={{ color: '#dc004e' }}>
+                                                    <ViewIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Delete">
+                                                <IconButton size="small" onClick={() => handleDeleteLog(log._id || log.id)} sx={{ color: '#dc004e' }}>
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </div>
+                {logs.length === 0 && !loading && (
+                    <div className="empty-state" style={{ padding: '80px 20px', textAlign: 'center' }}>
+                        <Info sx={{ fontSize: 64, color: '#dc004e', mb: 2 }} />
+                        <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600, mb: 1 }}>
+                            No Activity Logs Found
+                        </Typography>
+                        <Typography sx={{ color: '#6b7280' }}>
+                            Try adjusting your search or filter criteria.
+                        </Typography>
+                    </div>
+                )}
+                <TablePagination 
+                    component="div" 
+                    count={totalCount} 
+                    page={page} 
+                    onPageChange={(e, newPage) => setPage(newPage)} 
+                    rowsPerPage={rowsPerPage} 
+                    onRowsPerPageChange={e => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                    sx={{
+                        borderTop: '1px solid #f3f4f6',
+                        '.MuiTablePagination-select': { color: '#dc004e' },
+                        '.MuiTablePagination-selectIcon': { color: '#dc004e' }
+                    }}
+                />
             </div>
 
-            <Dialog open={viewDialog.open} onClose={() => setViewDialog({ open: false, log: null })} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><Info /> Activity Log Details</DialogTitle>
-                <DialogContent dividers>
+            <Dialog 
+                open={viewDialog.open} 
+                onClose={() => setViewDialog({ open: false, log: null })} 
+                maxWidth="md" 
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: '16px',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }
+                }}
+            >
+                <DialogTitle 
+                    sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1.5,
+                        bgcolor: '#f9fafb',
+                        borderBottom: '1px solid #e5e7eb',
+                        padding: '20px 24px',
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        color: '#1f2937'
+                    }}
+                >
+                    <Info sx={{ color: '#dc004e', fontSize: 28 }} /> 
+                    Activity Log Details
+                </DialogTitle>
+                <DialogContent sx={{ padding: '32px 24px', bgcolor: 'white' }}>
                     {viewDialog.log && (
-                        <Grid container spacing={2.5}>
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="caption" color="text.secondary">User</Typography>
-                                <Box display="flex" alignItems="center" gap={1} mt={0.5}><PersonIcon fontSize="small" /> <Typography variant="body1">{viewDialog.log.userName || 'System'}</Typography></Box>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="caption" color="text.secondary">Timestamp</Typography>
-                                <Box display="flex" alignItems="center" gap={1} mt={0.5}><CalendarIcon fontSize="small" /> <Typography variant="body1">{formatDate(viewDialog.log.createdAt)}</Typography></Box>
-                            </Grid>
-                            <Grid item xs={12}><Divider /></Grid>
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="caption" color="text.secondary">Action Type</Typography>
-                                <Box display="flex" alignItems="center" gap={1} mt={0.5}>
-                                    {getActionIcon(viewDialog.log.type)}
-                                    <Typography sx={{ textTransform: 'capitalize' }}>
-                                        {viewDialog.log.type?.replace(/_/g, ' ') || 'Unknown'}
+                        <Grid container spacing={3}>
+                            {/* User and Timestamp Row */}
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ 
+                                    padding: '16px', 
+                                    bgcolor: '#f9fafb', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        User
                                     </Typography>
+                                    <Box display="flex" alignItems="center" gap={1.5} mt={1}>
+                                        <Avatar sx={{ width: 40, height: 40, bgcolor: '#dc004e' }}>
+                                            {viewDialog.log.userName ? viewDialog.log.userName.charAt(0).toUpperCase() : '?'}
+                                        </Avatar>
+                                        <Typography variant="body1" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                                            {viewDialog.log.userName || 'System'}
+                                        </Typography>
+                                    </Box>
                                 </Box>
                             </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="caption" color="text.secondary">Category</Typography>
-                                <Box display="flex" alignItems="center" gap={1} mt={0.5}><CategoryIcon fontSize="small" /><Chip label={viewDialog.log.category || 'N/A'} size="small" color={getCategoryColor(viewDialog.log.category)} /></Box>
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ 
+                                    padding: '16px', 
+                                    bgcolor: '#f9fafb', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Timestamp
+                                    </Typography>
+                                    <Box display="flex" alignItems="center" gap={1} mt={1}>
+                                        <CalendarIcon sx={{ color: '#6b7280', fontSize: 20 }} />
+                                        <Typography variant="body1" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                                            {formatDate(viewDialog.log.createdAt)}
+                                        </Typography>
+                                    </Box>
+                                </Box>
                             </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="caption" color="text.secondary">Priority</Typography>
-                                <Box display="flex" alignItems="center" gap={1} mt={0.5}><PriorityIcon fontSize="small" /><Chip label={viewDialog.log.priority || 'N/A'} size="small" /></Box>
+
+                            {/* Action Type and Category Row */}
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ 
+                                    padding: '16px', 
+                                    bgcolor: '#f9fafb', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Action Type
+                                    </Typography>
+                                    <Box display="flex" alignItems="center" gap={1} mt={1}>
+                                        {getActionIcon(viewDialog.log.type)}
+                                        <Typography sx={{ textTransform: 'capitalize', fontWeight: 500, color: '#1f2937' }}>
+                                            {viewDialog.log.type?.replace(/_/g, ' ') || 'Unknown'}
+                                        </Typography>
+                                    </Box>
+                                </Box>
                             </Grid>
-                             <Grid item xs={12}>
-                                <Typography variant="caption" color="text.secondary">Message</Typography>
-                                <Typography variant="body1" sx={{ mt: 0.5, p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>{viewDialog.log.message}</Typography>
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ 
+                                    padding: '16px', 
+                                    bgcolor: '#f9fafb', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Category
+                                    </Typography>
+                                    <Box display="flex" alignItems="center" gap={1} mt={1}>
+                                        <CategoryIcon sx={{ color: '#6b7280', fontSize: 20 }} />
+                                        <Chip 
+                                            label={viewDialog.log.category || 'N/A'} 
+                                            size="medium"
+                                            sx={{
+                                                bgcolor: viewDialog.log.category === 'attendance' ? '#d1fae5' : 
+                                                        viewDialog.log.category === 'leave' ? '#fed7aa' : 
+                                                        viewDialog.log.category === 'break' ? '#dbeafe' : '#e5e7eb',
+                                                color: viewDialog.log.category === 'attendance' ? '#065f46' : 
+                                                       viewDialog.log.category === 'leave' ? '#9a3412' : 
+                                                       viewDialog.log.category === 'break' ? '#1e40af' : '#374151',
+                                                fontWeight: 600,
+                                                fontSize: '13px'
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+                            </Grid>
+
+                            {/* Priority */}
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ 
+                                    padding: '16px', 
+                                    bgcolor: '#f9fafb', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Priority
+                                    </Typography>
+                                    <Box display="flex" alignItems="center" gap={1} mt={1}>
+                                        <PriorityIcon sx={{ color: '#6b7280', fontSize: 20 }} />
+                                        <Chip 
+                                            label={viewDialog.log.priority || 'N/A'} 
+                                            size="medium"
+                                            sx={{
+                                                bgcolor: '#e5e7eb',
+                                                color: '#374151',
+                                                fontWeight: 600
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+                            </Grid>
+
+                            {/* Message */}
+                            <Grid item xs={12}>
+                                <Box sx={{ 
+                                    padding: '20px', 
+                                    bgcolor: '#fef3c7', 
+                                    borderRadius: '12px',
+                                    border: '1px solid #fde68a'
+                                }}>
+                                    <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Message
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mt: 1.5, color: '#78350f', lineHeight: 1.6, fontSize: '15px' }}>
+                                        {viewDialog.log.message}
+                                    </Typography>
+                                </Box>
                             </Grid>
                         </Grid>
                     )}
                 </DialogContent>
-                <DialogActions><Button onClick={() => setViewDialog({ open: false, log: null })}>Close</Button></DialogActions>
+                <DialogActions sx={{ padding: '16px 24px', bgcolor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+                    <Button 
+                        onClick={() => setViewDialog({ open: false, log: null })}
+                        variant="contained"
+                        sx={{
+                            bgcolor: '#dc004e',
+                            color: 'white',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            padding: '8px 24px',
+                            borderRadius: '8px',
+                            '&:hover': {
+                                bgcolor: '#b00040'
+                            }
+                        }}
+                    >
+                        Close
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}><Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled">{snackbar.message}</Alert></Snackbar>

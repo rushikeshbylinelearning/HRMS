@@ -22,6 +22,16 @@ import { formatISTTime, formatISTDate } from '../utils/istTime';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import socket from '../socket';
 import { SkeletonBox } from '../components/SkeletonLoaders';
+import {
+  getDashboardCache,
+  isDashboardCacheFresh,
+  isDashboardCacheServable,
+  setDashboardCache,
+  invalidateDashboardCache,
+  DASHBOARD_CACHE_KEYS,
+  DASHBOARD_CACHE_TTL_MS,
+  DASHBOARD_PENDING_TTL_MS,
+} from '../utils/apiCache';
 
 import '../styles/AdminDashboardPage.css';
 
@@ -201,30 +211,78 @@ const AdminDashboardPage = () => {
     const fetchAllDataRef = useRef(null);
     const refetchSummaryOnlyRef = useRef(null);
     const refetchPendingOnlyRef = useRef(null);
+    const lastFetchTimeRef = useRef(0);
 
     // OPTIMIZED: Single request for base summary + pending leaves (avoids sequential double call).
-    fetchAllDataRef.current = async (isInitialLoad = false) => {
-        if (isInitialLoad) setLoading(true);
+    fetchAllDataRef.current = async (isInitialLoad = false, forceRefresh = false) => {
+        const summaryKey = DASHBOARD_CACHE_KEYS.summary;
+        
+        // --- Serve from cache if available ---
+        const cached = getDashboardCache(summaryKey);
+        const fresh = isDashboardCacheFresh(summaryKey);
+        const servable = isDashboardCacheServable(summaryKey);
+        
+        if (cached && fresh && !forceRefresh) {
+            // Fresh cache: apply immediately, no network call
+            const baseSummary = cached.data?.summary ?? cached.data ?? null;
+            const pendingLeaveRequests = cached.data?.pendingLeaveRequests ?? [];
+            setSummary(baseSummary);
+            setPendingRequests(
+                Array.isArray(pendingLeaveRequests)
+                    ? [...pendingLeaveRequests].sort((a, b) =>
+                        new Date(b?.createdAt ?? 0) - new Date(a?.createdAt ?? 0)
+                      )
+                    : []
+            );
+            if (isInitialLoad) setLoading(false);
+            return;
+        }
+        
+        if (cached && servable && !forceRefresh) {
+            // Stale but servable: show cached data instantly, refresh in background
+            const baseSummary = cached.data?.summary ?? cached.data ?? null;
+            const pendingLeaveRequests = cached.data?.pendingLeaveRequests ?? [];
+            setSummary(baseSummary);
+            setPendingRequests(
+                Array.isArray(pendingLeaveRequests)
+                    ? [...pendingLeaveRequests].sort((a, b) =>
+                        new Date(b?.createdAt ?? 0) - new Date(a?.createdAt ?? 0)
+                      )
+                    : []
+            );
+            if (isInitialLoad) setLoading(false);
+            // Fall through to background fetch (do NOT return here)
+        } else {
+            // No usable cache: show loading spinner
+            if (isInitialLoad) setLoading(true);
+        }
+        
         setError('');
         try {
             const res = await api.get('/admin/dashboard-summary', {
-                params: { includePendingLeaves: true }
+                params: { includePendingLeaves: true },
             });
             const data = res?.data ?? null;
-            // Backend returns { summary, pendingLeaveRequests } when includePendingLeaves=true
             const baseSummary = data?.summary ?? data ?? null;
             const pendingLeaveRequests = data?.pendingLeaveRequests ?? [];
+            
+            // Write to frontend cache
+            setDashboardCache(summaryKey, data, DASHBOARD_CACHE_TTL_MS);
+            lastFetchTimeRef.current = Date.now();
+            
             setSummary(baseSummary);
-            const sortedRequests = Array.isArray(pendingLeaveRequests)
-                ? [...pendingLeaveRequests].sort((a, b) => {
-                    const dateA = new Date(a?.createdAt ?? 0);
-                    const dateB = new Date(b?.createdAt ?? 0);
-                    return dateB - dateA;
-                })
-                : [];
-            setPendingRequests(sortedRequests);
+            setPendingRequests(
+                Array.isArray(pendingLeaveRequests)
+                    ? [...pendingLeaveRequests].sort((a, b) =>
+                        new Date(b?.createdAt ?? 0) - new Date(a?.createdAt ?? 0)
+                      )
+                    : []
+            );
         } catch (err) {
-            setError('Failed to load dashboard data. Please try again later.');
+            // Only show error if we have nothing to display (no stale cache in use)
+            if (!cached) {
+                setError('Failed to load dashboard data. Please try again later.');
+            }
             if (import.meta.env?.DEV) console.error('[AdminDashboard] fetch error:', err);
         } finally {
             if (isInitialLoad) setLoading(false);
@@ -237,6 +295,15 @@ const AdminDashboardPage = () => {
             const res = await api.get('/admin/dashboard-summary', { params: { includePendingLeaves: false } });
             const data = res?.data ?? null;
             setSummary(data);
+            // Update cache: merge new summary into cached combined object
+            const summaryKey = DASHBOARD_CACHE_KEYS.summary;
+            const existing = getDashboardCache(summaryKey);
+            setDashboardCache(
+                summaryKey,
+                existing?.data ? { ...existing.data, summary: data } : data,
+                DASHBOARD_CACHE_TTL_MS
+            );
+            lastFetchTimeRef.current = Date.now();
         } catch (e) {
             if (import.meta.env?.DEV) console.error('[AdminDashboard] refetchSummaryOnly error:', e);
         }
@@ -248,71 +315,70 @@ const AdminDashboardPage = () => {
             const res = await api.get('/admin/dashboard-pending-leaves');
             const list = res?.data?.pendingLeaveRequests ?? [];
             const sorted = Array.isArray(list)
-                ? [...list].sort((a, b) => {
-                    const dateA = new Date(a?.createdAt ?? 0);
-                    const dateB = new Date(b?.createdAt ?? 0);
-                    return dateB - dateA;
-                })
+                ? [...list].sort((a, b) =>
+                    new Date(b?.createdAt ?? 0) - new Date(a?.createdAt ?? 0)
+                  )
                 : [];
             setPendingRequests(sorted);
+            // Update cache: merge fresh pending list into cached combined object
+            const summaryKey = DASHBOARD_CACHE_KEYS.summary;
+            const existing = getDashboardCache(summaryKey);
+            if (existing?.data) {
+                setDashboardCache(
+                    summaryKey,
+                    { ...existing.data, pendingLeaveRequests: list },
+                    DASHBOARD_PENDING_TTL_MS
+                );
+            }
+            lastFetchTimeRef.current = Date.now();
         } catch (e) {
             if (import.meta.env?.DEV) console.error('[AdminDashboard] refetchPendingOnly error:', e);
         }
     };
     
-    const fetchAllData = useCallback((isInitialLoad = false) => {
-        return fetchAllDataRef.current?.(isInitialLoad);
+    const fetchAllData = useCallback((isInitialLoad = false, forceRefresh = false) => {
+        return fetchAllDataRef.current?.(isInitialLoad, forceRefresh);
     }, []);
 
-    // Guard ref for React StrictMode duplicate execution prevention
-    const dataFetchedRef = useRef(false);
-    
     useEffect(() => {
-        // CRITICAL FIX: Guard API calls - only execute if auth is ready and user is authenticated
-        // This prevents API calls during page refresh before auth state is restored
-        if (authLoading || !user) {
-            if (import.meta.env?.DEV) console.log('[AdminDashboard] Waiting for auth to initialize...');
+        if (authLoading || !user) return;
+        
+        let mounted = true;
+        
+        const INITIAL_LOAD_COOLDOWN_MS = 500; // Prevents StrictMode double-fire only
+        const now = Date.now();
+        
+        // Only skip if a fetch just ran within the cooldown window
+        if (now - lastFetchTimeRef.current < INITIAL_LOAD_COOLDOWN_MS) {
             return;
         }
         
-        let mounted = true;
-        let intervalId = null;
-        
         const loadData = async () => {
-            // Prevent duplicate execution in React StrictMode
-            if (dataFetchedRef.current) {
-                if (import.meta.env?.DEV) console.log('[AdminDashboard] Data fetch already in progress, skipping duplicate call');
-                return;
-            }
-            dataFetchedRef.current = true;
-            
+            if (!mounted) return;
             if (fetchAllDataRef.current) {
-                await fetchAllDataRef.current(true);
+                await fetchAllDataRef.current(true, false); // isInitialLoad=true, forceRefresh=false
             }
-            // POLLING REMOVED: Socket events + mutation refetch provide real-time updates
-            // Visibility change fallback added below for socket disconnect scenarios
         };
         
         loadData();
         
-        // Fallback: Refresh on visibility change (socket disconnect recovery)
         const handleVisibilityChange = () => {
             if (!document.hidden && mounted && fetchAllDataRef.current) {
-                // Only refresh if socket is disconnected (fallback safety)
-                if (socket.disconnected) {
-                    if (import.meta.env?.DEV) console.log('[AdminDashboard] Socket disconnected, refreshing data on visibility change');
-                    fetchAllDataRef.current(false);
+                const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+                // Refetch on revisit if data is older than 60 seconds (regardless of socket state)
+                if (timeSinceLastFetch > DASHBOARD_CACHE_TTL_MS) {
+                    fetchAllDataRef.current(false, false);
                 }
             }
         };
+        
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
+        
         return () => {
             mounted = false;
-            dataFetchedRef.current = false; // Reset on unmount
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [user?.id, user?._id, authLoading]); // Depend on user IDs (stable) and loading to trigger when auth is ready
+    }, [user?.id, user?._id, authLoading]);
 
     // Real-time consistency: delta updates on socket events (throttled; minimal API calls).
     // attendance_log_updated → refetch summary only. leave_* → refetch pending leaves only.
@@ -327,33 +393,12 @@ const AdminDashboardPage = () => {
 
         const runSummaryRefetch = async () => {
             lastRunSummary = Date.now();
-            try {
-                const res = await api.get('/admin/dashboard-summary', {
-                    params: { includePendingLeaves: false }
-                });
-                const data = res?.data ?? null;
-                setSummary(data);
-            } catch (e) {
-                // Swallow; error UI is managed by main fetch
-            }
+            if (refetchSummaryOnlyRef.current) await refetchSummaryOnlyRef.current();
         };
 
         const runPendingRefetch = async () => {
             lastRunPending = Date.now();
-            try {
-                const res = await api.get('/admin/dashboard-pending-leaves');
-                const list = res?.data?.pendingLeaveRequests ?? [];
-                const sorted = Array.isArray(list)
-                    ? [...list].sort((a, b) => {
-                        const dateA = new Date(a?.createdAt ?? 0);
-                        const dateB = new Date(b?.createdAt ?? 0);
-                        return dateB - dateA;
-                    })
-                    : [];
-                setPendingRequests(sorted);
-            } catch (e) {
-                // Swallow
-            }
+            if (refetchPendingOnlyRef.current) await refetchPendingOnlyRef.current();
         };
 
         const scheduleSummaryRefetch = () => {
@@ -416,6 +461,7 @@ const AdminDashboardPage = () => {
                 status,
                 overrideReason: `Admin ${status.toLowerCase()} from dashboard by ${user?.fullName || 'admin'}`
             });
+            invalidateDashboardCache();
             setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
             // Targeted refetch: summary + pending so "On Leave" count and list update immediately (no full fetchAllData)
             if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
@@ -434,11 +480,13 @@ const AdminDashboardPage = () => {
         try {
             if (type === 'ExtraBreakRequest') {
                 await api.patch(`/admin/breaks/extra/${activityId}/status`, { status });
+                invalidateDashboardCache();
                 setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
                 handleCloseActivityModal();
                 if (refetchSummaryOnlyRef.current) await refetchSummaryOnlyRef.current();
             } else if (type === 'BackdatedLeaveRequest') {
                 await api.patch(`/admin/leaves/${activityId}/status`, { status });
+                invalidateDashboardCache();
                 setSnackbar({ open: true, message: `Request has been ${status.toLowerCase()}.` });
                 handleCloseActivityModal();
                 if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {
@@ -449,6 +497,7 @@ const AdminDashboardPage = () => {
                     ? `/admin/early-checkout-requests/${activityId}/approve`
                     : `/admin/early-checkout-requests/${activityId}/reject`;
                 await api.post(url, status === 'Rejected' && extraPayload?.rejectionNote ? { rejectionNote: extraPayload.rejectionNote } : {});
+                invalidateDashboardCache();
                 setSnackbar({ open: true, message: `Early checkout request ${status.toLowerCase()}.` });
                 handleCloseActivityModal();
                 if (refetchSummaryOnlyRef.current) await refetchSummaryOnlyRef.current();
@@ -817,6 +866,7 @@ const AdminDashboardPage = () => {
                             // CRITICAL FIX: Pass overrideReason to allow admin to approve/reject at any time
                             overrideReason: `Admin ${status.toLowerCase()} from dashboard modal by ${user?.fullName || 'admin'}`
                         });
+                        invalidateDashboardCache();
                         setSnackbar({ open: true, message: `Leave request has been ${status.toLowerCase()}.` });
                         // Targeted refetch: pending leaves + summary only (no full fetchAllData)
                         if (refetchSummaryOnlyRef.current && refetchPendingOnlyRef.current) {

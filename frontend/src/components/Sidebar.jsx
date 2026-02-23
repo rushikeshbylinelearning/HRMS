@@ -15,6 +15,7 @@ import Badge from '@mui/material/Badge';
 import useNewNotifications from '../hooks/useNewNotifications';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PolicyIcon from '@mui/icons-material/Policy';
+import BarChartIcon from '@mui/icons-material/BarChart';
 
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -56,6 +57,12 @@ const Sidebar = ({ onNotificationClick }) => {
             path: '/reports', 
             roles: ['Admin', 'HR'],
             permissionCheck: () => canAccess.viewReports()
+        },
+        { 
+            text: 'Analytics', 
+            icon: <BarChartIcon />, 
+            path: '/analytics/attendance', 
+            roles: ['Admin', 'HR']
         },
         { text: 'Activity Log', icon: <AssessmentIcon />, path: '/activity-log', roles: ['Admin', 'HR', 'Manager'] },
     ];

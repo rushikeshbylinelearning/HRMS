@@ -186,9 +186,6 @@ const LoginPage = () => {
                 'https://sso.bylinelms.com',
                 'https://sso.legatolxp.online',
                 'https://sso.leagatolxp.online',
-                'http://localhost:5173',
-                'http://localhost:3000',
-                'http://localhost:3003',
                 ...(import.meta.env.DEV ? ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3003'] : [])
             ];
             

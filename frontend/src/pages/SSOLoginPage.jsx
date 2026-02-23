@@ -21,16 +21,17 @@ const SSOLoginPage = () => {
         console.log('🔐 SSO Login Page - Processing token:', token ? token.substring(0, 20) + '...' : 'null');
         console.log('🔗 Redirect path:', redirectPath);
 
+        const apiUrl = import.meta.env.DEV
+          ? 'http://localhost:3001/api'
+          : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
+              ? import.meta.env.VITE_API_BASE_URL
+              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance-test.bylinelms.com'}/api`);
+
         if (!token) {
           // No token means direct redirect from SSO - check if session exists
           console.log('🔄 No token provided - checking existing session...');
           
           try {
-            const apiUrl = import.meta.env.DEV
-              ? 'http://localhost:3001/api'
-              : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
-                  ? import.meta.env.VITE_API_BASE_URL
-                  : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
             const response = await fetch(`${apiUrl}/auth/me`, {
               method: 'GET',
               credentials: 'include',
@@ -61,11 +62,6 @@ const SSOLoginPage = () => {
 
         // Call AMS backend to verify SSO token and create session
         console.log('🔄 Calling AMS backend /api/auth/sso-login...');
-        const apiUrl = import.meta.env.DEV 
-          ? 'http://localhost:3001/api' 
-          : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api') 
-              ? import.meta.env.VITE_API_BASE_URL 
-              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
         const response = await fetch(`${apiUrl}/auth/sso-login`, {
           method: 'POST',
           credentials: 'include',
@@ -92,11 +88,6 @@ const SSOLoginPage = () => {
         // Verify session is working by calling /api/auth/me
         console.log('🔄 Verifying session...');
         try {
-          const apiUrl = import.meta.env.DEV 
-            ? 'http://localhost:3001/api' 
-            : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api') 
-                ? import.meta.env.VITE_API_BASE_URL 
-                : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
           const sessionResponse = await fetch(`${apiUrl}/auth/me`, {
             method: 'GET',
             credentials: 'include',

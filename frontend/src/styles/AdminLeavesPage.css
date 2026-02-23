@@ -2,6 +2,10 @@
 
 .admin-leaves-page {
   padding: 24px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* --- Pill Header --- */
@@ -93,11 +97,13 @@
   border: 1px solid #e0e0e0;
   box-shadow: none;
   overflow: hidden;
-  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .admin-leaves-page .table-container {
-  max-height: calc(100vh - 450px);
+  flex: 1;
   overflow: auto;
 }
 

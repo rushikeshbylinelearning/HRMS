@@ -31,6 +31,9 @@ const { getISTDateString, parseISTDate } = require('../utils/istTime');
  * @param {string|ObjectId} employeeId - Employee user ID
  * @param {string|Date} startDate - Start date (YYYY-MM-DD or Date object)
  * @param {string|Date} endDate - End date (YYYY-MM-DD or Date object)
+ * @param {Object} [sharedData=null] - Optional pre-fetched shared data to avoid duplicate queries
+ * @param {Array} [sharedData.holidays] - Pre-fetched holidays array
+ * @param {number} [sharedData.gracePeriodMinutes] - Pre-fetched grace period in minutes
  * @returns {Promise<Array>} Array of attendance summary objects with resolved status
  * 
  * Each object contains:
@@ -43,8 +46,9 @@ const { getISTDateString, parseISTDate } = require('../utils/istTime');
  * - isAbsent: boolean
  * - halfDayReasonCode: string | null
  * - halfDayReasonText: string | null
+ * - totalWorkingHours: number (in hours, includes admin overrides)
  */
-async function getEmployeeAttendanceSummary(employeeId, startDate, endDate) {
+async function getEmployeeAttendanceSummary(employeeId, startDate, endDate, sharedData = null) {
     // Normalize dates to YYYY-MM-DD format
     const startDateStr = typeof startDate === 'string' ? startDate : getISTDateString(startDate);
     const endDateStr = typeof endDate === 'string' ? endDate : getISTDateString(endDate);
@@ -63,7 +67,7 @@ async function getEmployeeAttendanceSummary(employeeId, startDate, endDate) {
     const dateRange = generateDateRange(startDateStr, endDateStr);
     
     // Fetch all required data in parallel
-    const [employee, logs, holidays, leaveRequests, gracePeriodMinutes, userWithShift] = await Promise.all([
+    const [employee, logs, leaveRequests, userWithShift] = await Promise.all([
         // Fetch employee to get Saturday policy
         User.findById(employeeId).select('alternateSaturdayPolicy').lean(),
         
@@ -158,20 +162,6 @@ async function getEmployeeAttendanceSummary(employeeId, startDate, endDate) {
             { $sort: { attendanceDate: 1 } }
         ]),
         
-        // Fetch holidays filtered by date range (IST)
-        (async () => {
-            const startDateIST = parseISTDate(startDateStr);
-            const endDateIST = parseISTDate(endDateStr);
-            const holidays = await Holiday.find({
-                date: {
-                    $gte: startDateIST,
-                    $lte: endDateIST
-                },
-                isTentative: { $ne: true }
-            }).sort({ date: 1 }).lean();
-            return holidays;
-        })(),
-        
         // Fetch all approved leave requests for the date range
         LeaveRequest.find({
             employee: new mongoose.Types.ObjectId(employeeId),
@@ -184,12 +174,26 @@ async function getEmployeeAttendanceSummary(employeeId, startDate, endDate) {
             }
         }).sort({ createdAt: 1 }).lean(),
         
-        // Get grace period from settings
-        getGracePeriodMinutes(),
-        
         // Fetch user with shiftGroup for lateMinutes recalculation
         User.findById(employeeId).populate('shiftGroup').lean()
     ]);
+    
+    // Use shared data if available, otherwise fetch
+    const holidays = sharedData?.holidays || await (async () => {
+        const startDateIST = parseISTDate(startDateStr);
+        const endDateIST = parseISTDate(endDateStr);
+        return Holiday.find({
+            date: {
+                $gte: startDateIST,
+                $lte: endDateIST
+            },
+            isTentative: { $ne: true }
+        }).sort({ date: 1 }).lean();
+    })();
+    
+    const gracePeriodMinutes = sharedData?.gracePeriodMinutes !== undefined 
+        ? sharedData.gracePeriodMinutes 
+        : await getGracePeriodMinutes();
     
     // Validate employee exists
     if (!employee) {
@@ -303,13 +307,40 @@ async function getEmployeeAttendanceSummary(employeeId, startDate, endDate) {
             isAbsent: statusInfo.isAbsent,
             halfDayReasonCode: statusInfo.halfDayReasonCode || null,
             halfDayReasonText: statusInfo.halfDayReason || null,
-            overriddenByAdmin: statusInfo.overriddenByAdmin || false
+            overriddenByAdmin: statusInfo.overriddenByAdmin || false,
+            totalWorkingHours: log?.totalWorkingHours || 0  // Include working hours for Analytics
         };
     });
     
     return resolvedLogs;
 }
 
+/**
+ * Fetch holidays for a date range
+ * 
+ * @param {string|Date} startDate - Start date (YYYY-MM-DD or Date object)
+ * @param {string|Date} endDate - End date (YYYY-MM-DD or Date object)
+ * @returns {Promise<Array>} Array of holiday objects
+ */
+async function fetchHolidaysForDateRange(startDate, endDate) {
+    const startDateStr = typeof startDate === 'string' ? startDate : getISTDateString(startDate);
+    const endDateStr = typeof endDate === 'string' ? endDate : getISTDateString(endDate);
+    
+    const startDateIST = parseISTDate(startDateStr);
+    const endDateIST = parseISTDate(endDateStr);
+    
+    const holidays = await Holiday.find({
+        date: {
+            $gte: startDateIST,
+            $lte: endDateIST
+        },
+        isTentative: { $ne: true }
+    }).sort({ date: 1 }).lean();
+    
+    return holidays;
+}
+
 module.exports = {
-    getEmployeeAttendanceSummary
+    getEmployeeAttendanceSummary,
+    fetchHolidaysForDateRange
 };

@@ -6,21 +6,7 @@
 const busboy = require('busboy');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-
-let bucket;
-
-function getBucket() {
-    if (!bucket) {
-        if (!mongoose.connection || !mongoose.connection.db) {
-            throw new Error("MongoDB not connected yet");
-        }
-        bucket = new mongoose.mongo.GridFSBucket(
-            mongoose.connection.db,
-            { bucketName: "avatars" }
-        );
-    }
-    return bucket;
-}
+const { getAvatarBucket } = require('../db');
 
 const uuidv4 = () => {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -65,7 +51,7 @@ function checkRateLimit(userId) {
 }
 
 async function uploadToGridFS(buffer, userId, contentType) {
-    const avatarBucket = getBucket();
+    const avatarBucket = getAvatarBucket();
     const ext = contentType === 'image/png' ? 'png'
               : contentType === 'image/gif' ? 'gif'
               : contentType === 'image/webp' ? 'webp' : 'jpg';
@@ -99,6 +85,11 @@ async function uploadToGridFS(buffer, userId, contentType) {
 }
 
 function uploadAvatarGridFS(req, res, next) {
+    // Check MongoDB connection state before processing
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ error: 'Service temporarily unavailable. Please retry.' });
+    }
+    
     const contentType = req.headers['content-type'] || '';
     if (!contentType.includes('multipart/form-data')) {
         return res.status(400).json({ error: 'Content-Type must be multipart/form-data.' });

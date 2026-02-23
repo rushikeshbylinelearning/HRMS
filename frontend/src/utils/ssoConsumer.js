@@ -23,7 +23,7 @@ export async function consumeSsoTokenIfPresent() {
         ? '/api'  // Use Vite proxy in development
         : (apiBaseUrl 
             ? (apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`)
-            : 'https://attendance.bylinelms.com/api'); // Use full HTTPS URL in production
+            : 'https://attendance-test.bylinelms.com/api'); // Use full HTTPS URL in production
     
     // Call backend API to validate the token and create session
     const response = await fetch(`${apiBase}/auth/validate-sso`, {

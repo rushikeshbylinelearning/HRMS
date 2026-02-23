@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 
 // --- Middleware ---
 const authenticateToken = require('../middleware/authenticateToken');
+const { invalidateAnalyticsCache, invalidateCacheForDate } = require('../middleware/analyticsCacheInvalidation');
 
 // --- Models ---
 const User = require('../models/User');
@@ -2042,7 +2043,7 @@ router.post('/holidays/bulk-upload', [authenticateToken, isAdminOrHr], async (re
 
 // PATCH /api/admin/attendance/toggle-status
 // Toggle attendance status (late/half-day) for an employee on a specific date
-router.patch('/attendance/toggle-status', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.patch('/attendance/toggle-status', [authenticateToken, isAdminOrHr, invalidateCacheForDate], async (req, res) => {
     try {
         const { employeeId, attendanceDate, statusType, newStatus } = req.body;
 
@@ -3088,7 +3089,7 @@ router.get('/attendance/user/:userId', [authenticateToken, isAdminOrHr], async (
  * - breakType must be one of: 'Paid', 'Unpaid', 'Extra'
  * - Admins can edit auto-logged-out attendance logs (restriction removed)
  */
-router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     const { logId } = req.params;
     let { sessions, breaks, notes } = req.body;
 
@@ -4049,7 +4050,7 @@ router.delete('/leaves/year-end/:id', [authenticateToken, isAdminOrHr], async (r
 
 // POST /api/admin/attendance/override-half-day - Override half-day marking for an attendance log
 // NEW: Accepts overrideReason in request body
-router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const { attendanceLogId } = req.body;
 
@@ -4275,7 +4276,7 @@ router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr], a
 
 // PATCH /api/admin/attendance/override/:logId - Update override note
 // Only applies to logs that are already overridden. Updates existing record; no delete.
-router.patch('/attendance/override/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.patch('/attendance/override/:logId', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const logId = req.params.logId;
         const { overrideReason } = req.body;
@@ -4351,7 +4352,7 @@ router.patch('/attendance/override/:logId', [authenticateToken, isAdminOrHr], as
 
 // POST /api/admin/attendance/remove-override - Clear override and restore system-calculated status
 // Does NOT delete the attendance record. Clears override fields and recalculates status.
-router.post('/attendance/remove-override', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.post('/attendance/remove-override', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const { attendanceLogId } = req.body;
         if (!attendanceLogId || !mongoose.Types.ObjectId.isValid(attendanceLogId)) {
@@ -4458,7 +4459,7 @@ router.post('/attendance/remove-override', [authenticateToken, isAdminOrHr], asy
 const { generateDateRange } = require('../utils/attendanceStatusResolver');
 
 // POST /api/admin/attendance/bulk-override - Global form-based override: apply to all or selected employees, date/range
-router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const { employeeScope, startDate, endDate, overrideType, overrideNote } = req.body;
 
@@ -4601,7 +4602,7 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr], async
 });
 
 // PUT /api/admin/attendance/half-day/:logId - Toggle half-day status for an attendance log
-router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const { logId } = req.params;
         const { isHalfDay } = req.body;
@@ -4728,7 +4729,7 @@ router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr], asyn
  * Recalculate attendance records for a date range to sync with leave requests.
  * Admin-only endpoint for fixing historical data.
  */
-router.post('/attendance/recalculate', [authenticateToken, isAdminOrHr], async (req, res) => {
+router.post('/attendance/recalculate', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
     try {
         const { startDate, endDate, userId } = req.body;
 
