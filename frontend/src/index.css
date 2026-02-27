@@ -222,3 +222,102 @@ img {
 .skeleton-container {
   contain: layout style paint;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL MOBILE UTILITIES
+   These apply to all pages on mobile without touching desktop.
+═══════════════════════════════════════════════════════════════ */
+
+/* Prevent body from scrolling sideways on mobile */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  /* PageHeroHeader: reduce padding and font sizes on mobile */
+  .page-hero-header {
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .page-hero-header__title {
+    font-size: 1.35rem !important;
+  }
+
+  .page-hero-header__description {
+    font-size: 0.82rem !important;
+  }
+
+  /* All pill-style page headers (dark rounded bar) */
+  .page-header-pill,
+  .activity-logs-page .page-header,
+  .admin-leaves-page .page-header,
+  .shifts-page .page-header {
+    border-radius: 14px !important;
+    padding: 12px 16px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  /* All header-actions rows inside pill headers */
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .header-actions .MuiButton-root {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  /* MUI Tabs — horizontal scroll on mobile, hide scrollbar */
+  .MuiTabs-root {
+    overflow-x: auto !important;
+  }
+  .MuiTabs-scroller {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .MuiTabs-root .MuiTabs-scrollButtons {
+    display: flex !important;
+  }
+
+  /* MUI Table — always scrollable horizontally when content overflows */
+  .MuiTableContainer-root {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Tooltips — disable hover-triggered tooltips on touch (they don't work) */
+  .sidebar-link::after {
+    display: none !important;
+  }
+
+  /* Minimum touch target for all MUI buttons and icon buttons */
+  .MuiButtonBase-root {
+    min-height: 44px !important;
+  }
+  .MuiIconButton-root {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small screens: tighter hero header */
+  .page-hero-header {
+    padding: 12px !important;
+  }
+  .page-hero-header__title {
+    font-size: 1.2rem !important;
+  }
+}
+
+/* Smooth touch scrolling globally */
+* {
+  -webkit-overflow-scrolling: touch;
+}

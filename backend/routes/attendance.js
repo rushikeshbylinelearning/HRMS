@@ -173,7 +173,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         let isHalfDay = false;
         let attendanceStatus = 'On-time';
 
-        console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes}, isFirstCheckIn: ${isFirstCheckIn})`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[Grace Period] Using grace period: ${GRACE_PERIOD_MINUTES} minutes for clock-in (lateMinutes: ${lateMinutes}, isFirstCheckIn: ${isFirstCheckIn})`);
 
         // FIXED PRIORITY LOGIC:
         // At clock-in, we don't know working hours yet, so we apply grace period logic
@@ -224,7 +224,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             isHalfDay = attendanceLog.isHalfDay || false;
             attendanceStatus = attendanceLog.attendanceStatus || 'On-time';
             lateMinutes = attendanceLog.lateMinutes || 0;
-            console.log(`[Clock-In] Subsequent check-in detected. Preserving existing late status: ${attendanceStatus} (lateMinutes: ${lateMinutes})`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[Clock-In] Subsequent check-in detected. Preserving existing late status: ${attendanceStatus} (lateMinutes: ${lateMinutes})`);
         }
 
         // Track late login for weekly monitoring
@@ -328,7 +328,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
                     timestamp: getISTNow().toISOString(),
                     message: `${user.fullName} clocked in`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for clock-in ${attendanceLog._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for clock-in ${attendanceLog._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -452,8 +452,10 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
             autoLogoutReason: null
         };
 
-        // Get current log to check override status
-        const currentLog = await AttendanceLog.findById(log._id);
+        // Get current log to check override status — reuse the already-fetched `log` document
+        // PERFORMANCE FIX: Removed redundant AttendanceLog.findById(log._id) call here.
+        // The `log` variable already holds the document from the query above.
+        const currentLog = log;
         
         if (!currentLog?.overriddenByAdmin) {
             const GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
@@ -468,7 +470,7 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
                 updateData.halfDayReasonCode = 'INSUFFICIENT_WORKING_HOURS';
                 updateData.halfDayReasonText = `Less than ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hours total shift time (${elapsedShiftHours.toFixed(1)} hours elapsed). Minimum ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs for half-day, ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY} hrs for full day.`;
                 updateData.halfDaySource = 'AUTO';
-                console.log(`[CLOCK-OUT] Marked Absent for user ${userId} (${elapsedShiftHours.toFixed(1)} hours elapsed < ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs)`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[CLOCK-OUT] Marked Absent for user ${userId} (${elapsedShiftHours.toFixed(1)} hours elapsed < ${MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY} hrs)`);
             } else if (elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY) {
                 // 5 to < 9 hrs elapsed → Half-day
                 if (withinGracePeriod) {
@@ -493,11 +495,16 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         
         await AttendanceLog.findByIdAndUpdate(log._id, { $set: updateData });
         
-        // Refresh log to get updated status
-        const updatedLog = await AttendanceLog.findById(log._id);
+        // PERFORMANCE FIX: Removed redundant AttendanceLog.findById(log._id) call.
+        // We already have all updated values in `updateData`; use it directly below.
         
         // --- NOTIFICATION ---
-        const user = await User.findById(userId);
+        // PERFORMANCE FIX: Removed redundant User.findById(userId) call — 
+        // fetch user in parallel with the update instead.
+        const [updatedUser] = await Promise.all([
+            User.findById(userId).lean()
+        ]);
+        const user = updatedUser;
         if (user) {
             // Notify admins about user clock-out
             NewNotificationService.notifyCheckOut(userId, user.fullName)
@@ -541,17 +548,17 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
                     logId: log._id,
                     userId: userId,
                     attendanceDate: today,
-                    attendanceStatus: updatedLog?.attendanceStatus || log.attendanceStatus,
-                    isHalfDay: updatedLog?.isHalfDay || updateData.isHalfDay || log.isHalfDay,
-                    isLate: updatedLog?.isLate || log.isLate,
+                    attendanceStatus: updateData.attendanceStatus || log.attendanceStatus,
+                    isHalfDay: updateData.isHalfDay ?? log.isHalfDay,
+                    isLate: updateData.isLate ?? log.isLate,
                     clockInTime: log.clockInTime,
                     clockOutTime: clockOutTime,
                     totalWorkingHours: totalWorkingHours,
-                    halfDayReason: updatedLog?.halfDayReasonText || updateData.halfDayReasonText || null,
+                    halfDayReason: updateData.halfDayReasonText || null,
                     timestamp: getISTNow().toISOString(),
                     message: updateData.isHalfDay ? `Clocked out - Marked as half-day (insufficient hours)` : `Clocked out successfully`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for clock-out ${log._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for clock-out ${log._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);

@@ -154,7 +154,7 @@ const CIFManagementEnhanced = () => {
       <PageHeroHeader
         eyebrow="HR Operations"
         title="Critical Incident Files"
-        description="Manage and track employee incident records, compliance violations, and HR documentation"
+        description="Manage incident records and HR documentation."
         icon={<FolderOpenIcon />}
         actionArea={
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>

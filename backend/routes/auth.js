@@ -71,7 +71,7 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
     }
 
     try {
-        console.log('[Standalone Login] Login attempt for:', email);
+        if (process.env.NODE_ENV !== 'production') console.log('[Standalone Login] Login attempt for:', email);
         
         // =================================================================
         // ### START OF FIX ###
@@ -139,7 +139,7 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
         const expiresIn = isNightShiftEmployee(user._id.toString()) ? '10h' : '7d';
         const token = jwtUtils.sign(payload, { expiresIn });
 
-        console.log('[Standalone Login] ✅ Login successful for:', user.email, 'via standalone route');
+        if (process.env.NODE_ENV !== 'production') console.log('[Standalone Login] ✅ Login successful for:', user.email, 'via standalone route');
 
         // Set secure HTTP-only cookie for JWT token
         // CRITICAL FIX: Use domain attribute for cross-subdomain cookie sharing
@@ -232,7 +232,7 @@ router.get('/me', async (req, res) => {
             if (req.session && req.session.user) {
                 userId = req.session.user.id;
                 authMethod = 'SSO';
-                console.log('[/me] SSO session found for user:', userId);
+                if (process.env.NODE_ENV !== 'production') console.log('[/me] SSO session found for user:', userId);
             }
         } catch (sessionErr) {
             console.warn('[/me] Session access failed, falling back to JWT:', sessionErr?.message || sessionErr);
@@ -244,13 +244,13 @@ router.get('/me', async (req, res) => {
             const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
             if (token == null || (typeof token !== 'string')) {
-                console.log('[/me] No authorization header or token found');
+                if (process.env.NODE_ENV !== 'production') console.log('[/me] No authorization header or token found');
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
-            console.log('[/me] Attempting to verify JWT token...');
+            if (process.env.NODE_ENV !== 'production') console.log('[/me] Attempting to verify JWT token...');
             if (typeof token === 'string') {
-                console.log('[/me] Token preview:', token.slice(0, 50) + (token.length > 50 ? '...' : ''));
+                if (process.env.NODE_ENV !== 'production') console.log('[/me] Token preview:', token.slice(0, 50) + (token.length > 50 ? '...' : ''));
             }
             
             // Try to determine token type by decoding header
@@ -266,8 +266,8 @@ router.get('/me', async (req, res) => {
                     // SSO tokens have kid like 'sso-key-*', AMS tokens have 'ams-key'
                     if (kid && kid.startsWith('sso-key-')) {
                         tokenType = 'SSO';
-                        console.log('[/me] ⚠️ Detected SSO token (kid: ' + kid + ') - should have been converted to AMS token');
-                        console.log('[/me] Converting SSO token to AMS user lookup...');
+                        if (process.env.NODE_ENV !== 'production') console.log('[/me] ⚠️ Detected SSO token (kid: ' + kid + ') - should have been converted to AMS token');
+                        if (process.env.NODE_ENV !== 'production') console.log('[/me] Converting SSO token to AMS user lookup...');
                         
                         // Verify SSO token using JWKS
                         try {
@@ -275,8 +275,8 @@ router.get('/me', async (req, res) => {
                             const ssoUserId = decoded.userId || decoded.sub;
                             const ssoEmail = decoded.email;
                             
-                            console.log('[/me] SSO token verified for email:', ssoEmail);
-                            console.log('[/me] SSO user ID (from SSO DB):', ssoUserId);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] SSO token verified for email:', ssoEmail);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] SSO user ID (from SSO DB):', ssoUserId);
                             
                             if (!ssoEmail) {
                                 throw new Error('SSO token missing email claim - cannot map to AMS user');
@@ -285,8 +285,8 @@ router.get('/me', async (req, res) => {
                             // Normalize email, but also try raw lowercase for admin-created emails
                             const normalizedSsoEmail = normalizeEmail(ssoEmail);
                             const rawLowerEmail = String(ssoEmail).toLowerCase();
-                            console.log('[/me] SSO email from token:', ssoEmail);
-                            console.log('[/me] Normalized email for lookup:', normalizedSsoEmail);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] SSO email from token:', ssoEmail);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] Normalized email for lookup:', normalizedSsoEmail);
                             
                             // Find AMS user by normalized OR exact raw lowercase email
                             console.log('[/me] Looking up AMS user by normalized or raw email:', normalizedSsoEmail, rawLowerEmail);
@@ -299,8 +299,8 @@ router.get('/me', async (req, res) => {
                             }).lean();
                             
                             if (!amsUser) {
-                                console.log('[/me] ❌ AMS user not found for normalized email:', normalizedSsoEmail);
-                                console.log('[/me] SSO user must authenticate via /api/auth/sso-consume first to create AMS user');
+                                if (process.env.NODE_ENV !== 'production') console.log('[/me] ❌ AMS user not found for normalized email:', normalizedSsoEmail);
+                                if (process.env.NODE_ENV !== 'production') console.log('[/me] SSO user must authenticate via /api/auth/sso-consume first to create AMS user');
                                 return res.status(401).json({ 
                                     error: 'User not found in AMS database',
                                     message: `No AMS user found for email: ${normalizedSsoEmail}. Please authenticate via SSO login endpoint first.`,
@@ -311,11 +311,11 @@ router.get('/me', async (req, res) => {
                             
                             userId = amsUser._id.toString();
                             authMethod = 'SSO';
-                            console.log('[/me] ✅ SSO token mapped to AMS user:', userId);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] ✅ SSO token mapped to AMS user:', userId);
                             if (ssoEmail !== normalizedSsoEmail) {
-                                console.log('[SSO → AMS Sync] Email normalization matched:', ssoEmail, '->', normalizedSsoEmail);
+                                if (process.env.NODE_ENV !== 'production') console.log('[SSO → AMS Sync] Email normalization matched:', ssoEmail, '->', normalizedSsoEmail);
                             }
-                            console.log('[SSO → AMS Sync] Linked SSO user', ssoEmail, '(normalized:', normalizedSsoEmail + ')', 'to AMS user', userId);
+                            if (process.env.NODE_ENV !== 'production') console.log('[SSO → AMS Sync] Linked SSO user', ssoEmail, '(normalized:', normalizedSsoEmail + ')', 'to AMS user', userId);
                         } catch (ssoVerifyError) {
                             console.error('[/me] ❌ SSO token verification failed:', ssoVerifyError.message);
                             throw ssoVerifyError;
@@ -323,12 +323,13 @@ router.get('/me', async (req, res) => {
                     } else {
                         // Assume AMS local token
                         tokenType = 'AMS';
-                        console.log('[/me] Detected AMS local token (kid: ' + (kid || 'none') + ')');
+                        if (process.env.NODE_ENV !== 'production') console.log('[/me] Detected AMS local token (kid: ' + (kid || 'none') + ')');
                         try {
                             decoded = jwtUtils.verify(token);
                             userId = decoded.userId;
                             authMethod = decoded.authMethod || 'local';
-                            console.log('[/me] ✅ AMS JWT token verified successfully for user:', userId);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] ✅ AMS JWT token verified successfully for user:', userId);
+                            if (process.env.NODE_ENV !== 'production') console.log('[/me] decoded.userId value:', decoded.userId, 'type:', typeof decoded.userId);
                         } catch (amsVerifyError) {
                             console.error('[/me] ❌ AMS token verification failed:', amsVerifyError.message);
                             throw amsVerifyError;
@@ -373,34 +374,40 @@ router.get('/me', async (req, res) => {
         const cachedUser = cacheService.getUser(userId);
         
         if (cachedUser) {
-            console.log('[/me] Returning cached user data');
+            if (process.env.NODE_ENV !== 'production') console.log('[/me] Returning cached user data');
             return res.json(cachedUser);
         }
 
-        console.log('[/me] Fetching user from database');
+        if (process.env.NODE_ENV !== 'production') console.log('[/me] Fetching user from database');
+        if (process.env.NODE_ENV !== 'production') console.log('[/me] userId value:', userId, 'type:', typeof userId);
         
-        // Optimized query with specific field selection
+        // Fetch user with shiftGroup populate only (reportingPerson may have empty string issue)
         const user = await User.findById(userId)
             .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
             .select('-passwordHash -__v')
             .lean();
         
+        if (!user) {
+            if (process.env.NODE_ENV !== 'production') console.log('[/me] User not found:', userId);
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        
         // Manually populate reportingPerson if it's a valid ObjectId
-        if (user && user.reportingPerson && mongoose.Types.ObjectId.isValid(user.reportingPerson)) {
-            const reportingPerson = await User.findById(user.reportingPerson)
-                .select('fullName email department designation')
-                .lean();
-            user.reportingPerson = reportingPerson || null;
-        } else if (user) {
+        if (user.reportingPerson && user.reportingPerson !== '' && mongoose.Types.ObjectId.isValid(user.reportingPerson)) {
+            try {
+                const reportingPerson = await User.findById(user.reportingPerson)
+                    .select('fullName email department designation')
+                    .lean();
+                user.reportingPerson = reportingPerson;
+            } catch (err) {
+                console.error('[/me] Error populating reportingPerson:', err.message);
+                user.reportingPerson = null;
+            }
+        } else {
             user.reportingPerson = null;
         }
 
-        if (!user) {
-            console.log('[/me] User not found:', userId);
-            return res.status(404).json({ error: 'User not found.' });
-        }
-
-        console.log('[/me] User found:', user.email);
+        if (process.env.NODE_ENV !== 'production') console.log('[/me] User found:', user.email);
 
         const userResponse = {
             id: user._id,
@@ -459,7 +466,7 @@ router.get('/me', async (req, res) => {
         // Cache the user data
         cacheService.setUser(userId, userResponse);
         
-        console.log('[/me] User data cached and returned successfully');
+        if (process.env.NODE_ENV !== 'production') console.log('[/me] User data cached and returned successfully');
         res.json(userResponse);
     } catch (error) {
         console.error('[/me] Error fetching user data:', error);
@@ -477,11 +484,11 @@ router.get('/callback', async (req, res) => {
         const { sso_token } = req.query;
 
         if (!sso_token) {
-            console.log('[SSO] No SSO token provided in callback');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSO] No SSO token provided in callback');
             return res.redirect('/login?error=no_sso_token');
         }
 
-        console.log('[SSO] Processing SSO callback with token');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO] Processing SSO callback with token');
 
         // Validate the SSO token
         const ssoUser = await ssoService.validateToken(sso_token);
@@ -517,7 +524,7 @@ router.get('/callback', async (req, res) => {
             } : null
         };
 
-        console.log(`[SSO] Successfully authenticated user: ${user.email} via SSO`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SSO] Successfully authenticated user: ${user.email} via SSO`);
 
         // For SSO, we need to redirect to frontend with token
         // The frontend will handle setting the token in sessionStorage
@@ -558,7 +565,7 @@ router.post('/auto-login', async (req, res) => {
             });
         }
 
-        console.log(`[AutoLogin] Processing auto-login for app: ${appId}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[AutoLogin] Processing auto-login for app: ${appId}`);
 
         // Validate SSO token using existing SSO service
         const ssoUser = await ssoService.validateToken(ssoToken);
@@ -639,7 +646,7 @@ function cleanExpiredCacheEntries() {
 // This is the ONLY endpoint frontend should call for SSO authentication
 router.post('/sso-consume', async (req, res) => {
     try {
-        console.log('[SSO Login] SSO consume route called - processing SSO token authentication');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO Login] SSO consume route called - processing SSO token authentication');
         
         // Ensure MongoDB connection is ready before proceeding
         const mongoose = require('mongoose');
@@ -649,7 +656,7 @@ router.post('/sso-consume', async (req, res) => {
             console.warn('[SSO-Consume] MongoDB not connected (readyState: ' + mongoose.connection.readyState + '), reconnecting...');
             try {
                 await connectDB();
-                console.log('[SSO-Consume] ✅ MongoDB connection ready');
+                if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ MongoDB connection ready');
             } catch (dbError) {
                 console.error('[SSO-Consume] ❌ MongoDB reconnection failed:', dbError.message);
                 return res.status(503).json({ 
@@ -680,8 +687,8 @@ router.post('/sso-consume', async (req, res) => {
             return res.json(cachedResult.result);
         }
 
-        console.log('[SSO Login] Processing SSO token from frontend via SSO consume route');
-        console.log('[SSO-Consume] Token preview:', token.substring(0, 50) + '...');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO Login] Processing SSO token from frontend via SSO consume route');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Token preview:', token.substring(0, 50) + '...');
 
         // Verify SSO token using JWKS (RS256 only)
         let decoded;
@@ -692,8 +699,8 @@ router.post('/sso-consume', async (req, res) => {
             const alg = decodedHeader?.header?.alg;
             
             decoded = await jwtUtils.verifySSOTokenWithJWKS(token);
-            console.log('[SSO-Consume] ✅ SSO token verified via JWKS');
-            console.log('[SSO-Consume] Token payload:', {
+            if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ SSO token verified via JWKS');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Token payload:', {
                 sub: decoded.sub,
                 userId: decoded.userId,
                 email: decoded.email,
@@ -764,9 +771,9 @@ router.post('/sso-consume', async (req, res) => {
         const userEmail = normalizeEmail(rawEmail);
         const rawLowerEmail = String(rawEmail).toLowerCase();
         
-        console.log('[SSO-Consume] Processing user');
-        console.log('[SSO-Consume] Raw email from SSO token:', rawEmail);
-        console.log('[SSO-Consume] Normalized email for lookup:', userEmail);
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Processing user');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Raw email from SSO token:', rawEmail);
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Normalized email for lookup:', userEmail);
 
         // Helper function to map SSO role to AMS role
         const mapSSORoleToAMS = (ssoRole) => {
@@ -806,19 +813,19 @@ router.post('/sso-consume', async (req, res) => {
                 ]
             });
             if (inactiveUser) {
-                console.log(`[SSO-Consume] Found inactive user with normalized email: ${userEmail} - reactivating`);
-                console.log(`[SSO-Consume] Original raw email was: ${rawEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Found inactive user with normalized email: ${userEmail} - reactivating`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Original raw email was: ${rawEmail}`);
                 inactiveUser.isActive = true;
                 inactiveUser.authMethod = 'SSO';
                 inactiveUser.lastLogin = new Date();
                 await inactiveUser.save();
                 user = await User.findById(inactiveUser._id).populate('shiftGroup');
-                console.log(`[SSO-Consume] ✅ Reactivated existing user: ${userEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] ✅ Reactivated existing user: ${userEmail}`);
             } else {
                 // Check if auto-provisioning is enabled
                 const autoProvision = process.env.SSO_AUTO_PROVISION === 'true';
                 if (!autoProvision) {
-                    console.log(`[SSO-Consume] User ${userEmail} not found and auto-provisioning disabled`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] User ${userEmail} not found and auto-provisioning disabled`);
                     return res.status(403).json({ 
                         error: 'User not found and auto-provisioning disabled',
                         code: 'USER_NOT_FOUND'
@@ -828,8 +835,8 @@ router.post('/sso-consume', async (req, res) => {
                 // Auto-provision new user (only if doesn't exist)
                 // IMPORTANT: Store normalized email to maintain consistency
                 console.log(`[SSO-Consume] No existing user found with normalized email: ${userEmail}`);
-                console.log(`[SSO-Consume] Auto-provisioning new user with normalized email`);
-                console.log(`[SSO-Consume] Raw email from SSO: ${rawEmail} -> Normalized: ${userEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Auto-provisioning new user with normalized email`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Raw email from SSO: ${rawEmail} -> Normalized: ${userEmail}`);
                 
                 user = new User({
                     email: userEmail, // Store normalized email for consistency
@@ -861,14 +868,14 @@ router.post('/sso-consume', async (req, res) => {
 
                 await user.save();
                 user = await User.findById(user._id).populate('shiftGroup');
-                console.log(`[SSO-Consume] ✅ Successfully created new AMS user with normalized email: ${userEmail}`);
-                console.log('[SSO → AMS Sync] Created AMS user', userEmail, 'with ID:', user._id.toString());
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] ✅ Successfully created new AMS user with normalized email: ${userEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log('[SSO → AMS Sync] Created AMS user', userEmail, 'with ID:', user._id.toString());
             }
         } else {
             // User found using normalized email lookup
             console.log(`[SSO-Consume] ✅ Found existing user via normalized email lookup: ${userEmail}`);
             if (rawEmail !== userEmail) {
-                console.log(`[SSO-Consume] Email normalization matched: ${rawEmail} -> ${userEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Email normalization matched: ${rawEmail} -> ${userEmail}`);
             }
             
             // Update user data from SSO if needed
@@ -892,10 +899,10 @@ router.post('/sso-consume', async (req, res) => {
                     { new: true }
                 ).populate('shiftGroup');
 
-                console.log(`[SSO-Consume] Updated user data for: ${userEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] Updated user data for: ${userEmail}`);
             } else {
-                console.log('[SSO-Consume] ✅ Using existing AMS user - no update needed');
-                console.log('[SSO → AMS Sync] Linked SSO user', rawEmail, '(normalized:', userEmail + ')', 'to existing AMS user', user._id.toString());
+                if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ Using existing AMS user - no update needed');
+                if (process.env.NODE_ENV !== 'production') console.log('[SSO → AMS Sync] Linked SSO user', rawEmail, '(normalized:', userEmail + ')', 'to existing AMS user', user._id.toString());
             }
             
             // Update last login timestamp
@@ -916,14 +923,14 @@ router.post('/sso-consume', async (req, res) => {
             authMethod: 'SSO'
         }, { expiresIn: '7d' });
         
-        console.log('[SSO-Consume] ✅ AMS token generated successfully');
-        console.log('[SSO-Consume] AMS token preview:', amsToken.substring(0, 50) + '...');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ AMS token generated successfully');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] AMS token preview:', amsToken.substring(0, 50) + '...');
         
         // Self-verify the token we just created
         try {
             const verified = jwtUtils.verify(amsToken);
-            console.log('[SSO-Consume] ✅ AMS token self-verification successful');
-            console.log('[SSO-Consume] Verified payload:', { userId: verified.userId, email: verified.email });
+            if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ AMS token self-verification successful');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Verified payload:', { userId: verified.userId, email: verified.email });
         } catch (verifyError) {
             console.error('[SSO-Consume] ❌ AMS token self-verification failed:', verifyError.message);
             throw new Error(`Failed to verify generated AMS token: ${verifyError.message}`);
@@ -939,7 +946,7 @@ router.post('/sso-consume', async (req, res) => {
         };
         req.session.ssoAuthenticated = true;
 
-        console.log(`[SSO-Consume] ✅ SSO login success: ${userEmail}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SSO-Consume] ✅ SSO login success: ${userEmail}`);
 
         // Prepare user data for response
         const userData = {
@@ -981,11 +988,11 @@ router.post('/sso-consume', async (req, res) => {
             timestamp: Date.now()
         });
 
-        console.log('[SSO-Consume] ✅ SSO consume completed successfully');
-        console.log('[SSO-Consume] User:', userEmail);
-        console.log('[SSO-Consume] AMS User ID:', user._id.toString());
-        console.log('[SSO-Consume] Redirect URL:', redirectUrlToUse);
-        console.log('[SSO-Consume] Result cached to prevent duplicate requests');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] ✅ SSO consume completed successfully');
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] User:', userEmail);
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] AMS User ID:', user._id.toString());
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Redirect URL:', redirectUrlToUse);
+        if (process.env.NODE_ENV !== 'production') console.log('[SSO-Consume] Result cached to prevent duplicate requests');
         console.info('[SSO] Frontend successfully consumed AMS token');
 
         // Return JSON response (no redirect, no cookies - pure JSON)

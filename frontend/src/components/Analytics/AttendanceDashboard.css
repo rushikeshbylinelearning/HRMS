@@ -6,32 +6,6 @@
     background: #f5f6fb;
 }
 
-.attendance-dashboard .page-hero-header {
-    margin-left: 24px;
-    margin-right: 24px;
-    margin-bottom: 40px;
-    padding: 20px 24px;
-}
-
-.attendance-dashboard .page-hero-header__content {
-    gap: 6px;
-}
-
-.attendance-dashboard .page-hero-header__eyebrow {
-    font-size: 0.65rem;
-    letter-spacing: 0.15em !important;
-}
-
-.attendance-dashboard .page-hero-header__title {
-    font-size: 1.5rem !important;
-    font-weight: 700 !important;
-}
-
-.attendance-dashboard .page-hero-header__description {
-    font-size: 0.85rem;
-    line-height: 1.5;
-}
-
 /* Loading state */
 .loading-state {
     text-align: center;
@@ -92,24 +66,14 @@
 
 /* Responsive design */
 @media (max-width: 960px) {
-    .attendance-dashboard .page-hero-header {
-        margin-left: 16px;
-        margin-right: 16px;
-        padding: 18px 20px;
+    .loading-state,
+    .error-state {
+        padding: 3rem 1.5rem;
+        margin-bottom: 16px;
     }
 }
 
 @media (max-width: 600px) {
-    .attendance-dashboard .page-hero-header {
-        margin-left: 12px;
-        margin-right: 12px;
-        padding: 16px 18px;
-    }
-    
-    .attendance-dashboard .page-hero-header__title {
-        font-size: 1.3rem !important;
-    }
-    
     .loading-state,
     .error-state {
         padding: 3rem 1.5rem;

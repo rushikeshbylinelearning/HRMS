@@ -217,7 +217,7 @@ const NewActivityLogPage = () => {
             <PageHeroHeader
                 eyebrow="Real-time Feed"
                 title="Activity Log"
-                description="Monitor every clock-in, leave request, and system alert in one consolidated event stream."
+                description="Monitor clock-ins, leave requests, and system alerts in real time."
                 actionArea={
                     <Button
                         variant="contained"

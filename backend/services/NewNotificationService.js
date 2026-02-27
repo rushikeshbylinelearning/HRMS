@@ -9,7 +9,7 @@ class NewNotificationService {
             const generatedId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const notificationWithId = { ...notificationData, id: generatedId };
             const notification = await NewNotification.create(notificationWithId);
-            console.log('[SVC] Step 1: Notification document created in DB. ID:', notification.id);
+            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Step 1: Notification document created in DB. ID:', notification.id);
             return notification;
         } catch (error) {
             // Handle Mongoose validation errors (enum validation failures)
@@ -35,9 +35,9 @@ class NewNotificationService {
             return;
         }
         const targetRoom = `user_${notification.userId}`;
-        console.log(`[SVC] Step 2: Emitting 'new_notification' event to room: ${targetRoom}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Step 2: Emitting 'new_notification' event to room: ${targetRoom}`);
         io.to(targetRoom).emit('new_notification', { ...notification.toObject() });
-        console.log(`[SVC] Step 3: Event emitted successfully to ${targetRoom}.`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Step 3: Event emitted successfully to ${targetRoom}.`);
     }
 
     static async createAndEmitNotification(notificationData) {
@@ -52,7 +52,7 @@ class NewNotificationService {
 
     static async broadcastToAdmins(commonData, originatingUserId = null) {
         try {
-            console.log('[SVC] Broadcasting to admins. Common Data:', commonData);
+            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Broadcasting to admins. Common Data:', commonData);
             
             // Create a single notification that can be seen by all admins
             // Use a special "admin" user ID or null to indicate this is for all admins
@@ -80,11 +80,11 @@ class NewNotificationService {
                     !originatingUserId || admin._id.toString() !== originatingUserId.toString()
                 );
 
-                console.log(`[SVC] Emitting notification to ${filteredAdmins.length} admins.`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Emitting notification to ${filteredAdmins.length} admins.`);
                 
                 for (const admin of filteredAdmins) {
                     const targetRoom = `user_${admin._id}`;
-                    console.log(`[SVC] Emitting to room: ${targetRoom}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Emitting to room: ${targetRoom}`);
                     io.to(targetRoom).emit('new_notification', { 
                         ...notification.toObject(),
                         // Override userName for display purposes
@@ -93,7 +93,7 @@ class NewNotificationService {
                 }
             }
 
-            console.log('[SVC] Admin notification created and broadcasted successfully.');
+            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Admin notification created and broadcasted successfully.');
         } catch (error) {
             console.error('[SVC] CRITICAL ERROR in broadcastToAdmins:', error);
         }
@@ -320,7 +320,7 @@ class NewNotificationService {
      */
     static async notifyAnonymousFeedback(messagePreview, timestamp) {
         try {
-            console.log('[SVC] Broadcasting anonymous feedback notification to admins/HR');
+            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Broadcasting anonymous feedback notification to admins/HR');
             
             // Truncate message for notification preview (max 100 chars)
             const preview = messagePreview.length > 100 
@@ -347,7 +347,7 @@ class NewNotificationService {
                 }
             }, null); // null originatingUserId ensures no user is excluded
             
-            console.log('[SVC] Anonymous feedback notification sent successfully');
+            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Anonymous feedback notification sent successfully');
         } catch (error) {
             console.error('[SVC] Error notifying anonymous feedback:', error);
             // Don't throw - notification failure shouldn't block feedback submission

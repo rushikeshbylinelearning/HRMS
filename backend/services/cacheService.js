@@ -17,7 +17,7 @@ class CacheService {
     });
     
     this.dashboardCache = new NodeCache({ 
-      stdTTL: 60, // 1 minute - short TTL so dashboard summary cache is effective without stale data
+      stdTTL: 120, // 2 minutes – doubled from 60 s; cache-miss full recompute is the main dashboard latency driver
       checkperiod: 30,
       useClones: false
     });

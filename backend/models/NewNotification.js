@@ -7,7 +7,7 @@ const newNotificationSchema = new mongoose.Schema({
     message: { type: String, required: true },
     type: { 
         type: String, 
-        enum: ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added'], 
+        enum: ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview'], 
         required: true 
     },
     
@@ -27,7 +27,7 @@ const newNotificationSchema = new mongoose.Schema({
     
     // Action data for interactive notifications
     actionData: {
-        actionType: { type: String, enum: ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day'] },
+        actionType: { type: String, enum: ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day', 'open_teams_preview'] },
         actionUrl: { type: String },
         actionParams: { type: mongoose.Schema.Types.Mixed },
         requiresAction: { type: Boolean, default: false }
@@ -70,7 +70,7 @@ newNotificationSchema.index({ recipientType: 1, read: 1, createdAt: -1 });
 // This provides clear error messages and prevents server crashes
 newNotificationSchema.pre('save', function(next) {
     // Validate type enum
-    const validTypes = ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added'];
+    const validTypes = ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview'];
     if (this.type && !validTypes.includes(this.type)) {
         const error = new mongoose.Error.ValidationError(this);
         error.errors.type = new mongoose.Error.ValidatorError({
@@ -83,7 +83,7 @@ newNotificationSchema.pre('save', function(next) {
 
     // Validate actionData.actionType enum if actionData exists
     if (this.actionData && this.actionData.actionType) {
-        const validActionTypes = ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day'];
+        const validActionTypes = ['start_break', 'navigate', 'approve', 'reject', 'none', 'override_half_day', 'open_teams_preview'];
         if (!validActionTypes.includes(this.actionData.actionType)) {
             const error = new mongoose.Error.ValidationError(this);
             error.errors['actionData.actionType'] = new mongoose.Error.ValidatorError({

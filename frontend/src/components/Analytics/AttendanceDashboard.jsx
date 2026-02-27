@@ -146,7 +146,7 @@ function AttendanceDashboard() {
             <PageHeroHeader
                 eyebrow="Workforce Insights"
                 title="Attendance Analytics"
-                description="Comprehensive workforce attendance metrics and employee performance insights"
+                description="Workforce attendance metrics and performance insights."
                 actionArea={
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                         <TextField
@@ -215,7 +215,7 @@ function AttendanceDashboard() {
                 }
             />
             
-            <Box sx={{ py: 0, px: 3, maxWidth: '100%' }}>
+            <Box sx={{ py: 0, px: 0, maxWidth: '100%' }}>
                 {showFilters && (
                     <FilterControls filters={filters} onFilterChange={handleFilterChange} />
                 )}

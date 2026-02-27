@@ -604,7 +604,7 @@ const AdminDashboardPage = () => {
             <PageHeroHeader
                 eyebrow="Overview"
                 title="Admin Dashboard"
-                description="Monitor employee attendance, manage leave requests, and track real-time activity across your organization."
+                description="Monitor attendance, leave requests, and real-time activity."
                 icon={<DashboardIcon />}
             />
             

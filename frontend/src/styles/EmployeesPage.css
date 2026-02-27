@@ -1,7 +1,7 @@
 /* frontend/src/styles/EmployeesPage.css */
 
 .employees-page {
-    padding: 24px;
+    padding: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -172,4 +172,136 @@
 }
 .employees-page .error-alert {
     margin-bottom: 24px;
+}
+
+
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE — EmployeesPage
+   Desktop unchanged. All rules below use max-width.
+═══════════════════════════════════════════ */
+
+/* ─── Tablet: header controls wrap ──────────── */
+@media (max-width: 900px) {
+  .employees-page {
+    padding: 16px !important;
+  }
+
+  /* Header pill: stack on tablet */
+  .employees-page .page-header-pill {
+    border-radius: 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 14px 16px !important;
+  }
+
+  .employees-page .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .employees-page .add-button {
+    flex: 1 !important;
+  }
+}
+
+/* ─── Mobile: table → card layout ───────────── */
+@media (max-width: 768px) {
+  /* Hide the header row of the custom div-grid table */
+  .employee-grid-header {
+    display: none !important;
+  }
+
+  /* Reset the grid on the body rows — each row becomes a card */
+  .employee-grid-body {
+    padding: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    overflow-y: auto !important;
+  }
+
+  .employee-grid-row {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: unset !important;
+    border: 1px solid #e9ecef !important;
+    border-radius: 12px !important;
+    padding: 14px !important;
+    margin: 0 !important;
+    border-bottom: 1px solid #e9ecef !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    gap: 0 !important;
+  }
+
+  .employee-grid-row:hover {
+    background-color: #f8f9fa;
+  }
+
+  /* Each cell: label on the left, value on the right */
+  .grid-cell {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px solid #f1f3f5 !important;
+    font-size: 0.875rem !important;
+    overflow: visible !important;
+  }
+
+  .grid-cell:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Label from data-label attribute */
+  .grid-cell::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+
+  /* Employee name cell: override the flex-row layout from data-label */
+  .grid-cell.fullName {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+
+  .grid-cell.fullName::before {
+    display: none; /* avatar+name shown differently */
+  }
+
+  /* Actions cell: buttons row, full width */
+  .grid-cell.actions {
+    justify-content: flex-end !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    padding-top: 10px !important;
+    border-bottom: none !important;
+  }
+
+  .grid-cell.actions::before {
+    display: none; /* No label for actions */
+  }
+
+  /* Serial number: hide on mobile */
+  .grid-cell.serial-number {
+    display: none !important;
+  }
+
+  .grid-cell.isActive {
+    justify-content: space-between !important;
+  }
+}
+
+/* ─── Small phones ─────────────────────────── */
+@media (max-width: 480px) {
+  .employees-page {
+    padding: 10px !important;
+  }
 }

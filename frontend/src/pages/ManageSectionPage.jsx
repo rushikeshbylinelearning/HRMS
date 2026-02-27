@@ -1,5 +1,6 @@
 // frontend/src/pages/ManageSectionPage.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import TeamsNotificationModal from '../components/TeamsAttendanceNotificationSettings';
 import { Box, Typography, Card, CardContent, Switch, FormControl, InputLabel, Select, MenuItem, TextField, Button, Chip, Grid, Paper, Divider, Alert, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Avatar, Stack, InputAdornment, FormControlLabel, Checkbox, Menu } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -19,7 +20,8 @@ import {
   PeopleAlt as PeopleAltIcon,
   Insights as InsightsIcon,
   MoreVert as MoreVertIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  NotificationsActive as NotificationsActiveIcon
 } from '@mui/icons-material';
 import api from '../api/axios';
 import '../styles/ManageSectionPage.css';
@@ -113,6 +115,7 @@ const ManageSectionPage = () => {
   const [enforceLogoutDialog, setEnforceLogoutDialog] = useState({ open: false, enabled: false });
   const [updatingEnforceLogout, setUpdatingEnforceLogout] = useState(false);
   const [earlyCheckoutApprovalDialog, setEarlyCheckoutApprovalDialog] = useState({ open: false, enabled: false });
+  const [teamsNotifModal, setTeamsNotifModal] = useState(false);
   const [updatingEarlyCheckoutApproval, setUpdatingEarlyCheckoutApproval] = useState(false);
 
   // Fetch all users with their permissions
@@ -1603,13 +1606,19 @@ const privilegeOptions = useMemo(() => {
               onClick={(e) => setMenuAnchor(e.currentTarget)}
               sx={{
                 background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-                borderRadius: '25px',
-                padding: '8px',
+                borderRadius: '50%',
+                width: 44,
+                height: 44,
                 color: 'white',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
+                boxShadow: '0 4px 14px rgba(229, 57, 53, 0.35)',
+                transition: 'all 0.2s ease',
                 '&:hover': {
                   background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)',
-                  boxShadow: '0 6px 16px rgba(229, 57, 53, 0.4)',
+                  boxShadow: '0 6px 18px rgba(229, 57, 53, 0.45)',
+                  transform: 'scale(1.05)',
+                },
+                '&:active': {
+                  transform: 'scale(0.98)',
                 }
               }}
             >
@@ -1627,6 +1636,41 @@ const privilegeOptions = useMemo(() => {
                 vertical: 'top',
                 horizontal: 'right',
               }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: '#FFFFFF',
+                    borderRadius: '16px',
+                    boxShadow: '0 12px 48px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.08)',
+                    border: '1px solid #EFEFEF',
+                    mt: 1,
+                    minWidth: 280,
+                    overflow: 'visible',
+                    '&::before': {
+                      content: '""',
+                      display: 'block',
+                      position: 'absolute',
+                      top: -8,
+                      right: 20,
+                      width: 16,
+                      height: 16,
+                      bgcolor: '#FFFFFF',
+                      transform: 'rotate(45deg)',
+                      borderLeft: '1px solid #EFEFEF',
+                      borderTop: '1px solid #EFEFEF',
+                      zIndex: 0,
+                    },
+                  },
+                },
+              }}
+              TransitionProps={{
+                timeout: 200,
+              }}
+              sx={{
+                '& .MuiList-root': {
+                  py: 1.5,
+                },
+              }}
             >
               <MenuItem
                 onClick={() => {
@@ -1636,12 +1680,41 @@ const privilegeOptions = useMemo(() => {
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1,
-                  padding: '10px 20px'
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.5,
+                  mx: 1,
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: '#F7F7F9',
+                    transform: 'translateX(2px)',
+                  },
                 }}
               >
-                <GroupIcon sx={{ color: '#e53935' }} />
-                Bulk Update
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: '#F0F0F2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <GroupIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    color: '#1F1F1F',
+                  }}
+                >
+                  Bulk Update
+                </Typography>
               </MenuItem>
               <MenuItem
                 onClick={() => {
@@ -1651,36 +1724,168 @@ const privilegeOptions = useMemo(() => {
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1,
-                  padding: '10px 20px'
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.5,
+                  mx: 1,
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: '#F7F7F9',
+                    transform: 'translateX(2px)',
+                  },
                 }}
               >
-                <AccessTimeIcon sx={{ color: '#e53935' }} />
-                Update Grace Period ({gracePeriodMinutes} min)
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(229,57,53,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AccessTimeIcon sx={{ fontSize: 18, color: '#e53935' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    color: '#1F1F1F',
+                  }}
+                >
+                  Update Grace Period ({gracePeriodMinutes} min)
+                </Typography>
               </MenuItem>
               <MenuItem
                 onClick={openEnforceLogoutDialog}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1,
-                  padding: '10px 20px'
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.5,
+                  mx: 1,
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: '#F7F7F9',
+                    transform: 'translateX(2px)',
+                  },
                 }}
               >
-                <ScheduleIcon sx={{ color: '#e53935' }} />
-                Enforce Required Logout Before Checkout
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(229,57,53,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ScheduleIcon sx={{ fontSize: 18, color: '#e53935' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    color: '#1F1F1F',
+                  }}
+                >
+                  Enforce Required Logout Before Checkout
+                </Typography>
               </MenuItem>
               <MenuItem
                 onClick={openEarlyCheckoutApprovalDialog}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1,
-                  padding: '10px 20px'
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.5,
+                  mx: 1,
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: '#F7F7F9',
+                    transform: 'translateX(2px)',
+                  },
                 }}
               >
-                <ScheduleIcon sx={{ color: '#ed6c02' }} />
-                Require Admin Approval for Early Checkout
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(237,108,2,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ScheduleIcon sx={{ fontSize: 18, color: '#ed6c02' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    color: '#1F1F1F',
+                  }}
+                >
+                  Require Admin Approval for Early Checkout
+                </Typography>
+              </MenuItem>
+              <Divider sx={{ my: 1.5, mx: 2, borderColor: '#EFEFEF' }} />
+              <MenuItem
+                onClick={() => {
+                  setTeamsNotifModal(true);
+                  setMenuAnchor(null);
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.5,
+                  mx: 1,
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: '#F7F7F9',
+                    transform: 'translateX(2px)',
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(0,120,212,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <NotificationsActiveIcon sx={{ fontSize: 18, color: '#0078d4' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    color: '#1F1F1F',
+                  }}
+                >
+                  Teams Notification Settings
+                </Typography>
               </MenuItem>
             </Menu>
           </Stack>
@@ -1876,6 +2081,7 @@ const privilegeOptions = useMemo(() => {
         ))}
       </div>
 
+
       {/* User Management Modal */}
       <Dialog 
         open={userModal.open} 
@@ -2030,77 +2236,113 @@ const privilegeOptions = useMemo(() => {
         </DialogActions>
       </Dialog>
 
-      {/* Bulk Operations Dialog */}
+      {/* Bulk Operations Dialog - Premium UI */}
       <Dialog 
         open={bulkDialog.open} 
         onClose={() => setBulkDialog({ open: false, selectedUsers: [], applyToAll: false })} 
         maxWidth="md" 
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.2)',
-            overflow: 'hidden'
-          }
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '20px',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)',
+              overflow: 'hidden',
+              bgcolor: '#FFFFFF',
+            },
+          },
+        }}
+        TransitionProps={{
+          timeout: 250,
         }}
       >
-        {/* Custom Header with Red Background */}
+        {/* Premium Header with Minimal Red */}
         <Box 
           sx={{ 
-            background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-            color: 'white',
-            padding: '20px 24px',
+            bgcolor: '#FFFFFF',
+            borderTop: '4px solid #e53935',
+            padding: '24px 32px',
             display: 'flex',
             alignItems: 'center',
-            gap: 2,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            gap: 2.5,
           }}
         >
-          <GroupIcon sx={{ fontSize: 28 }} />
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, margin: 0 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              bgcolor: 'rgba(229,57,53,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(229,57,53,0.15)',
+            }}
+          >
+            <GroupIcon sx={{ fontSize: 26, color: '#e53935' }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, margin: 0, color: '#1a1a2e', fontSize: '1.375rem', lineHeight: 1.3 }}>
               {bulkDialog.applyToAll ? 'Apply Settings to All Users' : 'Apply Settings to Selected Users'}
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9, margin: 0 }}>
+            <Typography variant="body2" sx={{ color: '#6B7280', margin: 0, mt: 0.5, fontSize: '0.875rem' }}>
               Configure permissions for multiple users at once
             </Typography>
           </Box>
         </Box>
 
-        <DialogContent sx={{ padding: 0, backgroundColor: '#f8f9fa' }}>
-          <Box sx={{ padding: '24px' }}>
-            {/* User Selection Section */}
+        <DialogContent sx={{ padding: 0, backgroundColor: '#F7F7F9' }}>
+          <Box sx={{ padding: '32px' }}>
+            {/* User Selection Card */}
             <Paper 
               elevation={0} 
               sx={{ 
                 p: 3,
-                borderRadius: '12px',
-                border: '1px solid #e0e0e0',
-                backgroundColor: 'white',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                mb: 3
+                borderRadius: '16px',
+                border: '1px solid #EFEFEF',
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                mb: 3.5,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                },
               }}
             >
-              <Typography 
-                variant="h6" 
-                gutterBottom 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  color: '#e53935',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #e53935',
-                  paddingBottom: 1,
-                  marginBottom: 2
-                }}
-              >
-                <GroupIcon sx={{ color: '#e53935' }} />
-                Select Users
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(229,57,53,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <GroupIcon sx={{ fontSize: 18, color: '#e53935' }} />
+                </Box>
+                <Typography 
+                  variant="overline" 
+                  sx={{ 
+                    color: '#e53935',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    letterSpacing: 1.5,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Select Users
+                </Typography>
+              </Box>
               
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: '#F7F7F9', borderRadius: '12px' }}>
+                  <Typography variant="body1" sx={{ fontWeight: 500, color: '#1a1a2e', fontSize: '0.9375rem' }}>
+                    Apply to all users
+                  </Typography>
                   <Switch
                     checked={bulkDialog.applyToAll}
                     onChange={(e) => setBulkDialog(prev => ({ 
@@ -2108,16 +2350,44 @@ const privilegeOptions = useMemo(() => {
                       applyToAll: e.target.checked,
                       selectedUsers: e.target.checked ? [] : prev.selectedUsers
                     }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
                   />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    Apply to all users
-                  </Typography>
                 </Box>
                 
                 {!bulkDialog.applyToAll && (
                   <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
                         Select specific users to apply these settings to:
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -2132,8 +2402,17 @@ const privilegeOptions = useMemo(() => {
                           }}
                           sx={{ 
                             textTransform: 'none',
-                            fontSize: '0.75rem',
-                            padding: '4px 8px'
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            px: 2,
+                            py: 0.75,
+                            borderRadius: '20px',
+                            borderColor: '#e53935',
+                            color: '#e53935',
+                            '&:hover': {
+                              borderColor: '#d32f2f',
+                              bgcolor: 'rgba(229,57,53,0.04)',
+                            },
                           }}
                         >
                           Select All
@@ -2149,17 +2428,77 @@ const privilegeOptions = useMemo(() => {
                           }}
                           sx={{ 
                             textTransform: 'none',
-                            fontSize: '0.75rem',
-                            padding: '4px 8px'
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            px: 2,
+                            py: 0.75,
+                            borderRadius: '20px',
+                            borderColor: '#e53935',
+                            color: '#e53935',
+                            '&:hover': {
+                              borderColor: '#d32f2f',
+                              bgcolor: 'rgba(229,57,53,0.04)',
+                            },
                           }}
                         >
                           Deselect All
                         </Button>
                       </Box>
                     </Box>
-                    <Box sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
+                    <Box sx={{ 
+                      maxHeight: 220, 
+                      overflowY: 'auto', 
+                      border: '1px solid #EFEFEF', 
+                      borderRadius: '12px', 
+                      bgcolor: '#FFFFFF',
+                      '&::-webkit-scrollbar': {
+                        width: '8px',
+                      },
+                      '&::-webkit-scrollbar-track': {
+                        bgcolor: '#F7F7F9',
+                        borderRadius: '12px',
+                      },
+                      '&::-webkit-scrollbar-thumb': {
+                        bgcolor: '#D1D5DB',
+                        borderRadius: '12px',
+                        '&:hover': {
+                          bgcolor: '#9CA3AF',
+                        },
+                      },
+                    }}>
                       {users.map((user) => (
-                        <Box key={user._id} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                        <Box 
+                          key={user._id} 
+                          sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1.5, 
+                            p: 1.5,
+                            mx: 1,
+                            my: 0.5,
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            bgcolor: bulkDialog.selectedUsers.includes(user._id) ? 'rgba(229,57,53,0.04)' : 'transparent',
+                            '&:hover': {
+                              bgcolor: bulkDialog.selectedUsers.includes(user._id) ? 'rgba(229,57,53,0.08)' : '#F7F7F9',
+                            },
+                          }}
+                          onClick={() => {
+                            const isSelected = bulkDialog.selectedUsers.includes(user._id);
+                            if (isSelected) {
+                              setBulkDialog(prev => ({
+                                ...prev,
+                                selectedUsers: prev.selectedUsers.filter(id => id !== user._id)
+                              }));
+                            } else {
+                              setBulkDialog(prev => ({
+                                ...prev,
+                                selectedUsers: [...prev.selectedUsers, user._id]
+                              }));
+                            }
+                          }}
+                        >
                           <Checkbox
                             checked={bulkDialog.selectedUsers.includes(user._id)}
                             onChange={(e) => {
@@ -2177,32 +2516,22 @@ const privilegeOptions = useMemo(() => {
                             }}
                             size="small"
                             sx={{ 
-                              color: '#e53935',
+                              color: '#D1D5DB',
                               '&.Mui-checked': {
                                 color: '#e53935',
-                              }
+                              },
+                              '& .MuiSvgIcon-root': {
+                                borderRadius: '4px',
+                              },
                             }}
                           />
-                          <Typography variant="body2" sx={{ cursor: 'pointer', flex: 1 }} onClick={() => {
-                            const isSelected = bulkDialog.selectedUsers.includes(user._id);
-                            if (isSelected) {
-                              setBulkDialog(prev => ({
-                                ...prev,
-                                selectedUsers: prev.selectedUsers.filter(id => id !== user._id)
-                              }));
-                            } else {
-                              setBulkDialog(prev => ({
-                                ...prev,
-                                selectedUsers: [...prev.selectedUsers, user._id]
-                              }));
-                            }
-                          }}>
-                            {user.fullName} ({user.employeeCode})
+                          <Typography variant="body2" sx={{ flex: 1, fontSize: '0.875rem', color: '#1a1a2e', fontWeight: 500 }}>
+                            {user.fullName} <Typography component="span" sx={{ color: '#6B7280', fontSize: '0.8125rem' }}>({user.employeeCode})</Typography>
                           </Typography>
                         </Box>
                       ))}
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    <Typography variant="caption" sx={{ mt: 1.5, display: 'block', color: '#6B7280', fontSize: '0.75rem', fontWeight: 500 }}>
                       {bulkDialog.selectedUsers.length} user(s) selected
                     </Typography>
                   </Box>
@@ -2460,129 +2789,315 @@ const privilegeOptions = useMemo(() => {
             </Button>
             </Paper>
 
-            {/* UI Controls */}
+            {/* UI Controls Card */}
             <Paper 
               elevation={0} 
               sx={{ 
                 p: 3,
-                borderRadius: '12px',
-                border: '1px solid #e0e0e0',
-                backgroundColor: 'white',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                mb: 3
+                borderRadius: '16px',
+                border: '1px solid #EFEFEF',
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                mb: 3.5,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                },
               }}
             >
-              <Typography 
-                variant="h6" 
-                gutterBottom 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  color: '#e53935',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #e53935',
-                  paddingBottom: 1,
-                  marginBottom: 2
-                }}
-              >
-                <SettingsIcon sx={{ color: '#e53935' }} />
-                UI Controls
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(229,57,53,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <SettingsIcon sx={{ fontSize: 18, color: '#e53935' }} />
+                </Box>
+                <Typography 
+                  variant="overline" 
+                  sx={{ 
+                    color: '#e53935',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    letterSpacing: 1.5,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  UI Controls
+                </Typography>
+              </Box>
               
-              <Grid container spacing={2}>
+              <Grid container spacing={2.5}>
                 <Grid xs={4}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can Check In</Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 2,
+                    bgcolor: '#F7F7F9',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: '#EFEFEF',
+                    },
+                  }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a2e', fontSize: '0.875rem', mb: 1.5, textAlign: 'center' }}>Can Check In</Typography>
                     <Switch
                       checked={bulkSettings.featurePermissions.canCheckIn}
                       onChange={(e) => setBulkSettings(prev => ({
                         ...prev,
                         featurePermissions: { ...prev.featurePermissions, canCheckIn: e.target.checked }
                       }))}
+                      sx={{
+                        width: 52,
+                        height: 28,
+                        padding: 0,
+                        '& .MuiSwitch-switchBase': {
+                          padding: 0,
+                          margin: '2px',
+                          transitionDuration: '300ms',
+                          '&.Mui-checked': {
+                            transform: 'translateX(24px)',
+                            color: '#fff',
+                            '& + .MuiSwitch-track': {
+                              backgroundColor: '#e53935',
+                              opacity: 1,
+                              border: 0,
+                            },
+                          },
+                        },
+                        '& .MuiSwitch-thumb': {
+                          boxSizing: 'border-box',
+                          width: 24,
+                          height: 24,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        },
+                        '& .MuiSwitch-track': {
+                          borderRadius: 14,
+                          backgroundColor: '#D1D5DB',
+                          opacity: 1,
+                          transition: 'background-color 300ms ease',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 <Grid xs={4}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can Check Out</Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 2,
+                    bgcolor: '#F7F7F9',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: '#EFEFEF',
+                    },
+                  }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a2e', fontSize: '0.875rem', mb: 1.5, textAlign: 'center' }}>Can Check Out</Typography>
                     <Switch
                       checked={bulkSettings.featurePermissions.canCheckOut}
                       onChange={(e) => setBulkSettings(prev => ({
                         ...prev,
                         featurePermissions: { ...prev.featurePermissions, canCheckOut: e.target.checked }
                       }))}
+                      sx={{
+                        width: 52,
+                        height: 28,
+                        padding: 0,
+                        '& .MuiSwitch-switchBase': {
+                          padding: 0,
+                          margin: '2px',
+                          transitionDuration: '300ms',
+                          '&.Mui-checked': {
+                            transform: 'translateX(24px)',
+                            color: '#fff',
+                            '& + .MuiSwitch-track': {
+                              backgroundColor: '#e53935',
+                              opacity: 1,
+                              border: 0,
+                            },
+                          },
+                        },
+                        '& .MuiSwitch-thumb': {
+                          boxSizing: 'border-box',
+                          width: 24,
+                          height: 24,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        },
+                        '& .MuiSwitch-track': {
+                          borderRadius: 14,
+                          backgroundColor: '#D1D5DB',
+                          opacity: 1,
+                          transition: 'background-color 300ms ease',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
                 <Grid xs={4}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Can Take Break</Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 2,
+                    bgcolor: '#F7F7F9',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: '#EFEFEF',
+                    },
+                  }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a2e', fontSize: '0.875rem', mb: 1.5, textAlign: 'center' }}>Can Take Break</Typography>
                     <Switch
                       checked={bulkSettings.featurePermissions.canTakeBreak}
                       onChange={(e) => setBulkSettings(prev => ({
                         ...prev,
                         featurePermissions: { ...prev.featurePermissions, canTakeBreak: e.target.checked }
                       }))}
+                      sx={{
+                        width: 52,
+                        height: 28,
+                        padding: 0,
+                        '& .MuiSwitch-switchBase': {
+                          padding: 0,
+                          margin: '2px',
+                          transitionDuration: '300ms',
+                          '&.Mui-checked': {
+                            transform: 'translateX(24px)',
+                            color: '#fff',
+                            '& + .MuiSwitch-track': {
+                              backgroundColor: '#e53935',
+                              opacity: 1,
+                              border: 0,
+                            },
+                          },
+                        },
+                        '& .MuiSwitch-thumb': {
+                          boxSizing: 'border-box',
+                          width: 24,
+                          height: 24,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        },
+                        '& .MuiSwitch-track': {
+                          borderRadius: 14,
+                          backgroundColor: '#D1D5DB',
+                          opacity: 1,
+                          transition: 'background-color 300ms ease',
+                        },
+                      }}
                     />
                   </Box>
                 </Grid>
               </Grid>
               
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid xs={12}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        Can View Analytics
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Access to analytics dashboard and reports
-                      </Typography>
-                    </Box>
-                    <Switch
-                      checked={bulkSettings.featurePermissions.canViewAnalytics}
-                      onChange={(e) => setBulkSettings(prev => ({
-                        ...prev,
-                        featurePermissions: { ...prev.featurePermissions, canViewAnalytics: e.target.checked }
-                      }))}
-                    />
+              <Box sx={{ mt: 2.5, p: 2.5, bgcolor: '#F7F7F9', borderRadius: '12px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.875rem' }}>
+                      Can View Analytics
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem', mt: 0.3, display: 'block' }}>
+                      Access to analytics dashboard and reports
+                    </Typography>
                   </Box>
-                </Grid>
-              </Grid>
+                  <Switch
+                    checked={bulkSettings.featurePermissions.canViewAnalytics}
+                    onChange={(e) => setBulkSettings(prev => ({
+                      ...prev,
+                      featurePermissions: { ...prev.featurePermissions, canViewAnalytics: e.target.checked }
+                    }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
             </Paper>
 
-            {/* Privilege Level */}
+            {/* Privilege Level Card */}
             <Paper 
               elevation={0} 
               sx={{ 
                 p: 3,
-                borderRadius: '12px',
-                border: '1px solid #e0e0e0',
-                backgroundColor: 'white',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                mb: 3
+                borderRadius: '16px',
+                border: '1px solid #EFEFEF',
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                mb: 3.5,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                },
               }}
             >
-              <Typography 
-                variant="h6" 
-                gutterBottom 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  color: '#e53935',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #e53935',
-                  paddingBottom: 1,
-                  marginBottom: 2
-                }}
-              >
-                <SecurityIcon sx={{ color: '#e53935' }} />
-                Privilege Level
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(229,57,53,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <SecurityIcon sx={{ fontSize: 18, color: '#e53935' }} />
+                </Box>
+                <Typography 
+                  variant="overline" 
+                  sx={{ 
+                    color: '#e53935',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    letterSpacing: 1.5,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Privilege Level
+                </Typography>
+              </Box>
               
-              <FormControl fullWidth size="small">
+              <FormControl fullWidth>
                 <InputLabel>Privilege Level</InputLabel>
                 <Select
                   value={bulkSettings.featurePermissions.privilegeLevel}
@@ -2591,6 +3106,21 @@ const privilegeOptions = useMemo(() => {
                     featurePermissions: { ...prev.featurePermissions, privilegeLevel: e.target.value }
                   }))}
                   label="Privilege Level"
+                  sx={{
+                    borderRadius: '12px',
+                    bgcolor: '#F7F7F9',
+                    '& fieldset': {
+                      borderColor: '#EFEFEF',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#e53935',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#e53935',
+                      borderWidth: '2px',
+                      boxShadow: '0 0 0 3px rgba(229,57,53,0.08)',
+                    },
+                  }}
                 >
                   <MenuItem value="restricted">Restricted</MenuItem>
                   <MenuItem value="normal">Normal</MenuItem>
@@ -2783,29 +3313,44 @@ const privilegeOptions = useMemo(() => {
         </DialogContent>
 
         <DialogActions sx={{ 
-          padding: '20px 24px', 
-          backgroundColor: 'white',
-          borderTop: '1px solid #e0e0e0',
+          padding: '24px 32px', 
+          backgroundColor: '#FFFFFF',
+          borderTop: '1px solid #EFEFEF',
           gap: 2,
           flexDirection: 'column',
           alignItems: 'stretch'
         }}>
           {(!bulkDialog.applyToAll && bulkDialog.selectedUsers.length === 0) && (
-            <Alert severity="info" sx={{ mb: 1 }}>
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mb: 1,
+                borderRadius: '12px',
+                bgcolor: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                '& .MuiAlert-icon': {
+                  color: '#3B82F6',
+                },
+              }}
+            >
               Please select at least one user or enable "Apply to all users" to proceed.
             </Alert>
           )}
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
             <Button 
               onClick={() => setBulkDialog({ open: false, selectedUsers: [], applyToAll: false })}
-              variant="outlined"
               sx={{ 
-                borderColor: '#bdbdbd',
-                color: '#757575',
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                px: 3,
+                py: 1.25,
+                color: '#6B7280',
                 '&:hover': {
-                  borderColor: '#9e9e9e',
-                  backgroundColor: '#f5f5f5'
-                }
+                  bgcolor: '#F7F7F9',
+                  color: '#1a1a2e',
+                },
+                transition: 'all 0.2s ease',
               }}
             >
               Cancel
@@ -2815,21 +3360,26 @@ const privilegeOptions = useMemo(() => {
               onClick={applyBulkSettings}
               disabled={saving.bulk || (!bulkDialog.applyToAll && bulkDialog.selectedUsers.length === 0)}
               sx={{
-                background: 'linear-gradient(135deg, #e53935 0%, #d32f2f 100%)',
-                borderRadius: '25px',
-                padding: '8px 24px',
-                fontWeight: 600,
+                bgcolor: '#e53935',
+                color: 'white',
                 textTransform: 'none',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                px: 4,
+                py: 1.25,
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(229,57,53,0.25)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)',
-                  boxShadow: '0 6px 16px rgba(229, 57, 53, 0.4)',
+                  bgcolor: '#d32f2f',
+                  boxShadow: '0 6px 16px rgba(229,57,53,0.35)',
+                  transform: 'translateY(-1px)',
                 },
                 '&:disabled': {
-                  background: '#bdbdbd',
+                  bgcolor: '#D1D5DB',
+                  color: '#9CA3AF',
                   boxShadow: 'none',
-                  cursor: 'not-allowed'
-                }
+                },
+                transition: 'all 0.2s ease',
               }}
             >
               {saving.bulk ? 'Applying...' : 'Apply Settings'}
@@ -2940,6 +3490,10 @@ const privilegeOptions = useMemo(() => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Teams Notification Modal */}
+      <TeamsNotificationModal open={teamsNotifModal} onClose={() => setTeamsNotifModal(false)} />
+
     </div>
   );
 };

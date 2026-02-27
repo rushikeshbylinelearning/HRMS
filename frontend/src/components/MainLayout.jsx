@@ -14,6 +14,7 @@ import '../styles/MainLayout.css';
 
 const MainLayout = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [ecrModal, setEcrModal] = useState({ open: false, requestId: null });
     const [toast, setToast] = useState({ open: false, message: '' });
     const location = useLocation();
@@ -45,8 +46,8 @@ const MainLayout = () => {
                 }
             });
         } else if (mainContentRef.current) {
-            // New page - scroll to top smoothly
-            mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            // New page - scroll to top instantly
+            mainContentRef.current.scrollTo({ top: 0, behavior: 'instant' });
         }
     }, [location.pathname]);
 
@@ -57,6 +58,10 @@ const MainLayout = () => {
     const handleDrawerClose = () => {
         setIsDrawerOpen(false);
     };
+
+    const handleHamburgerClick = () => setIsMobileSidebarOpen(prev => !prev);
+    
+    const handleOverlayClick = () => setIsMobileSidebarOpen(false);
 
     const handleOpenECRModal = useCallback((requestId) => {
         setEcrModal({ open: true, requestId });
@@ -77,8 +82,21 @@ const MainLayout = () => {
 
     return (
         <div className="app-container">
-            <Topbar onNotificationClick={handleNotificationIconClick} />
-            <Sidebar onNotificationClick={handleNotificationIconClick} />
+            <Topbar 
+                onNotificationClick={handleNotificationIconClick}
+                onHamburgerClick={handleHamburgerClick}
+            />
+            <Sidebar 
+                onNotificationClick={handleNotificationIconClick}
+                isMobileOpen={isMobileSidebarOpen}
+                onClose={() => setIsMobileSidebarOpen(false)}
+            />
+            
+            <div
+                className={`mobile-sidebar-overlay ${isMobileSidebarOpen ? 'active' : ''}`}
+                onClick={handleOverlayClick}
+                aria-hidden="true"
+            />
             
             <main className="main-content" ref={mainContentRef}>
                 <PageTransition>

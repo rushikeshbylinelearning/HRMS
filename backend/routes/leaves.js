@@ -268,12 +268,15 @@ router.post('/request', authenticateToken, async (req, res) => {
         const finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
         let leaveDatesArray = dateNorm.dateStrings.map(d => parseISTDate(d));
         
-        // Apply Saturday clubbing for Planned Leave (Paid Leave) - this should match what was done in validation
+        // Apply Saturday clubbing for Planned Leave (Paid Leave) only.
+        // Saturday is only clubbed when advance notice ≥ 30 days is met.
+        // Casual, Sick, and LOP are never eligible for Saturday clubbing.
         if (finalRequestType === 'Planned') {
             const clubbedDates = LeavePolicyService.clubSaturdayInLeaveDates(
                 employee,
                 leaveDatesArray,
-                finalRequestType
+                finalRequestType,
+                new Date()   // appliedDate = today (employee-apply flow)
             );
             // Convert clubbed date strings back to Date objects
             leaveDatesArray = clubbedDates.map(d => parseISTDate(d));

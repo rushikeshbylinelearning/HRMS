@@ -1,66 +1,18 @@
 /* Employee Leaves Tracker - Full-Width Layout */
 
 .leaves-tracker-container {
-  max-width: 1600px;
+  max-width: 100%;
   width: 100%;
   margin: 0;
-  margin-left: auto;
-  padding: 1.5rem 2rem;
+  padding: 0;
   background-color: #f5f5f5;
   min-height: 100vh;
 }
 
-.leaves-tracker-breadcrumb {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.leaves-tracker-breadcrumb a {
-  color: #666;
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-.leaves-tracker-breadcrumb a:hover {
-  color: #dc3545;
-}
-
-.leaves-tracker-breadcrumb span {
-  color: #333;
-  font-weight: 500;
-}
-
-.leaves-tracker-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.leaves-tracker-header-left h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: #000;
-  margin: 0 0 4px 0;
-}
-
-.leaves-tracker-header-left p {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.leaves-tracker-header-right {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+/* Removed: .leaves-tracker-breadcrumb - replaced by PageHeroHeader */
+/* Removed: .leaves-tracker-header - replaced by PageHeroHeader */
+/* Removed: .leaves-tracker-header-left - replaced by PageHeroHeader */
+/* Removed: .leaves-tracker-header-right - replaced by PageHeroHeader */
 
 .leaves-tracker-summary-cards {
   display: grid;

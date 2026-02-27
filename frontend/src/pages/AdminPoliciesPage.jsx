@@ -162,10 +162,10 @@ const AdminPoliciesPage = () => {
             <PageHeroHeader
                 eyebrow="Operations Control"
                 title="Policies Management"
-                description="Upload, manage, and version control company policies"
+                description="Upload and manage company policies."
             />
             
-            <Box sx={{ py: 0, px: 3, maxWidth: '100%' }}>
+            <Box sx={{ py: 0, px: 0, maxWidth: '100%' }}>
                 {/* Two Column Grid Layout */}
                 <Box sx={{ 
                     display: 'grid', 

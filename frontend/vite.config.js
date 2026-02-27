@@ -19,43 +19,23 @@ export default defineConfig({
           res.removeHeader('X-Frame-Options');
           
           // Set CSP frame-ancestors for HTML responses
-    //       if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
-    //         const allowedOrigins = process.env.NODE_ENV === 'development' 
-    //           ? "http://localhost:5173 http://localhost:5174 http://localhost:5175 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:5175"
-    //           : "https://sso.bylinelms.com https://attendance-test.bylinelms.com";
+          if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
+            const allowedOrigins = process.env.NODE_ENV === 'development' 
+              ? "http://localhost:5173"
+              : "https://attendance-test.bylinelms.com";
             
-    //         const existingCSP = res.getHeader('Content-Security-Policy') || '';
-    //         if (existingCSP && !existingCSP.includes('frame-ancestors')) {
-    //           res.setHeader('Content-Security-Policy', `${existingCSP}; frame-ancestors ${allowedOrigins};`);
-    //         } else if (!existingCSP) {
-    //           res.setHeader('Content-Security-Policy', `frame-ancestors ${allowedOrigins};`);
-    //         }
-    //       }
+            const existingCSP = res.getHeader('Content-Security-Policy') || '';
+            if (existingCSP && !existingCSP.includes('frame-ancestors')) {
+              res.setHeader('Content-Security-Policy', `${existingCSP}; frame-ancestors ${allowedOrigins};`);
+            } else if (!existingCSP) {
+              res.setHeader('Content-Security-Policy', `frame-ancestors ${allowedOrigins};`);
+            }
+          }
           
-    //       next();
-    //     });
-    //   },
-    // },
-
-
-
-    if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
-      const allowedOrigins = process.env.NODE_ENV === 'development' 
-        ? "http://localhost:5173"
-        : "https://attendance-test.bylinelms.com";
-      
-      const existingCSP = res.getHeader('Content-Security-Policy') || '';
-      if (existingCSP && !existingCSP.includes('frame-ancestors')) {
-        res.setHeader('Content-Security-Policy', `${existingCSP}; frame-ancestors ${allowedOrigins};`);
-      } else if (!existingCSP) {
-        res.setHeader('Content-Security-Policy', `frame-ancestors ${allowedOrigins};`);
-      }
-    }
-    
-    next();
-  });
-},
-},
+          next();
+        });
+      },
+    },
 
 
 

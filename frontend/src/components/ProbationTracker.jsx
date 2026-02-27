@@ -751,8 +751,11 @@ const ProbationTracker = () => {
                                 <Info fontSize="inherit" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
                                 Probation end date = Joining date + 6 months + leave extensions + absence extensions
                               </Typography>
+                              <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', mb: 0.5 }}>
+                                Exclusions: {emp.holidaysExcluded || 0} holidays, {emp.weeklyOffsExcluded || 0} weekly offs (Sundays + Saturday policy: {emp.saturdayPolicy || 'N/A'})
+                              </Typography>
                               <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
-                                Exclusions: {emp.holidaysExcluded || 0} holidays, Sundays, and Saturday offs (Policy: {emp.saturdayPolicy || 'N/A'})
+                                Present days: {emp.presentDays || 0} | Policy: Before Jan 30, 2025 (≥8 hrs = full day), After Jan 30, 2025 (≥9 hrs = full day)
                               </Typography>
                             </Box>
                           </Box>

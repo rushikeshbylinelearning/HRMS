@@ -458,7 +458,7 @@ const EmployeesPage = () => {
             <PageHeroHeader
                 eyebrow="People Directory"
                 title="Manage Employees"
-                description="Search, onboard, and keep employee records accurate across shifts and departments."
+                description="Search, onboard, and manage employee records."
                 actionArea={actionArea}
             />
 
@@ -485,18 +485,18 @@ const EmployeesPage = () => {
                     <div className="employee-grid-body">
                         {visibleRows.length > 0 ? visibleRows.map((employee, index) => (
                             <div className="employee-grid-row" key={employee._id}>
-                                <div className="grid-cell serial-number">{page * rowsPerPage + index + 1}</div>
-                                <div className="grid-cell employeeCode">{employee.employeeCode}</div>
-                                <div className="grid-cell fullName">
+                                <div className="grid-cell serial-number" data-label="S.No.">{page * rowsPerPage + index + 1}</div>
+                                <div className="grid-cell employeeCode" data-label="Employee ID">{employee.employeeCode}</div>
+                                <div className="grid-cell fullName" data-label="Name">
                                     <UserAvatar user={employee} size="sm" lazy />
                                     <div className="employee-text-info">
                                         <div className="employee-name">{employee.fullName}</div>
                                         <div className="employee-email">{employee.email}</div>
                                     </div>
                                 </div>
-                                <div className="grid-cell joiningDate">{formatDate(employee.joiningDate)}</div>
-                                <div className="grid-cell role">{employee.role}</div>
-                                <div className="grid-cell isActive">
+                                <div className="grid-cell joiningDate" data-label="Joining Date">{formatDate(employee.joiningDate)}</div>
+                                <div className="grid-cell role" data-label="Role">{employee.role}</div>
+                                <div className="grid-cell isActive" data-label="Status">
                                     <Box display="flex" alignItems="center" gap={1}>
                                         <Switch
                                             checked={!!employee.isActive}
@@ -512,7 +512,7 @@ const EmployeesPage = () => {
                                         )}
                                     </Box>
                                 </div>
-                                <div className="grid-cell actions">
+                                <div className="grid-cell actions" data-label="Actions">
                                     <Tooltip title="View Details">
                                         <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenProfileDialog(employee, 'view'); }}>
                                             <VisibilityOutlinedIcon fontSize="small" />

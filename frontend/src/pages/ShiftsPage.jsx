@@ -250,7 +250,7 @@ const ShiftsPage = () => {
             <PageHeroHeader
                 eyebrow="Scheduling"
                 title="Manage Shifts"
-                description="Create and refine work shifts, track durations, and keep policies aligned with attendance analytics."
+                description="Create and manage work shifts and policies."
                 actionArea={
                     <Button
                         variant="contained"

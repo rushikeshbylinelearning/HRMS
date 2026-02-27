@@ -168,25 +168,25 @@ body, html {
   max-width: 100%;
   width: 100%;
   margin: 0;
-  padding: 0 16px 32px 16px;
+  padding: 0;
 }
 
 @media (max-width: 1400px) {
   .probation-page-layout {
     max-width: 100vw;
     width: 100vw;
-    padding: 0 12px 24px 12px;
+    padding: 0;
   }
 }
 
 @media (max-width: 900px) {
   .probation-page-layout {
-    padding: 0 8px 24px 8px;
+    padding: 0;
   }
 }
 
 @media (max-width: 600px) {
   .probation-page-layout {
-    padding: 0 4px 16px 4px;
+    padding: 0;
   }
 }

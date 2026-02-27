@@ -1,95 +1,87 @@
 // frontend/src/api/axios.js
 import axios from 'axios';
 
-// Create a simple custom event that the AuthContext can listen for.
-// This is a more robust way to handle authentication errors globally.
 const authErrorEvent = new Event('auth-error');
 
-// --- API Configuration ---
-// Use Vite's environment variables for the baseURL
-// If VITE_API_BASE_URL is set, use it. Otherwise use relative path (same domain).
-
-// Debug: Log the environment variable
-console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('NODE_ENV:', import.meta.env.NODE_ENV);
-console.log('MODE:', import.meta.env.MODE);
-
-// Determine baseURL:
-// - Development: Use Vite proxy (/api)
-// - Production: Use VITE_API_BASE_URL if set, otherwise use full URL
-//   CRITICAL: In production, must use full URL: https://attendance-test.bylinelms.com/api
-const baseURL = import.meta.env.DEV 
-  ? '/api' // Use Vite proxy in development
-  : (import.meta.env.VITE_API_BASE_URL 
-      ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api') 
-          ? import.meta.env.VITE_API_BASE_URL 
+// ─── Base URL ────────────────────────────────────────────────────────────────
+const baseURL = import.meta.env.DEV
+  ? '/api'
+  : (import.meta.env.VITE_API_BASE_URL
+      ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api')
+          ? import.meta.env.VITE_API_BASE_URL
           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-      : 'https://attendance-test.bylinelms.com/api'); // Use full URL in production
+      : 'https://attendance-test.bylinelms.com/api');
 
 const api = axios.create({
-  baseURL: baseURL,
-  withCredentials: true, // Enable credentials for cross-origin requests
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL,
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Debug: Log the actual baseURL being used
-console.log('Axios baseURL:', api.defaults.baseURL);
-
-// Auto-restore token on app load (for SSO persistence)
-// Check for ams_token first (SSO preference), then fallback to token
+// ─── Token auto-restore ──────────────────────────────────────────────────────
 const restoreToken = () => {
-  const amsToken = sessionStorage.getItem('ams_token');
-  const token = sessionStorage.getItem('token');
-  const tokenToUse = amsToken || token;
-  
+  const tokenToUse = sessionStorage.getItem('ams_token') || sessionStorage.getItem('token');
   if (tokenToUse) {
     api.defaults.headers.common['Authorization'] = `Bearer ${tokenToUse}`;
-    console.log('[Axios] Token auto-restored from sessionStorage');
-    console.log('[Axios] Token source:', amsToken ? 'ams_token' : 'token');
   }
 };
-
-// Restore token immediately on module load
 restoreToken();
 
-// Request interceptor - ensures Authorization header is always included
+// ─── Request interceptor ─────────────────────────────────────────────────────
+// PERFORMANCE FIX: Adding ?_t=<timestamp> to every GET request defeats the
+// browser's HTTP cache and forces a new network round-trip on every poll
+// cycle.  On A2 Hosting the extra DNS + TCP + TLS cost for cross-origin API
+// calls is significant.
+//
+// Strategy: only bust cache for endpoints that are truly time-sensitive and
+// are NOT already served with short Cache-Control / no-cache headers by the
+// server.  Everything that uses server-side NodeCache or has its own TTL
+// should be exempt so the browser can honour the server's Cache-Control header.
+//
+// Exempt patterns (server already handles freshness):
+//   /attendance/status      – 30 s NodeCache, returns fresh data on clock events
+//   /attendance/summary     – summaries keyed by date
+//   /leaves                 – short TTL cache
+//   /admin/leaves           – short TTL cache
+//   /admin/dashboard*       – 2-min NodeCache
+//   /attendance/dashboard*  – NodeCache
+//   /probation/tracker      – 10-min server cache
+//   /announcements          – 60 s server cache
+//   /analytics              – 5-min analytics cache
+//   /holidays               – rarely changes; long server TTL
+//   /admin/settings         – 30-min settings cache
+//   /new-notifications      – realtime via socket; DB results cached 60 s
+// ─────────────────────────────────────────────────────────────────────────────
+const CACHE_BUST_EXEMPT_PATTERNS = [
+  '/auth/me',            // server-side 5-min userCache; _t only inflates URL and defeats CDN/edge caching
+  '/leaves',
+  '/admin/leaves',
+  '/admin/dashboard',
+  '/attendance/dashboard',
+  '/attendance/status',
+  '/attendance/summary',
+  '/probation/tracker',
+  '/announcements',
+  '/analytics',
+  '/holidays',
+  '/admin/settings',
+  '/new-notifications',
+  '/admin/leave-years',
+];
+
 api.interceptors.request.use(
   (config) => {
-    // Check for token in order: ams_token (SSO) > token
-    const amsToken = sessionStorage.getItem('ams_token');
-    const token = sessionStorage.getItem('token');
-    const tokenToUse = amsToken || token;
-    
+    const tokenToUse = sessionStorage.getItem('ams_token') || sessionStorage.getItem('token');
     if (tokenToUse) {
       config.headers.Authorization = `Bearer ${tokenToUse}`;
-      // Debug logging in development
-      if (import.meta.env.DEV) {
-        console.log('[Axios] Request with token:', {
-          url: config.url,
-          method: config.method,
-          hasToken: !!tokenToUse,
-          tokenPreview: tokenToUse.substring(0, 20) + '...'
-        });
-      }
-    } else {
-      console.warn('[Axios] ⚠️ Request without token:', {
-        url: config.url,
-        method: config.method
-      });
     }
-    
-    // Add timestamp to prevent browser caching of GET requests.
-    // Skip cache-busting for Leaves and Dashboard endpoints so frontend caching can work (stable keys).
-    const isExemptFromCacheBust = config.method?.toUpperCase() === 'GET' && config.url && (
-      config.url.includes('/leaves') ||
-      config.url.includes('/admin/leaves') ||
-      config.url.includes('/admin/dashboard-summary') ||
-      config.url.includes('/admin/dashboard-pending-leaves') ||
-      config.url.includes('/attendance/dashboard/employee')
-    );
-    if (config.method?.toUpperCase() === 'GET' && !config.params?._t && !isExemptFromCacheBust) {
+
+    // Add cache-buster only where strictly needed
+    const isGet = config.method?.toUpperCase() === 'GET';
+    const url = config.url || '';
+    const isExempt = CACHE_BUST_EXEMPT_PATTERNS.some(pattern => url.includes(pattern));
+
+    if (isGet && !config.params?._t && !isExempt) {
       config.params = { ...config.params, _t: Date.now() };
     }
 
@@ -98,23 +90,15 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// --- FIX #2: Make the 401 error handling more graceful ---
-// Implement token refresh with proper error handling to prevent infinite loops
-// --- ALSO: Implement API Fallback Mechanism ---
-
-// Global flag to prevent multiple simultaneous refresh attempts
+// ─── Response interceptor ─────────────────────────────────────────────────────
 let isRefreshing = false;
 let refreshSubscribers = [];
-let isLoggingOut = false; // Flag to prevent multiple logout attempts
+let isLoggingOut = false;
 
-// Function to add request to queue while token is being refreshed
-const onTokenRefreshed = (callback) => {
-  refreshSubscribers.push(callback);
-};
+const onTokenRefreshed = (callback) => refreshSubscribers.push(callback);
 
-// Function to process all queued requests after token refresh
 const processQueue = (error, token = null) => {
-  refreshSubscribers.forEach(callback => callback(error, token));
+  refreshSubscribers.forEach(cb => cb(error, token));
   refreshSubscribers = [];
 };
 
@@ -123,171 +107,84 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Check if it's a 401 Unauthorized error and we are not already on the login page
-    if (error.response && error.response.status === 401 && window.location.pathname !== '/login' && !isLoggingOut) {
-      // CRITICAL FIX: Don't logout during initial auth restoration
-      // The AuthContext is checking if the token is valid, a 401 here is expected if token is invalid
-      // But we shouldn't trigger logout during the initial /auth/me call
+    if (
+      error.response?.status === 401 &&
+      window.location.pathname !== '/login' &&
+      !isLoggingOut
+    ) {
       const isAuthRestoring = window.__AUTH_RESTORING__ === true;
       const isAuthMeCall = originalRequest.url?.includes('/auth/me');
-      
-      // If this is the initial auth check and it fails, let AuthContext handle it
-      // Don't trigger logout here as it will cause a redirect loop
+
       if (isAuthRestoring && isAuthMeCall) {
-        console.log('[Axios Interceptor] 401 during auth restoration - letting AuthContext handle it');
         return Promise.reject(error);
       }
-      
-      // Check if this request has already been retried to prevent infinite loops
+
       if (originalRequest._retry || originalRequest._retryFailed) {
-        // If we've already retried and still got 401, the session is invalid
-        console.error('[Axios Interceptor] Token refresh failed or token is invalid. Logging out.');
-        
-        // Prevent multiple logout attempts
-        if (isLoggingOut) {
-          return Promise.reject(error);
-        }
+        if (isLoggingOut) return Promise.reject(error);
         isLoggingOut = true;
-        
-        // Clear all tokens
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('ams_token');
         sessionStorage.removeItem('refreshToken');
         sessionStorage.removeItem('sso_processed_token');
         delete api.defaults.headers.common['Authorization'];
-        
-        // Dispatch logout event
         window.dispatchEvent(authErrorEvent);
-        
-        // Redirect to login
         setTimeout(() => {
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
+          if (window.location.pathname !== '/login') window.location.href = '/login';
         }, 100);
-        
         return Promise.reject(error);
       }
 
-      // If we're already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           onTokenRefreshed((err, token) => {
-            if (err) {
-              reject(err);
-            } else {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
-            }
+            if (err) return reject(err);
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(api(originalRequest));
           });
         });
       }
 
-      // Mark that we're attempting a refresh
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        // Attempt to refresh the token
-        // Check if we have a refresh token stored (if refresh token system exists)
         const refreshToken = sessionStorage.getItem('refreshToken');
-        
-        // If no refresh token exists, treat as expired session and logout immediately
-        if (!refreshToken) {
-          throw new Error('No refresh token available - session expired');
-        }
-        
-        // Proceed with refresh attempt (refreshToken exists at this point)
-        console.log('[Axios Interceptor] Attempting to refresh token...');
-        
-        // Use a temporary axios instance without interceptors to avoid infinite loop
-        const refreshAxios = axios.create({
-          baseURL: baseURL,
-          withCredentials: true,
-        });
-        
-        try {
-          const response = await refreshAxios.post('/auth/refresh', { 
-            token: refreshToken 
-          });
-          
-          const { accessToken, token: newToken } = response.data;
-          const newAccessToken = accessToken || newToken;
-          
-          if (newAccessToken) {
-            // Update token in storage and headers
-            sessionStorage.setItem('token', newAccessToken);
-            sessionStorage.setItem('ams_token', newAccessToken);
-            api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            
-            // Process all queued requests
-            processQueue(null, newAccessToken);
-            isRefreshing = false;
-            
-            // Retry the original request
-            return api(originalRequest);
-          } else {
-            throw new Error('No access token received from refresh endpoint');
-          }
-        } catch (refreshRequestError) {
-          // Re-throw to be caught by outer catch block
-          throw refreshRequestError;
-        }
+        if (!refreshToken) throw new Error('No refresh token available');
+
+        const refreshAxios = axios.create({ baseURL, withCredentials: true });
+        const response = await refreshAxios.post('/auth/refresh', { token: refreshToken });
+        const newAccessToken = response.data.accessToken || response.data.token;
+
+        if (!newAccessToken) throw new Error('No access token in refresh response');
+
+        sessionStorage.setItem('token', newAccessToken);
+        sessionStorage.setItem('ams_token', newAccessToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        processQueue(null, newAccessToken);
+        isRefreshing = false;
+        return api(originalRequest);
       } catch (refreshError) {
-        // CRITICAL FIX: If refresh fails, we must logout to prevent infinite loop
-        console.error('[Axios Interceptor] Token refresh failed:', refreshError.message);
-        console.error('[Axios Interceptor] Refresh error details:', refreshError.response?.data || refreshError.message);
-        
-        // Reset refresh state to prevent further refresh attempts
         isRefreshing = false;
         processQueue(refreshError, null);
-        
-        // Mark the original request as permanently failed to prevent retry loops
         originalRequest._retryFailed = true;
-        
-        // Prevent multiple logout attempts
-        if (isLoggingOut) {
-          return Promise.reject(refreshError);
+
+        if (!isLoggingOut) {
+          isLoggingOut = true;
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('ams_token');
+          sessionStorage.removeItem('refreshToken');
+          sessionStorage.removeItem('sso_processed_token');
+          delete api.defaults.headers.common['Authorization'];
+          window.dispatchEvent(authErrorEvent);
+          setTimeout(() => {
+            if (window.location.pathname !== '/login') window.location.href = '/login';
+          }, 100);
         }
-        isLoggingOut = true;
-        
-        // Clear all tokens immediately
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('ams_token');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('sso_processed_token');
-        delete api.defaults.headers.common['Authorization'];
-        
-        // Dispatch logout event (AuthContext will handle additional cleanup)
-        window.dispatchEvent(authErrorEvent);
-        
-        // Redirect to login page if not already there
-        // Small delay to ensure tokens are cleared first
-        setTimeout(() => {
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-        }, 100);
-        
-        // Reject the promise to prevent further processing
         return Promise.reject(refreshError);
       }
     }
 
-    // --- API Fallback Logic ---
-    // Only trigger fallback for 5xx errors or network errors (server unreachable)
-    // Do NOT fallback on 4xx errors (client errors like validation, unauthorized, etc.)
-    const shouldFallback = 
-      // Network error (no response from server)
-      (!error.response && error.code !== 'ECONNABORTED') || 
-      // Server error (5xx)
-      (error.response && error.response.status >= 500);
-
-    // Fallback logic removed - use single API endpoint (bylinelms.com)
-    // If you need fallback in the future, configure it via environment variables
-
-    // Always reject the promise so the component's catch block can still handle it.
     return Promise.reject(error);
   }
 );

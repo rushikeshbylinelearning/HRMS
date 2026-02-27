@@ -466,9 +466,9 @@ class LeavePolicyService {
                 const workedDateString = `${year}-${month}-${day}`; // YYYY-MM-DD
 
                 // Debug logging (temporary)
-                console.log('[validateCompOffEligibility] Worked Date Object:', workedDate);
-                console.log('[validateCompOffEligibility] Worked Date String:', workedDateString);
-                console.log('[validateCompOffEligibility] Employee ID:', employeeId);
+                if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Worked Date Object:', workedDate);
+                if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Worked Date String:', workedDateString);
+                if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Employee ID:', employeeId);
 
                 // CRITICAL FIX: Skip attendance validation for future dates
                 // Employees can apply for Comp-Off in advance for future weekend work
@@ -477,7 +477,7 @@ class LeavePolicyService {
                 const today = startOfISTDay();
                 const isFutureDate = workedDate > today;
 
-                console.log('[validateCompOffEligibility] Is Future Date:', isFutureDate);
+                if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Is Future Date:', isFutureDate);
 
                 // Only validate attendance for past or current dates
                 if (!isFutureDate) {
@@ -487,9 +487,9 @@ class LeavePolicyService {
                         attendanceDate: workedDateString
                     });
 
-                    console.log('[validateCompOffEligibility] Attendance Record Found:', attendanceRecord ? 'YES' : 'NO');
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Attendance Record Found:', attendanceRecord ? 'YES' : 'NO');
                     if (attendanceRecord) {
-                        console.log('[validateCompOffEligibility] Attendance Details:', {
+                        if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Attendance Details:', {
                             date: attendanceRecord.attendanceDate,
                             clockInTime: attendanceRecord.clockInTime,
                             status: attendanceRecord.attendanceStatus
@@ -522,7 +522,7 @@ class LeavePolicyService {
                         };
                     }
                 } else {
-                    console.log('[validateCompOffEligibility] Skipping attendance validation for future date');
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Skipping attendance validation for future date');
                 }
 
                 // Check 4: Prevent duplicate Comp-Off claims for the same worked date
@@ -557,14 +557,14 @@ class LeavePolicyService {
 
                 if (holiday) {
                     // It's a holiday - Comp-Off is ALLOWED
-                    console.log('[validateCompOffEligibility] Result: ALLOWED (Holiday)');
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Result: ALLOWED (Holiday)');
                     return { eligible: true };
                 }
 
                 // Check if it's a Sunday (always a week off)
                 if (workedDayOfWeek === 0) {
                     // Sunday - Comp-Off is ALLOWED
-                    console.log('[validateCompOffEligibility] Result: ALLOWED (Sunday)');
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Result: ALLOWED (Sunday)');
                     return { eligible: true };
                 }
 
@@ -572,12 +572,12 @@ class LeavePolicyService {
                 if (workedDayOfWeek === 6) {
                     const isWorkingDay = this.isWorkingSaturday(workedDate, saturdayPolicy);
 
-                    console.log('[validateCompOffEligibility] Saturday Policy:', saturdayPolicy);
-                    console.log('[validateCompOffEligibility] Is Working Saturday:', isWorkingDay);
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Saturday Policy:', saturdayPolicy);
+                    if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Is Working Saturday:', isWorkingDay);
 
                     if (isWorkingDay) {
                         // Saturday was a WORKING DAY - Comp-Off is REJECTED
-                        console.log('[validateCompOffEligibility] Result: REJECTED (Working Saturday)');
+                        if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Result: REJECTED (Working Saturday)');
                         return {
                             eligible: false,
                             reason: 'Comp-Off can only be claimed if you worked on a scheduled week off or holiday. This Saturday was a regular working day according to your Saturday policy.',
@@ -585,7 +585,7 @@ class LeavePolicyService {
                         };
                     } else {
                         // Saturday was a WEEK OFF - Comp-Off is ALLOWED
-                        console.log('[validateCompOffEligibility] Result: ALLOWED (Week Off Saturday)');
+                        if (process.env.NODE_ENV !== 'production') console.log('[validateCompOffEligibility] Result: ALLOWED (Week Off Saturday)');
                         return { eligible: true };
                     }
                 }
@@ -1339,29 +1339,52 @@ class LeavePolicyService {
     }
 
     /**
-     * Automatically club Saturday in leave dates for Planned Leave (Paid Leave)
-     * 
-     * BUSINESS RULE: If an employee takes Planned Leave on Friday and Monday,
-     * and Saturday between them is a "Week off", then Saturday should be automatically
-     * included in the leave dates without consuming a leave day.
-     * 
-     * @param {Object} employee - Employee document with alternateSaturdayPolicy
-     * @param {Array<string|Date>} leaveDates - Array of leave dates (normalized to YYYY-MM-DD or Date)
-     * @param {string} requestType - Leave request type
-     * @returns {Array<string>} Updated leave dates array with Saturday clubbed (if applicable)
+     * Automatically club Saturday in leave dates for Planned Leave (Paid Leave) ONLY.
+     *
+     * BUSINESS RULE: If an employee takes Planned Leave on Friday and Monday, and the
+     * Saturday between them is a "Week off", that Saturday is automatically included —
+     * BUT ONLY when the leave was applied at least 30 days before the first leave date
+     * (i.e. the standard Planned Leave advance-notice requirement is satisfied).
+     *
+     * Saturday clubbing NEVER applies to Casual, Sick, or Loss of Pay leave.
+     *
+     * @param {Object}           employee    - Employee document with alternateSaturdayPolicy
+     * @param {Array<string|Date>} leaveDates - Leave dates (YYYY-MM-DD strings or Date objects)
+     * @param {string}           requestType - Leave request type
+     * @param {Date|string|null} appliedDate - Date the leave was applied (defaults to today).
+     *                                         Used to enforce the ≥30-day advance-notice guard.
+     * @returns {Array<string>} Updated leave-dates array with Saturday clubbed (if eligible)
      */
-    static clubSaturdayInLeaveDates(employee, leaveDates, requestType) {
-        // Only apply to Planned Leave (Paid Leave)
+    static clubSaturdayInLeaveDates(employee, leaveDates, requestType, appliedDate = null) {
+        // Only applies to Planned (Paid) Leave — Casual / Sick / LOP are never eligible
         if (requestType !== 'Planned') {
             return leaveDates.map(d => typeof d === 'string' ? d : getISTDateString(parseISTDate(d)));
         }
 
         const saturdayPolicy = employee?.alternateSaturdayPolicy || 'All Saturdays Working';
-        
-        // If all Saturdays are working, no clubbing needed
+
+        // If all Saturdays are working days, clubbing is irrelevant
         if (saturdayPolicy === 'All Saturdays Working') {
             return leaveDates.map(d => typeof d === 'string' ? d : getISTDateString(parseISTDate(d)));
         }
+
+        // ── ADVANCE-NOTICE GUARD ────────────────────────────────────────────────
+        // Saturday clubbing is only allowed when the Planned Leave was applied at
+        // least 30 days before the first leave date.  Last-minute Planned Leave must
+        // NOT silently absorb a week-off Saturday.
+        const referenceDate = appliedDate
+            ? parseISTDate(getISTDateString(appliedDate instanceof Date ? appliedDate : new Date(appliedDate)))
+            : parseISTDate(getISTDateString());          // default: today
+        const firstDateStr = typeof leaveDates[0] === 'string'
+            ? leaveDates[0]
+            : getISTDateString(leaveDates[0]);
+        const normalizedFirst = parseISTDate(firstDateStr);
+        const daysDiff = Math.floor((normalizedFirst - referenceDate) / (1000 * 60 * 60 * 24));
+        if (daysDiff < 30) {
+            // Advance notice not satisfied — return dates unchanged, no Saturday clubbed
+            return leaveDates.map(d => typeof d === 'string' ? d : getISTDateString(parseISTDate(d)));
+        }
+        // ────────────────────────────────────────────────────────────────────────
 
         // Convert all dates to normalized strings
         const normalizedDates = leaveDates.map(d => {
@@ -1485,10 +1508,11 @@ class LeavePolicyService {
             return { valid: false, errors: ['Leave dates are required.'], warnings: [] };
         }
 
-        // CRITICAL: Apply Saturday clubbing for Planned Leave BEFORE validation
-        // This ensures that Saturday is included in leave dates before any validation checks
+        // CRITICAL: Apply Saturday clubbing for Planned Leave BEFORE validation.
+        // Saturday is only clubbed when advance notice ≥ 30 days is met (enforced inside
+        // clubSaturdayInLeaveDates). Casual / Sick / LOP are never affected.
         if (requestType === 'Planned') {
-            const clubbedDates = this.clubSaturdayInLeaveDates(employee, leaveDates, requestType);
+            const clubbedDates = this.clubSaturdayInLeaveDates(employee, leaveDates, requestType, null /* appliedDate = today */);
             // Convert clubbed date strings back to Date objects or keep as strings (depending on input format)
             leaveDates = clubbedDates.map(d => {
                 // If input was Date objects, return Date objects; if strings, return strings

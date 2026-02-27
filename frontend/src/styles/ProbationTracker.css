@@ -2,7 +2,7 @@
 
 .probation-tracker {
   width: 100%;
-  padding: 24px;
+  padding: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -13,48 +13,6 @@
   display: flex;
   gap: 16px;
   align-items: center;
-}
-
-/* Compact header for probation page */
-.probation-tracker .page-hero-header {
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  border-radius: 12px;
-}
-
-.probation-tracker .page-hero-header__eyebrow {
-  font-size: 0.7rem !important;
-  margin-bottom: 2px !important;
-}
-
-.probation-tracker .page-hero-header__title {
-  font-size: 1.5rem !important;
-  margin-bottom: 2px !important;
-}
-
-.probation-tracker .page-hero-header__description {
-  font-size: 0.875rem !important;
-  margin-top: 0 !important;
-}
-
-.probation-tracker .page-hero-header__icon {
-  width: 36px;
-  height: 36px;
-  font-size: 1.1rem;
-}
-
-.probation-tracker .page-hero-header::before {
-  width: 200px;
-  height: 200px;
-  top: -80px;
-  right: -60px;
-}
-
-.probation-tracker .page-hero-header::after {
-  width: 160px;
-  height: 160px;
-  bottom: -100px;
-  left: -60px;
 }
 
 /* Summary Cards */

@@ -160,15 +160,19 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         
-        const totalCount = await User.countDocuments(employeeQuery);
-        // Use the same `fieldsToSelect` for the paginated query
-        const employees = await User.find(employeeQuery)
-            .select(fieldsToSelect) // Added select here as well for consistency
-            .populate('shiftGroup')
-            .sort({ fullName: 1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        // PERF FIX: Run countDocuments and find in parallel (saves one round-trip).
+        // Also restrict shiftGroup populate to only the fields the UI actually uses
+        // (previously `.populate('shiftGroup')` fetched the entire document).
+        const [totalCount, employees] = await Promise.all([
+            User.countDocuments(employeeQuery),
+            User.find(employeeQuery)
+                .select(fieldsToSelect)
+                .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
+                .sort({ fullName: 1 })
+                .skip(skip)
+                .limit(limit)
+                .lean()
+        ]);
         
         // Manually populate reportingPerson for valid ObjectIds
         const validReportingPersonIds = employees

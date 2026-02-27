@@ -182,11 +182,23 @@ const optimizedTheme = createTheme({
           borderRadius: 8,
           textTransform: 'none',
           fontWeight: 500,
+          '@media (max-width: 768px)': {
+            minHeight: '44px',
+          },
         },
         contained: {
           boxShadow: 'none',
           '&:hover': {
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 768px)': {
+            padding: '10px',
           },
         },
       },
@@ -205,6 +217,11 @@ const optimizedTheme = createTheme({
           '& .MuiOutlinedInput-root': {
             borderRadius: 8,
           },
+          '@media (max-width: 768px)': {
+            '& .MuiInputBase-root': {
+              fontSize: '0.875rem',
+            },
+          },
         },
       },
     },
@@ -212,6 +229,10 @@ const optimizedTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 16,
+          '@media (max-width: 768px)': {
+            height: '28px',
+            fontSize: '0.75rem',
+          },
         },
       },
     },
@@ -219,6 +240,63 @@ const optimizedTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 8,
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          '@media (max-width: 600px)': {
+            margin: '0 !important',
+            maxHeight: '92vh !important',
+            width: '100% !important',
+            maxWidth: '100% !important',
+            borderRadius: '20px 20px 0 0 !important',
+            position: 'fixed !important',
+            bottom: '0 !important',
+            top: 'auto !important',
+          },
+        },
+      },
+    },
+    MuiPopper: {
+      defaultProps: {
+        modifiers: [
+          {
+            name: 'preventOverflow',
+            options: { boundary: 'viewport' },
+          },
+        ],
+      },
+    },
+    MuiTablePagination: {
+      styleOverrides: {
+        toolbar: {
+          '@media (max-width: 480px)': {
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            paddingLeft: '8px',
+            paddingRight: '8px',
+          },
+        },
+        selectLabel: {
+          '@media (max-width: 480px)': {
+            display: 'none',
+          },
+        },
+        displayedRows: {
+          '@media (max-width: 480px)': {
+            margin: '0',
+          },
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          '@media (max-width: 768px)': {
+            fontSize: '0.875rem',
+          },
         },
       },
     },

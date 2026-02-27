@@ -5,6 +5,8 @@ const router = express.Router();
 const Setting = require('../models/Setting');
 const authenticateToken = require('../middleware/authenticateToken');
 const cache = require('../utils/cache');
+const User = require('../models/User');
+
 
 // Admin-only middleware for RBAC-protected settings (e.g. enforce required logout toggle)
 const isAdmin = (req, res, next) => {
@@ -208,6 +210,168 @@ router.post('/require-admin-approval-early-checkout', [authenticateToken, isAdmi
         res.json({ enabled: !!updatedSetting.value });
     } catch (error) {
         res.status(500).json({ error: 'Server error updating require admin approval for early checkout setting.' });
+    }
+});
+
+
+
+
+
+// --- Teams Attendance Notification (Power Automate Webhook) ---
+const TEAMS_WEBHOOK_KEY = 'teamsAttendanceWebhookUrl';
+const REPORT_CONFIG_KEY = 'teamsReportConfig';
+const { sendMorningAttendanceReport, sendEditedReport, getPreviewData, DEFAULT_CONFIG } = require('../services/teamsAttendanceNotificationService');
+
+// GET /api/admin/settings/teams-webhook
+router.get('/teams-webhook', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const [webhookSetting, configSetting] = await Promise.all([
+            Setting.findOne({ key: TEAMS_WEBHOOK_KEY }),
+            Setting.findOne({ key: REPORT_CONFIG_KEY }),
+        ]);
+        res.json({
+            webhookUrl:   webhookSetting?.value  || '',
+            reportConfig: configSetting?.value   || DEFAULT_CONFIG,
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch Teams settings.' });
+    }
+});
+
+// POST /api/admin/settings/teams-webhook  { webhookUrl }
+router.post('/teams-webhook', [authenticateToken, isAdmin], async (req, res) => {
+    const { webhookUrl } = req.body;
+    if (!webhookUrl || !webhookUrl.startsWith('https://')) {
+        return res.status(400).json({ error: 'A valid https:// webhook URL is required.' });
+    }
+    try {
+        await Setting.findOneAndUpdate(
+            { key: TEAMS_WEBHOOK_KEY },
+            { value: webhookUrl.trim() },
+            { upsert: true, new: true }
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save webhook URL.' });
+    }
+});
+
+// DELETE /api/admin/settings/teams-webhook
+router.delete('/teams-webhook', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        await Setting.findOneAndDelete({ key: TEAMS_WEBHOOK_KEY });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove webhook URL.' });
+    }
+});
+
+// POST /api/admin/settings/teams-report-config  { config }
+router.post('/teams-report-config', [authenticateToken, isAdmin], async (req, res) => {
+    const { config } = req.body;
+    if (!config || typeof config !== 'object') {
+        return res.status(400).json({ error: 'config object is required.' });
+    }
+    try {
+        const merged = { ...DEFAULT_CONFIG, ...config };
+        await Setting.findOneAndUpdate(
+            { key: REPORT_CONFIG_KEY },
+            { value: merged },
+            { upsert: true, new: true }
+        );
+        res.json({ success: true, config: merged });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save report config.' });
+    }
+});
+
+// GET /api/admin/settings/teams-preview — get live attendance data for HR to review before sending
+router.get('/teams-preview', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const previewData = await getPreviewData();
+        res.json(previewData);
+    } catch (err) {
+        console.error('[Settings] Teams preview error:', err);
+        res.status(500).json({ error: 'Failed to build preview: ' + err.message });
+    }
+});
+
+// POST /api/admin/settings/teams-webhook/send-edited — send (possibly edited) report
+router.post('/teams-webhook/send-edited', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const { sections, config, todayStr } = req.body;
+        if (!sections || !config) {
+            return res.status(400).json({ error: 'sections and config are required.' });
+        }
+        await sendEditedReport(sections, config, todayStr);
+        res.json({ success: true, message: 'Report sent to Teams channel.' });
+    } catch (err) {
+        console.error('[Settings] Teams send-edited error:', err);
+        res.status(500).json({ error: 'Failed to send: ' + err.message });
+    }
+});
+
+// POST /api/admin/settings/teams-webhook/test
+router.post('/teams-webhook/test', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const setting = await Setting.findOne({ key: TEAMS_WEBHOOK_KEY });
+        if (!setting?.value) {
+            return res.status(400).json({ error: 'No webhook URL configured.' });
+        }
+        await Setting.findOneAndDelete({ key: 'teamsAttendanceLastSentDate' });
+        await sendMorningAttendanceReport();
+        res.json({ success: true, message: 'Test report sent to your Teams channel.' });
+    } catch (err) {
+        console.error('[Settings] Teams test error:', err);
+        res.status(500).json({ error: 'Test failed: ' + err.message });
+    }
+});
+
+// --- Upcoming Leaves Notification ---
+const { getUpcomingLeaves, sendUpcomingLeavesReport } = require('../services/teamsUpcomingLeavesService');
+
+// GET /api/admin/settings/teams-upcoming-leaves?weeks=2
+router.get('/teams-upcoming-leaves', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const weeksAhead = parseInt(req.query.weeks) || 2;
+        if (weeksAhead < 1 || weeksAhead > 8) {
+            return res.status(400).json({ error: 'weeks must be between 1 and 8' });
+        }
+        const data = await getUpcomingLeaves(weeksAhead);
+        res.json(data);
+    } catch (err) {
+        console.error('[Settings] Teams upcoming leaves error:', err);
+        res.status(500).json({ error: 'Failed to fetch upcoming leaves: ' + err.message });
+    }
+});
+
+// POST /api/admin/settings/teams-upcoming-leaves/send
+router.post('/teams-upcoming-leaves/send', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const { employees, weeksAhead, startDate, endDate } = req.body;
+        if (!employees || !weeksAhead || !startDate || !endDate) {
+            return res.status(400).json({ error: 'employees, weeksAhead, startDate, and endDate are required.' });
+        }
+        await sendUpcomingLeavesReport(employees, weeksAhead, startDate, endDate);
+        res.json({ success: true, message: 'Upcoming leaves report sent to Teams channel.' });
+    } catch (err) {
+        console.error('[Settings] Teams send upcoming leaves error:', err);
+        res.status(500).json({ error: 'Failed to send: ' + err.message });
+    }
+});
+
+// GET /api/admin/settings/teams-upcoming-leaves/employees
+// Returns all active non-admin employees for the "add manually" dropdown
+router.get('/teams-upcoming-leaves/employees', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const employees = await User.find({ isActive: true, role: { $nin: ['Admin'] } })
+            .select('_id fullName designation department')
+            .sort({ fullName: 1 })
+            .lean();
+        res.json({ employees });
+    } catch (err) {
+        console.error('[Settings] Teams employee list error:', err);
+        res.status(500).json({ error: 'Failed to fetch employees: ' + err.message });
     }
 });
 

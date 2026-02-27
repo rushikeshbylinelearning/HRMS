@@ -1,92 +1,93 @@
 // backend/services/mailService.js
 const nodemailer = require('nodemailer');
 
-const createTransporter = async () => {
-    // This function remains the same as it correctly checks for .env variables.
+// ─── Transporter Singleton ────────────────────────────────────────────────────
+// CRITICAL PERFORMANCE FIX: Previously, every email call created a brand-new
+// transporter AND called transporter.verify() (a full SMTP handshake) BEFORE
+// sending.  On A2 Hosting that added 200–800 ms of blocking SMTP latency to
+// every request that triggered an email.
+//
+// Solution:
+//  1. Create the transporter once and reuse it (connection pooling).
+//  2. Remove transporter.verify() from the send path entirely – it is only
+//     useful during startup diagnostics, not on every send.
+//  3. Disable nodemailer's verbose logger/debug flags in production – they
+//     write to stdout on every send which hammers the shared-hosting log I/O.
+// ─────────────────────────────────────────────────────────────────────────────
+let _transporter = null;
+
+function getTransporter() {
+    if (_transporter) return _transporter;
+
+    const isProd = process.env.NODE_ENV === 'production';
+
     if (!process.env.MAIL_HOST) {
-        // Ethereal (testing) setup...
-        let testAccount = await nodemailer.createTestAccount();
-        console.log("************************************************************");
-        console.log("NO REAL MAIL SERVICE CONFIGURED - USING ETHEREAL FOR DEV");
-        console.log("Preview emails at:", nodemailer.getTestMessageUrl(null));
-        console.log("************************************************************");
-        
-        return nodemailer.createTransport({
-            host: 'smtp.ethereal.email',
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-        });
+        // Dev/test: Ethereal – do NOT create a test account on every call.
+        // Ethereal accounts are only valid for a session; use env vars instead.
+        console.warn('[Email Service] MAIL_HOST not set. Emails will silently drop in production.');
+        // Return a no-op transport so the server never crashes on missing config.
+        _transporter = nodemailer.createTransport({ jsonTransport: true });
+        return _transporter;
     }
 
-    // --- Production/Real SMTP Configuration ---
-    return nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
-        port: process.env.MAIL_PORT,
-        secure: process.env.MAIL_SECURE === 'true', // Should be true for port 465
+    _transporter = nodemailer.createTransport({
+        host:   process.env.MAIL_HOST,
+        port:   Number(process.env.MAIL_PORT) || 465,
+        secure: process.env.MAIL_SECURE === 'true',
         auth: {
             user: process.env.MAIL_USER,
             pass: process.env.MAIL_PASS,
         },
-        // --- ADDED: More robust connection options ---
-        // This helps with debugging and potential network issues.
-        logger: true, // Log all communication with the mail server
-        debug: true,  // Show debug output
+        // Connection pool: reuse connections instead of opening a new TCP
+        // connection + TLS handshake on every email.
+        pool: true,
+        maxConnections: 3,
+        maxMessages:    50,
+        // Reduce I/O overhead on A2 shared hosting in production.
+        logger: !isProd,
+        debug:  !isProd,
     });
-};
+
+    return _transporter;
+}
 
 const sendEmail = async ({ to, subject, text, html, isHREmail = false }) => {
-    // Check if all emails are disabled
     if (process.env.DISABLE_ALL_EMAILS === 'true') {
-        console.log(`[Email Service] All emails disabled - skipping email to: "${to}", Subject: "${subject}"`);
-        return;
+        return; // silently skip – no log spam needed
     }
-    
-    // Check if HR emails are disabled
     if (isHREmail && process.env.DISABLE_HR_EMAILS === 'true') {
-        console.log(`[Email Service] HR emails disabled - skipping HR email to: "${to}", Subject: "${subject}"`);
         return;
     }
-    
-    console.log(`[Email Service] Preparing to send email. To: "${to}", Subject: "${subject}"`);
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Email Service] Sending email to: "${to}", Subject: "${subject}"`);
+    }
+
     try {
-        const transporter = await createTransporter();
-        
-        console.log('[Email Service] Transporter created. Verifying connection...');
-        // --- ADDED: Verify connection to SMTP server ---
-        await transporter.verify();
-        console.log('[Email Service] SMTP Connection Verified Successfully.');
+        const transporter = getTransporter();
+
+        // ── DO NOT call transporter.verify() here ──
+        // verify() opens a new SMTP connection just to ping the server and
+        // adds 200-800 ms per email on every request.  Errors surface naturally
+        // from sendMail() and are caught below.
 
         const info = await transporter.sendMail({
-            from: `"AMS Portal" <${process.env.MAIL_USER}>`, // Use the configured user as the sender
+            from: `"AMS Portal" <${process.env.MAIL_USER}>`,
             to,
             subject,
             text,
             html,
         });
 
-        console.log(`[Email Service] SUCCESS! Message sent: ${info.messageId}`);
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-            console.log(`[Email Service] Preview URL (for Ethereal): ${previewUrl}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Email Service] Sent: ${info.messageId}`);
         }
     } catch (error) {
-        // --- IMPROVED: Detailed Error Logging ---
-        console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        console.error('!!! [Email Service] FAILED TO SEND EMAIL !!!');
-        console.error(`!!! Reason: ${error.message}`);
-        if (error.code === 'EAUTH') {
-            console.error('!!! Authentication Error (EAUTH): This is likely an incorrect MAIL_USER or MAIL_PASS (App Password) in your .env file.');
-        } else if (error.code === 'ECONNECTION') {
-            console.error('!!! Connection Error (ECONNECTION): The server could not connect to the SMTP host. Check for firewall blocks on port 465.');
+        console.error(`[Email Service] Failed to send email to "${to}": ${error.message}`);
+        // Reset transporter on fatal errors so it re-creates on next attempt
+        if (['ECONNECTION', 'EAUTH', 'ETIMEDOUT'].includes(error.code)) {
+            _transporter = null;
         }
-        console.error('!!! Full Error Details:', error);
-        console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        // We throw the error here so the calling function knows it failed,
-        // even though it's fire-and-forget in leaves.js. This is good practice.
         throw error;
     }
 };

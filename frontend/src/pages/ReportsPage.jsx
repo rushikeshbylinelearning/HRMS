@@ -594,7 +594,7 @@ const ReportsPage = () => {
             <PageHeroHeader
                 eyebrow="Reports & Exports"
                 title="Generate Reports"
-                description="Export attendance, leave, notes, and activity insights with curated presets for leadership-ready summaries."
+                description="Export attendance, leave, and activity insights."
             />
             
             {loading && <div className="loading-overlay"><SkeletonBox width="24px" height="24px" borderRadius="50%" /></div>}

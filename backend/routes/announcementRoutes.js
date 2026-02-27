@@ -4,26 +4,57 @@ const AnnouncementMessage = require("../models/AnnouncementMessage");
 const AnnouncementRead = require("../models/AnnouncementRead");
 const authenticateToken = require("../middleware/authenticateToken");
 
+// PERFORMANCE FIX: In-memory cache for the announcements list.
+// Announcements change rarely (admin posts them). Cache for 60 seconds.
+// Cache is invalidated on POST/PUT/DELETE/PATCH so users always see fresh data after writes.
+let _announcementsCache = null;
+let _announcementsCacheAt = 0;
+const ANNOUNCEMENTS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+function invalidateAnnouncementsCache() {
+  _announcementsCache = null;
+  _announcementsCacheAt = 0;
+}
+
+// Helper: transform fullName → firstName/lastName (compute at write-time, stored at read-time)
+function transformMessages(messages) {
+  return messages.map(msg => {
+    const msgObj = typeof msg.toObject === 'function' ? msg.toObject() : msg;
+    if (msgObj.sender && msgObj.sender.fullName) {
+      const nameParts = msgObj.sender.fullName.split(' ');
+      msgObj.sender.firstName = nameParts[0] || '';
+      msgObj.sender.lastName = nameParts.slice(1).join(' ') || '';
+    }
+    return msgObj;
+  });
+}
+
 // Get last 50 messages
 router.get("/", authenticateToken, async (req, res) => {
   try {
+    const now = Date.now();
+
+    // Return from memory cache if still fresh
+    if (_announcementsCache && (now - _announcementsCacheAt) < ANNOUNCEMENTS_CACHE_TTL_MS) {
+      // Allow browser to cache for 30 seconds (shorter than server cache so users stay fresh)
+      res.set('Cache-Control', 'private, max-age=30');
+      return res.json(_announcementsCache);
+    }
+
     const messages = await AnnouncementMessage.find()
       .populate("sender", "fullName role profileImageUrl")
       .sort({ pinned: -1, createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean(); // lean() — no need for Mongoose doc methods on read
 
-    // Transform fullName to firstName/lastName for frontend compatibility
-    const transformedMessages = messages.map(msg => {
-      const msgObj = msg.toObject();
-      if (msgObj.sender && msgObj.sender.fullName) {
-        const nameParts = msgObj.sender.fullName.split(' ');
-        msgObj.sender.firstName = nameParts[0] || '';
-        msgObj.sender.lastName = nameParts.slice(1).join(' ') || '';
-      }
-      return msgObj;
-    });
+    const transformed = transformMessages(messages).reverse();
 
-    res.json(transformedMessages.reverse());
+    // Cache result
+    _announcementsCache = transformed;
+    _announcementsCacheAt = now;
+
+    res.set('Cache-Control', 'private, max-age=30');
+    res.json(transformed);
   } catch (err) {
     console.error("[Announcements] Error fetching messages:", err);
     res.status(500).json({ message: "Server error" });
@@ -68,6 +99,9 @@ router.post("/", authenticateToken, async (req, res) => {
       msgObj.sender.firstName = nameParts[0] || '';
       msgObj.sender.lastName = nameParts.slice(1).join(' ') || '';
     }
+
+    // Invalidate list cache so next GET reflects new message immediately
+    invalidateAnnouncementsCache();
 
     res.status(201).json(msgObj);
   } catch (err) {
@@ -120,6 +154,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
       msgObj.sender.lastName = nameParts.slice(1).join(' ') || '';
     }
 
+    invalidateAnnouncementsCache();
     res.json(msgObj);
   } catch (err) {
     console.error("[Announcements] Error updating message:", err);
@@ -148,6 +183,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 
     await AnnouncementMessage.findByIdAndDelete(id);
 
+    invalidateAnnouncementsCache();
     res.json({ message: "Announcement deleted successfully", id });
   } catch (err) {
     console.error("[Announcements] Error deleting message:", err);
@@ -188,6 +224,7 @@ router.patch("/:id/pin", authenticateToken, async (req, res) => {
       msgObj.sender.lastName = nameParts.slice(1).join(' ') || '';
     }
 
+    invalidateAnnouncementsCache();
     res.json(msgObj);
   } catch (err) {
     console.error("[Announcements] Error pinning message:", err);

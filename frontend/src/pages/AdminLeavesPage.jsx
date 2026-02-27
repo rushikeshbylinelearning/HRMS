@@ -52,6 +52,38 @@ import {
   getAnalyticsCountsCacheKey,
   getWorkDaysCacheKey,
 } from '../utils/leavesCache';
+
+// Helper function to calculate working days excluding Sundays and alternate Saturdays
+const calculateWorkingDays = (year, month) => {
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    
+    let workingDays = 0;
+    let saturdayCount = 0;
+    
+    for (let date = new Date(firstDay); date <= lastDay; date.setDate(date.getDate() + 1)) {
+        const dayOfWeek = date.getDay();
+        
+        // Skip Sundays (0)
+        if (dayOfWeek === 0) {
+            continue;
+        }
+        
+        // For Saturdays (6), count only alternate ones (2nd and 4th)
+        if (dayOfWeek === 6) {
+            saturdayCount++;
+            // Skip alternate Saturdays (1st, 3rd, 5th)
+            if (saturdayCount % 2 === 1) {
+                continue;
+            }
+        }
+        
+        workingDays++;
+    }
+    
+    return workingDays;
+};
+
 // --- Shared DatePicker SlotProps for Microsoft Calendar Style ---
 const datePickerSlotProps = {
     textField: {
@@ -250,11 +282,11 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
     const [dateRange, setDateRange] = useState({ start: null, end: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeaveType, setSelectedLeaveType] = useState('');
-    const [filtersExpanded, setFiltersExpanded] = useState(true);
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
     
     // Pagination
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     
     // Clear all filters
     const handleClearFilters = () => {
@@ -520,7 +552,8 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
         } else {
             periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
         }
-        const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays;
+        // Calculate working days for the selected month excluding Sundays and alternate Saturdays
+        const totalWorkingDaysForPeriod = calculateWorkingDays(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1);
         
         const aggregated = analyticsCounts !== null
             ? employees.map(emp => {
@@ -682,7 +715,8 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
                 </Alert>
             )}
             
-            {/* Filter Controls with KPI Cards */}
+            {/* Filter Controls with KPI Cards - Hidden by default, shown via button */}
+            {filtersExpanded && (
             <Paper 
                 elevation={0} 
                 sx={{ 
@@ -737,12 +771,12 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
                                 Clear All
                             </Button>
                         )}
-                        <IconButton size="small">
-                            {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        <IconButton size="small" onClick={() => setFiltersExpanded(false)}>
+                            <CloseIcon />
                         </IconButton>
                     </Box>
                 </Box>
-                <Collapse in={filtersExpanded}>
+                <Collapse in={true}>
                     <Box sx={{ p: 3, bgcolor: 'white' }}>
                         {/* KPI Cards Section */}
                         <Box sx={{ mb: 4 }}>
@@ -1073,6 +1107,7 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
                     </Box>
                 </Collapse>
             </Paper>
+            )}
             
             {/* Employee Leave List */}
             <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1088,15 +1123,51 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
                         flexDirection: 'column'
                     }}
                 >
-                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
-                            Employee Leave Summary
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {filteredData.length} employee{filteredData.length !== 1 ? 's' : ''} found
-                        </Typography>
+                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                                Employee Leave Summary
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                {filteredData.length} employee{filteredData.length !== 1 ? 's' : ''} found
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterListIcon />}
+                            onClick={() => setFiltersExpanded(!filtersExpanded)}
+                            sx={{
+                                textTransform: 'none',
+                                borderColor: '#dc3545',
+                                color: '#dc3545',
+                                '&:hover': {
+                                    borderColor: '#c82333',
+                                    bgcolor: 'rgba(220, 53, 69, 0.04)'
+                                }
+                            }}
+                        >
+                            {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
+                            {hasActiveFilters && (
+                                <Chip
+                                    label={Object.keys({ searchTerm, selectedLeaveType, dateRange: dateRange.start || dateRange.end }).filter(k => 
+                                        k === 'searchTerm' ? searchTerm : 
+                                        k === 'selectedLeaveType' ? selectedLeaveType : 
+                                        dateRange.start || dateRange.end
+                                    ).length}
+                                    size="small"
+                                    sx={{ 
+                                        ml: 1, 
+                                        height: 18, 
+                                        fontSize: '0.65rem',
+                                        bgcolor: '#dc3545',
+                                        color: 'white'
+                                    }}
+                                />
+                            )}
+                        </Button>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} className="table-container">
+                    <TableContainer component={Paper} elevation={0} className="table-container employee-leave-summary-table">
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
@@ -1352,7 +1423,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
     const [dateRange, setDateRange] = useState({ start: null, end: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeaveType, setSelectedLeaveType] = useState('');
-    const [filtersExpanded, setFiltersExpanded] = useState(true);
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     
@@ -1604,7 +1675,8 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
         } else {
             periodDisplay = `${selectedMonth.toLocaleString('default', { month: 'long' })} ${selectedMonth.getFullYear()}`;
         }
-        const totalWorkingDaysForPeriod = totalWorkingDays || monthlyContextDays;
+        // Calculate working days for the selected month excluding Sundays and alternate Saturdays
+        const totalWorkingDaysForPeriod = calculateWorkingDays(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1);
         
         const aggregated = analyticsCounts !== null
             ? employees.map(emp => {
@@ -1740,7 +1812,8 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                 </Alert>
             )}
             
-            {/* Filter Controls with KPI Cards */}
+            {/* Filter Controls with KPI Cards - Hidden by default, shown via button */}
+            {filtersExpanded && (
             <Paper 
                 elevation={0} 
                 sx={{ 
@@ -1795,12 +1868,12 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                                 Clear All
                             </Button>
                         )}
-                        <IconButton size="small">
-                            {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        <IconButton size="small" onClick={() => setFiltersExpanded(false)}>
+                            <CloseIcon />
                         </IconButton>
                     </Box>
                 </Box>
-                <Collapse in={filtersExpanded}>
+                <Collapse in={true}>
                     <Box sx={{ p: 3, bgcolor: 'white' }}>
                         {/* KPI Cards Section */}
                         <Box sx={{ mb: 4 }}>
@@ -2131,6 +2204,7 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                     </Box>
                 </Collapse>
             </Paper>
+            )}
             
             {/* Intern Leave List */}
             <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -2146,13 +2220,49 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                         flexDirection: 'column'
                     }}
                 >
-                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
-                            Intern Leave Summary
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {filteredData.length} intern{filteredData.length !== 1 ? 's' : ''} found
-                        </Typography>
+                    <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                                Intern Leave Summary
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                {filteredData.length} intern{filteredData.length !== 1 ? 's' : ''} found
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterListIcon />}
+                            onClick={() => setFiltersExpanded(!filtersExpanded)}
+                            sx={{
+                                textTransform: 'none',
+                                borderColor: '#dc3545',
+                                color: '#dc3545',
+                                '&:hover': {
+                                    borderColor: '#c82333',
+                                    bgcolor: 'rgba(220, 53, 69, 0.04)'
+                                }
+                            }}
+                        >
+                            {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
+                            {hasActiveFilters && (
+                                <Chip
+                                    label={Object.keys({ searchTerm, selectedLeaveType, dateRange: dateRange.start || dateRange.end }).filter(k => 
+                                        k === 'searchTerm' ? searchTerm : 
+                                        k === 'selectedLeaveType' ? selectedLeaveType : 
+                                        dateRange.start || dateRange.end
+                                    ).length}
+                                    size="small"
+                                    sx={{ 
+                                        ml: 1, 
+                                        height: 18, 
+                                        fontSize: '0.65rem',
+                                        bgcolor: '#dc3545',
+                                        color: 'white'
+                                    }}
+                                />
+                            )}
+                        </Button>
                     </Box>
                     <TableContainer component={Paper} elevation={0} className="table-container">
                     <Table stickyHeader>
@@ -3381,7 +3491,7 @@ const AdminLeavesPage = () => {
             <PageHeroHeader
                 eyebrow="Operations Control"
                 title="Leave Management"
-                description="Monitor, approve, and organize backdated leave workflows with real-time insights."
+                description="Monitor, approve, and manage leave workflows."
                 actionArea={
                     <Stack
                         direction="row"
@@ -4119,3 +4229,8 @@ const AdminLeavesPage = () => {
 };
 
 export default AdminLeavesPage;
+
+
+
+
+

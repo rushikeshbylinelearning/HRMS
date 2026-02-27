@@ -281,7 +281,7 @@ const SchedulingManagementPage = () => {
             <PageHeroHeader
                 eyebrow="Scheduling"
                 title="Manage Shifts & Locations"
-                description="Manage work shifts and office locations from a single unified interface."
+                description="Manage work shifts and office locations."
             />
 
             <div className="scheduling-content-wrapper">

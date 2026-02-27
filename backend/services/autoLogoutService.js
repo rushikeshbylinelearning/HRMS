@@ -20,6 +20,8 @@ const Setting = require('../models/Setting');
 const { getUserDailyStatus } = require('./dailyStatusService');
 const NewNotificationService = require('./NewNotificationService');
 const logAction = require('./logAction');
+const cacheService = require('./cacheService');
+
 const { isNightShiftEmployee } = require('../utils/istTime');
 
 // Note: We cannot import computeCalculatedLogoutTime directly as it requires sessions/breaks arrays
@@ -64,7 +66,7 @@ const calculateExpectedLogoutTime = async (userId, attendanceDate) => {
                     const clockInTime = new Date(attendanceLog.clockInTime);
                     const shiftDurationMinutes = shift.durationHours ? shift.durationHours * 60 : 540; // Default 9 hours
                     const expectedLogout = new Date(clockInTime.getTime() + shiftDurationMinutes * 60 * 1000);
-                    console.log(`[autoLogoutService] ⚠️ Using fallback calculation for user ${userId}: ${expectedLogout.toISOString()}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Using fallback calculation for user ${userId}: ${expectedLogout.toISOString()}`);
                     return expectedLogout;
                 }
             }
@@ -83,13 +85,16 @@ const calculateExpectedLogoutTime = async (userId, attendanceDate) => {
  */
 const isAutoLogoutEnabled = async () => {
     try {
-        const setting = await Setting.findOne({ key: 'enableAutoLogout' });
-        if (setting !== null && setting !== undefined) {
-            // If setting exists, respect its value (true/false)
-            return setting.value === true || setting.value === 'true' || setting.value === '1';
+        const cached = cacheService.getSetting('enableAutoLogout');
+        if (cached !== null && cached !== undefined) {
+            return cached === true || cached === 'true' || cached === '1';
         }
-        // Default: enabled if setting doesn't exist
-        return true;
+        const setting = await Setting.findOne({ key: 'enableAutoLogout' });
+        const value = (setting !== null && setting !== undefined)
+            ? (setting.value === true || setting.value === 'true' || setting.value === '1')
+            : true;
+        cacheService.setSetting('enableAutoLogout', value);
+        return value;
     } catch (error) {
         console.error('[autoLogoutService] Error checking auto logout enable setting:', error);
         return true; // Default: enabled on error
@@ -101,14 +106,17 @@ const isAutoLogoutEnabled = async () => {
  */
 const getAutoLogoutBufferMinutes = async () => {
     try {
+        const cached = cacheService.getSetting('autoLogoutBufferMinutes');
+        if (cached !== null && cached !== undefined && !isNaN(Number(cached))) {
+            const cachedBuffer = Number(cached);
+            if (cachedBuffer >= 30 && cachedBuffer <= 480) return cachedBuffer;
+        }
         const setting = await Setting.findOne({ key: 'autoLogoutBufferMinutes' });
         if (setting && !isNaN(Number(setting.value))) {
             const buffer = Number(setting.value);
-            // Validate buffer is reasonable (between 30 minutes and 8 hours)
             if (buffer >= 30 && buffer <= 480) {
+                cacheService.setSetting('autoLogoutBufferMinutes', buffer);
                 return buffer;
-            } else {
-                console.warn(`[autoLogoutService] Invalid buffer value ${buffer}, using default ${DEFAULT_AUTO_LOGOUT_BUFFER_MINUTES}`);
             }
         }
     } catch (error) {
@@ -133,12 +141,12 @@ const calculateAutoLogoutThreshold = async (expectedLogoutTime) => {
 /**
  * Perform auto logout for a specific attendance session
  */
-const performAutoLogout = async (attendanceLog, activeSession, user) => {
+const performAutoLogout = async (attendanceLog, activeSession, user, preloadedBufferMinutes = null) => {
     try {
         const now = new Date();
         
-        // Get buffer minutes once at the start (used throughout the function)
-        const bufferMinutes = await getAutoLogoutBufferMinutes();
+        // Get buffer minutes (use preloaded value from cycle if available, else fetch once)
+        const bufferMinutes = preloadedBufferMinutes !== null ? preloadedBufferMinutes : await getAutoLogoutBufferMinutes();
         
         // CRITICAL: Atomic duplicate prevention - check and lock in single operation
         // Use findOneAndUpdate to atomically check and mark as in-progress
@@ -160,7 +168,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
 
         // If logCheck is null, the log was already closed by another process
         if (!logCheck) {
-            console.log(`[autoLogoutService] ⚠️ User ${user.email} already has clockOutTime set (race condition prevented), skipping duplicate auto-logout`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ User ${user.email} already has clockOutTime set (race condition prevented), skipping duplicate auto-logout`);
             return false;
         }
 
@@ -186,7 +194,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
             await AttendanceLog.findByIdAndUpdate(attendanceLog._id, {
                 $unset: { _autoLogoutLock: 1 }
             });
-            console.log(`[autoLogoutService] ⚠️ Session ${activeSession._id} already has endTime set, skipping duplicate auto-logout`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Session ${activeSession._id} already has endTime set, skipping duplicate auto-logout`);
             return false;
         }
 
@@ -219,7 +227,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
                 const sessionStartTime = new Date(activeSession.startTime);
                 const maxLogoutTime = new Date(sessionStartTime.getTime() + maxSessionDuration);
                 logoutTime = threshold < maxLogoutTime ? threshold : maxLogoutTime;
-                console.log(`[autoLogoutService] 📅 Using calculated logout time for past date: ${logoutTime.toISOString()}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 📅 Using calculated logout time for past date: ${logoutTime.toISOString()}`);
             }
         }
         
@@ -247,7 +255,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
             await AttendanceLog.findByIdAndUpdate(attendanceLog._id, {
                 $unset: { _autoLogoutLock: 1 }
             });
-            console.log(`[autoLogoutService] ⚠️ Session ${activeSession._id} was closed by another process, aborting auto-logout`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Session ${activeSession._id} was closed by another process, aborting auto-logout`);
             return false;
         }
 
@@ -334,7 +342,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
                 totalWorkingHours: totalWorkingHours,
                 reason: `Exceeded allowed session time by ${overrunMinutes} minutes`
             });
-            console.log(`[autoLogoutService] ✅ Activity log entry created for auto logout`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Activity log entry created for auto logout`);
         } catch (logError) {
             console.error(`[autoLogoutService] ❌ Failed to create activity log entry:`, logError);
             // Don't fail the auto logout if logging fails
@@ -358,7 +366,7 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
                     overrunMinutes: overrunMinutes
                 }
             });
-            console.log(`[autoLogoutService] ✅ Employee notification sent`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Employee notification sent`);
         } catch (notifError) {
             console.error(`[autoLogoutService] ❌ Failed to send employee notification:`, notifError);
             // Don't fail the auto logout if notification fails
@@ -386,17 +394,17 @@ const performAutoLogout = async (attendanceLog, activeSession, user) => {
                     expectedLogoutTime: expectedLogoutTime ? expectedLogoutTime.toISOString() : null
                 }
             }, user._id);
-            console.log(`[autoLogoutService] ✅ Admin notification sent`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Admin notification sent`);
         } catch (notifError) {
             console.error(`[autoLogoutService] ❌ Failed to send admin notification:`, notifError);
             console.error(`[autoLogoutService]   Error details:`, notifError.message, notifError.stack);
             // Don't fail the auto logout if notification fails
         }
 
-        console.log(`[autoLogoutService] ✅ Auto-logged out user ${user.fullName} (${user.email}) at ${logoutTime.toISOString()}`);
-        console.log(`[autoLogoutService]   Total working hours: ${totalWorkingHours.toFixed(2)}h`);
-        console.log(`[autoLogoutService]   Attendance date: ${attendanceLog.attendanceDate}`);
-        console.log(`[autoLogoutService]   Overrun: ${overrunMinutes} minutes`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Auto-logged out user ${user.fullName} (${user.email}) at ${logoutTime.toISOString()}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Total working hours: ${totalWorkingHours.toFixed(2)}h`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Attendance date: ${attendanceLog.attendanceDate}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Overrun: ${overrunMinutes} minutes`);
 
         return true;
     } catch (error) {
@@ -493,7 +501,7 @@ const cleanupLegacySessions = async () => {
         }
 
         if (legacyCount > 0) {
-            console.log(`[autoLogoutService] ✅ Closed ${legacyCount} legacy session(s) (pre-auto-logout)`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Closed ${legacyCount} legacy session(s) (pre-auto-logout)`);
         }
 
         return legacyCount;
@@ -509,18 +517,18 @@ const cleanupLegacySessions = async () => {
  */
 const checkAndAutoLogout = async () => {
     const checkStartTime = new Date();
-    console.log(`[autoLogoutService] 🔍 Running auto-logout check at ${checkStartTime.toISOString()}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🔍 Running auto-logout check at ${checkStartTime.toISOString()}`);
 
     // Check if database is connected
     if (mongoose.connection.readyState !== 1) {
-        console.log('[autoLogoutService] ⚠️ Database not connected, skipping auto-logout check');
+        if (process.env.NODE_ENV !== 'production') console.log('[autoLogoutService] ⚠️ Database not connected, skipping auto-logout check');
         return;
     }
 
     // CRITICAL: Check if auto logout feature is enabled
     const featureEnabled = await isAutoLogoutEnabled();
     if (!featureEnabled) {
-        console.log('[autoLogoutService] ℹ️ Auto logout feature is disabled, skipping check');
+        if (process.env.NODE_ENV !== 'production') console.log('[autoLogoutService] ℹ️ Auto logout feature is disabled, skipping check');
         return;
     }
 
@@ -538,11 +546,30 @@ const checkAndAutoLogout = async () => {
         }).populate('user').lean();
 
         if (!activeAttendanceLogs || activeAttendanceLogs.length === 0) {
-            console.log('[autoLogoutService] ℹ️ No active attendance sessions found');
+            if (process.env.NODE_ENV !== 'production') console.log('[autoLogoutService] ℹ️ No active attendance sessions found');
             return;
         }
 
-        console.log(`[autoLogoutService] 📊 Found ${activeAttendanceLogs.length} active attendance log(s) to check`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 📊 Found ${activeAttendanceLogs.length} active attendance log(s) to check`);
+
+        // Performance: fetch buffer setting once per cycle (not per user) and bulk-fetch sessions
+        const cycleBufferMinutes = await getAutoLogoutBufferMinutes();
+        
+        // Bulk-fetch all active AttendanceSessions in one $in query (N+1 fix)
+        const activeLogIds = activeAttendanceLogs.map(log => log._id);
+        const allActiveSessions = await AttendanceSession.find({
+            attendanceLog: { $in: activeLogIds },
+            endTime: null,
+            isLegacySession: { $ne: true }
+        }).sort({ startTime: -1 }).lean();
+        
+        // Build a map: logId -> [sessions] for O(1) lookup per user
+        const sessionsByLogId = {};
+        for (const session of allActiveSessions) {
+            const key = session.attendanceLog.toString();
+            if (!sessionsByLogId[key]) sessionsByLogId[key] = [];
+            sessionsByLogId[key].push(session);
+        }
 
         let autoLogoutCount = 0;
         let skippedCount = 0;
@@ -586,7 +613,7 @@ const checkAndAutoLogout = async () => {
                             }
                         });
 
-                        console.log(`[autoLogoutService] 🧹 Closed legacy session for ${attendanceLog.user?.email || 'unknown user'}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🧹 Closed legacy session for ${attendanceLog.user?.email || 'unknown user'}`);
                         autoLogoutCount++; // Count as processed
                     } else {
                         // No active session, just close the log
@@ -600,23 +627,18 @@ const checkAndAutoLogout = async () => {
                                 isLegacySession: true
                             }
                         });
-                        console.log(`[autoLogoutService] 🧹 Closed legacy log for ${attendanceLog.user?.email || 'unknown user'}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🧹 Closed legacy log for ${attendanceLog.user?.email || 'unknown user'}`);
                         autoLogoutCount++;
                     }
                     continue; // Skip normal processing
                 }
 
-                // Get active session for this attendance log (exclude legacy sessions)
-                // CRITICAL: Handle multiple active sessions - get the most recent one
-                const activeSessions = await AttendanceSession.find({
-                    attendanceLog: attendanceLog._id,
-                    endTime: null, // Still active
-                    isLegacySession: { $ne: true } // Exclude legacy sessions
-                }).sort({ startTime: -1 }).lean(); // Sort by most recent first
+                // Get active sessions from pre-fetched bulk map (eliminates N+1 DB queries)
+                const activeSessions = sessionsByLogId[attendanceLog._id.toString()] || [];
 
                 // If multiple active sessions exist, log a warning and use the most recent
                 if (activeSessions.length > 1) {
-                    console.log(`[autoLogoutService] ⚠️ WARNING: User ${attendanceLog.user?.email || 'unknown'} has ${activeSessions.length} active sessions. Using most recent.`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ WARNING: User ${attendanceLog.user?.email || 'unknown'} has ${activeSessions.length} active sessions. Using most recent.`);
                 }
 
                 const activeSession = activeSessions.length > 0 ? activeSessions[0] : null;
@@ -630,7 +652,7 @@ const checkAndAutoLogout = async () => {
                     }).sort({ endTime: -1 }).lean();
                     
                     if (lastSession && lastSession.endTime) {
-                        console.log(`[autoLogoutService] 🔧 Fixing data inconsistency for ${attendanceLog.user?.email || 'unknown'}: Setting clockOutTime to last session endTime`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🔧 Fixing data inconsistency for ${attendanceLog.user?.email || 'unknown'}: Setting clockOutTime to last session endTime`);
                         await AttendanceLog.findByIdAndUpdate(attendanceLog._id, {
                             $set: { clockOutTime: lastSession.endTime }
                         });
@@ -645,7 +667,7 @@ const checkAndAutoLogout = async () => {
                 // CRITICAL: Skip auto-logout for night-shift employees
                 // Night-shift employees have extended attendance day until 6 AM
                 if (user && isNightShiftEmployee(user._id.toString())) {
-                    console.log(`[autoLogoutService] ⏰ Skipping auto-logout for ${user.email} - night-shift employee (attendance day extends until 6 AM)`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⏰ Skipping auto-logout for ${user.email} - night-shift employee (attendance day extends until 6 AM)`);
                     skippedCount++;
                     continue;
                 }
@@ -685,13 +707,13 @@ const checkAndAutoLogout = async () => {
                                 }
                             });
                             
-                            console.log(`[autoLogoutService] 🧹 Closed legacy session (no shift, >24h old) for ${attendanceLog.user?.email || 'unknown'}`);
+                            if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🧹 Closed legacy session (no shift, >24h old) for ${attendanceLog.user?.email || 'unknown'}`);
                             autoLogoutCount++;
                             continue;
                         }
                     }
                     
-                    console.log(`[autoLogoutService] ⚠️ User ${attendanceLog.user?.email || 'unknown'} has no shift assigned, skipping`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ User ${attendanceLog.user?.email || 'unknown'} has no shift assigned, skipping`);
                     skippedCount++;
                     continue;
                 }
@@ -709,11 +731,11 @@ const checkAndAutoLogout = async () => {
                 const daysDiff = Math.floor((todayDateObj - attendanceDateObj) / (1000 * 60 * 60 * 24));
                 
                 if (daysDiff > 0) {
-                    console.log(`[autoLogoutService] 📅 Processing ${daysDiff} day(s) old attendance log for ${user.email} (date: ${attendanceLog.attendanceDate})`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 📅 Processing ${daysDiff} day(s) old attendance log for ${user.email} (date: ${attendanceLog.attendanceDate})`);
                     
                     // Warn if log is very old (more than 7 days) - might indicate data inconsistency
                     if (daysDiff > 7) {
-                        console.log(`[autoLogoutService] ⚠️ WARNING: Very old attendance log (${daysDiff} days) for ${user.email}. This might indicate a data inconsistency.`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ WARNING: Very old attendance log (${daysDiff} days) for ${user.email}. This might indicate a data inconsistency.`);
                     }
                 }
 
@@ -725,7 +747,7 @@ const checkAndAutoLogout = async () => {
                 );
 
                 if (!expectedLogoutTime) {
-                    console.log(`[autoLogoutService] ⚠️ Could not calculate expected logout time for user ${user.email} (date: ${attendanceLog.attendanceDate}), skipping`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Could not calculate expected logout time for user ${user.email} (date: ${attendanceLog.attendanceDate}), skipping`);
                     skippedCount++;
                     continue;
                 }
@@ -734,7 +756,7 @@ const checkAndAutoLogout = async () => {
                 const autoLogoutThreshold = await calculateAutoLogoutThreshold(expectedLogoutTime);
 
                 if (!autoLogoutThreshold) {
-                    console.log(`[autoLogoutService] ⚠️ Could not calculate auto-logout threshold for user ${user.email}, skipping`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Could not calculate auto-logout threshold for user ${user.email}, skipping`);
                     skippedCount++;
                     continue;
                 }
@@ -748,7 +770,7 @@ const checkAndAutoLogout = async () => {
                 const isOvernightShift = expectedLogoutDateStr > attendanceDateStr;
                 
                 if (isOvernightShift) {
-                    console.log(`[autoLogoutService] 🌙 Detected overnight shift for ${user.email} (logout on next day)`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 🌙 Detected overnight shift for ${user.email} (logout on next day)`);
                 }
 
                 // CRITICAL: For past dates (yesterday or older), auto-logout immediately if threshold has passed
@@ -760,38 +782,38 @@ const checkAndAutoLogout = async () => {
                 // This prevents logging out users who just clocked in
                 const sessionStartTime = new Date(activeSession.startTime);
                 const sessionAgeMinutes = (now - sessionStartTime) / (1000 * 60);
-                const bufferMinutes = await getAutoLogoutBufferMinutes();
+                const bufferMinutes = cycleBufferMinutes;
                 const minSessionAge = bufferMinutes; // Don't logout sessions newer than buffer period
                 
                 if (shouldAutoLogout && sessionAgeMinutes < minSessionAge) {
-                    console.log(`[autoLogoutService] ⚠️ Skipping auto-logout for ${user.email}: Session is too new (${Math.round(sessionAgeMinutes)} minutes old, minimum ${minSessionAge} minutes required)`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ Skipping auto-logout for ${user.email}: Session is too new (${Math.round(sessionAgeMinutes)} minutes old, minimum ${minSessionAge} minutes required)`);
                     skippedCount++;
                     continue;
                 }
 
                 if (shouldAutoLogout) {
-                    console.log(`[autoLogoutService] ⏰ User ${user.email} exceeded auto-logout threshold`);
-                    console.log(`[autoLogoutService]   Attendance Date: ${attendanceLog.attendanceDate}`);
-                    console.log(`[autoLogoutService]   Expected logout: ${expectedLogoutTime.toISOString()}`);
-                    console.log(`[autoLogoutService]   Auto-logout threshold: ${autoLogoutThreshold.toISOString()}`);
-                    console.log(`[autoLogoutService]   Current time: ${now.toISOString()}`);
-                    console.log(`[autoLogoutService]   Time exceeded by: ${Math.round((now - autoLogoutThreshold) / (1000 * 60))} minutes`);
-                    console.log(`[autoLogoutService]   Session age: ${Math.round(sessionAgeMinutes)} minutes`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⏰ User ${user.email} exceeded auto-logout threshold`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Attendance Date: ${attendanceLog.attendanceDate}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Expected logout: ${expectedLogoutTime.toISOString()}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Auto-logout threshold: ${autoLogoutThreshold.toISOString()}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Current time: ${now.toISOString()}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Time exceeded by: ${Math.round((now - autoLogoutThreshold) / (1000 * 60))} minutes`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService]   Session age: ${Math.round(sessionAgeMinutes)} minutes`);
                     
                     // Perform auto logout
-                    const success = await performAutoLogout(attendanceLog, activeSession, user);
+                    const success = await performAutoLogout(attendanceLog, activeSession, user, cycleBufferMinutes);
                     if (success) {
                         autoLogoutCount++;
-                        console.log(`[autoLogoutService] ✅ Successfully auto-logged out ${user.email}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Successfully auto-logged out ${user.email}`);
                     } else {
-                        console.log(`[autoLogoutService] ❌ Failed to auto-logout ${user.email}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ❌ Failed to auto-logout ${user.email}`);
                     }
                 } else {
                     // Not yet time for auto-logout
                     const minutesUntilAutoLogout = Math.round((autoLogoutThreshold - now) / (1000 * 60));
                     if (minutesUntilAutoLogout <= 30 && minutesUntilAutoLogout > 0) {
                         // Log warning if within 30 minutes of auto-logout
-                        console.log(`[autoLogoutService] ⚠️ User ${user.email} will be auto-logged out in ~${minutesUntilAutoLogout} minutes`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ⚠️ User ${user.email} will be auto-logged out in ~${minutesUntilAutoLogout} minutes`);
                     }
                 }
             } catch (error) {
@@ -802,8 +824,8 @@ const checkAndAutoLogout = async () => {
         }
 
         const checkDuration = Math.round((new Date() - checkStartTime) / 1000);
-        console.log(`[autoLogoutService] ✅ Auto-logout check completed in ${checkDuration}s`);
-        console.log(`[autoLogoutService] 📊 Summary: Processed: ${processedCount}, Auto-logged out: ${autoLogoutCount}, Skipped: ${skippedCount}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] ✅ Auto-logout check completed in ${checkDuration}s`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[autoLogoutService] 📊 Summary: Processed: ${processedCount}, Auto-logged out: ${autoLogoutCount}, Skipped: ${skippedCount}`);
     } catch (error) {
         console.error('[autoLogoutService] ❌ Fatal error in auto-logout check:', error);
         console.error('[autoLogoutService]   Error stack:', error.stack);

@@ -59,6 +59,18 @@ import { setupPrefetchListeners, routePrefetchMap } from './utils/prefetch';
 // Import resource preloading utilities
 import { preloadCriticalResources, preloadAssets } from './utils/resourcePreloader';
 
+// Delayed fallback component - only shows skeleton after 300ms delay
+const DelayedFallback = ({ children, delay = 300 }) => {
+    const [show, setShow] = React.useState(false);
+    
+    React.useEffect(() => {
+        const timer = setTimeout(() => setShow(true), delay);
+        return () => clearTimeout(timer);
+    }, [delay]);
+    
+    return show ? children : null;
+};
+
 // Enhanced loading component for Suspense - uses skeleton loaders
 const PageLoader = ({ type = 'default' }) => (
     <Box sx={{ 
@@ -209,7 +221,7 @@ function App() {
                                     <Route path="/login" element={<LoginPage />} />
                                     <Route path="/sso-login" element={<SSOLoginPage />} />
                                     <Route path="/auth/sso-callback" element={
-                                        <Suspense fallback={<PageLoader />}>
+                                        <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                             <SSOCallbackPage />
                                         </Suspense>
                                     } />
@@ -220,20 +232,20 @@ function App() {
                                     {/* Protected routes - require authentication */}
                                     <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                                         <Route path="/dashboard" element={
-                                            <Suspense fallback={<PageLoader type="dashboard" />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="dashboard" /></DelayedFallback>}>
                                                 <DashboardRouter />
                                             </Suspense>
                                         } />
 
                                         <Route path="/leaves" element={
-                                            <Suspense fallback={<PageLoader type="list" />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="list" /></DelayedFallback>}>
                                                 <PermissionProtectedRoute requiredPermission="leaves">
                                                     <LeavesPage />
                                                 </PermissionProtectedRoute>
                                             </Suspense>
                                         } />
                                         <Route path="/attendance-summary" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AttendanceSummaryPage />
                                             </Suspense>
                                         } />
@@ -241,101 +253,101 @@ function App() {
                                         
                                         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
                                         <Route path="/admin/dashboard" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AdminDashboardPage />
                                             </Suspense>
                                         } />
                                         <Route path="/employees" element={
-                                            <Suspense fallback={<PageLoader type="table" />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="table" /></DelayedFallback>}>
                                                 <EmployeesPage />
                                             </Suspense>
                                         } />
                                         <Route path="/employees/deactivated" element={
-                                            <Suspense fallback={<PageLoader type="table" />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="table" /></DelayedFallback>}>
                                                 <DeactivatedEmployeesPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/leaves" element={
-                                            <Suspense fallback={<PageLoader type="table" />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="table" /></DelayedFallback>}>
                                                 <AdminLeavesPage />
                                             </Suspense>
                                         } />
                                         <Route path="/reports" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <PermissionProtectedRoute requiredPermission="viewReports">
                                                     <ReportsPage />
                                                 </PermissionProtectedRoute>
                                             </Suspense>
                                         } />
                                         <Route path="/activity-log" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <NewActivityLogPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/attendance-summary" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AdminAttendanceSummaryPage />
                                             </Suspense>
                                         } />
                                         <Route path="/scheduling-management" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <SchedulingManagementPage />
                                             </Suspense>
                                         } />
                                         <Route path="/shifts" element={<Navigate to="/scheduling-management" replace />} />
                                         <Route path="/office-locations" element={<Navigate to="/scheduling-management" replace />} />
                                         <Route path="/manage-section" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <ManageSectionPage />
                                             </Suspense>
                                         } />
                                         <Route path="/probation" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <ProbationPage />
                                             </Suspense>
                                         } />
                                         <Route path="/employee-muster-roll" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <EmployeeMusterRollPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/leaves/more-options/leaves-tracker" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <LeavesTrackerPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/policies" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AdminPoliciesPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/cif" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <CIFManagementPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/cif/employee/:employeeId" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <EmployeeCIFDetailsPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/compliance/cif" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <CIFManagementPage />
                                             </Suspense>
                                         } />
                                         <Route path="/analytics/attendance" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AnalyticsPage />
                                             </Suspense>
                                         } />
                                         <Route path="/analytics/employee/:employeeId" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <EmployeeDetailedAnalyticsPage />
                                             </Suspense>
                                         } />
                                         <Route path="/admin/holidays" element={
-                                            <Suspense fallback={<PageLoader />}>
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <HolidayManagementPage />
                                             </Suspense>
                                         } />

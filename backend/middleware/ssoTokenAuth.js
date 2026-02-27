@@ -45,7 +45,7 @@ function ssoTokenAuth(SSO_CONFIG) {
 
     // If SSO is not configured, redirect to SSO portal
     if (!ssoVerification.isConfigured()) {
-      console.log('[SSOAuth] SSO not configured, redirecting to SSO portal');
+      if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] SSO not configured, redirecting to SSO portal');
       const redirectUrl = process.env.NODE_ENV === 'production'
         ? 'https://sso.bylinelms.com/login'
         : 'http://localhost:3000/login';
@@ -53,7 +53,7 @@ function ssoTokenAuth(SSO_CONFIG) {
     }
 
     try {
-      console.log('[SSOAuth] Processing SSO token...');
+      if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] Processing SSO token...');
       
       // Verify the SSO token using the new verification utility
       const decoded = await ssoVerification.verifyToken(token);
@@ -64,9 +64,9 @@ function ssoTokenAuth(SSO_CONFIG) {
       // Use appEmail for user lookup (primary), fallback to SSO email
       const lookupEmail = userClaims.appEmail || userClaims.email;
       
-      console.log('[SSOAuth] Using email for lookup:', lookupEmail);
-      console.log('[SSOAuth] App email available:', !!userClaims.appEmail);
-      console.log('[SSOAuth] App password available:', !!userClaims.appPassword);
+      if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] Using email for lookup:', lookupEmail);
+      if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] App email available:', !!userClaims.appEmail);
+      if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] App password available:', !!userClaims.appPassword);
 
       // Find or create user using appEmail (not SSO email)
       let user = await User.findOne({ 
@@ -78,7 +78,7 @@ function ssoTokenAuth(SSO_CONFIG) {
         // Check if auto-provisioning is enabled
         const autoProvision = process.env.SSO_AUTO_PROVISION === 'true';
         if (!autoProvision) {
-          console.log(`[SSOAuth] User ${userClaims.email} not found and auto-provisioning disabled`);
+          if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] User ${userClaims.email} not found and auto-provisioning disabled`);
           const redirectUrl = process.env.NODE_ENV === 'production'
             ? 'https://sso.bylinelms.com/login'
             : 'http://localhost:3000/login';
@@ -86,14 +86,14 @@ function ssoTokenAuth(SSO_CONFIG) {
         }
 
         // Auto-provision new user using appEmail
-        console.log(`[SSOAuth] Auto-provisioning new user: ${lookupEmail}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Auto-provisioning new user: ${lookupEmail}`);
         
         // Hash password if provided in token
         let passwordHash = 'SSO_USER_NO_PASSWORD';
         if (userClaims.appPassword) {
           const bcrypt = require('bcrypt');
           passwordHash = await bcrypt.hash(userClaims.appPassword, 10);
-          console.log(`[SSOAuth] Hashed password for new user: ${lookupEmail}`);
+          if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Hashed password for new user: ${lookupEmail}`);
         }
         
         user = new User({
@@ -126,9 +126,9 @@ function ssoTokenAuth(SSO_CONFIG) {
 
         await user.save();
         user = await User.findById(user._id).populate('shiftGroup');
-        console.log(`[SSOAuth] Successfully created new user: ${lookupEmail}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Successfully created new user: ${lookupEmail}`);
       } else {
-        console.log(`[SSOAuth] Found existing AMS user: ${lookupEmail}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Found existing AMS user: ${lookupEmail}`);
         
         // Verify app password if provided in token
         if (userClaims.appPassword && user.passwordHash && user.passwordHash !== 'SSO_USER_NO_PASSWORD') {
@@ -142,7 +142,7 @@ function ssoTokenAuth(SSO_CONFIG) {
                 : 'http://localhost:3000/login';
               return res.redirect(redirectUrl);
             }
-            console.log(`[SSOAuth] ✅ Password verification successful for user: ${lookupEmail}`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] ✅ Password verification successful for user: ${lookupEmail}`);
           } catch (passwordError) {
             console.error(`[SSOAuth] ❌ Password verification error: ${passwordError.message}`);
             const redirectUrl = process.env.NODE_ENV === 'production'
@@ -152,10 +152,10 @@ function ssoTokenAuth(SSO_CONFIG) {
           }
         } else if (userClaims.appPassword && (!user.passwordHash || user.passwordHash === 'SSO_USER_NO_PASSWORD')) {
           // User has no password set (SSO-only user), skip password verification
-          console.log(`[SSOAuth] ⚠️ User ${lookupEmail} has no password set, skipping password verification`);
+          if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] ⚠️ User ${lookupEmail} has no password set, skipping password verification`);
         } else if (!userClaims.appPassword) {
           // No password in token, skip verification (backward compatibility)
-          console.log(`[SSOAuth] ⚠️ No app password in token, skipping password verification`);
+          if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] ⚠️ No app password in token, skipping password verification`);
         }
         
         // Update user data from SSO if needed
@@ -179,7 +179,7 @@ function ssoTokenAuth(SSO_CONFIG) {
             { new: true }
           ).populate('shiftGroup');
 
-          console.log(`[SSOAuth] Updated user data for: ${lookupEmail}`);
+          if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Updated user data for: ${lookupEmail}`);
         }
       }
 
@@ -193,7 +193,7 @@ function ssoTokenAuth(SSO_CONFIG) {
       };
       req.session.ssoAuthenticated = true;
 
-      console.log(`✅ SSO Login: ${lookupEmail}`);
+      if (process.env.NODE_ENV !== 'production') console.log(`✅ SSO Login: ${lookupEmail}`);
 
       // Redirect to intended route
       const returnUrl = req.query.return_url || '/dashboard';

@@ -1,23 +1,17 @@
 import { memo } from 'react';
 import AnonymousFeedback from './AnonymousFeedback';
 
-/**
- * ROOT CAUSE FIX: Memoize ProfilePolicies to prevent unnecessary re-renders
- * This component should ONLY re-render when policies array changes
- */
 const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
+        return new Date(dateString).toLocaleDateString('en-IN', {
+            month: 'short', day: 'numeric', year: 'numeric'
         });
     };
 
     return (
         <div className="profile-policies">
-            <h3 className="policies-title">Policies & Anonymous Feedback</h3>
+            <h3 className="policies-title">Policies &amp; Feedback</h3>
 
             {/* Company Policies */}
             <div className="policies-section">
@@ -27,15 +21,18 @@ const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
                         <p className="policies-empty">No policies available</p>
                     ) : (
                         policies.map((policy) => (
-                            <div 
-                                key={policy._id} 
+                            <div
+                                key={policy._id}
                                 className="policy-item"
                                 onClick={() => onPolicyClick(policy)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === 'Enter' && onPolicyClick(policy)}
                             >
                                 <div className="policy-icon">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#E53935" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        <path d="M14 2V8H20" stroke="#E53935" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <path d="M14 2H6C5.47 2 4.96 2.21 4.59 2.59C4.21 2.96 4 3.47 4 4v16c0 .53.21 1.04.59 1.41.37.38.88.59 1.41.59h12c.53 0 1.04-.21 1.41-.59.38-.37.59-.88.59-1.41V8L14 2z" stroke="#E53935" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <polyline points="14 2 14 8 20 8" stroke="#E53935" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                     </svg>
                                 </div>
                                 <div className="policy-content">
@@ -46,8 +43,8 @@ const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
                                         </span>
                                     </div>
                                     <div className="policy-meta">
-                                        <span className="policy-version">Version {policy.version}</span>
-                                        <span className="policy-divider">•</span>
+                                        <span className="policy-version">v{policy.version}</span>
+                                        <span className="policy-divider">·</span>
                                         <span className="policy-date">Effective {formatDate(policy.effectiveFrom)}</span>
                                     </div>
                                 </div>
@@ -57,7 +54,7 @@ const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
                 </div>
             </div>
 
-            {/* Anonymous Message */}
+            {/* Anonymous Feedback */}
             <div className="policies-section">
                 <h4 className="policies-section-title-bold">ANONYMOUS MESSAGE</h4>
                 <AnonymousFeedback />
@@ -66,4 +63,5 @@ const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
     );
 });
 
+ProfilePolicies.displayName = 'ProfilePolicies';
 export default ProfilePolicies;

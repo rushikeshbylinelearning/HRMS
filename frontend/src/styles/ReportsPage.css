@@ -1,36 +1,9 @@
 /* src/styles/ReportsPage.css */
 
 .reports-page {
-  padding: 24px;
+  padding: 0;
   background: #f4f6f8;
   min-height: 100vh;
-}
-
-/* --- Compact Header Styling (Match Policies Page) --- */
-.reports-page .page-hero-header {
-  margin-left: 0;
-  margin-right: 0;
-  margin-bottom: 24px;
-  padding: 20px 24px;
-}
-
-.reports-page .page-hero-header__content {
-  gap: 6px;
-}
-
-.reports-page .page-hero-header__eyebrow {
-  font-size: 0.65rem;
-  letter-spacing: 0.15em !important;
-}
-
-.reports-page .page-hero-header__title {
-  font-size: 1.5rem !important;
-  font-weight: 700 !important;
-}
-
-.reports-page .page-hero-header__description {
-  font-size: 0.85rem;
-  line-height: 1.5;
 }
 
 /* --- Loading & Error States --- */
@@ -430,15 +403,15 @@
   width: 100%;
   box-sizing: border-box;
   align-items: stretch;
-  margin-left: -12px !important;
-  margin-right: -12px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .reports-page .reports-grid-container > .MuiGrid-item {
   display: flex;
   box-sizing: border-box;
   margin: 0;
-  padding: 12px !important;
+  padding: 0 12px 12px 0 !important;
   align-items: stretch;
 }
 
@@ -690,17 +663,6 @@
     padding: 16px;
   }
   
-  .reports-page .page-hero-header {
-    margin-left: 0;
-    margin-right: 0;
-    margin-bottom: 20px;
-    padding: 18px 20px;
-  }
-  
-  .reports-page .page-hero-header__title {
-    font-size: 1.3rem !important;
-  }
-  
   .reports-page .filter-card {
     padding: 24px 20px;
     margin-bottom: 24px;
@@ -816,15 +778,7 @@
 }
 
 @media (max-width: 600px) {
-  .reports-page .page-hero-header {
-    margin-left: 0;
-    margin-right: 0;
-    padding: 16px 18px;
-  }
-  
-  .reports-page .page-hero-header__title {
-    font-size: 1.3rem !important;
-  }
+  /* Responsive styles for mobile */
 }
 
 /* --- Animation Keyframes --- */

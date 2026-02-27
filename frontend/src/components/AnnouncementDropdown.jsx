@@ -33,17 +33,17 @@ const AnnouncementDropdown = () => {
           setLastReadTime(backendTime);
           // Update localStorage to match backend
           localStorage.setItem('announcements_last_read', data.lastReadTime);
-          console.log('[AnnouncementDropdown] Loaded lastReadTime from backend:', data.lastReadTime);
+          if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Loaded lastReadTime from backend:', data.lastReadTime);
         } else {
           // Explicitly set to null (user never read)
           setLastReadTime(null);
-          console.log('[AnnouncementDropdown] No lastReadTime in backend (fresh user)');
+          if (import.meta.env.DEV) console.log('[AnnouncementDropdown] No lastReadTime in backend (fresh user)');
           
           // Fallback to localStorage if backend has no record
           const stored = localStorage.getItem('announcements_last_read');
           if (stored) {
             setLastReadTime(new Date(stored));
-            console.log('[AnnouncementDropdown] Loaded lastReadTime from localStorage:', stored);
+            if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Loaded lastReadTime from localStorage:', stored);
           }
         }
       } catch (error) {
@@ -53,13 +53,13 @@ const AnnouncementDropdown = () => {
         const stored = localStorage.getItem('announcements_last_read');
         if (stored) {
           setLastReadTime(new Date(stored));
-          console.log('[AnnouncementDropdown] Fallback to localStorage:', stored);
+          if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Fallback to localStorage:', stored);
         } else {
           setLastReadTime(null);
         }
       } finally {
         setLastReadTimeLoading(false); // Done loading
-        console.log('[AnnouncementDropdown] lastReadTime loading complete');
+        if (import.meta.env.DEV) console.log('[AnnouncementDropdown] lastReadTime loading complete');
       }
     };
 
@@ -73,7 +73,7 @@ const AnnouncementDropdown = () => {
       channelRef.current = new BroadcastChannel('announcements_channel');
       
       channelRef.current.onmessage = (event) => {
-        console.log('[AnnouncementDropdown] BroadcastChannel message:', event.data);
+        if (import.meta.env.DEV) console.log('[AnnouncementDropdown] BroadcastChannel message:', event.data);
         
         if (event.data.type === 'MARK_READ') {
           // Another tab marked announcements as read
@@ -88,7 +88,7 @@ const AnnouncementDropdown = () => {
         }
       };
 
-      console.log('[AnnouncementDropdown] BroadcastChannel initialized');
+      if (import.meta.env.DEV) console.log('[AnnouncementDropdown] BroadcastChannel initialized');
     } else {
       console.warn('[AnnouncementDropdown] BroadcastChannel not supported');
     }
@@ -97,7 +97,7 @@ const AnnouncementDropdown = () => {
       // Cleanup BroadcastChannel on unmount
       if (channelRef.current) {
         channelRef.current.close();
-        console.log('[AnnouncementDropdown] BroadcastChannel closed');
+        if (import.meta.env.DEV) console.log('[AnnouncementDropdown] BroadcastChannel closed');
       }
     };
   }, [requestPermission]);
@@ -107,7 +107,7 @@ const AnnouncementDropdown = () => {
     const checkUnreadMessages = async () => {
       // FIX: Don't calculate if still loading lastReadTime (prevents race condition)
       if (lastReadTimeLoading) {
-        console.log('[AnnouncementDropdown] Skipping unread calc - still loading lastReadTime');
+        if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Skipping unread calc - still loading lastReadTime');
         return;
       }
       
@@ -134,12 +134,12 @@ const AnnouncementDropdown = () => {
           );
           setUnreadCount(unreadMessages.length);
           setHasUnread(unreadMessages.length > 0);
-          console.log('[AnnouncementDropdown] Unread count calculated:', unreadMessages.length, 'lastReadTime:', lastReadTime.toISOString());
+          if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Unread count calculated:', unreadMessages.length, 'lastReadTime:', lastReadTime.toISOString());
         } else {
           // No last read time means all messages from others are unread
           setUnreadCount(otherUsersMessages.length);
           setHasUnread(otherUsersMessages.length > 0);
-          console.log('[AnnouncementDropdown] No lastReadTime - all messages unread:', otherUsersMessages.length);
+          if (import.meta.env.DEV) console.log('[AnnouncementDropdown] No lastReadTime - all messages unread:', otherUsersMessages.length);
         }
       } catch (error) {
         console.error('Error checking unread messages:', error);
@@ -152,7 +152,15 @@ const AnnouncementDropdown = () => {
     // Only check if not currently open
     if (!open) {
       checkUnreadMessages();
-      const interval = setInterval(checkUnreadMessages, 30000);
+      // PERFORMANCE FIX: Increased polling interval 30s → 5 minutes.
+      // Real-time new announcements are delivered via Socket.IO (receiveAnnouncement event below).
+      // This poll is only a fallback for when socket is disconnected.
+      // 5 min is sufficient — announcements are not time-critical to the second.
+      const interval = setInterval(() => {
+        // Skip the HTTP poll if socket is connected — socket will push new announcements
+        if (socket.connected) return;
+        checkUnreadMessages();
+      }, 5 * 60 * 1000); // 5 minutes
       return () => clearInterval(interval);
     }
   }, [lastReadTime, lastReadTimeLoading, open, user]); // Added lastReadTimeLoading dependency
@@ -160,7 +168,7 @@ const AnnouncementDropdown = () => {
   // Socket reconnection handler - refetch announcements on reconnect
   useEffect(() => {
     const handleReconnect = () => {
-      console.log('[AnnouncementDropdown] Socket reconnected, refetching announcements');
+      if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Socket reconnected, refetching announcements');
       
       // Refetch announcements to catch any missed during disconnect
       api.get('/announcements')
@@ -254,7 +262,7 @@ const AnnouncementDropdown = () => {
     // Persist to backend for cross-device sync
     try {
       await api.post('/announcements/mark-read');
-      console.log('[AnnouncementDropdown] Marked as read on backend');
+      if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Marked as read on backend');
     } catch (error) {
       console.error('[AnnouncementDropdown] Error marking as read on backend:', error);
       // Continue with localStorage fallback (already saved above)
@@ -266,7 +274,7 @@ const AnnouncementDropdown = () => {
         type: 'MARK_READ',
         timestamp: timestamp
       });
-      console.log('[AnnouncementDropdown] Broadcasted MARK_READ to other tabs');
+      if (import.meta.env.DEV) console.log('[AnnouncementDropdown] Broadcasted MARK_READ to other tabs');
     }
   };
 

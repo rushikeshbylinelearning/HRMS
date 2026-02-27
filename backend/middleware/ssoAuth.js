@@ -25,7 +25,7 @@ class SSOAuthMiddleware {
         }
 
         try {
-            console.log(`[SSOAuth] Fetching JWKS from: ${this.jwksUrl}`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Fetching JWKS from: ${this.jwksUrl}`);
             
             const response = await axios.get(this.jwksUrl, {
                 timeout: this.requestTimeout,
@@ -60,9 +60,9 @@ class SSOAuthMiddleware {
                         const publicKeyPem = rsaKey.exportKey('public');
                         this.publicKeys.set(key.kid, publicKeyPem);
                         
-                        console.log(`[SSOAuth] Cached public key: ${key.kid}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Cached public key: ${key.kid}`);
                     } catch (keyError) {
-                        console.warn(`[SSOAuth] Failed to process key ${key.kid}:`, keyError.message);
+                        if (process.env.NODE_ENV !== 'production') console.warn(`[SSOAuth] Failed to process key ${key.kid}:`, keyError.message);
                     }
                 }
             }
@@ -73,7 +73,7 @@ class SSOAuthMiddleware {
 
             // Set cache expiry
             this.keyCacheExpiry = Date.now() + this.cacheDuration;
-            console.log(`[SSOAuth] Successfully cached ${this.publicKeys.size} public keys`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Successfully cached ${this.publicKeys.size} public keys`);
 
             return this.publicKeys;
         } catch (error) {
@@ -113,7 +113,7 @@ class SSOAuthMiddleware {
             }
 
             const keyId = decodedHeader.header.kid;
-            console.log(`[SSOAuth] Validating token with key ID: ${keyId}`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Validating token with key ID: ${keyId}`);
 
             // Get the appropriate public key
             let publicKey;
@@ -121,7 +121,7 @@ class SSOAuthMiddleware {
                 publicKey = await this.getPublicKey(keyId);
             } catch (keyError) {
                 // If specific key not found, try to refresh JWKS and try again
-                console.log(`[SSOAuth] Key ${keyId} not found, refreshing JWKS...`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Key ${keyId} not found, refreshing JWKS...`);
                 this.keyCacheExpiry = null; // Force refresh
                 await this.fetchJWKS();
                 publicKey = await this.getPublicKey(keyId);
@@ -147,7 +147,7 @@ class SSOAuthMiddleware {
                 throw new Error('Token missing required email claim');
             }
 
-            console.log(`[SSOAuth] Token validated successfully for user: ${identityEmail}`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Token validated successfully for user: ${identityEmail}`);
             return decoded;
 
         } catch (error) {
@@ -173,7 +173,7 @@ class SSOAuthMiddleware {
             // Extract token from Authorization header
             const authHeader = req.headers.authorization;
             if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                console.log('[SSOAuth] No valid authorization header found');
+                if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] No valid authorization header found');
                 return res.status(401).json({ 
                     error: 'Authorization header required',
                     code: 'MISSING_AUTH_HEADER'
@@ -181,7 +181,7 @@ class SSOAuthMiddleware {
             }
 
             const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-            console.log(`[SSOAuth] Validating token for ${req.method} ${req.path}`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] Validating token for ${req.method} ${req.path}`);
 
             // Validate the token
             const decoded = await this.validateToken(token);
@@ -199,7 +199,7 @@ class SSOAuthMiddleware {
             const user = await User.findOne({ email: identityEmail, isActive: true }).lean();
 
             if (!user) {
-                console.warn(`[SSOAuth] Local user not found for email ${identityEmail}`);
+                if (process.env.NODE_ENV !== 'production') console.warn(`[SSOAuth] Local user not found for email ${identityEmail}`);
                 return res.status(403).json({
                     error: 'User not found in application database',
                     code: 'USER_NOT_FOUND'
@@ -219,7 +219,7 @@ class SSOAuthMiddleware {
                 token: decoded
             };
 
-            console.log(`[SSOAuth] User authenticated: ${req.user.email} (role from DB: ${req.user.role})`);
+            if (process.env.NODE_ENV !== 'production') console.log(`[SSOAuth] User authenticated: ${req.user.email} (role from DB: ${req.user.role})`);
             next();
 
         } catch (error) {
@@ -250,16 +250,16 @@ class SSOAuthMiddleware {
     async initialize() {
         // Only initialize if SSO is properly configured
         if (!this.ssoPortalUrl || this.ssoPortalUrl === 'http://localhost:5000') {
-            console.log('[SSOAuth] SSO middleware disabled - no valid SSO_PORTAL_URL configured');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] SSO middleware disabled - no valid SSO_PORTAL_URL configured');
             return;
         }
 
         try {
             await this.fetchJWKS();
-            console.log('[SSOAuth] SSO authentication middleware initialized successfully');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] SSO authentication middleware initialized successfully');
         } catch (error) {
             console.error('[SSOAuth] Failed to initialize SSO middleware:', error.message);
-            console.log('[SSOAuth] SSO middleware will be disabled until SSO portal is available');
+            if (process.env.NODE_ENV !== 'production') console.log('[SSOAuth] SSO middleware will be disabled until SSO portal is available');
             // Don't throw error to prevent server startup failure
             // Middleware will attempt to fetch keys on first use
         }

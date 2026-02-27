@@ -1,7 +1,7 @@
 // frontend/src/components/Sidebar.jsx
 
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useTransition } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 // Importing icons
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -25,11 +25,13 @@ const Logo = () => (
     <img src="/BL.svg" alt="Company Logo" style={{ height: '40px' }} />
 );
 
-// Updated to accept notification props
-const Sidebar = ({ onNotificationClick }) => {
+// Updated to accept notification props and mobile menu props
+const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {} }) => {
     const { user } = useAuth();
     const { unreadCount } = useNewNotifications();
     const { canAccess, rolePermissions } = usePermissions();
+    const navigate = useNavigate();
+    const [isPending, startTransition] = useTransition();
 
     const menuItems = [
         { text: 'Home', icon: <DashboardIcon />, path: '/dashboard', roles: ['Employee', 'Intern', 'HR', 'Admin'] },
@@ -79,7 +81,7 @@ const Sidebar = ({ onNotificationClick }) => {
     }
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 <Logo />
             </div>
@@ -99,6 +101,14 @@ const Sidebar = ({ onNotificationClick }) => {
                         to={typeof item.path === 'function' ? item.path(user) : item.path}
                         className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
                         data-tooltip={item.text}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            const targetPath = typeof item.path === 'function' ? item.path(user) : item.path;
+                            startTransition(() => {
+                                navigate(targetPath);
+                            });
+                            onClose();
+                        }}
                     >
                         <div className="icon-container">
                             {item.icon}
@@ -114,7 +124,7 @@ const Sidebar = ({ onNotificationClick }) => {
                      <div
                         className="sidebar-link"
                         data-tooltip={notificationItem.text}
-                        onClick={onNotificationClick}
+                        onClick={() => { onNotificationClick(); onClose(); }}
                         style={{ cursor: 'pointer' }}
                     >
                         <div className="icon-container">

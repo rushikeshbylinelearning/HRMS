@@ -3,19 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Menu, MenuItem, Tooltip, IconButton, Badge } from '@mui/material';
-import { NotificationsNone as NotificationsNoneIcon } from '@mui/icons-material';
+import { Menu, MenuItem, Tooltip, IconButton, Badge, useMediaQuery, useTheme } from '@mui/material';
+import { NotificationsNone as NotificationsNoneIcon, Menu as MenuIcon } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
 import UserAvatar from './common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
 import AnnouncementDropdown from './AnnouncementDropdown';
 import '../styles/Topbar.css';
 
-const Topbar = ({ onNotificationClick }) => {
+const Topbar = ({ onNotificationClick, onHamburgerClick }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState(null);
     const { unreadCount } = useNewNotifications();
     const [scrolled, setScrolled] = useState(false);
+    const theme = useTheme();
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
     useEffect(() => {
         const handleScroll = () => {
@@ -44,6 +46,16 @@ const Topbar = ({ onNotificationClick }) => {
     return (
         <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
             <div className="topbar-left">
+                {isMobile && (
+                    <IconButton
+                        onClick={onHamburgerClick}
+                        size="medium"
+                        aria-label="Open navigation menu"
+                        sx={{ mr: 1, color: '#212121', padding: '10px' }}
+                    >
+                        <MenuIcon />
+                    </IconButton>
+                )}
                 <img src="/BL.svg" alt="Company Logo" className="topbar-logo-img" />
             </div>
             <div className="topbar-right">

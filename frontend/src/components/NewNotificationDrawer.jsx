@@ -1,4 +1,3 @@
-// frontend/src/components/NewNotificationDrawer.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -8,11 +7,13 @@ import {
     Warning as WarningIcon, NotificationsOffOutlined as NotificationsOffOutlinedIcon,
     Login as LoginIcon, Logout as LogoutIcon, Coffee as CoffeeIcon, EventNote as EventNoteIcon,
     DeleteSweep as DeleteSweepIcon, MarkEmailRead as MarkEmailReadIcon, PlayArrow as StartBreakIcon,
-    Wifi as WifiIcon, Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon
+    Wifi as WifiIcon, Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon,
+    Groups as TeamsIcon, Preview as PreviewIcon,
 } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
 import api from '../api/axios';
 import '../styles/NotificationDrawer.css';
+import TeamsNotificationModal from './TeamsAttendanceNotificationSettings';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatDistanceToNow = (dateString) => {
@@ -54,6 +55,7 @@ const getNotificationIcon = (type) => {
         policy_added: <DescriptionIcon className="notification-icon success" />,
         policy_updated: <DescriptionIcon className="notification-icon warning" />,
         anonymous_feedback: <MessageIcon className="notification-icon info" />,
+        teams_report_preview: <TeamsIcon className="notification-icon info" style={{ color: '#6264A7' }} />,
         success: <CheckCircleIcon className="notification-icon success" />,
         error: <ErrorIcon className="notification-icon error" />,
         warning: <WarningIcon className="notification-icon warning" />,
@@ -62,7 +64,7 @@ const getNotificationIcon = (type) => {
     return iconMap[type] || iconMap.default;
 };
 
-const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, onStartBreak, onPromoteEmployee, onOverrideHalfDay }) => {
+const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, onStartBreak, onPromoteEmployee, onOverrideHalfDay, onOpenTeamsPreview }) => {
     const [actionLoading, setActionLoading] = useState(false);
 
     const handleAction = async (e, actionFn, ...args) => {
@@ -79,9 +81,12 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
             navigationData: notification.navigationData 
         });
         
+        if (notification.type === 'teams_report_preview') {
+            onNavigate(notification.navigationData || {}, notification.type, notification.metadata);
+        }
         // Navigate first, then mark as read (non-blocking)
         // Handle anonymous feedback notifications - navigate to admin policies page
-        if (notification.type === 'anonymous_feedback') {
+        else if (notification.type === 'anonymous_feedback') {
             console.log('[Notification] Anonymous feedback notification detected');
             onNavigate(
                 { page: 'admin/policies', params: { section: 'anonymous-messages' } },
@@ -216,6 +221,19 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                                 </Button>
                             </Box>
                         )}
+                        {notification.type === 'teams_report_preview' && (
+                            <Box sx={{ mt: 1.5 }}>
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    startIcon={<PreviewIcon />}
+                                    onClick={(e) => { e.stopPropagation(); onOpenTeamsPreview && onOpenTeamsPreview(notification.id); }}
+                                    sx={{ bgcolor: '#6264A7', color: 'white', textTransform: 'none', fontWeight: 600, borderRadius: '8px', '&:hover': { bgcolor: '#464775' } }}
+                                >
+                                    Preview & Edit Report
+                                </Button>
+                            </Box>
+                        )}
                     </Box>
                 }
             />
@@ -236,6 +254,16 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
         markAsRead, fetchNotifications
     } = useNewNotifications();
 
+    const [teamsModalOpen, setTeamsModalOpen] = useState(false);
+
+    const handleOpenTeamsPreview = (notificationId) => {
+        onClose();
+        setTeamsModalOpen(true);
+        if (notificationId) {
+            setTimeout(() => markAsRead(notificationId), 100);
+        }
+    };
+
     const handleNavigate = (navigationData, notificationType, metadata) => {
         onClose();
         const isAdmin = ['Admin', 'HR'].includes(user?.role);
@@ -250,6 +278,12 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
 
         console.log('[Notification] Navigation triggered:', { notificationType, navigationData, metadata, isAdmin });
         
+        // Handle TEAMS REPORT PREVIEW — open modal
+        if (notificationType === 'teams_report_preview') {
+            setTeamsModalOpen(true);
+            return;
+        }
+
         // Handle ANONYMOUS FEEDBACK notifications (Admin/HR only)
         if (notificationType === 'anonymous_feedback') {
             console.log('[Notification] Anonymous feedback notification - navigating to admin policies');
@@ -412,6 +446,7 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
     };
     
     return (
+        <>
         <Drawer
             anchor="right"
             open={open}
@@ -451,6 +486,7 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
                                 onStartBreak={handleStartBreak}
                                 onPromoteEmployee={handlePromoteEmployee}
                                 onOverrideHalfDay={handleOverrideHalfDay}
+                                onOpenTeamsPreview={handleOpenTeamsPreview}
                             />
                         ))}
                     </List>
@@ -463,6 +499,12 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
                 )}
             </Box>
         </Drawer>
+        <TeamsNotificationModal
+            open={teamsModalOpen}
+            onClose={() => setTeamsModalOpen(false)}
+            initialTab={2}
+        />
+    </>
     );
 };
 

@@ -1,7 +1,7 @@
 // frontend/src/components/PageTransition.jsx
 // Smooth page transitions for route changes
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 
@@ -10,47 +10,15 @@ import { Box } from '@mui/material';
  * Provides fade + slide animation for page transitions
  * 
  * CRITICAL: Disabled for /profile and /leaves to prevent layout mutations
+ * FIXED: Enter-only animation - no exit flash, old page stays visible while new page loads
  */
 const PageTransition = ({ children }) => {
     const location = useLocation();
-    const [displayLocation, setDisplayLocation] = useState(location);
-    const [transitionStage, setTransitionStage] = useState('enter');
 
     // CRITICAL FIX: Disable transitions for Profile and Leaves pages
     // These pages have zero-mutation requirements
     const NO_TRANSITION_ROUTES = ['/profile', '/leaves'];
     const shouldDisableTransition = NO_TRANSITION_ROUTES.includes(location.pathname);
-
-    useEffect(() => {
-        // Skip transition logic for protected routes
-        if (shouldDisableTransition) {
-            setDisplayLocation(location);
-            setTransitionStage('enter');
-            return;
-        }
-
-        // Only animate if pathname actually changed
-        if (location.pathname !== displayLocation.pathname) {
-            setTransitionStage('exit');
-        }
-    }, [location, displayLocation, shouldDisableTransition]);
-
-    useEffect(() => {
-        // Skip transition logic for protected routes
-        if (shouldDisableTransition) {
-            return;
-        }
-
-        if (transitionStage === 'exit') {
-            // Delay updating location until exit animation starts
-            const timer = setTimeout(() => {
-                setDisplayLocation(location);
-                setTransitionStage('enter');
-            }, 150); // Half of transition duration
-            
-            return () => clearTimeout(timer);
-        }
-    }, [transitionStage, location, shouldDisableTransition]);
 
     // CRITICAL: Return children directly for protected routes (no animation wrapper)
     if (shouldDisableTransition) {
@@ -59,15 +27,21 @@ const PageTransition = ({ children }) => {
 
     return (
         <Box
+            key={location.pathname}
             sx={{
+                '@keyframes fadeIn': {
+                    from: { 
+                        opacity: 0
+                    },
+                    to: { 
+                        opacity: 1
+                    },
+                },
+                animation: 'fadeIn 150ms ease-out',
                 width: '100%',
-                minHeight: '100%',
-                opacity: transitionStage === 'enter' ? 1 : 0,
-                transform: transitionStage === 'enter' 
-                    ? 'translateY(0)' 
-                    : 'translateY(10px)',
-                transition: 'opacity 200ms ease-in-out, transform 200ms ease-in-out',
-                willChange: transitionStage === 'exit' ? 'opacity, transform' : 'auto',
+                padding: 0,
+                margin: 0,
+                willChange: 'opacity',
             }}
         >
             {children}

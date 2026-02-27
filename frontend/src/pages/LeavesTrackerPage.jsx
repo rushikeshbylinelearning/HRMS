@@ -28,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from '../api/axios';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import AdminLeaveForm from '../components/AdminLeaveForm';
+import PageHeroHeader from '../components/PageHeroHeader';
 import '../styles/LeavesTrackerPage.css';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
@@ -641,10 +642,9 @@ const LeavesTrackerPage = () => {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showAllocateDialog, setShowAllocateDialog] = useState(false);
   const [showBulkAllocateDialog, setShowBulkAllocateDialog] = useState(false);
+  const [showUpdateLeavesDialog, setShowUpdateLeavesDialog] = useState(false);
   const [isAssigningLeave, setIsAssigningLeave] = useState(false);
   const [assignLeaveRequest, setAssignLeaveRequest] = useState(null);
-  const [yearEndHistory, setYearEndHistory] = useState([]);
-  const [loadingYearEndHistory, setLoadingYearEndHistory] = useState(false);
   const [dialogSelectedYear, setDialogSelectedYear] = useState(new Date().getFullYear());
   const [leaveUsageData, setLeaveUsageData] = useState(null);
   const [loadingLeaveUsage, setLoadingLeaveUsage] = useState(false);
@@ -652,6 +652,8 @@ const LeavesTrackerPage = () => {
     employeeId: '', sickLeaveEntitlement: 12, casualLeaveEntitlement: 12, paidLeaveEntitlement: 0, year: new Date().getFullYear() });
   const [bulkAllocateForm, setBulkAllocateForm] = useState({
     employeeIds: [], sickLeaveEntitlement: 12, casualLeaveEntitlement: 12, paidLeaveEntitlement: 0, year: new Date().getFullYear() });
+  const [updateLeavesForm, setUpdateLeavesForm] = useState({
+    employeeId: '', sickLeaveEntitlement: 12, casualLeaveEntitlement: 12, paidLeaveEntitlement: 0, year: new Date().getFullYear() });
 
   // UPGRADED: Debounce search input
   useEffect(() => {
@@ -666,7 +668,7 @@ const LeavesTrackerPage = () => {
       try {
           const [empRes, reqRes] = await Promise.all([
               axios.get('/admin/employees?all=true'),
-              axios.get('/admin/leaves/all')
+              axios.get('/admin/leaves/all?limit=9999')
           ]);
   
           const employeesData = empRes.data || [];
@@ -719,9 +721,9 @@ const LeavesTrackerPage = () => {
     // FIXED: Backend is source of truth for balances - no frontend calculation
     // Use backend-provided balances and entitlements directly
     const entitlements = {
-        sick: employee.leaveEntitlements?.sick ?? 12,
-        casual: employee.leaveEntitlements?.casual ?? 12,
-        paid: employee.leaveEntitlements?.paid ?? 0,
+        sick: employee.leaveEntitlements?.sick ?? 6,
+        casual: employee.leaveEntitlements?.casual ?? 6,
+        paid: employee.leaveEntitlements?.paid ?? 10,
     };
 
     const balances = {
@@ -947,6 +949,29 @@ const LeavesTrackerPage = () => {
     setBulkAllocateForm(prev => ({ ...prev, employeeIds: [] }));
   };
 
+  const handleUpdateLeaves = async () => {
+    try {
+        await axios.post('/admin/leaves/allocate', {
+            employeeId: updateLeavesForm.employeeId,
+            year: updateLeavesForm.year,
+            sickLeaveEntitlement: updateLeavesForm.sickLeaveEntitlement,
+            casualLeaveEntitlement: updateLeavesForm.casualLeaveEntitlement,
+            paidLeaveEntitlement: updateLeavesForm.paidLeaveEntitlement,
+        });
+        setSnackbar({ open: true, message: 'Leave entitlements updated successfully!', severity: 'success' });
+        setShowUpdateLeavesDialog(false);
+        fetchAllData();
+        // Refresh the employee dialog data
+        if (dialogEmployee?._id) {
+            const fullEmp = employees.find(e => e._id === dialogEmployee._id) || dialogEmployee;
+            fetchLeaveUsageForYear(dialogEmployee._id, updateLeavesForm.year, fullEmp);
+        }
+    } catch (error) {
+        console.error('Error updating leaves:', error);
+        setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to update leaves', severity: 'error' });
+    }
+  };
+
 
   const handleBack = () => navigate(-1);
   
@@ -978,13 +1003,14 @@ const LeavesTrackerPage = () => {
       const employeeYearEndRequests = yearEndRes.data.requests || yearEndRes.data || [];
 
       // Calculate utilized leaves by type for the PREVIOUS year
-      const utilized = { sick: 0, casual: 0, paid: 0 };
+      const utilized = { sick: 0, casual: 0, paid: 0, lop: 0 };
       normalLeaveRequestsPrevious.forEach(leave => {
         if (leave.status === 'Approved') {
           const days = leave.leaveDates.length * (leave.leaveType?.startsWith('Half Day') ? 0.5 : 1);
           if (leave.requestType === 'Sick') utilized.sick += days;
-          else if (leave.requestType === 'Planned' || leave.requestType === 'Casual') utilized.casual += days;
-          else if (leave.requestType === 'Loss of Pay') utilized.paid += days; // Adjust based on your system
+          else if (leave.requestType === 'Casual') utilized.casual += days;
+          else if (leave.requestType === 'Planned') utilized.paid += days;
+          else if (leave.requestType === 'Loss of Pay') utilized.lop += days;
         }
       });
       
@@ -992,9 +1018,9 @@ const LeavesTrackerPage = () => {
       // This would typically be in leaveEntitlements, but we need historical data
       // For now, we'll use current entitlements as a proxy, but ideally this should come from historical records
       const previousYearOpening = {
-        sick: employeeData?.leaveEntitlements?.sick ?? 12,
-        casual: employeeData?.leaveEntitlements?.casual ?? 12,
-        paid: employeeData?.leaveEntitlements?.paid ?? 0
+        sick: employeeData?.leaveEntitlements?.sick ?? 6,
+        casual: employeeData?.leaveEntitlements?.casual ?? 6,
+        paid: employeeData?.leaveEntitlements?.paid ?? 10
       };
 
       // Group year-end requests by leave type
@@ -1022,7 +1048,12 @@ const LeavesTrackerPage = () => {
         remainingBeforeYearEnd,
         yearEndRequests: employeeYearEndRequests,
         yearEndByType,
-        currentBalances: employeeData?.leaveBalances || {}, // Current year balances (resulting from previous year's year-end action)
+        currentBalances: employeeData?.leaveBalances || {}, // Live running balance (after this year's deductions)
+        currentYearEntitlements: { // Entitlements allocated for the selected year
+          sick: employeeData?.leaveEntitlements?.sick ?? 6,
+          casual: employeeData?.leaveEntitlements?.casual ?? 6,
+          paid: employeeData?.leaveEntitlements?.paid ?? 10
+        },
         leaveRequests: normalLeaveRequestsCurrent // Store current year leave requests for KPI calculations
       });
     } catch (err) {
@@ -1033,34 +1064,17 @@ const LeavesTrackerPage = () => {
     }
   }, []);
 
-  // Fetch Year-End history and leave usage when employee dialog opens
+  // Fetch leave usage when employee dialog opens or year changes
   useEffect(() => {
     if (showEmployeeDialog && dialogEmployee?._id) {
-      setLoadingYearEndHistory(true);
-      setLoadingLeaveUsage(true);
-      
-      // FIXED: Fetch employee-specific Year-End requests only
-      axios.get(`/admin/leaves/year-end-requests?employeeId=${dialogEmployee._id}&limit=100`)
-        .then(res => {
-          // Backend already filtered by employeeId
-          const employeeYearEndRequests = res.data.requests || [];
-          setYearEndHistory(employeeYearEndRequests);
-        })
-        .catch(err => {
-          console.error('Error fetching Year-End history:', err);
-          setYearEndHistory([]);
-        })
-        .finally(() => {
-          setLoadingYearEndHistory(false);
-        });
-
-      // Fetch leave usage for the selected year
-      fetchLeaveUsageForYear(dialogEmployee._id, dialogSelectedYear, dialogEmployee);
+      // Resolve full employee data — dialog may be opened from Leave Requests tab
+      // where dialogEmployee is a partial object without leaveEntitlements/leaveBalances
+      const fullEmployee = employees.find(e => e._id === dialogEmployee._id) || dialogEmployee;
+      fetchLeaveUsageForYear(fullEmployee._id, dialogSelectedYear, fullEmployee);
     } else {
-      setYearEndHistory([]);
       setLeaveUsageData(null);
     }
-  }, [showEmployeeDialog, dialogEmployee, dialogSelectedYear, fetchLeaveUsageForYear]);
+  }, [showEmployeeDialog, dialogEmployee, dialogSelectedYear, fetchLeaveUsageForYear, employees]);
 
   const getProgressColor = (used, total) => {
     const percentage = total > 0 ? (used / total) * 100 : 0;
@@ -1077,94 +1091,106 @@ const LeavesTrackerPage = () => {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box className="leaves-tracker-container">
         {/* Breadcrumb */}
-        <Box className="leaves-tracker-breadcrumb">
-          <a href="#" onClick={(e) => { e.preventDefault(); navigate('/leaves'); }}>Leaves</a>
-          <span>/</span>
-          <span>Employee Leave Tracker</span>
-        </Box>
-
         {/* Header Section */}
-        <Box className="leaves-tracker-header">
-          <Box className="leaves-tracker-header-left">
-            <h1>Employee Leave Tracker</h1>
-            <p>Track and manage employee leave balances and usage</p>
-          </Box>
-          <Box className="leaves-tracker-header-right">
-            <Button 
-              variant="contained" 
-              size="medium"
-              startIcon={<Add />} 
-              onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }}
-              sx={{ 
-                textTransform: 'none',
-                bgcolor: '#dc3545',
-                '&:hover': { bgcolor: '#c82333' },
-                borderRadius: '8px',
-                px: 2
-              }}
-            >
-              Assign Leave
-            </Button>
-            <Button 
-              variant="outlined" 
-              size="medium"
-              startIcon={<Assignment />} 
-              onClick={() => setShowAllocateDialog(true)}
-              sx={{ 
-                textTransform: 'none',
-                borderColor: '#dc3545',
-                color: '#dc3545',
-                '&:hover': { 
-                  borderColor: '#c82333',
-                  bgcolor: 'rgba(220, 53, 69, 0.04)'
-                },
-                borderRadius: '8px',
-                px: 2
-              }}
-            >
-              Allocate
-            </Button>
-            <Button 
-              variant="outlined" 
-              size="medium"
-              startIcon={<Group />} 
-              onClick={() => setShowBulkAllocateDialog(true)}
-              sx={{ 
-                textTransform: 'none',
-                borderColor: '#dc3545',
-                color: '#dc3545',
-                '&:hover': { 
-                  borderColor: '#c82333',
-                  bgcolor: 'rgba(220, 53, 69, 0.04)'
-                },
-                borderRadius: '8px',
-                px: 2
-              }}
-            >
-              Bulk Allocate
-            </Button>
-          </Box>
-        </Box>
+        <PageHeroHeader
+          eyebrow="Leave Operations"
+          title="Leaves Tracker"
+          description="Manage and track employee leave schedules."
+          actionArea={
+            <>
+              <Button 
+                variant="contained" 
+                size="medium"
+                startIcon={<Add />} 
+                onClick={() => { setAssignLeaveRequest(null); setShowAssignDialog(true); }}
+                sx={{ 
+                  textTransform: 'none',
+                  bgcolor: '#dc3545',
+                  '&:hover': { bgcolor: '#c82333' },
+                  borderRadius: '8px',
+                  px: 2
+                }}
+              >
+                Assign Leave
+              </Button>
+              <Button 
+                variant="outlined" 
+                size="medium"
+                startIcon={<Assignment />} 
+                onClick={() => setShowAllocateDialog(true)}
+                sx={{ 
+                  textTransform: 'none',
+                  borderColor: '#dc3545',
+                  color: '#dc3545',
+                  '&:hover': { 
+                    borderColor: '#c82333',
+                    bgcolor: 'rgba(220, 53, 69, 0.04)'
+                  },
+                  borderRadius: '8px',
+                  px: 2
+                }}
+              >
+                Allocate
+              </Button>
+              <Button 
+                variant="outlined" 
+                size="medium"
+                startIcon={<Group />} 
+                onClick={() => setShowBulkAllocateDialog(true)}
+                sx={{ 
+                  textTransform: 'none',
+                  borderColor: '#dc3545',
+                  color: '#dc3545',
+                  '&:hover': { 
+                    borderColor: '#c82333',
+                    bgcolor: 'rgba(220, 53, 69, 0.04)'
+                  },
+                  borderRadius: '8px',
+                  px: 2
+                }}
+              >
+                Bulk Allocate
+              </Button>
+            </>
+          }
+        />
 
-        {/* Summary Cards */}
-        <Box className="leaves-tracker-summary-cards">
-          <Box className="leaves-tracker-summary-card">
-            <h3>{employees.length}</h3>
-            <p>Total Employees</p>
-          </Box>
-          <Box className="leaves-tracker-summary-card">
-            <h3>{leaveData.reduce((sum, d) => sum + (d.balances?.totalEntitlement || 0), 0)}</h3>
-            <p>Total Leave Balance</p>
-          </Box>
-          <Box className="leaves-tracker-summary-card">
-            <h3>{leaveData.reduce((sum, d) => sum + (d.balances?.totalUsed || 0), 0)}</h3>
-            <p>Leaves Used</p>
-          </Box>
-          <Box className="leaves-tracker-summary-card">
-            <h3>{leaveRequests.filter(r => r.status === 'Pending').length}</h3>
-            <p>Pending Requests</p>
-          </Box>
-        </Box>
+        {/* Summary Cards — Permanent employees only */}
+        {(() => {
+          const permanentEmployeeIds = new Set(
+            employees
+              .filter(emp => emp.employmentStatus === 'Permanent' || emp.probationStatus === 'Permanent')
+              .map(emp => emp._id)
+          );
+          const permanentLeaveData = leaveData.filter(d => d.employee && permanentEmployeeIds.has(d.employee._id));
+          const permanentPendingCount = leaveRequests.filter(r => {
+            const empId = r.employee?._id || r.employee;
+            return r.status === 'Pending' && permanentEmployeeIds.has(empId);
+          }).length;
+          const totalEntitlement = permanentLeaveData.reduce((sum, d) => sum + (d.balances?.totalEntitlement || 0), 0);
+          const totalUsed = permanentLeaveData.reduce((sum, d) => sum + (d.balances?.totalUsed || 0), 0);
+          const totalBalance = totalEntitlement - totalUsed;
+          return (
+            <Box className="leaves-tracker-summary-cards">
+              <Box className="leaves-tracker-summary-card">
+                <h3>{permanentEmployeeIds.size}</h3>
+                <p>Permanent Employees</p>
+              </Box>
+              <Box className="leaves-tracker-summary-card">
+                <h3>{totalBalance}</h3>
+                <p>Leave Balance Remaining</p>
+              </Box>
+              <Box className="leaves-tracker-summary-card">
+                <h3>{totalUsed}</h3>
+                <p>Leaves Used</p>
+              </Box>
+              <Box className="leaves-tracker-summary-card">
+                <h3>{permanentPendingCount}</h3>
+                <p>Pending Requests</p>
+              </Box>
+            </Box>
+          );
+        })()}
         
         {/* Tabs */}
         <Paper elevation={0} className="leaves-tracker-tabs">
@@ -1294,6 +1320,7 @@ const LeavesTrackerPage = () => {
                                         <TableCell>Sick</TableCell>
                                         <TableCell>Casual</TableCell>
                                         <TableCell>Planned</TableCell>
+                                        <TableCell>Total Balance</TableCell>
                                         <TableCell>LOP</TableCell>
                                         <TableCell align="center">Actions</TableCell>
                                     </TableRow>
@@ -1373,6 +1400,16 @@ const LeavesTrackerPage = () => {
                                                     <Typography variant="caption" color={balances.balances.paid > 0 ? 'success.main' : 'error.main'}>
                                                         Bal: {balances.balances.paid}
                                                     </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ minWidth: 80 }}>
+                                                        <Typography variant="body2" fontWeight={600} color="primary.main">
+                                                            {balances.balances.sick + balances.balances.casual + balances.balances.paid}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Remaining
+                                                        </Typography>
+                                                    </Box>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Typography variant="body2" color="warning.main">
@@ -1599,7 +1636,6 @@ const LeavesTrackerPage = () => {
             open={showEmployeeDialog}
             onClose={() => {
                 setShowEmployeeDialog(false);
-                setYearEndHistory([]);
                 setLeaveUsageData(null);
                 setDialogSelectedYear(new Date().getFullYear());
             }}
@@ -1657,7 +1693,8 @@ const LeavesTrackerPage = () => {
                                 const newYear = e.target.value;
                                 setDialogSelectedYear(newYear);
                                 if (dialogEmployee?._id) {
-                                    fetchLeaveUsageForYear(dialogEmployee._id, newYear, dialogEmployee);
+                                    const fullEmp = employees.find(e => e._id === dialogEmployee._id) || dialogEmployee;
+                                    fetchLeaveUsageForYear(fullEmp._id, newYear, fullEmp);
                                 }
                             }}
                         >
@@ -1673,7 +1710,7 @@ const LeavesTrackerPage = () => {
                 {dialogEmployee ? (
                     <Box>
 
-                        {loadingLeaveUsage || loadingYearEndHistory ? (
+                        {loadingLeaveUsage ? (
                             <Box display="flex" flexDirection="column" alignItems="center" py={6}>
                                 <SkeletonBox width="24px" height="24px" borderRadius="50%" />
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -1688,8 +1725,11 @@ const LeavesTrackerPage = () => {
                             <>
                                 {/* Calculate totals across all leave types */}
                                 {(() => {
+                                    // totalOpening = sick + casual + paid entitlements for previous year
                                     const totalOpening = Object.values(leaveUsageData.previousYearOpening).reduce((sum, val) => sum + (val || 0), 0);
-                                    const totalUtilized = Object.values(leaveUsageData.utilized).reduce((sum, val) => sum + (val || 0), 0);
+                                    // totalUtilized = sick + casual + paid used (balance-affecting); LOP is separate
+                                    const { lop: lopDays = 0, ...balanceLeavesUtilized } = leaveUsageData.utilized || {};
+                                    const totalUtilized = Object.values(balanceLeavesUtilized).reduce((sum, val) => sum + (val || 0), 0);
                                     const totalRemaining = Object.values(leaveUsageData.remainingBeforeYearEnd).reduce((sum, val) => sum + (val || 0), 0);
                                     
                                     // Find the primary year-end action (prefer approved, then pending, then rejected)
@@ -1699,7 +1739,23 @@ const LeavesTrackerPage = () => {
                                     const rejectedAction = allYearEndRequests.find(r => r.status === 'Rejected');
                                     const primaryYearEndAction = approvedAction || pendingAction || rejectedAction || null;
                                     
-                                    // Calculate total current balance
+                                    // Compute Jan 1 opening balance for selected year:
+                                    // = entitlements allocated for this year + carry-forward from previous year (if approved)
+                                    const entitlementsThisYear = leaveUsageData.currentYearEntitlements || { sick: 6, casual: 6, paid: 10 };
+                                    const carryForward = { sick: 0, casual: 0, paid: 0 };
+                                    allYearEndRequests
+                                        .filter(r => r.status === 'Approved' && r.yearEndSubType === 'CARRY_FORWARD')
+                                        .forEach(r => {
+                                            const field = r.yearEndLeaveType === 'Sick' ? 'sick' : r.yearEndLeaveType === 'Casual' ? 'casual' : 'paid';
+                                            carryForward[field] += r.yearEndDays || 0;
+                                        });
+                                    const jan1Opening = {
+                                        sick: (entitlementsThisYear.sick || 0) + carryForward.sick,
+                                        casual: (entitlementsThisYear.casual || 0) + carryForward.casual,
+                                        paid: (entitlementsThisYear.paid || 0) + carryForward.paid,
+                                    };
+                                    const totalJan1Opening = jan1Opening.sick + jan1Opening.casual + jan1Opening.paid;
+                                    // Live balance (current deducted balance)
                                     const totalCurrentBalance = Object.values(leaveUsageData.currentBalances).reduce((sum, val) => sum + (val || 0), 0);
                                     
                                     return (
@@ -1782,7 +1838,7 @@ const LeavesTrackerPage = () => {
                                                                 {totalUtilized.toFixed(1)}
                                                             </Typography>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                DAYS
+                                                                DAYS{lopDays > 0 ? ` + ${lopDays.toFixed(1)} LOP` : ''}
                                                             </Typography>
                                                         </Paper>
                                                     </Grid>
@@ -1976,28 +2032,51 @@ const LeavesTrackerPage = () => {
                                                             color: 'primary.main'
                                                         }}
                                                     >
-                                                        Leaves Available from 1st January {leaveUsageData.year}
+                                                        Leave Balance — {leaveUsageData.year}
                                                     </Typography>
                                                 </Box>
                                                 
-                                                <Box sx={{ textAlign: 'center', py: 1 }}>
-                                                    <Typography 
-                                                        variant="h3" 
-                                                        sx={{ 
-                                                            fontWeight: 600, 
-                                                            color: 'primary.main',
-                                                            mb: 0.5
-                                                        }}
-                                                    >
-                                                        {totalCurrentBalance.toFixed(1)} <Typography component="span" variant="body1">days</Typography>
-                                                    </Typography>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Opening Balance (after carry forward / encash)
-                                                    </Typography>
-                                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                                        Effective From: 01 January {leaveUsageData.year}
-                                                    </Typography>
-                                                </Box>
+                                                <Grid container spacing={2}>
+                                                    <Grid item xs={12} sm={6} sx={{ textAlign: 'center', py: 1 }}>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                                            Opening Balance (1 Jan {leaveUsageData.year})
+                                                        </Typography>
+                                                        <Typography 
+                                                            variant="h4" 
+                                                            sx={{ 
+                                                                fontWeight: 600, 
+                                                                color: 'primary.main',
+                                                                mb: 0.5
+                                                            }}
+                                                        >
+                                                            {totalJan1Opening.toFixed(1)} <Typography component="span" variant="body1">days</Typography>
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Sick: {jan1Opening.sick} · Casual: {jan1Opening.casual} · Planned: {jan1Opening.paid}
+                                                            {(carryForward.sick + carryForward.casual + carryForward.paid) > 0 && (
+                                                                <> (incl. {(carryForward.sick + carryForward.casual + carryForward.paid)} carried forward)</>
+                                                            )}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} sx={{ textAlign: 'center', py: 1, borderLeft: { sm: '1px solid' }, borderColor: { sm: 'divider' } }}>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                                            Current Balance (Today)
+                                                        </Typography>
+                                                        <Typography 
+                                                            variant="h4" 
+                                                            sx={{ 
+                                                                fontWeight: 600, 
+                                                                color: totalCurrentBalance > 0 ? 'success.main' : 'error.main',
+                                                                mb: 0.5
+                                                            }}
+                                                        >
+                                                            {totalCurrentBalance.toFixed(1)} <Typography component="span" variant="body1">days</Typography>
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Sick: {(leaveUsageData.currentBalances.sick || 0).toFixed(1)} · Casual: {(leaveUsageData.currentBalances.casual || 0).toFixed(1)} · Planned: {(leaveUsageData.currentBalances.paid || 0).toFixed(1)}
+                                                        </Typography>
+                                                    </Grid>
+                                                </Grid>
                                             </Paper>
 
                                             {/* KPI CARDS SECTION */}
@@ -2493,9 +2572,31 @@ const LeavesTrackerPage = () => {
                     borderColor: 'divider',
                     position: 'sticky',
                     bottom: 0,
-                    zIndex: 1
+                    zIndex: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between'
                 }}
             >
+                <Button
+                    onClick={() => {
+                        if (dialogEmployee) {
+                            const fullEmp = employees.find(e => e._id === dialogEmployee._id) || dialogEmployee;
+                            setUpdateLeavesForm({
+                                employeeId: dialogEmployee._id,
+                                sickLeaveEntitlement: fullEmp.leaveEntitlements?.sick ?? 12,
+                                casualLeaveEntitlement: fullEmp.leaveEntitlements?.casual ?? 12,
+                                paidLeaveEntitlement: fullEmp.leaveEntitlements?.paid ?? 0,
+                                year: dialogSelectedYear
+                            });
+                            setShowUpdateLeavesDialog(true);
+                        }
+                    }}
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<Assignment />}
+                >
+                    Update Leaves
+                </Button>
                 <Button
                     onClick={() => {
                         setShowEmployeeDialog(false);
@@ -3765,6 +3866,399 @@ const LeavesTrackerPage = () => {
                         Bulk Allocate Entitlements
                     </Button>
                 </Box>
+            </DialogActions>
+        </Dialog>
+
+        {/* Update Employee Leaves Dialog */}
+        <Dialog 
+            open={showUpdateLeavesDialog} 
+            onClose={() => setShowUpdateLeavesDialog(false)} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    backgroundColor: '#fafafa'
+                }
+            }}
+        >
+            <DialogTitle sx={{ 
+                backgroundColor: '#ffffff',
+                color: '#1a1a1a', 
+                fontWeight: 600,
+                fontSize: '1.5rem',
+                py: 3,
+                px: 4,
+                borderBottom: '2px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Assignment sx={{ color: '#dc3545', fontSize: '1.75rem' }} />
+                    <Box>
+                        <Typography 
+                            variant="h5" 
+                            sx={{ 
+                                color: '#1a1a1a',
+                                fontWeight: 600,
+                                fontSize: '1.5rem'
+                            }}
+                        >
+                            Update Leave Entitlements
+                        </Typography>
+                        {dialogEmployee && (
+                            <Typography variant="body2" sx={{ color: '#6b7280', mt: 0.5 }}>
+                                {dialogEmployee.fullName} ({dialogEmployee.employeeCode})
+                            </Typography>
+                        )}
+                    </Box>
+                </Box>
+            </DialogTitle>
+
+            <DialogContent sx={{ 
+                backgroundColor: '#fafafa',
+                p: 4,
+                '&.MuiDialogContent-root': {
+                    paddingTop: '32px'
+                }
+            }}>
+                <Stack spacing={3}>
+                    {/* Year Selection */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <FormControl fullWidth>
+                                <InputLabel 
+                                    id="update-year-label"
+                                    sx={{ 
+                                        color: '#6b7280', 
+                                        '&.Mui-focused': { color: '#dc3545' } 
+                                    }}
+                                >
+                                    Year *
+                                </InputLabel>
+                                <Select 
+                                    value={updateLeavesForm.year} 
+                                    labelId="update-year-label"
+                                    label="Year *" 
+                                    onChange={(e) => setUpdateLeavesForm({ ...updateLeavesForm, year: e.target.value })}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        backgroundColor: '#ffffff',
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: '#d1d5db'
+                                        },
+                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: '#dc3545'
+                                        },
+                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: '#dc3545',
+                                            borderWidth: '2px'
+                                        }
+                                    }}
+                                >
+                                    {[2023, 2024, 2025, 2026, 2027].map((year) => (
+                                        <MenuItem key={year} value={year}>{year}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </CardContent>
+                    </Card>
+
+                    {/* Leave Entitlements */}
+                    <Card sx={{ 
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 3, 
+                                color: '#1a1a1a', 
+                                fontWeight: 600,
+                                fontSize: '1.125rem'
+                            }}>
+                                Leave Entitlements
+                            </Typography>
+                            
+                            <Grid container spacing={3}>
+                                {/* Sick Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#ef4444' 
+                                                }} />
+                                                Sick Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={updateLeavesForm.sickLeaveEntitlement} 
+                                                onChange={(e) => setUpdateLeavesForm({ 
+                                                    ...updateLeavesForm, 
+                                                    sickLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    step: 0.5
+                                                }} 
+                                                helperText="0-365 days"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Casual Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#f59e0b' 
+                                                }} />
+                                                Casual Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={updateLeavesForm.casualLeaveEntitlement} 
+                                                onChange={(e) => setUpdateLeavesForm({ 
+                                                    ...updateLeavesForm, 
+                                                    casualLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    step: 0.5
+                                                }} 
+                                                helperText="0-365 days"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Planned Leave */}
+                                <Grid item xs={12} md={4}>
+                                    <Card sx={{ 
+                                        border: '2px solid #f3f4f6',
+                                        borderRadius: '8px',
+                                        '&:hover': {
+                                            borderColor: '#dc3545',
+                                            boxShadow: '0 4px 12px rgba(220, 53, 69, 0.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <CardContent sx={{ p: 2.5 }}>
+                                            <Typography variant="subtitle1" sx={{ 
+                                                fontWeight: 600, 
+                                                color: '#1a1a1a', 
+                                                mb: 1.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}>
+                                                <Box sx={{ 
+                                                    width: 8, 
+                                                    height: 8, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#10b981' 
+                                                }} />
+                                                Planned Leave
+                                            </Typography>
+                                            <TextField 
+                                                fullWidth 
+                                                label="Days" 
+                                                type="number" 
+                                                value={updateLeavesForm.paidLeaveEntitlement} 
+                                                onChange={(e) => setUpdateLeavesForm({ 
+                                                    ...updateLeavesForm, 
+                                                    paidLeaveEntitlement: Math.max(0, Math.min(365, parseFloat(e.target.value) || 0))
+                                                })} 
+                                                inputProps={{ 
+                                                    min: 0, 
+                                                    max: 365,
+                                                    step: 0.5
+                                                }} 
+                                                helperText="0-365 days"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: '6px',
+                                                        '& fieldset': {
+                                                            borderColor: '#d1d5db'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: '#dc3545'
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#dc3545',
+                                                            borderWidth: '2px'
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root.Mui-focused': {
+                                                        color: '#dc3545'
+                                                    }
+                                                }}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+
+                            {/* Total Summary */}
+                            <Box sx={{ 
+                                mt: 3, 
+                                p: 2, 
+                                bgcolor: '#f8f9fa', 
+                                borderRadius: '8px',
+                                border: '1px solid #e5e7eb'
+                            }}>
+                                <Typography variant="body2" sx={{ color: '#6b7280', mb: 1 }}>
+                                    Total Leave Entitlement
+                                </Typography>
+                                <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                    {updateLeavesForm.sickLeaveEntitlement + updateLeavesForm.casualLeaveEntitlement + updateLeavesForm.paidLeaveEntitlement} days
+                                </Typography>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Stack>
+            </DialogContent>
+
+            <DialogActions sx={{ 
+                px: 4, 
+                py: 3, 
+                bgcolor: 'white',
+                borderTop: '1px solid #e5e7eb',
+                gap: 2
+            }}>
+                <Button 
+                    onClick={() => setShowUpdateLeavesDialog(false)} 
+                    variant="outlined"
+                    sx={{
+                        borderColor: '#d1d5db',
+                        color: '#6b7280',
+                        fontWeight: 600,
+                        px: 4,
+                        py: 1.5,
+                        borderRadius: '8px',
+                        textTransform: 'none',
+                        '&:hover': {
+                            borderColor: '#9ca3af',
+                            backgroundColor: '#f9fafb'
+                        }
+                    }}
+                >
+                    Cancel
+                </Button>
+                <Button 
+                    onClick={handleUpdateLeaves} 
+                    variant="contained"
+                    disabled={!updateLeavesForm.employeeId || !updateLeavesForm.year}
+                    sx={{
+                        backgroundColor: '#dc3545',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        px: 6,
+                        py: 1.5,
+                        borderRadius: '8px',
+                        textTransform: 'none',
+                        boxShadow: '0 4px 12px rgba(220, 53, 69, 0.3)',
+                        '&:hover': {
+                            backgroundColor: '#c82333',
+                            boxShadow: '0 6px 16px rgba(220, 53, 69, 0.4)'
+                        },
+                        '&.Mui-disabled': {
+                            backgroundColor: '#d1d5db',
+                            color: '#9ca3af',
+                            boxShadow: 'none'
+                        }
+                    }}
+                >
+                    Update Entitlements
+                </Button>
             </DialogActions>
         </Dialog>
 

@@ -47,7 +47,7 @@ const isAdminOrHr = async (req, res, next) => {
                 userRole = dbUser.role;
                 // Update req.user.role for consistency
                 req.user.role = userRole;
-                console.log('[isAdminOrHr] Fetched role from database:', userRole);
+                if (process.env.NODE_ENV !== 'production') console.log('[isAdminOrHr] Fetched role from database:', userRole);
             }
         } catch (error) {
             console.error('[isAdminOrHr] Error fetching user role from database:', error);
@@ -372,9 +372,6 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
     session.startTransaction();
     
     try {
-        // 🔍 DEBUG: Log incoming request body
-        console.log("Incoming leave request body:", JSON.stringify(req.body, null, 2));
-        
         const { employee, requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate, adminOverrideReason, status, appliedDate } = req.body;
         
         if (!employee || !requestType || !leaveDates || !leaveType || !reason) {
@@ -398,13 +395,17 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
         
         const requestTypeNorm = LeavePolicyService.normalizeRequestType(requestType);
         
-        // Apply Saturday clubbing for Planned Leave (Paid Leave)
-        // If employee takes leave on Friday and Monday, automatically include Saturday (if it's a week off)
+        // Apply Saturday clubbing for Planned Leave (Paid Leave) only.
+        // Saturday is only clubbed when advance notice ≥ 30 days is met.
+        // Casual, Sick, and LOP are never eligible for Saturday clubbing.
         if (requestTypeNorm === 'Planned') {
+            // Use admin-provided appliedDate if present (for backdated admin entries), else today
+            const leaveAppliedDate = appliedDate ? new Date(appliedDate) : new Date();
             const clubbedDates = LeavePolicyService.clubSaturdayInLeaveDates(
                 employeeDoc,
                 leaveDatesArray,
-                requestTypeNorm
+                requestTypeNorm,
+                leaveAppliedDate
             );
             // Convert clubbed date strings back to Date objects
             leaveDatesArray = clubbedDates.map(d => parseISTDate(d));
@@ -552,7 +553,7 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
                 }
                 
                 const newBalance = updated.leaveBalances?.[leaveField] ?? 0;
-                console.log(`[LEAVE_BALANCE] Admin POST: Deducted ${leaveDuration} ${leaveField} days. Old balance: ${effectiveBalance}, New balance: ${newBalance}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_BALANCE] Admin POST: Deducted ${leaveDuration} ${leaveField} days. Old balance: ${effectiveBalance}, New balance: ${newBalance}`);
                 
                 // Update employeeDoc reference for potential use later in transaction
                 if (!employeeDoc.leaveBalances) {
@@ -817,8 +818,8 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
                 const removedDates = oldDates.filter(d => !newDates.includes(d));
                 const addedDates = newDates.filter(d => !oldDates.includes(d));
 
-                console.log(`[LEAVE_UPDATE] Dates changed - Removed: ${removedDates.join(', ')}, Added: ${addedDates.join(', ')}`);
-                console.log(`[LEAVE_UPDATE] Original dates: ${oldDates.join(', ')}, New dates: ${newDates.join(', ')}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_UPDATE] Dates changed - Removed: ${removedDates.join(', ')}, Added: ${addedDates.join(', ')}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_UPDATE] Original dates: ${oldDates.join(', ')}, New dates: ${newDates.join(', ')}`);
 
                 // Revert attendance for removed dates
                 if (removedDates.length > 0) {
@@ -828,7 +829,7 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
                         ...originalRequest.toObject(),
                         leaveDates: removedDates.map(d => parseISTDate(d))
                     };
-                    console.log(`[LEAVE_UPDATE] Reverting attendance for dates: ${removedDates.join(', ')}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_UPDATE] Reverting attendance for dates: ${removedDates.join(', ')}`);
                     await syncAttendanceOnLeaveRejection(tempLeaveForRevert, session);
                 }
 
@@ -840,7 +841,7 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
                         ...updatedRequest.toObject(),
                         leaveDates: addedDates.map(d => parseISTDate(d))
                     };
-                    console.log(`[LEAVE_UPDATE] Syncing attendance for dates: ${addedDates.join(', ')}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_UPDATE] Syncing attendance for dates: ${addedDates.join(', ')}`);
                     await syncAttendanceOnLeaveApproval(tempLeaveForSync, session);
                 }
             } catch (syncError) {
@@ -893,7 +894,7 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
                     timestamp: new Date().toISOString(),
                     message: `Leave request updated${datesChanged ? ' (dates changed)' : ''}${statusChanged ? ` (status: ${updatedRequest.status})` : ''}`
                 });
-                console.log(`📡 Emitted leave_request_updated event for leave ${updatedRequest._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted leave_request_updated event for leave ${updatedRequest._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -946,7 +947,7 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
                     if (deletedRequest.backdatedSickDeducted > 0) update.$inc['leaveBalances.sick'] = deletedRequest.backdatedSickDeducted;
                     if (deletedRequest.backdatedCasualDeducted > 0) update.$inc['leaveBalances.casual'] = deletedRequest.backdatedCasualDeducted;
                     await User.findByIdAndUpdate(employee._id, update, { session });
-                    console.log(`[LEAVE_BALANCE] Deleted approved Backdated Leave: Restored sick=${deletedRequest.backdatedSickDeducted}, casual=${deletedRequest.backdatedCasualDeducted} for employee ${employee._id}`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_BALANCE] Deleted approved Backdated Leave: Restored sick=${deletedRequest.backdatedSickDeducted}, casual=${deletedRequest.backdatedCasualDeducted} for employee ${employee._id}`);
                 } else {
                     let leaveField;
                     switch (reqTypeNorm) {
@@ -961,7 +962,7 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
                         }
                         employee.leaveBalances[leaveField] += leaveDuration;
                         await employee.save({ session });
-                        console.log(`[LEAVE_BALANCE] Deleted approved leave: Restored ${leaveDuration} ${leaveField} days for employee ${employee._id}. New balance: ${employee.leaveBalances[leaveField]}`);
+                        if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_BALANCE] Deleted approved leave: Restored ${leaveDuration} ${leaveField} days for employee ${employee._id}. New balance: ${employee.leaveBalances[leaveField]}`);
                     }
                 }
                 
@@ -998,7 +999,7 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
                     timestamp: new Date().toISOString(),
                     message: 'Leave request deleted by Admin.'
                 });
-                console.log(`📡 Emitted leave_request_updated (deleted) for leave ${deletedRequest._id}, employee ${deletedRequest.employee}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted leave_request_updated (deleted) for leave ${deletedRequest._id}, employee ${deletedRequest.employee}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event on leave delete:', socketError);
@@ -1155,9 +1156,9 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                     });
                 }
                 
-                console.log(`[Comp-Off Approval] Attendance validated for worked date ${workedDateString}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[Comp-Off Approval] Attendance validated for worked date ${workedDateString}`);
             } else {
-                console.log(`[Comp-Off Approval] Worked date ${workedDate.toISOString()} is in the future, skipping attendance validation`);
+                if (process.env.NODE_ENV !== 'production') console.log(`[Comp-Off Approval] Worked date ${workedDate.toISOString()} is in the future, skipping attendance validation`);
             }
         }
 
@@ -1368,7 +1369,7 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
                     timestamp: new Date().toISOString(),
                     message: `Leave request ${newStatus.toLowerCase()}`
                 });
-                console.log(`📡 Emitted leave_request_updated event for leave ${request._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted leave_request_updated event for leave ${request._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -1486,51 +1487,49 @@ router.post('/leaves/bulk-allocate', [authenticateToken, isAdminOrHr], async (re
         const casual = casualLeaveEntitlement || 0;
         const paid = paidLeaveEntitlement || 0;
 
-        // Process each employee
-        for (const employeeId of employeeIds) {
-            try {
-                if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-                    results.failed.push({
-                        employeeId,
-                        error: 'Invalid employee ID format.'
-                    });
-                    continue;
+        // PERFORMANCE FIX: Replaced N+1 loop (findById + save per employee) with a single
+        // bulkWrite. For 50 employees this reduces ~100 DB round-trips to 2 (find + bulkWrite).
+        const validIds = employeeIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+        const invalidIds = employeeIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+
+        // Track invalid IDs as failed
+        invalidIds.forEach(id => {
+            results.failed.push({ employeeId: id, error: 'Invalid employee ID format.' });
+        });
+
+        if (validIds.length > 0) {
+            // Fetch all users in one query to verify they exist
+            const users = await User.find({ _id: { $in: validIds } }).select('_id fullName employeeCode').lean();
+            const foundIds = new Set(users.map(u => u._id.toString()));
+
+            // Track users not found
+            validIds.forEach(id => {
+                if (!foundIds.has(id.toString())) {
+                    results.failed.push({ employeeId: id, error: 'Employee not found.' });
                 }
+            });
 
-                const user = await User.findById(employeeId);
-                if (!user) {
-                    results.failed.push({
-                        employeeId,
-                        error: 'Employee not found.'
-                    });
-                    continue;
+            // Build bulkWrite operations for found users
+            const bulkOps = users.map(u => ({
+                updateOne: {
+                    filter: { _id: u._id },
+                    update: {
+                        $set: {
+                            leaveEntitlements: { sick, casual, paid },
+                            leaveBalances: { sick, casual, paid }
+                        }
+                    }
                 }
+            }));
 
-                // Set entitlements and balances
-                user.leaveEntitlements = {
-                    sick: sick,
-                    casual: casual,
-                    paid: paid,
-                };
-
-                user.leaveBalances = {
-                    sick: sick,
-                    casual: casual,
-                    paid: paid,
-                };
-
-                await user.save();
-
-                results.successful.push({
-                    employeeId: user._id,
-                    fullName: user.fullName,
-                    employeeCode: user.employeeCode
-                });
-            } catch (error) {
-                console.error(`Error allocating leaves for employee ${employeeId}:`, error);
-                results.failed.push({
-                    employeeId,
-                    error: error.message || 'Failed to allocate leaves for this employee.'
+            if (bulkOps.length > 0) {
+                await User.bulkWrite(bulkOps, { ordered: false });
+                users.forEach(u => {
+                    results.successful.push({
+                        employeeId: u._id,
+                        fullName: u.fullName,
+                        employeeCode: u.employeeCode
+                    });
                 });
             }
         }
@@ -2047,7 +2046,7 @@ router.patch('/attendance/toggle-status', [authenticateToken, isAdminOrHr, inval
     try {
         const { employeeId, attendanceDate, statusType, newStatus } = req.body;
 
-        console.log('Toggle attendance status request:', { employeeId, attendanceDate, statusType, newStatus });
+        if (process.env.NODE_ENV !== 'production') console.log('Toggle attendance status request:', { employeeId, attendanceDate, statusType, newStatus });
 
         // Validate required fields
         if (!employeeId || !attendanceDate || !statusType || !newStatus) {
@@ -2165,7 +2164,7 @@ router.patch('/attendance/toggle-status', [authenticateToken, isAdminOrHr, inval
                     timestamp: new Date().toISOString(),
                     message: `Attendance status updated to "${newStatus}" for ${employee.fullName} on ${attendanceDate}`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for log ${attendanceLog._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for log ${attendanceLog._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -2219,17 +2218,17 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
         // Build query
         const query = { user: employeeId };
 
-        console.log('Querying attendance logs for employee:', employeeId);
+        if (process.env.NODE_ENV !== 'production') console.log('Querying attendance logs for employee:', employeeId);
 
         if (startDate && endDate) {
             query.attendanceDate = {
                 $gte: startDate,
                 $lte: endDate
             };
-            console.log('Date range filter applied:', { startDate, endDate });
+            if (process.env.NODE_ENV !== 'production') console.log('Date range filter applied:', { startDate, endDate });
         }
 
-        console.log('Final query:', query);
+        if (process.env.NODE_ENV !== 'production') console.log('Final query:', query);
 
         // Get attendance logs with recent dates first
         const attendanceLogs = await AttendanceLog.find(query)
@@ -2238,10 +2237,10 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
             .limit(50) // Limit to recent 50 records for performance
             .lean();
 
-        console.log(`Found ${attendanceLogs.length} attendance logs for employee ${employeeId}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`Found ${attendanceLogs.length} attendance logs for employee ${employeeId}`);
 
         const GRACE_PERIOD_MINUTES = await getGracePeriodMinutes();
-        console.log(`Using grace period: ${GRACE_PERIOD_MINUTES} minutes`);
+        if (process.env.NODE_ENV !== 'production') console.log(`Using grace period: ${GRACE_PERIOD_MINUTES} minutes`);
 
         // Calculate correct status for each log based on grace period
         const logsWithCalculatedStatus = attendanceLogs.map(log => {
@@ -2306,7 +2305,7 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
         });
 
         if (attendanceLogs.length > 0) {
-            console.log('Sample attendance log with calculated status:', logsWithCalculatedStatus[0]);
+            if (process.env.NODE_ENV !== 'production') console.log('Sample attendance log with calculated status:', logsWithCalculatedStatus[0]);
         }
 
         res.json({
@@ -2395,12 +2394,10 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 console.warn('[dashboard-summary] Cache get failed, falling back to full computation:', cacheErr?.message);
             }
         }
-        console.log(`[ADMIN_DASHBOARD_TIMING] cache_lookup took ${Date.now() - t0}ms`);
-
-        // CACHE HIT: Return cached base summary when we don't need pending leaves (normalize Required Log Out to 7 PM policy)
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache_lookup took ${Date.now() - t0}ms`);
         if (cachedSummary && !shouldIncludePendingLeaves) {
             if (perfLog) {
-                console.log('[dashboard-summary] cache=hit includePendingLeaves=false ms=', Date.now() - startMs);
+                if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=hit includePendingLeaves=false ms=', Date.now() - startMs);
             }
             const normalized = {
                 ...cachedSummary,
@@ -2420,9 +2417,9 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     .populate('employee', 'fullName employeeCode')
                     .sort({ createdAt: 1 })
                     .lean();
-                console.log(`[ADMIN_DASHBOARD_TIMING] pending_leaves_query took ${Date.now() - t1}ms`);
+                if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] pending_leaves_query took ${Date.now() - t1}ms`);
                 if (perfLog) {
-                    console.log('[dashboard-summary] cache=hit includePendingLeaves=true ms=', Date.now() - startMs);
+                    if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=hit includePendingLeaves=true ms=', Date.now() - startMs);
                 }
                 const normalizedSummary = {
                     ...cachedSummary,
@@ -2449,9 +2446,9 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
 
         // CACHE MISS: Compute base dashboard summary (no N+1 in Who's In)
         if (perfLog) {
-            console.log('[dashboard-summary] cache=miss computing full summary');
+            if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss computing full summary');
         }
-        console.log(`[ADMIN_DASHBOARD_TIMING] cache=miss, starting full computation`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache=miss, starting full computation`);
         // Filter: Exclude Admin role and inactive users (business rule: only active employees/interns should appear in counts)
         const t2 = Date.now();
         const totalEmployeesPromise = User.countDocuments({ role: { $ne: 'Admin' }, isActive: true }).lean();
@@ -2550,12 +2547,12 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             backdatedLeavesPromise,
             pendingEarlyCheckoutPromise
         ]);
-        console.log(`[ADMIN_DASHBOARD_TIMING] parallel_queries took ${Date.now() - t2}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] parallel_queries took ${Date.now() - t2}ms`);
 
         // PERFORMANCE FIX: Batch-load all data for Who's In list to eliminate N+1 queries
         const t3 = Date.now();
         const rawList = Array.isArray(whosInListRaw) ? whosInListRaw : [];
-        console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_count=${rawList.length}`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_count=${rawList.length}`);
         
         // Check cache first for all employees
         const uncachedEmployees = [];
@@ -2579,7 +2576,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             }
         }
         
-        console.log(`[ADMIN_DASHBOARD_TIMING] cache_hits=${rawList.length - uncachedEmployees.length} cache_misses=${uncachedEmployees.length}`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache_hits=${rawList.length - uncachedEmployees.length} cache_misses=${uncachedEmployees.length}`);
         
         // For uncached employees, batch-load all required data in 3 parallel queries
         if (uncachedEmployees.length > 0) {
@@ -2627,7 +2624,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 usersMap.set(user._id.toString(), user);
             });
             
-            console.log(`[ADMIN_DASHBOARD_TIMING] batch_queries took ${Date.now() - t3a}ms`);
+            if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] batch_queries took ${Date.now() - t3a}ms`);
             
             // Now process each uncached employee with pre-loaded data (no DB calls)
             const t3b = Date.now();
@@ -2677,16 +2674,16 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     activeBreak
                 });
             }
-            console.log(`[ADMIN_DASHBOARD_TIMING] uncached_processing took ${Date.now() - t3b}ms`);
+            if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] uncached_processing took ${Date.now() - t3b}ms`);
         }
         
-        console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_enrichment took ${Date.now() - t3}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_enrichment took ${Date.now() - t3}ms`);
 
         const t4 = Date.now();
         let presentCount = 0;
         let lateCount = 0;
-        console.log(`[ADMIN_DASHBOARD_TIMING] count_calculation_start took ${Date.now() - t4}ms`);
-        console.log(`[ADMIN_DASHBOARD_DEBUG] todayLogs.length=${(todayLogs || []).length}`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] count_calculation_start took ${Date.now() - t4}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_DEBUG] todayLogs.length=${(todayLogs || []).length}`);
 
         // Count ALL employees who clocked in as present (both on-time and late)
         // Late employees are a subset of present employees
@@ -2699,7 +2696,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             }
         });
         
-        console.log(`[ADMIN_DASHBOARD_DEBUG] After forEach: presentCount=${presentCount}, lateCount=${lateCount}`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_DEBUG] After forEach: presentCount=${presentCount}, lateCount=${lateCount}`);
 
         if ((todayLogs || []).length === 0) {
             const logIds = await AttendanceLog.find({ attendanceDate: today }).select('_id').lean();
@@ -2732,7 +2729,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 }
             }
         });
-        console.log(`[ADMIN_DASHBOARD_TIMING] onLeaveCount_query took ${Date.now() - t5}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] onLeaveCount_query took ${Date.now() - t5}ms`);
 
         const statusCounts = {
             'Present': presentCount,
@@ -2791,7 +2788,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 console.warn('[dashboard-summary] Cache set failed:', setCacheErr?.message);
             }
         }
-        console.log(`[ADMIN_DASHBOARD_TIMING] summary_assembly_and_cache_set took ${Date.now() - t6}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] summary_assembly_and_cache_set took ${Date.now() - t6}ms`);
 
         if (shouldIncludePendingLeaves) {
             try {
@@ -2803,7 +2800,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     .sort({ createdAt: 1 })
                     .lean();
                 if (perfLog) {
-                    console.log('[dashboard-summary] cache=miss includePendingLeaves=true ms=', Date.now() - startMs);
+                    if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss includePendingLeaves=true ms=', Date.now() - startMs);
                 }
                 return res.json({
                     summary,
@@ -2821,12 +2818,12 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
         }
 
         if (perfLog) {
-            console.log('[dashboard-summary] cache=miss ms=', Date.now() - startMs);
+            if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss ms=', Date.now() - startMs);
         }
-        console.log(`[ADMIN_DASHBOARD_TIMING] TOTAL_TIME=${Date.now() - startMs}ms`);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] TOTAL_TIME=${Date.now() - startMs}ms`);
         res.json(summary);
     } catch (error) {
-        console.log(`[ADMIN_DASHBOARD_TIMING] ERROR after ${Date.now() - startMs}ms:`, error.message);
+        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] ERROR after ${Date.now() - startMs}ms:`, error.message);
         if (process.env.NODE_ENV !== 'production') {
             console.error('[dashboard-summary] Error:', error);
         }
@@ -3102,7 +3099,7 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidate
     }
 
     // Log received data for debugging (remove in production if needed)
-    console.log('PUT /admin/attendance/log/:logId - Received data:', {
+    if (process.env.NODE_ENV !== 'production') console.log('PUT /admin/attendance/log/:logId - Received data:', {
         logId,
         sessionsType: typeof sessions,
         sessionsIsArray: Array.isArray(sessions),
@@ -3149,7 +3146,7 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidate
         if (sessions !== undefined || breaks !== undefined) {
             log.logoutType = 'MANUAL';
             log.autoLogoutReason = null;
-            console.log('[Admin Edit] Auto-logout status cleared by admin edit');
+            if (process.env.NODE_ENV !== 'production') console.log('[Admin Edit] Auto-logout status cleared by admin edit');
         }
         // Continue with normal edit flow below
     }
@@ -3340,7 +3337,7 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidate
             // Clear auto-logout status
             logInTransaction.logoutType = 'MANUAL';
             logInTransaction.autoLogoutReason = null;
-            console.log('[Admin Edit] Auto-logout status cleared by admin edit in transaction');
+            if (process.env.NODE_ENV !== 'production') console.log('[Admin Edit] Auto-logout status cleared by admin edit in transaction');
         }
 
         const log = logInTransaction;
@@ -3464,7 +3461,7 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidate
                     log.isHalfDay = recalculatedStatus.isHalfDay;
                     log.lateMinutes = recalculatedStatus.lateMinutes;
                     log.attendanceStatus = recalculatedStatus.attendanceStatus;
-                    console.log(`✅ Recalculated attendance status after clockInTime update: ${recalculatedStatus.attendanceStatus} (lateMinutes: ${recalculatedStatus.lateMinutes})`);
+                    if (process.env.NODE_ENV !== 'production') console.log(`✅ Recalculated attendance status after clockInTime update: ${recalculatedStatus.attendanceStatus} (lateMinutes: ${recalculatedStatus.lateMinutes})`);
                 }
             } catch (recalcError) {
                 console.error('Error recalculating late status after clockInTime update:', recalcError);
@@ -3525,7 +3522,7 @@ router.put('/attendance/log/:logId', [authenticateToken, isAdminOrHr, invalidate
                     timestamp: new Date().toISOString(),
                     message: `Attendance log updated by admin - Working hours: ${log.totalWorkingHours.toFixed(2)}h`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for log ${log._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for log ${log._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -3673,7 +3670,7 @@ router.delete('/attendance/log/:logId', [authenticateToken, isAdminOrHr], async 
                     timestamp: new Date().toISOString(),
                     message: `Attendance log deleted by admin for ${logData.userName} on ${logData.attendanceDate}`
                 });
-                console.log(`📡 Emitted attendance_log_deleted event for log ${logData.logId}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_deleted event for log ${logData.logId}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -4202,7 +4199,7 @@ router.post('/attendance/override-half-day', [authenticateToken, isAdminOrHr, in
                     timestamp: new Date().toISOString(),
                     message: `Half-day override applied: ${originalStatus} → ${log.attendanceStatus}`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for override on log ${log._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for override on log ${log._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -4536,117 +4533,169 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
         const isHalfDay = overrideType === 'halfday';
         const status = overrideType === 'leave' ? 'Leave' : (isHalfDay ? 'Half-day' : 'On-time');
 
+        // PERFORMANCE FIX: Pre-load ALL existing logs for all employees × all dates in ONE query.
+        // Previously: nested for-loops with findOne per (employee, date) = up to 1,400 DB queries.
+        // Now: 1 find + 1 bulkWrite regardless of how many employees/days are selected.
+        const existingLogs = await AttendanceLog.find({
+            user: { $in: employeeIds },
+            attendanceDate: { $in: dates }
+        }).lean();
+
+        // Build a lookup map: "userId_dateStr" → log
+        const logMap = new Map();
+        existingLogs.forEach(log => {
+            logMap.set(`${log.user.toString()}_${log.attendanceDate}`, log);
+        });
+
+        // Collect leave conflicts to resolve (logs that reference an approved leave and we're not applying 'leave' override)
+        const leaveConflicts = [];
+        if (overrideType !== 'leave') {
+            existingLogs.forEach(log => {
+                if (log.leaveRequest) {
+                    leaveConflicts.push(log);
+                }
+            });
+        }
+
+        // Resolve leave conflicts: fetch all referenced leave requests in one batch query
+        if (leaveConflicts.length > 0) {
+            const leaveIds = leaveConflicts.map(l => l.leaveRequest).filter(Boolean);
+            const leaveRequests = await LeaveRequest.find({ _id: { $in: leaveIds }, status: 'Approved' }).lean();
+            const leaveMap = new Map(leaveRequests.map(lr => [lr._id.toString(), lr]));
+
+            const leaveUpdateOps = [];
+            const userLeaveBalanceUpdates = new Map(); // userId → { field, delta }
+
+            for (const log of leaveConflicts) {
+                const leaveReq = leaveMap.get(log.leaveRequest?.toString());
+                if (!leaveReq) continue;
+
+                const typeToField = {
+                    'Planned': 'paid', 'Sick': 'sick', 'Casual': 'casual',
+                    'Loss of Pay': 'lop', 'Compensatory': 'compensatory',
+                    'Backdated Leave': 'paid', 'Comp-Off': 'compensatory',
+                };
+                const leaveField = typeToField[leaveReq.requestType];
+                const leaveDuration = leaveReq.leaveType === 'Full Day' ? 1 : 0.5;
+
+                if (leaveField) {
+                    const key = `${leaveReq.employee.toString()}_${leaveField}`;
+                    userLeaveBalanceUpdates.set(key, (userLeaveBalanceUpdates.get(key) || 0) + leaveDuration);
+                }
+
+                leaveUpdateOps.push({
+                    updateOne: {
+                        filter: { _id: leaveReq._id },
+                        update: {
+                            $set: {
+                                status: 'Rejected',
+                                rejectionNotes: `Admin bulk override changed attendance to '${overrideType}'. Leave auto-cancelled. Override reason: ${note}`
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Apply all leave rejections in one bulkWrite
+            if (leaveUpdateOps.length > 0) {
+                await LeaveRequest.bulkWrite(leaveUpdateOps, { ordered: false });
+            }
+
+            // Apply leave balance restorations (group by userId and field)
+            const balanceUpdateOps = [];
+            for (const [key, delta] of userLeaveBalanceUpdates) {
+                const [uid, field] = key.split('_');
+                balanceUpdateOps.push({
+                    updateOne: {
+                        filter: { _id: uid },
+                        update: { $inc: { [`leaveBalances.${field}`]: delta } }
+                    }
+                });
+            }
+            if (balanceUpdateOps.length > 0) {
+                await User.bulkWrite(balanceUpdateOps, { ordered: false });
+            }
+        }
+
+        // Build bulkWrite operations for attendance log upserts
+        const overrideTimestamp = new Date();
+        const attendanceBulkOps = [];
+
         for (const eid of employeeIds) {
             const shiftMinutes = shiftMinutesMap.get(eid.toString()) ?? defaultShiftMinutes;
 
             for (const dateStr of dates) {
-                let log = await AttendanceLog.findOne({ user: eid, attendanceDate: dateStr }).lean();
-                if (!log) {
-                    const created = await AttendanceLog.create({
-                        user: eid,
-                        attendanceDate: dateStr,
-                        shiftDurationMinutes: shiftMinutes,
-                        penaltyMinutes: 0,
-                        paidBreakMinutesTaken: 0,
-                        unpaidBreakMinutesTaken: 0,
-                        attendanceStatus: status,
-                        isHalfDay,
-                        isLate: false,
-                        lateMinutes: 0,
-                        totalWorkingHours: isHalfDay ? 0 : (shiftMinutes / 60),
-                        overriddenByAdmin: true,
-                        overrideType,
-                        overrideReason: note,
-                        adminOverride: adminOverrideLabel,
-                        overriddenAt: new Date(),
-                        overriddenBy: adminUserId,
-                        halfDayReasonCode: isHalfDay ? 'MANUAL_ADMIN' : null,
-                        halfDayReasonText: isHalfDay ? note : '',
-                        halfDaySource: isHalfDay ? 'MANUAL' : null,
-                    });
-                    log = { _id: created._id, user: eid, attendanceDate: dateStr };
-                    appliedCount++;
-                } else {
-                    const doc = await AttendanceLog.findById(log._id);
+                const existingLog = logMap.get(`${eid.toString()}_${dateStr}`);
+                appliedCount++;
 
-                    // ─── LEAVE CONFLICT GUARD ────────────────────────────────
-                    // If this attendance record has a linked approved LeaveRequest
-                    // and the admin is NOT applying a 'leave' override (i.e. they
-                    // are converting a leave day to Present/Half-day/Holiday),
-                    // we must: (a) mark the LeaveRequest as Rejected/cancelled so
-                    // the leaves page stays in sync, and (b) restore the leave
-                    // balance that was deducted when the leave was approved.
-                    if (doc.leaveRequest && overrideType !== 'leave') {
-                        try {
-                            const LeaveRequest = require('../models/LeaveRequest');
-                            const User = require('../models/User');
-                            const leaveReq = await LeaveRequest.findById(doc.leaveRequest);
-                            if (leaveReq && leaveReq.status === 'Approved') {
-                                // Determine leave field and duration to restore
-                                const typeToField = {
-                                    'Planned': 'paid', 'Sick': 'sick', 'Casual': 'casual',
-                                    'Loss of Pay': 'lop', 'Compensatory': 'compensatory',
-                                    'Backdated Leave': 'paid', 'Comp-Off': 'compensatory',
-                                };
-                                const leaveField = typeToField[leaveReq.requestType];
-                                const leaveDuration = leaveReq.leaveType === 'Full Day' ? 1 : 0.5;
-                                if (leaveField) {
-                                    await User.updateOne(
-                                        { _id: leaveReq.employee },
-                                        { $inc: { [`leaveBalances.${leaveField}`]: leaveDuration } }
-                                    );
-                                }
-                                leaveReq.status = 'Rejected';
-                                leaveReq.rejectionNotes = `Admin bulk override on ${dateStr} changed attendance to '${overrideType}'. Leave auto-cancelled to prevent mismatch. Override reason: ${note}`;
-                                await leaveReq.save();
+                const updateFields = {
+                    overriddenByAdmin: true,
+                    overrideType,
+                    overrideReason: note,
+                    adminOverride: adminOverrideLabel,
+                    overriddenAt: overrideTimestamp,
+                    overriddenBy: adminUserId,
+                    attendanceStatus: status,
+                    isHalfDay,
+                    isLate: false,
+                    lateMinutes: 0,
+                    halfDayReasonCode: isHalfDay ? 'MANUAL_ADMIN' : null,
+                    halfDayReasonText: isHalfDay ? note : '',
+                    halfDaySource: isHalfDay ? 'MANUAL' : null,
+                    // Detach any leave reference when conflict was resolved above
+                    ...(existingLog?.leaveRequest && overrideType !== 'leave' ? { leaveRequest: null } : {})
+                };
+
+                if (!existingLog) {
+                    // No existing log: insert a new one
+                    attendanceBulkOps.push({
+                        insertOne: {
+                            document: {
+                                user: eid,
+                                attendanceDate: dateStr,
+                                shiftDurationMinutes: shiftMinutes,
+                                penaltyMinutes: 0,
+                                paidBreakMinutesTaken: 0,
+                                unpaidBreakMinutesTaken: 0,
+                                totalWorkingHours: isHalfDay ? 0 : (shiftMinutes / 60),
+                                ...updateFields
                             }
-                            // Detach the leave reference from this attendance log
-                            doc.leaveRequest = null;
-                        } catch (leaveErr) {
-                            console.error(`[bulk-override] Failed to resolve leave conflict for log ${doc._id}:`, leaveErr.message);
                         }
-                    }
-                    // If override type IS 'leave', we do not create a real LeaveRequest —
-                    // the attendance record itself carries the Leave status. The leaveRequest
-                    // ref stays null (admin-applied leave has no request document).
-                    // ────────────────────────────────────────────────────────────
-
-                    doc.overriddenByAdmin = true;
-                    doc.overrideType = overrideType;
-                    doc.overrideReason = note;
-                    doc.adminOverride = adminOverrideLabel;
-                    doc.overriddenAt = new Date();
-                    doc.overriddenBy = adminUserId;
-                    doc.attendanceStatus = status;
-                    doc.isHalfDay = isHalfDay;
-                    doc.isLate = false;
-                    doc.lateMinutes = 0;
-                    doc.halfDayReasonCode = isHalfDay ? 'MANUAL_ADMIN' : null;
-                    doc.halfDayReasonText = isHalfDay ? note : '';
-                    doc.halfDaySource = isHalfDay ? 'MANUAL' : null;
-                    await doc.save();
-                    appliedCount++;
-                    log = { _id: doc._id, user: doc.user, attendanceDate: doc.attendanceDate };
+                    });
+                } else {
+                    // Existing log: update it
+                    attendanceBulkOps.push({
+                        updateOne: {
+                            filter: { _id: existingLog._id },
+                            update: { $set: updateFields }
+                        }
+                    });
                 }
 
+                // Emit socket event for real-time dashboard update
                 try {
                     if (io) {
                         io.emit('attendance_log_updated', {
-                            logId: log._id,
-                            userId: log.user?._id || log.user,
-                            attendanceDate: log.attendanceDate,
+                            logId: existingLog?._id,
+                            userId: eid,
+                            attendanceDate: dateStr,
                             attendanceStatus: status,
                             isHalfDay,
                             overrideReason: note,
                             overriddenByAdmin: true,
                             overrideType,
                             updatedBy: adminUserId,
-                            timestamp: new Date().toISOString(),
+                            timestamp: overrideTimestamp.toISOString(),
                             message: 'Bulk override applied.',
                         });
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) { /* ignore socket errors */ }
             }
+        }
+
+        // Execute all attendance updates in one bulkWrite
+        if (attendanceBulkOps.length > 0) {
+            await AttendanceLog.bulkWrite(attendanceBulkOps, { ordered: false });
         }
 
         try {
@@ -4742,7 +4791,7 @@ router.put('/attendance/half-day/:logId', [authenticateToken, isAdminOrHr, inval
                     timestamp: new Date().toISOString(),
                     message: `Attendance log updated: ${originalStatus} → ${log.attendanceStatus} - Working hours: ${log.totalWorkingHours.toFixed(2)}h`
                 });
-                console.log(`📡 Emitted attendance_log_updated event for log ${log._id}`);
+                if (process.env.NODE_ENV !== 'production') console.log(`📡 Emitted attendance_log_updated event for log ${log._id}`);
             }
         } catch (socketError) {
             console.error('Failed to emit Socket.IO event:', socketError);
@@ -4891,7 +4940,7 @@ router.post('/leaves/run-halfday-validation', [authenticateToken, isAdminOrHr], 
         
         const { autoConvertHalfDayLeaves } = require('../services/halfDayAutoConversionService');
         
-        console.log(`[Admin] Manual half-day conversion triggered by ${req.user.userId} for date: ${date}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[Admin] Manual half-day conversion triggered by ${req.user.userId} for date: ${date}`);
         
         const result = await autoConvertHalfDayLeaves(date);
         
@@ -4950,7 +4999,7 @@ router.post('/leaves/run-auto-revert-check', [authenticateToken, isAdminOrHr], a
         
         const { autoRevertIncorrectConversions } = require('../services/halfDayAutoConversionService');
         
-        console.log(`[Admin] Manual auto-revert check triggered by ${req.user.userId} for date: ${date}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[Admin] Manual auto-revert check triggered by ${req.user.userId} for date: ${date}`);
         
         const result = await autoRevertIncorrectConversions(date);
         
