@@ -192,14 +192,21 @@ async function getEmployeeDetailedAnalytics(req, res) {
         // Build daily logs with resolved status
         const dailyLogs = summaryData.map(day => {
             const detailedLog = logsMap.get(day.date);
+            const netHours = day.totalWorkingHours || 0;
+            
+            // FIXED: Overtime per day = net hours beyond 8.5 required hours
+            const REQUIRED_NET_HOURS = 8.5;
+            const isPresent = day.finalStatus === 'On-time' || day.finalStatus === 'Late' || day.finalStatus === 'Half-day';
+            const dailyOvertime = isPresent && netHours > REQUIRED_NET_HOURS ? netHours - REQUIRED_NET_HOURS : 0;
             
             return {
                 date: day.date,
                 clockIn: detailedLog?.clockInTime || null,
                 clockOut: detailedLog?.clockOutTime || null,
-                workedTime: day.totalWorkingHours || 0,
+                workedTime: netHours,
                 breakTime: detailedLog?.totalBreakTime || 0,
-                totalTime: (day.totalWorkingHours || 0) + (detailedLog?.totalBreakTime || 0),
+                totalTime: netHours + (detailedLog?.totalBreakTime || 0),
+                overtimeHours: Math.round(dailyOvertime * 100) / 100,
                 dayType: determineDayType(day, detailedLog),
                 status: day.finalStatus,
                 isHalfDay: day.isHalfDay,
@@ -268,10 +275,11 @@ function calculateEmployeeKPIs(summaryData, shiftGroup) {
     let overtimeHours = 0;
     let nonWorkingDays = 0;
     
-    // Get shift duration (default 9 hours)
-    const shiftDurationHours = 9;
-    const halfDayThreshold = 6; // Hours threshold for half day
-    const fullDayThreshold = 8; // Hours threshold for full day
+    // CORRECTED: Required net working hours = 8.5 hours (510 minutes)
+    // totalWorkingHours in DB is already NET (breaks subtracted)
+    // Overtime = net hours worked beyond 8.5 hours
+    const REQUIRED_NET_HOURS = 8.5;
+    const halfDayThreshold = 4.5; // Hours threshold for half day classification
     
     summaryData.forEach(day => {
         const status = day.finalStatus;
@@ -283,15 +291,15 @@ function calculateEmployeeKPIs(summaryData, shiftGroup) {
             presentDays += 1;
             totalNetHours += hours;
             
-            // Calculate overtime
-            if (hours > shiftDurationHours) {
-                overtimeHours += (hours - shiftDurationHours);
+            // FIXED: Overtime = net hours beyond 8.5 required hours
+            if (hours > REQUIRED_NET_HOURS) {
+                overtimeHours += (hours - REQUIRED_NET_HOURS);
             }
             
-            // Determine if half day or full day based on hours worked
-            if (hours < halfDayThreshold) {
+            // Determine if half day or full day
+            if (day.isHalfDay || status === 'Half-day') {
                 halfDays += 1;
-            } else if (hours >= fullDayThreshold) {
+            } else {
                 fullDays += 1;
             }
         } else if (status === 'Leave' || status === 'Approved Leave') {
@@ -304,7 +312,7 @@ function calculateEmployeeKPIs(summaryData, shiftGroup) {
     });
     
     // Calculate derived metrics
-    const avgWorkingHours = presentDays > 1 ? totalNetHours / (presentDays - 1) : 0;
+    const avgWorkingHours = presentDays > 0 ? totalNetHours / presentDays : 0;
     
     return {
         presentDays: Math.round(presentDays * 10) / 10,

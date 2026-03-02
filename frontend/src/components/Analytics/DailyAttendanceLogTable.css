@@ -279,3 +279,10 @@
         padding: 3px 8px;
     }
 }
+
+/* Overtime positive highlight */
+.overtime-positive {
+    color: #16a34a;
+    font-weight: 600;
+}
+

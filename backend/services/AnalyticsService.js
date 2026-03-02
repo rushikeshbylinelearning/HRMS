@@ -215,13 +215,16 @@ function calculateEmployeeMetrics(employee, summaryData) {
     let totalNetHours = 0;
     let overtimeHours = 0;
     
-    // Get shift duration for overtime calculation (default 9 hours)
-    const shiftDurationHours = 9;
+    // CORRECTED: Required net working hours per day is 8.5 hours (510 min)
+    // totalWorkingHours in DB is already NET (breaks excluded)
+    // Overtime = hours worked beyond 8.5 hours net
+    const REQUIRED_NET_HOURS = 8.5; // 510 minutes / 60
     
     summaryData.forEach(day => {
         const status = day.finalStatus;
         
         // Get working hours from summary data (includes admin overrides)
+        // This is already NET hours (breaks excluded) from AttendanceLog.totalWorkingHours
         const hours = day.totalWorkingHours || 0;
         
         // CRITICAL: Half-day counts as 1 full Present Day (not 0.5)
@@ -234,25 +237,31 @@ function calculateEmployeeMetrics(employee, summaryData) {
             presentDays += dayValue;
             totalNetHours += hours;
             
-            // Calculate overtime (hours beyond shift duration)
-            if (hours > shiftDurationHours) {
-                overtimeHours += (hours - shiftDurationHours);
+            // FIXED: Overtime = net hours worked beyond 8.5 required hours
+            if (hours > REQUIRED_NET_HOURS) {
+                overtimeHours += (hours - REQUIRED_NET_HOURS);
             }
         } else if (status === 'Leave' || status === 'Approved Leave') {
-            // Leave day
+            // Leave day - counts as non-working (not present)
             leaveDays += dayValue;
         } else if (status === 'Absent') {
-            // Absent day
+            // Absent day - should have been a working day but employee was absent
             absentDays += dayValue;
         }
-        // Ignore: Holiday, Weekly Off, Weekend, etc.
+        // Note: Holiday, Weekly Off, Weekend are NOT counted in any category
+        // They are excluded from all metrics as they are not working days
     });
     
     // Calculate derived metrics
+    // Non-Working Days = Leave Days + Absent Days (excludes weekends/holidays)
     const nonWorkingDays = leaveDays + absentDays;
-    const avgWorkingHours = presentDays > 1 ? totalNetHours / (presentDays - 1) : 0;
-    const totalDays = presentDays + leaveDays + absentDays;
-    const attendancePercentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+    
+    // Working days in period = present + leave + absent (excludes weekends/holidays)
+    const workingDaysInPeriod = presentDays + leaveDays + absentDays;
+    const avgWorkingHours = presentDays > 0 ? totalNetHours / presentDays : 0;
+    // Attendance % = present days / (present + absent) days (excludes leave and non-working)
+    const attendableDays = presentDays + absentDays;
+    const attendancePercentage = workingDaysInPeriod > 0 ? (presentDays / workingDaysInPeriod) * 100 : 0;
     
     return {
         employeeId: employee._id,
@@ -321,17 +330,16 @@ function buildUserFilterQuery(filters) {
 function validateMetrics(metrics, context = 'unknown') {
     const errors = [];
     
-    // CRITICAL CHECK: Non-Working Days = Leave + Absent
+    // CRITICAL: Non-Working Days MUST equal Leave Days + Absent Days
     const expectedNonWorking = (metrics.leaveDays || 0) + (metrics.absentDays || 0);
     const actualNonWorking = metrics.nonWorkingDays || 0;
     
-    if (Math.abs(expectedNonWorking - actualNonWorking) > 0.01) {
+    // Allow small floating point tolerance (0.01)
+    if (Math.abs(actualNonWorking - expectedNonWorking) > 0.01) {
         errors.push({
             check: 'Non-Working Days Invariant',
             severity: 'CRITICAL',
-            expected: expectedNonWorking,
-            actual: actualNonWorking,
-            message: `Non-Working Days (${actualNonWorking}) MUST equal Leave Days (${metrics.leaveDays}) + Absent Days (${metrics.absentDays})`
+            message: `Non-Working Days (${actualNonWorking}) ≠ Leave Days (${metrics.leaveDays}) + Absent Days (${metrics.absentDays}) = ${expectedNonWorking}`
         });
     }
     
@@ -382,6 +390,7 @@ function calculateSummaryMetrics(employeeMetrics) {
         acc.presentDays += emp.presentDays || 0;
         acc.leaveDays += emp.leaveDays || 0;
         acc.absentDays += emp.absentDays || 0;
+        acc.nonWorkingDays += emp.nonWorkingDays || 0;
         acc.totalNetHours += emp.totalNetHours || 0;
         acc.overtimeHours += emp.overtimeHours || 0;
         return acc;
@@ -389,22 +398,22 @@ function calculateSummaryMetrics(employeeMetrics) {
         presentDays: 0,
         leaveDays: 0,
         absentDays: 0,
+        nonWorkingDays: 0,
         totalNetHours: 0,
         overtimeHours: 0
     });
     
     // Calculate derived metrics
-    const nonWorkingDays = totals.leaveDays + totals.absentDays;
-    const totalDays = totals.presentDays + totals.leaveDays + totals.absentDays;
-    const averageWorkingHours = totals.presentDays > 1 ? totals.totalNetHours / (totals.presentDays - 1) : 0;
-    const attendancePercentage = totalDays > 0 ? (totals.presentDays / totalDays) * 100 : 0;
+    const workingDaysInPeriod = totals.presentDays + totals.leaveDays + totals.absentDays;
+    const averageWorkingHours = totals.presentDays > 0 ? totals.totalNetHours / totals.presentDays : 0;
+    const attendancePercentage = workingDaysInPeriod > 0 ? (totals.presentDays / workingDaysInPeriod) * 100 : 0;
     
     const summary = {
         totalEmployees: employeeMetrics.length,
         presentDays: Math.round(totals.presentDays * 10) / 10,
         leaveDays: Math.round(totals.leaveDays * 10) / 10,
         absentDays: Math.round(totals.absentDays * 10) / 10,
-        nonWorkingDays: Math.round(nonWorkingDays * 10) / 10,
+        nonWorkingDays: Math.round(totals.nonWorkingDays * 10) / 10,
         attendancePercentage: Math.round(attendancePercentage * 100) / 100,
         totalNetHours: Math.round(totals.totalNetHours * 100) / 100,
         totalNetHoursFormatted: formatHoursToHHMM(totals.totalNetHours),

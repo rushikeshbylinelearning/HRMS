@@ -3,14 +3,19 @@
  * 
  * Displays comprehensive attendance analytics for a single employee.
  * Includes KPI cards, filters, and detailed daily attendance log table.
+ * Updated to support PDF export instead of CSV.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Box, Button, IconButton } from '@mui/material';
+import { Box, Button, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import DownloadIcon from '@mui/icons-material/Download';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { fetchEmployeeDetailedAnalytics } from '../../services/employeeAnalyticsService';
+import { exportEmployeeAnalytics } from '../../services/employeeAnalyticsService';
 import { getISTNow } from '../../utils/istTime';
 import PageHeroHeader from '../PageHeroHeader';
 import EmployeeKPICards from './EmployeeKPICards';
@@ -28,6 +33,8 @@ function EmployeeDetailedAnalytics() {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
+    const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+    const [exporting, setExporting] = useState(false);
     const debounceRef = useRef(null);
     
     // Initialize filters from URL params or current month
@@ -94,6 +101,30 @@ function EmployeeDetailedAnalytics() {
         setShowFilters(prev => !prev);
     };
     
+    // Handle export menu
+    const handleExportClick = (event) => {
+        setExportMenuAnchor(event.currentTarget);
+    };
+    
+    const handleExportClose = () => {
+        setExportMenuAnchor(null);
+    };
+    
+    // Handle export to format
+    const handleExport = async (format) => {
+        handleExportClose();
+        setExporting(true);
+        
+        try {
+            await exportEmployeeAnalytics(employeeId, filters.month, filters.year, format);
+        } catch (err) {
+            console.error('Error exporting analytics:', err);
+            alert('Failed to export analytics. Please try again.');
+        } finally {
+            setExporting(false);
+        }
+    };
+    
     // Get month name
     const getMonthName = (month) => {
         const months = [
@@ -144,6 +175,69 @@ function EmployeeDetailedAnalytics() {
                         </IconButton>
                         <Button
                             variant="contained"
+                            startIcon={<DownloadIcon />}
+                            onClick={handleExportClick}
+                            disabled={!data || exporting}
+                            size="medium"
+                            sx={{
+                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                color: 'white',
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                px: 2.5,
+                                py: 0.75,
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                                fontSize: '0.875rem',
+                                '&:hover': {
+                                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)',
+                                },
+                                '&:disabled': {
+                                    background: '#9CA3AF',
+                                    color: 'white',
+                                    opacity: 0.6
+                                }
+                            }}
+                        >
+                            {exporting ? 'Exporting...' : 'Export'}
+                        </Button>
+                        <Menu
+                            anchorEl={exportMenuAnchor}
+                            open={Boolean(exportMenuAnchor)}
+                            onClose={handleExportClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'right',
+                            }}
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    mt: 1,
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                                    minWidth: 180
+                                }
+                            }}
+                        >
+                            <MenuItem onClick={() => handleExport('xlsx')}>
+                                <ListItemIcon>
+                                    <DescriptionIcon fontSize="small" sx={{ color: '#10B981' }} />
+                                </ListItemIcon>
+                                <ListItemText>Excel (.xlsx)</ListItemText>
+                            </MenuItem>
+                            <MenuItem onClick={() => handleExport('pdf')}>
+                                <ListItemIcon>
+                                    <PictureAsPdfIcon fontSize="small" sx={{ color: '#EF4444' }} />
+                                </ListItemIcon>
+                                <ListItemText>PDF (.pdf)</ListItemText>
+                            </MenuItem>
+                        </Menu>
+                        <Button
+                            variant="contained"
                             startIcon={<FilterListIcon />}
                             onClick={handleToggleFilters}
                             size="medium"
@@ -169,12 +263,9 @@ function EmployeeDetailedAnalytics() {
                 }
             />
             
-            <Box sx={{ py: 0, px: 3, maxWidth: '100%' }}>
+            <Box sx={{ py: 0, px: 0, maxWidth: '100%' }}>
                 {showFilters && (
-                    <EmployeeFilterControls
-                        filters={filters}
-                        onFilterChange={handleFilterChange}
-                    />
+                    <EmployeeFilterControls filters={filters} onFilterChange={handleFilterChange} />
                 )}
                 
                 {/* Only show full-page spinner when there's no data yet */}
@@ -217,8 +308,14 @@ function EmployeeDetailedAnalytics() {
                 {/* Always show data if we have it, even during refresh */}
                 {!loading && !error && data && (
                     <>
-                        <EmployeeKPICards summary={data.summary} />
-                        <DailyAttendanceLogTable dailyLogs={data.dailyLogs} />
+                        <EmployeeKPICards 
+                            summary={data.summary}
+                            employeeInfo={data.employeeInfo}
+                        />
+                        <DailyAttendanceLogTable
+                            dailyLogs={data.dailyLogs}
+                            employeeId={employeeId}
+                        />
                     </>
                 )}
             </Box>

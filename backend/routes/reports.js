@@ -140,9 +140,12 @@ router.post('/attendance', [authenticateToken, isAdminOrHr], async (req, res) =>
                         ]
                     },
                     totalWorkMinutes: 1,
+                    totalWorkHours: { $divide: ['$totalWorkMinutes', 60] },
                     status: { $ifNull: ['$status', 'Present'] },
                     penaltyMinutes: { $ifNull: ['$penaltyMinutes', 0] },
-                    shiftName: { $ifNull: ['$shift.shiftName', 'N/A'] }
+                    shiftName: { $ifNull: ['$shift.shiftName', 'N/A'] },
+                    clockInTime: '$clockInTime',
+                    clockOutTime: '$clockOutTime'
                 }
             },
             { $sort: { date: 1, employeeName: 1 } }
@@ -211,10 +214,32 @@ router.post('/attendance', [authenticateToken, isAdminOrHr], async (req, res) =>
             const employeeId = log.employeeId.toString();
             const dateStr = formatDate(log.date);
             const key = `${employeeId}-${dateStr}`;
+            
+            // Calculate overtime: Hours worked beyond 8.5 hours (510 minutes)
+            let overtimeMinutes = 0;
+            const totalWorkHours = log.totalWorkMinutes / 60;
+            
+            if (log.clockOut && totalWorkHours > 8.5) {
+                try {
+                    // clockOut is a Date object from sessions
+                    const clockOutDate = new Date(log.clockOut);
+                    const clockOutHour = clockOutDate.getHours();
+                    
+                    // Only count as overtime if worked more than 8.5 hours AND clocked out after 7 PM
+                    if (clockOutHour >= 19) {
+                        overtimeMinutes = Math.round((totalWorkHours - 8.5) * 60);
+                    }
+                } catch (error) {
+                    console.error('Error calculating overtime:', error);
+                    overtimeMinutes = 0;
+                }
+            }
+            
             attendanceMap.set(key, {
                 ...log,
                 employeeId,
-                date: dateStr
+                date: dateStr,
+                overtimeMinutes
             });
         });
 
@@ -260,6 +285,7 @@ router.post('/attendance', [authenticateToken, isAdminOrHr], async (req, res) =>
                         extraUnpaidBreakMinutes: 0,
                         totalBreakMinutes: 0,
                         totalWorkMinutes: 0,
+                        overtimeMinutes: 0,
                         status,
                         penaltyMinutes: 0,
                         shiftName: defaultShiftName

@@ -67,6 +67,7 @@ function DailyAttendanceLogTable({ dailyLogs }) {
                         workedTime: isLeave || isAbsent ? '-' : formatHoursToHHMM(log.workedTime),
                         breakTime: isLeave || isAbsent ? '-' : formatHoursToHHMM(log.breakTime),
                         totalTime: isLeave || isAbsent ? '-' : formatHoursToHHMM(log.totalTime),
+                        overtimeHours: isLeave || isAbsent ? '-' : (log.overtimeHours > 0 ? formatHoursToHHMM(log.overtimeHours) : '00:00'),
                     }
                 };
             });
@@ -141,6 +142,9 @@ function DailyAttendanceLogTable({ dailyLogs }) {
                             <th onClick={() => handleSort('totalTime')} className="sortable">
                                 Total Time {sortConfig.key === 'totalTime' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
+                            <th onClick={() => handleSort('overtimeHours')} className="sortable">
+                                Overtime {sortConfig.key === 'overtimeHours' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            </th>
                             <th onClick={() => handleSort('dayType')} className="sortable">
                                 Day Type {sortConfig.key === 'dayType' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
@@ -164,6 +168,9 @@ function DailyAttendanceLogTable({ dailyLogs }) {
                                     <td className="number-cell">{log._formatted.workedTime}</td>
                                     <td className="number-cell">{log._formatted.breakTime}</td>
                                     <td className="number-cell">{log._formatted.totalTime}</td>
+                                    <td className={`number-cell ${log.overtimeHours > 0 ? 'overtime-positive' : ''}`}>
+                                        {log._formatted.overtimeHours}
+                                    </td>
                                     <td className="day-type-cell">
                                         {log.dayType}
                                         {log.isHalfDay && log.workedTime > 0 && (

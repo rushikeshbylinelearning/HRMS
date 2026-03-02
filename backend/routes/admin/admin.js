@@ -26,19 +26,6 @@ const { syncAttendanceOnLeaveApproval, syncAttendanceOnLeaveRejection } = requir
 const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 const { getTodayISTKey, getISTDateString, parseISTDate, startOfISTDay, endOfISTDay, getShiftDateTimeIST, normalizeLeaveDatesForApi } = require('../utils/istTime');
 
-// ── HELPER: count only Monday–Friday dates in a leaveDates array ─────────────
-// Saturday-clubbing may have added weekend dates to the array. When deducting
-// from leaveBalances we must count ONLY working days to stay in sync with what
-// the employee portal and admin tracker display.
-const countWorkingDaysInLeaveDates = (leaveDates) => {
-    if (!leaveDates || leaveDates.length === 0) return 0;
-    return leaveDates.filter(d => {
-        const dow = new Date(d).getDay();
-        return dow !== 0 && dow !== 6; // exclude Sunday(0) and Saturday(6)
-    }).length;
-};
-// ─────────────────────────────────────────────────────────────────────────────
-
 // Middleware to check for Admin/HR role
 // Prefer req.user.role from JWT (auth includes role in payload); fallback to DB only when missing to avoid extra User.findById on every request.
 const isAdminOrHr = async (req, res, next) => {
@@ -482,9 +469,7 @@ router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
         
         // CRITICAL FIX: If status is Approved, update leave balance immediately
         if (savedRequest.status === 'Approved') {
-            // Use working-day count only (exclude any auto-clubbed Saturdays/Sundays)
-            const workingDayCount = countWorkingDaysInLeaveDates(savedRequest.leaveDates);
-            const leaveDuration = workingDayCount * (savedRequest.leaveType === 'Full Day' ? 1 : 0.5);
+            const leaveDuration = savedRequest.leaveDates.length * (savedRequest.leaveType === 'Full Day' ? 1 : 0.5);
             const leaveField = LeavePolicyService.getBalanceField(savedRequest.requestType);
 
             if (leaveField === 'backdated') {
@@ -740,11 +725,8 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
         }
 
         // CRITICAL FIX: Handle balance updates when requestType, leaveType, or duration changes
-        // Use working-day count only (exclude any auto-clubbed Saturdays/Sundays)
-        const oldWorkingDayCount = countWorkingDaysInLeaveDates(originalRequest.leaveDates);
-        const newWorkingDayCount = countWorkingDaysInLeaveDates(updatedRequest.leaveDates);
-        const oldLeaveDuration = oldWorkingDayCount * (originalRequest.leaveType === 'Full Day' ? 1 : 0.5);
-        const newLeaveDuration = newWorkingDayCount * (updatedRequest.leaveType === 'Full Day' ? 1 : 0.5);
+        const oldLeaveDuration = originalRequest.leaveDates.length * (originalRequest.leaveType === 'Full Day' ? 1 : 0.5);
+        const newLeaveDuration = updatedRequest.leaveDates.length * (updatedRequest.leaveType === 'Full Day' ? 1 : 0.5);
         const durationChanged = newLeaveDuration !== oldLeaveDuration;
 
         const oldReqTypeNorm = LeavePolicyService.normalizeRequestType(originalRequest.requestType);
@@ -956,9 +938,7 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
         if (deletedRequest.status === 'Approved') {
             const employee = await User.findById(deletedRequest.employee).session(session);
             if (employee) {
-                // Use working-day count only (exclude any auto-clubbed Saturdays/Sundays)
-                const workingDayCount = countWorkingDaysInLeaveDates(deletedRequest.leaveDates);
-                const leaveDuration = workingDayCount * (deletedRequest.leaveType === 'Full Day' ? 1 : 0.5);
+                const leaveDuration = deletedRequest.leaveDates.length * (deletedRequest.leaveType === 'Full Day' ? 1 : 0.5);
                 
                 // Map leave types to balance fields; Backdated Leave uses stored breakdown
                 const reqTypeNorm = LeavePolicyService.normalizeRequestType(deletedRequest.requestType);
@@ -1188,9 +1168,7 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
             return res.json({ message: 'Request already approved.', request });
         }
 
-        // Use working-day count only (exclude any auto-clubbed Saturdays/Sundays)
-        const workingDayCount = countWorkingDaysInLeaveDates(request.leaveDates);
-        const leaveDuration = workingDayCount * (request.leaveType === 'Full Day' ? 1 : 0.5);
+        const leaveDuration = request.leaveDates.length * (request.leaveType === 'Full Day' ? 1 : 0.5);
         const requestTypeNormalized = LeavePolicyService.normalizeRequestType(request.requestType);
         const leaveField = LeavePolicyService.getBalanceField(requestTypeNormalized);
 
@@ -4740,216 +4718,6 @@ router.post('/attendance/bulk-override', [authenticateToken, isAdminOrHr, invali
     } catch (err) {
         console.error('Error in bulk-override:', err);
         return res.status(500).json({ success: false, error: 'Server error while applying bulk override.', details: err.message });
-    }
-});
-
-// POST /api/admin/attendance/absent-to-leave
-// Convert absent days to leave for permanent employees (employmentStatus = 'Permanent').
-// Deducts leave balance per employee. Only processes days where the employee was absent.
-router.post('/attendance/absent-to-leave', [authenticateToken, isAdminOrHr, invalidateAnalyticsCache], async (req, res) => {
-    try {
-        const { employeeScope, startDate, endDate, leaveType, maxDaysPerEmployee, overrideNote } = req.body;
-
-        const validLeaveTypes = ['Sick', 'Casual', 'Planned'];
-        if (!leaveType || !validLeaveTypes.includes(leaveType)) {
-            return res.status(400).json({ success: false, error: `leaveType must be one of: ${validLeaveTypes.join(', ')}` });
-        }
-        if (!overrideNote || typeof overrideNote !== 'string' || overrideNote.trim().length === 0) {
-            return res.status(400).json({ success: false, error: 'overrideNote is required.' });
-        }
-        if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate.trim())) {
-            return res.status(400).json({ success: false, error: 'startDate is required in YYYY-MM-DD format.' });
-        }
-
-        const maxDays = (typeof maxDaysPerEmployee === 'number' && maxDaysPerEmployee >= 1 && maxDaysPerEmployee <= 3)
-            ? maxDaysPerEmployee : 3;
-
-        const start = startDate.trim();
-        const { getISTDateString } = require('../utils/istTime');
-        const todayIST = getISTDateString();
-        const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate.trim())) ? endDate.trim() : start;
-        const effectiveEnd = end > todayIST ? todayIST : end;
-
-        if (start > todayIST) {
-            return res.status(400).json({ success: false, error: 'Cannot convert future dates.' });
-        }
-        if (start > effectiveEnd) {
-            return res.status(400).json({ success: false, error: 'startDate must be before or equal to endDate.' });
-        }
-
-        const { generateDateRange } = require('../utils/attendanceStatusResolver');
-        const dates = generateDateRange(start, effectiveEnd);
-        if (dates.length > 31) {
-            return res.status(400).json({ success: false, error: 'Maximum 31 days allowed per operation.' });
-        }
-
-        // Map leaveType → leaveBalances field
-        const leaveTypeToField = { 'Sick': 'sick', 'Casual': 'casual', 'Planned': 'paid' };
-        const balanceField = leaveTypeToField[leaveType];
-        const adminUserId = req.user.userId;
-        const note = overrideNote.trim();
-
-        // ── KEY FIX: filter by employmentStatus: 'Permanent' (not probationStatus) ──
-        const permanentFilter = { employmentStatus: 'Permanent', role: { $ne: 'Admin' }, isActive: true };
-
-        let employeeIds = [];
-        if (employeeScope === 'all') {
-            const users = await User.find(permanentFilter).select('_id').lean();
-            employeeIds = users.map(u => u._id);
-        } else if (Array.isArray(employeeScope) && employeeScope.length > 0) {
-            const valid = employeeScope.filter(id => mongoose.Types.ObjectId.isValid(id));
-            const users = await User.find({ _id: { $in: valid }, ...permanentFilter }).select('_id fullName').lean();
-            employeeIds = users.map(u => u._id);
-
-            // If caller selected specific employees but none are Permanent, give a clear message
-            if (employeeIds.length === 0) {
-                const anyUsers = await User.find({ _id: { $in: valid } }).select('fullName employmentStatus').lean();
-                const detail = anyUsers.map(u => `${u.fullName} (${u.employmentStatus || 'unknown status'})`).join(', ');
-                return res.status(400).json({
-                    success: false,
-                    error: `None of the selected employees have Permanent employment status. Selected: ${detail}. Only employees with employmentStatus = "Permanent" can have absences converted to leave.`
-                });
-            }
-        }
-
-        if (employeeIds.length === 0) {
-            return res.status(400).json({ success: false, error: 'No permanent employees found in the selected scope.' });
-        }
-
-        // Load all attendance logs for selected employees × dates
-        const existingLogs = await AttendanceLog.find({
-            user: { $in: employeeIds },
-            attendanceDate: { $in: dates },
-        }).lean();
-
-        const userLogsMap = new Map();
-        for (const log of existingLogs) {
-            const uid = log.user.toString();
-            if (!userLogsMap.has(uid)) userLogsMap.set(uid, []);
-            userLogsMap.get(uid).push(log);
-        }
-
-        const attendanceBulkOps = [];
-        const balanceBulkOps = [];
-        const leaveRequestDocs = [];
-        const overrideTs = new Date();
-        let convertedCount = 0;
-        let skippedCount = 0;
-
-        // Fetch current leave balances for all matched employees
-        const usersWithBalance = await User.find({ _id: { $in: employeeIds } }).select('_id leaveBalances').lean();
-        const balanceMap = new Map(usersWithBalance.map(u => [u._id.toString(), { ...u.leaveBalances }]));
-
-        for (const eid of employeeIds) {
-            const uid = eid.toString();
-            const logsByDate = new Map((userLogsMap.get(uid) || []).map(l => [l.attendanceDate, l]));
-            let daysConverted = 0;
-            let deducted = 0;
-
-            for (const dateStr of dates) {
-                if (daysConverted >= maxDays) break;
-
-                const log = logsByDate.get(dateStr);
-                // Only convert truly absent days (no clock-in, not already overridden, not leave/holiday)
-                const isAbsent = !log
-                    || log.attendanceStatus === 'Absent'
-                    || (!log.clockInTime && !log.overriddenByAdmin && log.attendanceStatus !== 'Leave' && log.attendanceStatus !== 'Holiday');
-
-                if (!isAbsent) continue;
-
-                const balance = balanceMap.get(uid);
-                if (!balance || (balance[balanceField] || 0) < 1) {
-                    skippedCount++;
-                    continue;
-                }
-
-                balance[balanceField] = (balance[balanceField] || 0) - 1;
-                deducted++;
-                daysConverted++;
-                convertedCount++;
-
-                leaveRequestDocs.push({
-                    employee: eid,
-                    requestType: leaveType,
-                    leaveType: 'Full Day',
-                    leaveDates: [new Date(dateStr)],
-                    reason: `Admin bulk convert: ${note}`,
-                    status: 'Approved',
-                    approvedBy: adminUserId,
-                    approvedAt: overrideTs,
-                    isBackdated: true,
-                });
-
-                if (log) {
-                    attendanceBulkOps.push({
-                        updateOne: {
-                            filter: { _id: log._id },
-                            update: { $set: {
-                                attendanceStatus: 'Leave',
-                                overriddenByAdmin: true,
-                                overrideType: 'leave',
-                                overrideReason: note,
-                                adminOverride: `Convert Absent to ${leaveType} Leave`,
-                                overriddenAt: overrideTs,
-                                overriddenBy: adminUserId,
-                                isHalfDay: false, isLate: false, lateMinutes: 0,
-                            }}
-                        }
-                    });
-                } else {
-                    attendanceBulkOps.push({
-                        insertOne: {
-                            document: {
-                                user: eid, attendanceDate: dateStr,
-                                attendanceStatus: 'Leave',
-                                overriddenByAdmin: true, overrideType: 'leave',
-                                overrideReason: note,
-                                adminOverride: `Convert Absent to ${leaveType} Leave`,
-                                overriddenAt: overrideTs, overriddenBy: adminUserId,
-                                isHalfDay: false, isLate: false, lateMinutes: 0,
-                                penaltyMinutes: 0, paidBreakMinutesTaken: 0,
-                                unpaidBreakMinutesTaken: 0, totalWorkingHours: 0, shiftDurationMinutes: 480,
-                            }
-                        }
-                    });
-                }
-            }
-
-            if (deducted > 0) {
-                balanceBulkOps.push({
-                    updateOne: {
-                        filter: { _id: eid },
-                        update: { $inc: { [`leaveBalances.${balanceField}`]: -deducted } }
-                    }
-                });
-            }
-        }
-
-        if (leaveRequestDocs.length > 0) await LeaveRequest.insertMany(leaveRequestDocs, { ordered: false });
-        if (attendanceBulkOps.length > 0) await AttendanceLog.bulkWrite(attendanceBulkOps, { ordered: false });
-        if (balanceBulkOps.length > 0) await User.bulkWrite(balanceBulkOps, { ordered: false });
-
-        try {
-            const logAction = require('../services/logAction');
-            await logAction(adminUserId, 'ABSENT_TO_LEAVE_BULK', {
-                employeeScope: employeeScope === 'all' ? 'all' : employeeIds.length,
-                startDate: start, endDate: effectiveEnd,
-                leaveType, maxDaysPerEmployee: maxDays,
-                convertedCount, skippedCount, overrideNote: note,
-            });
-        } catch (e) { /* ignore */ }
-
-        return res.status(200).json({
-            success: true,
-            message: `Converted ${convertedCount} absent day(s) to ${leaveType} leave.`,
-            convertedCount,
-            skippedCount,
-            employeesProcessed: employeeIds.length,
-        });
-
-    } catch (err) {
-        console.error('Error in absent-to-leave:', err);
-        return res.status(500).json({ success: false, error: 'Server error during absent-to-leave conversion.', details: err.message });
     }
 });
 

@@ -276,6 +276,9 @@ app.use('/api/policies', policiesRoutes);
 const policiesGridFSRoutes = require('./routes/policiesGridFS');
 app.use('/api/policies-gridfs', policiesGridFSRoutes);
 
+const absentToLeaveRoutes = require('./routes/absent_to_leave_route');
+app.use('/api/admin', absentToLeaveRoutes);
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
   const healthStatus = performanceMonitor.getHealthStatus();

@@ -123,7 +123,8 @@ function generateCacheKey(filters) {
         department: filters.department || '',
         location: filters.location || '',
         shiftType: filters.shiftType || '',
-        employmentStatus: filters.employmentStatus || ''
+        employmentStatus: filters.employmentStatus || '',
+        search: filters.search || ''
     };
     
     // Create hash of filter data for shorter key

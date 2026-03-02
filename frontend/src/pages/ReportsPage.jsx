@@ -64,7 +64,7 @@ const generatePdf = (reportType, data, selectedEmployees, dateRange) => {
 
     if (reportType === 'attendance') {
         title = 'Attendance & Break Report';
-        head = [['Date', 'Employee', 'Status', 'Shift', 'Clock In', 'Clock Out', 'Work Time', 'Paid Break', 'Unpaid Break', 'Extra Unpaid Break', 'Penalty Break Time', 'Total Break']];
+        head = [['Date', 'Employee', 'Status', 'Shift', 'Clock In', 'Clock Out', 'Work Time', 'Paid Break', 'Unpaid Break', 'Extra Unpaid Break', 'Penalty Break Time', 'Total Break', 'Overtime']];
         body = data.map(row => [
             row.date,
             row.employeeName,
@@ -77,7 +77,8 @@ const generatePdf = (reportType, data, selectedEmployees, dateRange) => {
             formatDuration(row.unpaidBreakMinutes),
             formatDuration(row.extraUnpaidBreakMinutes),
             `${row.penaltyMinutes || 0} min`,
-            formatDuration(row.totalBreakMinutes)
+            formatDuration(row.totalBreakMinutes),
+            formatDuration(row.overtimeMinutes || 0)
         ]);
     } else if (reportType === 'leaves') {
         title = 'Leave Request Report';
@@ -224,9 +225,10 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
             'Extra Unpaid Break': formatDuration(row.extraUnpaidBreakMinutes),
             'Penalty Break Time (Mins)': row.penaltyMinutes || 0,
             'Total Break': formatDuration(row.totalBreakMinutes),
+            'Overtime': formatDuration(row.overtimeMinutes || 0)
         }));
         const ws1 = XLSX.utils.json_to_sheet(detailedLogData);
-        ws1['!cols'] = [ { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 12 }];
+        ws1['!cols'] = [ { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 12 }];
         const range1 = XLSX.utils.decode_range(ws1['!ref']);
         for (let C = range1.s.c; C <= range1.e.c; ++C) { const address = XLSX.utils.encode_cell({ r: 0, c: C }); if (ws1[address]) ws1[address].s = boldStyle; }
         XLSX.utils.book_append_sheet(wb, ws1, 'Detailed Log');
@@ -239,6 +241,9 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
             let holidayDays = 0; // Company holidays
             let weekendDays = 0; // Weekend days
             let absentDays = 0; // Absent days
+            let totalNetMinutes = 0; // Total work time without breaks
+            let totalMinutesWithBreak = 0; // Total time including breaks
+            let totalOvertimeMinutes = 0; // Total overtime
 
             data.forEach(row => {
                 const day = new Date(row.date);
@@ -247,14 +252,19 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
 
                 if (isWeekend) {
                     weekendDays++;
+                } else if (row.status === 'Holiday') {
+                    // Holidays are not counted as working days
+                    holidayDays++;
                 } else {
-                    // It's a working day (not weekend)
+                    // It's a working day (not weekend, not holiday)
                     totalWorkingDays++;
                     
-                    if (row.status === 'Holiday') {
-                        holidayDays++;
-                    } else if (row.status === 'Present' || row.status === 'Late') {
+                    if (row.status === 'Present' || row.status === 'Late') {
                         actualWorkingDays++;
+                        // Add work time and break time
+                        totalNetMinutes += row.totalWorkMinutes || 0;
+                        totalMinutesWithBreak += (row.totalWorkMinutes || 0) + (row.totalBreakMinutes || 0);
+                        totalOvertimeMinutes += row.overtimeMinutes || 0;
                     } else if (row.status === 'On Leave') {
                         onLeaveDays++;
                     } else if (row.status === 'Absent') {
@@ -263,6 +273,9 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
                 }
             });
 
+            // Calculate averages
+            const avgWorkingMinutes = actualWorkingDays > 0 ? totalNetMinutes / actualWorkingDays : 0;
+
             const summaryData = [
                 ['Summary'],
                 ['Total Working Days', totalWorkingDays],
@@ -270,13 +283,25 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
                 ['On Leave Days', onLeaveDays],
                 ['Holiday Days', holidayDays],
                 ['Absent Days', absentDays],
-                ['Weekend Days', weekendDays]
+                ['Weekend Days', weekendDays],
+                [],
+                ['Time Summary'],
+                ['Total Net Hours (Work Time)', formatDuration(totalNetMinutes)],
+                ['Total Hours with Break', formatDuration(totalMinutesWithBreak)],
+                ['Average Working Hours', formatDuration(avgWorkingMinutes)],
+                ['Total Overtime Hours', formatDuration(totalOvertimeMinutes)]
             ];
             const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-            wsSummary['!cols'] = [{ wch: 25 }, { wch: 15 }];
+            wsSummary['!cols'] = [{ wch: 30 }, { wch: 20 }];
             const rangeSummary = XLSX.utils.decode_range(wsSummary['!ref']);
+            // Make "Summary" header bold (row 0)
             for (let C = rangeSummary.s.c; C <= rangeSummary.e.c; ++C) {
                 const address = XLSX.utils.encode_cell({ r: 0, c: C });
+                if (wsSummary[address]) wsSummary[address].s = boldStyle;
+            }
+            // Make "Time Summary" header bold (row 8)
+            for (let C = rangeSummary.s.c; C <= rangeSummary.e.c; ++C) {
+                const address = XLSX.utils.encode_cell({ r: 8, c: C });
                 if (wsSummary[address]) wsSummary[address].s = boldStyle;
             }
             XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
@@ -628,7 +653,7 @@ const ReportsPage = () => {
                         </LocalizationProvider>
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
-                        <LocalizationProvider dateAdapter={AdapterDateFns}>lizationProvider dateAdapter={AdapterDateFns}
+                        <LocalizationProvider dateAdapter={AdapterDateFns}>
                             <DatePicker 
                                 label="End Date" 
                                 value={endDate} 

@@ -220,7 +220,16 @@ router.post('/require-admin-approval-early-checkout', [authenticateToken, isAdmi
 // --- Teams Attendance Notification (Power Automate Webhook) ---
 const TEAMS_WEBHOOK_KEY = 'teamsAttendanceWebhookUrl';
 const REPORT_CONFIG_KEY = 'teamsReportConfig';
-const { sendMorningAttendanceReport, sendEditedReport, getPreviewData, DEFAULT_CONFIG } = require('../services/teamsAttendanceNotificationService');
+const {
+    sendMorningAttendanceReport,
+    sendAfternoonAttendanceReport,
+    sendEditedReport,
+    getPreviewData,
+    getStatusOverrides,
+    saveStatusOverride,
+    deleteStatusOverride,
+    DEFAULT_CONFIG,
+} = require('../services/teamsAttendanceNotificationService');
 
 // GET /api/admin/settings/teams-webhook
 router.get('/teams-webhook', [authenticateToken, isAdmin], async (req, res) => {
@@ -285,10 +294,11 @@ router.post('/teams-report-config', [authenticateToken, isAdmin], async (req, re
     }
 });
 
-// GET /api/admin/settings/teams-preview — get live attendance data for HR to review before sending
+// GET /api/admin/settings/teams-preview?scope=morning|afternoon|all
 router.get('/teams-preview', [authenticateToken, isAdmin], async (req, res) => {
     try {
-        const previewData = await getPreviewData();
+        const scope = ['morning', 'afternoon', 'all'].includes(req.query.scope) ? req.query.scope : 'all';
+        const previewData = await getPreviewData(scope);
         res.json(previewData);
     } catch (err) {
         console.error('[Settings] Teams preview error:', err);
@@ -299,15 +309,68 @@ router.get('/teams-preview', [authenticateToken, isAdmin], async (req, res) => {
 // POST /api/admin/settings/teams-webhook/send-edited — send (possibly edited) report
 router.post('/teams-webhook/send-edited', [authenticateToken, isAdmin], async (req, res) => {
     try {
-        const { sections, config, todayStr } = req.body;
+        const { sections, config, todayStr, reportLabel } = req.body;
         if (!sections || !config) {
             return res.status(400).json({ error: 'sections and config are required.' });
         }
-        await sendEditedReport(sections, config, todayStr);
+        await sendEditedReport(sections, config, todayStr, reportLabel || '');
         res.json({ success: true, message: 'Report sent to Teams channel.' });
     } catch (err) {
         console.error('[Settings] Teams send-edited error:', err);
         res.status(500).json({ error: 'Failed to send: ' + err.message });
+    }
+});
+
+// ─── Status Override routes ────────────────────────────────────────────────────
+
+// GET /api/admin/settings/teams-status-overrides?date=YYYY-MM-DD
+router.get('/teams-status-overrides', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const overrides = await getStatusOverrides(req.query.date || null);
+        res.json({ overrides });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch status overrides.' });
+    }
+});
+
+// POST /api/admin/settings/teams-status-overrides — create/update override
+// Body: { employeeId, employeeName, designation, date, status, reason }
+router.post('/teams-status-overrides', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const { employeeId, employeeName, designation, date, status, reason } = req.body;
+        if (!employeeId || !date || !status) {
+            return res.status(400).json({ error: 'employeeId, date and status are required.' });
+        }
+        const validStatuses = ['absent', 'present', 'late', 'on_leave'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'status must be one of: ' + validStatuses.join(', ') });
+        }
+        const adminUser = await require('../models/User').findById(req.user.id).select('fullName').lean();
+        await saveStatusOverride({
+            employeeId: employeeId.toString(),
+            employeeName: employeeName || '',
+            designation:  designation  || '',
+            date,
+            status,
+            reason: reason || '',
+            createdBy: adminUser?.fullName || 'Admin',
+        });
+        res.json({ success: true, message: 'Status override saved.' });
+    } catch (err) {
+        console.error('[Settings] Save status override error:', err);
+        res.status(500).json({ error: 'Failed to save override: ' + err.message });
+    }
+});
+
+// DELETE /api/admin/settings/teams-status-overrides?employeeId=X&date=YYYY-MM-DD
+router.delete('/teams-status-overrides', [authenticateToken, isAdmin], async (req, res) => {
+    try {
+        const { employeeId, date } = req.query;
+        if (!employeeId || !date) return res.status(400).json({ error: 'employeeId and date are required.' });
+        await deleteStatusOverride(employeeId, date);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete override.' });
     }
 });
 

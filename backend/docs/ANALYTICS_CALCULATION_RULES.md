@@ -66,20 +66,33 @@ isLeaveDay: {
 Non-Working Days = Leave Days + Absent Days
 ```
 
+**Definition:** Non-Working Days represents days when the employee was expected to work but did not (either on leave or absent). It does NOT include weekends or holidays.
+
 **THIS IS THE ONLY CORRECT FORMULA. DO NOT USE ANY OTHER CALCULATION.**
 
 **WRONG Formulas (DO NOT USE):**
 - ❌ `Non-Working Days = Total Days - Present Days`
 - ❌ `Non-Working Days += Non-Working Days` (self-add bug)
 - ❌ `Non-Working Days = Leave Days + Absent Days + Holidays`
+- ❌ `Non-Working Days = Leave Days + Absent Days + Weekends`
+- ❌ `Non-Working Days = Weekends + Holidays` (counting non-working calendar days)
 - ❌ Any formula involving total days or calendar days
+- ❌ Any formula that includes weekends or holidays
 
 **Correct Implementation:**
 ```javascript
-nonWorkingDays: {
-    $add: ['$leaveDays', '$absentDays']
-}
+// Calculate after counting leave and absent days
+const nonWorkingDays = leaveDays + absentDays;
 ```
+
+**What IS included:**
+- Leave Days (approved leaves)
+- Absent Days (unauthorized absences)
+
+**What is NOT included:**
+- Weekends (Saturday/Sunday or configured weekly offs)
+- Public Holidays
+- Any day marked as "Holiday", "Weekly Off", or "Weekend" status
 
 **Validation:**
 ```javascript

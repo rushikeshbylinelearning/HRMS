@@ -91,8 +91,14 @@ function AttendanceDashboard() {
         return () => clearTimeout(debounceRef.current);
     }, [filters]);
     
-    // Handle filter changes
+    // Handle filter changes from FilterControls panel
+    // KEY FIX: if FilterControls sends a 'search' field (e.g. from Clear Filters),
+    // we must also update the searchQuery state so the search box reflects the reset.
     const handleFilterChange = (newFilters) => {
+        // If the incoming filters explicitly include 'search', sync the search box
+        if ('search' in newFilters) {
+            setSearchQuery(newFilters.search || '');
+        }
         setFilters(prev => ({
             ...prev,
             ...newFilters,
@@ -125,7 +131,8 @@ function AttendanceDashboard() {
             setFilters(prev => ({
                 ...prev,
                 search: value,
-                page: 1 // Reset to first page when search changes
+                page: 1, // Reset to first page when search changes
+                _searchTs: Date.now() // force new cache key so cached stale results are skipped
             }));
         }, 500);
     };
@@ -137,7 +144,8 @@ function AttendanceDashboard() {
         setFilters(prev => ({
             ...prev,
             search: '',
-            page: 1
+            page: 1,
+            _searchTs: Date.now() // force cache bypass
         }));
     };
     

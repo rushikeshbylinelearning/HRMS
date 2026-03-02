@@ -10,7 +10,7 @@ const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
 const { executeLeaveAccrual } = require('../cron/leaveAccrualCron');
-const { sendMorningAttendanceReport } = require('./teamsAttendanceNotificationService');
+const { sendMorningAttendanceReport, sendAfternoonAttendanceReport } = require('./teamsAttendanceNotificationService');
 
 // --- CONFIGURATION (from .env) ---
 const PROBATION_PERIOD_DAYS = parseInt(process.env.PROBATION_PERIOD_DAYS, 10) || 90;
@@ -417,21 +417,14 @@ const startLeaveAccrualJob = () => {
  *   3 poll opportunities for both preview and auto-send.
  */
 const startTeamsMorningReportJob = () => {
-    console.log('[CRON] Starting Teams morning attendance report job (reads reportTime from DB config)');
+    console.log('[CRON] Starting Teams dual attendance report job (morning + afternoon).');
 
-    const PREVIEW_NOTIF_SENT_KEY = 'teamsPreviewNotifSentDate';
+    const PREVIEW_NOTIF_SENT_KEY      = 'teamsPreviewNotifSentDate';
+    const AFTERNOON_PREVIEW_SENT_KEY  = 'teamsAfternoonPreviewNotifSentDate';
 
-    /**
-     * Extract IST hour and minute directly from a Date object.
-     * getISTDateParts() only gives date parts (year/month/day), NOT time parts — 
-     * using it for { hour, minute } always returns undefined (the original bug).
-     */
     const getISTHourMinute = (date) => {
         const formatter = new Intl.DateTimeFormat('en-GB', {
-            timeZone: 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
+            timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
         });
         const parts = formatter.formatToParts(date);
         const hour   = parseInt(parts.find(p => p.type === 'hour').value,   10);
@@ -439,98 +432,122 @@ const startTeamsMorningReportJob = () => {
         return { hour, minute };
     };
 
-    /**
-     * Parse "HH:mm" string to { hour, minute }.
-     * Defaults to 11:30 if the stored value is missing or malformed.
-     */
-    const parseReportTime = (timeStr) => {
+    const parseReportTime = (timeStr, defaultH = 11, defaultM = 35) => {
         if (typeof timeStr === 'string' && /^\d{1,2}:\d{2}$/.test(timeStr)) {
             const [h, m] = timeStr.split(':').map(Number);
-            if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-                return { hour: h, minute: m };
-            }
+            if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) return { hour: h, minute: m };
         }
-        console.warn('[CRON] Invalid or missing reportTime in config, defaulting to 11:30');
-        return { hour: 11, minute: 30 };
+        return { hour: defaultH, minute: defaultM };
     };
 
-    /**
-     * Subtract offsetMinutes from a { hour, minute } pair (handles midnight wrap).
-     */
     const subtractMinutes = ({ hour, minute }, offset) => {
         let total = hour * 60 + minute - offset;
         if (total < 0) total += 24 * 60;
         return { hour: Math.floor(total / 60), minute: total % 60 };
     };
 
-    const PREVIEW_OFFSET_MINUTES = 5; // notify this many minutes before the report fires
-    const WINDOW_MINUTES = 4;          // accept poll hits within a 4-min window
+    const PREVIEW_OFFSET_MINUTES = 5;
+    const WINDOW_MINUTES = 4;
 
     const checkAndRun = async () => {
         try {
             const now = getISTNow();
-            const { hour, minute } = getISTHourMinute(now);  // ← FIX 1: correct IST hour & minute
+            const { hour, minute } = getISTHourMinute(now);
             const todayStr = getISTDateString(now);
 
-            // ── Read configured report time from DB (FIX 2) ──────────────────
+            // Read config from DB
             const configSetting = await Setting.findOne({ key: 'teamsReportConfig' });
             const storedConfig  = configSetting?.value || {};
-            const reportTime    = parseReportTime(storedConfig.reportTime);
-            const previewTime   = subtractMinutes(reportTime, PREVIEW_OFFSET_MINUTES);
 
-            const currentMins = hour * 60 + minute;
-            const previewMins = previewTime.hour * 60 + previewTime.minute;
-            const reportMins  = reportTime.hour  * 60 + reportTime.minute;
+            const morningTime   = parseReportTime(storedConfig.reportTime, 11, 35);
+            const afternoonTime = parseReportTime(storedConfig.afternoonReportTime, 14, 0);
+            const afternoonEnabled = storedConfig.afternoonReportEnabled !== false;
 
-            // ── Preview notification: fires PREVIEW_OFFSET_MINUTES before report (FIX 3) ─
-            if (currentMins >= previewMins && currentMins < previewMins + WINDOW_MINUTES) {
-                const alreadySentNotif = await Setting.findOne({ key: PREVIEW_NOTIF_SENT_KEY });
-                if (alreadySentNotif?.value !== todayStr) {
+            const currentMins   = hour * 60 + minute;
+            const morningMins   = morningTime.hour   * 60 + morningTime.minute;
+            const afternoonMins = afternoonTime.hour * 60 + afternoonTime.minute;
+
+            const fmtTime = (t) => `${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')}`;
+
+            // ── Morning preview notification ─────────────────────────────────────
+            const morningPreviewMins = subtractMinutes(morningTime, PREVIEW_OFFSET_MINUTES).hour * 60 +
+                                       subtractMinutes(morningTime, PREVIEW_OFFSET_MINUTES).minute;
+
+            if (currentMins >= morningPreviewMins && currentMins < morningPreviewMins + WINDOW_MINUTES) {
+                const alreadySent = await Setting.findOne({ key: PREVIEW_NOTIF_SENT_KEY });
+                if (alreadySent?.value !== todayStr) {
                     const webhookSetting = await Setting.findOne({ key: 'teamsAttendanceWebhookUrl' });
                     if (webhookSetting?.value) {
                         try {
                             const NewNotificationService = require('./NewNotificationService');
-                            const reportLabel = `${String(reportTime.hour).padStart(2, '0')}:${String(reportTime.minute).padStart(2, '0')}`;
                             await NewNotificationService.broadcastToAdmins({
-                                message: `📊 Teams attendance report is ready to send at ${reportLabel} IST. Click to preview & edit before sending.`,
+                                message: `📊 Morning Teams attendance report (Shift 1 & 2) sending at ${fmtTime(morningTime)} IST. Click to preview & edit.`,
                                 type: 'teams_report_preview',
                                 category: 'admin',
                                 priority: 'high',
-                                actionData: {
-                                    actionType: 'open_teams_preview',
-                                    requiresAction: true,
-                                },
+                                actionData: { actionType: 'open_teams_preview', requiresAction: true },
                                 navigationData: { page: 'teams_preview' },
-                                metadata: { scheduledFor: reportLabel, date: todayStr },
+                                metadata: { scheduledFor: fmtTime(morningTime), date: todayStr, scope: 'morning' },
                             });
-                            await Setting.findOneAndUpdate(
-                                { key: PREVIEW_NOTIF_SENT_KEY },
-                                { value: todayStr },
-                                { upsert: true }
-                            );
-                            console.log(`[CRON] ✅ Teams preview notification sent to admins (report at ${reportLabel} IST).`);
+                            await Setting.findOneAndUpdate({ key: PREVIEW_NOTIF_SENT_KEY }, { value: todayStr }, { upsert: true });
+                            console.log(`[CRON] ✅ Teams morning preview notification sent (report at ${fmtTime(morningTime)} IST).`);
                         } catch (err) {
-                            console.error('[CRON] Failed to send Teams preview notification:', err.message);
+                            console.error('[CRON] Failed to send Teams morning preview notification:', err.message);
                         }
-                    } else {
-                        console.log('[CRON] Teams preview: no webhook URL configured — skipping preview notification.');
                     }
                 }
             }
 
-            // ── Auto-send at configured report time (FIX 3: 4-min window) ────
-            if (currentMins >= reportMins && currentMins < reportMins + WINDOW_MINUTES) {
+            // ── Auto-send morning report ─────────────────────────────────────────
+            if (currentMins >= morningMins && currentMins < morningMins + WINDOW_MINUTES) {
                 await sendMorningAttendanceReport();
             }
+
+            // ── Afternoon preview notification ───────────────────────────────────
+            if (afternoonEnabled) {
+                const afPreviewTime = subtractMinutes(afternoonTime, PREVIEW_OFFSET_MINUTES);
+                const afPreviewMins = afPreviewTime.hour * 60 + afPreviewTime.minute;
+
+                if (currentMins >= afPreviewMins && currentMins < afPreviewMins + WINDOW_MINUTES) {
+                    const alreadySent = await Setting.findOne({ key: AFTERNOON_PREVIEW_SENT_KEY });
+                    if (alreadySent?.value !== todayStr) {
+                        const webhookSetting = await Setting.findOne({ key: 'teamsAttendanceWebhookUrl' });
+                        if (webhookSetting?.value) {
+                            try {
+                                const NewNotificationService = require('./NewNotificationService');
+                                await NewNotificationService.broadcastToAdmins({
+                                    message: `🕑 Afternoon Teams attendance report (All shifts) sending at ${fmtTime(afternoonTime)} IST. Click to preview & edit.`,
+                                    type: 'teams_afternoon_report_preview',
+                                    category: 'admin',
+                                    priority: 'high',
+                                    actionData: { actionType: 'open_teams_preview', requiresAction: true },
+                                    navigationData: { page: 'teams_preview' },
+                                    metadata: { scheduledFor: fmtTime(afternoonTime), date: todayStr, scope: 'afternoon' },
+                                });
+                                await Setting.findOneAndUpdate({ key: AFTERNOON_PREVIEW_SENT_KEY }, { value: todayStr }, { upsert: true });
+                                console.log(`[CRON] ✅ Teams afternoon preview notification sent (report at ${fmtTime(afternoonTime)} IST).`);
+                            } catch (err) {
+                                console.error('[CRON] Failed to send Teams afternoon preview notification:', err.message);
+                            }
+                        }
+                    }
+                }
+
+                // ── Auto-send afternoon report ───────────────────────────────────
+                if (currentMins >= afternoonMins && currentMins < afternoonMins + WINDOW_MINUTES) {
+                    await sendAfternoonAttendanceReport();
+                }
+            }
+
         } catch (error) {
-            console.error('[CRON] Error in Teams morning report job:', error);
+            console.error('[CRON] Error in Teams attendance report job:', error);
         }
     };
 
     // Poll every 60 seconds
     setInterval(checkAndRun, 60 * 1000);
 
-    console.log('✅ Teams morning attendance report job scheduled (time controlled by DB teamsReportConfig.reportTime)');
+    console.log('✅ Teams dual attendance report job scheduled (morning + afternoon, time controlled by DB teamsReportConfig).');
 };
 
 module.exports = { startScheduledJobs, checkProbationAndInternshipEndings, startLeaveAccrualJob, startTeamsMorningReportJob };

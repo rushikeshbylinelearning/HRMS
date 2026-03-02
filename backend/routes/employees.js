@@ -107,7 +107,7 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
         if (getAllEmployees) {
             // Check for slim=true parameter for minimal field selection
             if (req.query.slim === 'true') {
-                const slimFields = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup profileImageUrl isActive role';
+                const slimFields = '_id fullName employeeCode alternateSaturdayPolicy shiftGroup profileImageUrl isActive role employmentStatus';
                 const employees = await User.find(employeeQuery)
                     .select(slimFields)
                     .populate('shiftGroup', 'shiftName startTime endTime durationHours')

@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analyticsController');
 const employeeAnalyticsController = require('../controllers/employeeAnalyticsController');
+const analyticsExportController = require('../controllers/analyticsExportController');
 const authenticateToken = require('../middleware/authenticateToken');
 
 /**
@@ -69,6 +70,24 @@ router.get(
     authenticateToken,
     requireAnalyticsAccess,
     employeeAnalyticsController.getEmployeeDetailedAnalytics
+);
+
+/**
+ * GET /api/analytics/export/employee/:employeeId
+ * Export employee analytics to Excel, CSV, or PDF format
+ * 
+ * Query params:
+ * - month: MM (01-12)
+ * - year: YYYY
+ * - format: xlsx | csv | pdf (default: xlsx)
+ * 
+ * Access: Admin, HR, or users with canViewAnalytics permission
+ */
+router.get(
+    '/export/employee/:employeeId',
+    authenticateToken,
+    requireAnalyticsAccess,
+    analyticsExportController.exportEmployeeAnalytics
 );
 
 /**
