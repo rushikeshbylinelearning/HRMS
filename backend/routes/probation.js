@@ -13,6 +13,130 @@ const router = express.Router();
 // Short-lived cache: probation data is expensive to compute; cache for 1 minute
 const probationCache = new NodeCache({ stdTTL: 60, checkperiod: 30 });
 
+const MAX_PERIOD_DETAIL_ENTRIES = 366;
+
+function roundOneDecimal(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function createMonthBucket(monthMap, monthKey) {
+  if (!monthMap.has(monthKey)) {
+    monthMap.set(monthKey, {
+      month: monthKey,
+      fullDays: 0,
+      halfDays: 0,
+      totalExtensionDays: 0,
+      dates: []
+    });
+  }
+  return monthMap.get(monthKey);
+}
+
+function addToMonthBucket(monthMap, date, type, extensionDays, extra = {}) {
+  const monthKey = date.slice(0, 7);
+  const monthEntry = createMonthBucket(monthMap, monthKey);
+  if (type === 'half') {
+    monthEntry.halfDays += 1;
+  } else {
+    monthEntry.fullDays += 1;
+  }
+  monthEntry.totalExtensionDays += extensionDays;
+  monthEntry.dates.push({ date, type, extensionDays, ...extra });
+}
+
+function finalizeMonthSummary(monthMap) {
+  return Array.from(monthMap.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((entry) => ({
+      month: entry.month,
+      fullDays: entry.fullDays,
+      halfDays: entry.halfDays,
+      totalExtensionDays: roundOneDecimal(entry.totalExtensionDays),
+      dates: entry.dates.sort((a, b) => a.date.localeCompare(b.date))
+    }));
+}
+
+/**
+ * Build month-wise leave & absent breakdown for the initial 6-month probation window.
+ * Excludes holidays and weekly offs (same rules as extension counting).
+ */
+function buildProbationPeriodDetails(attendanceSummary, periodStartStr, periodEndStr) {
+  const leaveDetails = [];
+  const absentDetails = [];
+  const leaveMonthMap = new Map();
+  const absentMonthMap = new Map();
+
+  let fullDayLeaves = 0;
+  let halfDayLeaves = 0;
+  let fullDayAbsents = 0;
+  let halfDayAbsents = 0;
+
+  for (const day of attendanceSummary) {
+    if (!day?.date || day.date < periodStartStr || day.date > periodEndStr) continue;
+    if (day.isHoliday || day.isWeeklyOff) continue;
+
+    if (day.finalStatus === 'Leave' && leaveDetails.length < MAX_PERIOD_DETAIL_ENTRIES) {
+      const isHalf = Boolean(day.isHalfDay);
+      const extensionDays = isHalf ? 0.5 : 1;
+      const type = isHalf ? 'half' : 'full';
+      leaveDetails.push({ date: day.date, type, extensionDays });
+      addToMonthBucket(leaveMonthMap, day.date, type, extensionDays);
+      if (isHalf) halfDayLeaves += 1;
+      else fullDayLeaves += 1;
+    }
+
+    const isAbsentStatus = day.finalStatus === 'Absent';
+    const isHalfDayAttendance = day.finalStatus === 'Half-day';
+
+    if ((isAbsentStatus || isHalfDayAttendance) && absentDetails.length < MAX_PERIOD_DETAIL_ENTRIES) {
+      let type;
+      let extensionDays;
+      let category;
+
+      if (isHalfDayAttendance) {
+        type = 'half';
+        extensionDays = 0.5;
+        category = 'half-day';
+      } else {
+        const isHalf = Boolean(day.isHalfDay);
+        type = isHalf ? 'half' : 'full';
+        extensionDays = isHalf ? 0.5 : 1;
+        category = 'absent';
+      }
+
+      absentDetails.push({ date: day.date, type, extensionDays, category });
+      addToMonthBucket(absentMonthMap, day.date, type, extensionDays, { category });
+      if (type === 'half') halfDayAbsents += 1;
+      else fullDayAbsents += 1;
+    }
+  }
+
+  leaveDetails.sort((a, b) => a.date.localeCompare(b.date));
+  absentDetails.sort((a, b) => a.date.localeCompare(b.date));
+
+  const leaveExtensionDays = fullDayLeaves + halfDayLeaves * 0.5;
+  const absentExtensionDays = fullDayAbsents + halfDayAbsents * 0.5;
+  const totalExtensionDays = leaveExtensionDays + absentExtensionDays;
+
+  return {
+    leaveDetails,
+    leaveMonthSummary: finalizeMonthSummary(leaveMonthMap),
+    absentDetails,
+    absentMonthSummary: finalizeMonthSummary(absentMonthMap),
+    periodSummary: {
+      fullDayLeaves,
+      halfDayLeaves,
+      fullDayAbsents,
+      halfDayAbsents,
+      leaveExtensionDays: roundOneDecimal(leaveExtensionDays),
+      absentExtensionDays: roundOneDecimal(absentExtensionDays),
+      totalExtensionDays: roundOneDecimal(totalExtensionDays),
+      leaveInstanceCount: leaveDetails.length,
+      absentInstanceCount: absentDetails.length
+    }
+  };
+}
+
 // GET /api/probation/tracker - Get probation tracker data for all employees on probation
 // COMPANY POLICY: Probation is 6 calendar months from joining date, extended by approved leaves AND absences.
 // ACCESS: Admin and HR only
@@ -154,6 +278,12 @@ router.get('/tracker', authenticateToken, async (req, res) => {
           );
           const daysLeft = Math.ceil((finalProbationEndDate - todayMidnight) / (1000 * 60 * 60 * 24));
 
+          const periodDetails = buildProbationPeriodDetails(
+            attendanceSummary,
+            probationStartDateStr,
+            baseProbationEndDateStr
+          );
+
           // STEP 7: Return Detailed Transparent Breakdown
           return {
             employeeId: employee._id,
@@ -164,7 +294,15 @@ router.get('/tracker', authenticateToken, async (req, res) => {
             designation: employee.designation,
             joiningDate: probationStartDateStr,
             baseProbationEndDate: baseProbationEndDateStr,
-            
+            probationPeriodEnd: baseProbationEndDateStr,
+
+            // Leave & absent history within joining → 6-month window (for UI drill-down)
+            leaveDetails: periodDetails.leaveDetails,
+            leaveMonthSummary: periodDetails.leaveMonthSummary,
+            absentDetails: periodDetails.absentDetails,
+            absentMonthSummary: periodDetails.absentMonthSummary,
+            periodSummary: periodDetails.periodSummary,
+
             // Detailed leave breakdown
             fullDayLeaves,
             halfDayLeaves,

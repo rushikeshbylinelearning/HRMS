@@ -115,7 +115,10 @@ exports.getCIFList = async (req, res) => {
     ]);
 
     const responseTime = Date.now() - startTime;
-    console.log(`CIF List query completed in ${responseTime}ms`); // Performance logging
+    // Only log slow queries (>500ms) in production
+    if (process.env.NODE_ENV !== 'production' || responseTime > 500) {
+      console.log(`CIF List query completed in ${responseTime}ms`);
+    }
 
     res.json({
       records,
@@ -183,8 +186,6 @@ exports.createCIF = async (req, res) => {
 
     // Generate CIF ID
     const { cifNumber, cifId } = await generateCIFId();
-    
-    console.log('Generated CIF ID:', { cifNumber, cifId }); // Debug log
 
     const cif = new CIF({
       cifNumber,
@@ -616,7 +617,6 @@ exports.getCIFAnalytics = async (req, res) => {
     // Check cache
     const now = Date.now();
     if (analyticsCache.data && (now - analyticsCache.timestamp) < analyticsCache.TTL) {
-      console.log('Returning cached analytics data');
       return res.json(analyticsCache.data);
     }
 
@@ -764,7 +764,6 @@ exports.getCIFAnalytics = async (req, res) => {
     };
 
     const responseTime = Date.now() - startTime;
-    console.log(`Analytics query completed in ${responseTime}ms`);
 
     res.json(analyticsData);
   } catch (error) {
@@ -858,7 +857,6 @@ exports.getRiskHeatmap = async (req, res) => {
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`Risk heatmap query completed in ${responseTime}ms`);
 
     res.json(formattedHeatmap);
   } catch (error) {
@@ -958,7 +956,6 @@ exports.exportCIF = async (req, res) => {
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`Export completed in ${responseTime}ms - ${records.length} records`);
 
     // Set headers for file download
     res.setHeader('Content-Type', 'text/csv');

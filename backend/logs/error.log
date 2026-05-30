@@ -358,3 +358,55 @@
   level: 'error',
   timestamp: '2026-02-19 19:52:28'
 }
+{
+  service: 'attendance-system',
+  message: 'Application Error User validation failed: role: `Full Stack Developer` is not a valid enum value for path `role`.',
+  stack: 'ValidationError: User validation failed: role: `Full Stack Developer` is not a valid enum value for path `role`.\n' +
+    '    at Document.invalidate (D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3358:32)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3119:17\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\schemaType.js:1416:9\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)',
+  operation: 'update_user_permissions',
+  userId: '693d3a77da051f96635ac9dc',
+  body: {
+    featurePermissions: {
+      leaves: false,
+      breaks: false,
+      extraFeatures: false,
+      maxBreaks: 999,
+      breakAfterHours: 0,
+      breakWindows: [
+        {
+          type: 'Paid',
+          name: 'Lunch Break',
+          startTime: '13:00',
+          endTime: '14:40',
+          isActive: true,
+          _id: '69aac73811e4f800208e9c32'
+        }
+      ],
+      canCheckIn: true,
+      canCheckOut: true,
+      canTakeBreak: true,
+      canViewAnalytics: false,
+      privilegeLevel: 'normal',
+      restrictedFeatures: {
+        canViewReports: false,
+        canViewOtherLogs: false,
+        canEditProfile: true,
+        canRequestExtraBreak: true,
+        _id: '693d3a77da051f96635ac9da'
+      },
+      advancedFeatures: {
+        canBulkActions: false,
+        canExportData: false,
+        _id: '693d3a77da051f96635ac9db'
+      },
+      autoBreakOnInactivity: false,
+      inactivityThresholdMinutes: 5,
+      lateArrivalMarksHalfDay: false
+    }
+  },
+  level: 'error',
+  timestamp: '2026-05-18 15:10:17'
+}

@@ -38,6 +38,31 @@ const getReportPeriod = (dateRange) => {
 };
 const selectAllOption = { _id: 'SELECT_ALL', fullName: 'Select All Employees', employeeCode: 'ALL' };
 
+const mapLeaveReportRow = (row) => {
+    if (row.recordType === 'absent') {
+        return {
+            date: row.date,
+            employeeName: row.employee?.fullName || '',
+            employeeCode: row.employee?.employeeCode || '',
+            recordType: 'Absent',
+            type: 'Absent',
+            status: 'Absent',
+            reason: row.reason || '-',
+            isAbsent: true
+        };
+    }
+    return {
+        date: format(new Date(row.createdAt), 'yyyy-MM-dd'),
+        employeeName: row.employee?.fullName || '',
+        employeeCode: row.employee?.employeeCode || '',
+        recordType: 'Leave Request',
+        type: formatLeaveRequestType(row.requestType),
+        status: row.status,
+        reason: row.reason || '-',
+        isAbsent: false
+    };
+};
+
 // --- PDF GENERATION LOGIC (UPDATED) ---
 const generatePdf = (reportType, data, selectedEmployees, dateRange) => {
     const doc = new jsPDF({ orientation: reportType === 'notes' ? 'portrait' : 'landscape' });
@@ -82,14 +107,11 @@ const generatePdf = (reportType, data, selectedEmployees, dateRange) => {
         ]);
     } else if (reportType === 'leaves') {
         title = 'Leave Request Report';
-        head = [['Date Submitted', 'Employee', 'Type', 'Status', 'Reason']];
-        body = data.map(row => [
-            format(new Date(row.createdAt), 'yyyy-MM-dd'),
-            row.employee.fullName,
-            formatLeaveRequestType(row.requestType),
-            row.status,
-            row.reason
-        ]);
+        head = [['Date', 'Employee', 'Record', 'Type', 'Status', 'Reason']];
+        body = data.map(row => {
+            const mapped = mapLeaveReportRow(row);
+            return [mapped.date, mapped.employeeName, mapped.recordType, mapped.type, mapped.status, mapped.reason];
+        });
     } else if (reportType === 'notes') {
         title = 'Attendance Notes Report';
         head = [['Date', 'Employee', 'Status', 'Shift', 'Clock In', 'Clock Out', 'Notes']];
@@ -114,6 +136,19 @@ const generatePdf = (reportType, data, selectedEmployees, dateRange) => {
         styles: { fontSize: 8 },
         columnStyles: reportType === 'notes' ? { 6: { cellWidth: 80 } } : {}
     };
+
+    if (reportType === 'leaves') {
+        const leaveOriginalData = data.map(mapLeaveReportRow);
+        tableConfig.didParseCell = (cellData) => {
+            if (cellData.row.index >= 0 && cellData.row.index < leaveOriginalData.length) {
+                const mapped = leaveOriginalData[cellData.row.index];
+                if (mapped?.isAbsent) {
+                    cellData.cell.styles.fillColor = [255, 182, 193];
+                    cellData.cell.styles.textColor = [255, 255, 255];
+                }
+            }
+        };
+    }
 
     // Add row styling for attendance reports
     if (reportType === 'attendance') {
@@ -347,16 +382,20 @@ const generateExcel = (reportType, data, selectedEmployees, dateRange) => {
         reportName = 'Attendance';
 
     } else if (reportType === 'leaves') {
-         const leaveWorksheetData = data.map(row => ({
-            'Date Submitted': format(new Date(row.createdAt), 'yyyy-MM-dd'),
-            'Employee Code': row.employee.employeeCode,
-            'Employee Name': row.employee.fullName,
-            'Request Type': formatLeaveRequestType(row.requestType),
-            'Status': row.status,
-            'Reason': row.reason
-        }));
+        const leaveWorksheetData = data.map(row => {
+            const mapped = mapLeaveReportRow(row);
+            return {
+                'Date': mapped.date,
+                'Employee Code': mapped.employeeCode,
+                'Employee Name': mapped.employeeName,
+                'Record': mapped.recordType,
+                'Type': mapped.type,
+                'Status': mapped.status,
+                'Reason': mapped.reason
+            };
+        });
         const ws = XLSX.utils.json_to_sheet(leaveWorksheetData);
-        ws['!cols'] = [ { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }];
+        ws['!cols'] = [ { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 40 }];
         const range = XLSX.utils.decode_range(ws['!ref']);
         for (let C = range.s.c; C <= range.e.c; ++C) { const address = XLSX.utils.encode_cell({ r: 0, c: C }); if (ws[address]) ws[address].s = boldStyle; }
         XLSX.utils.book_append_sheet(wb, ws, 'Leave Report');
@@ -895,7 +934,7 @@ const ReportsPage = () => {
                 />
                 <ReportCard 
                     title="Leave Request Report" 
-                    description="Employee leave requests and approval status"
+                    description="Employee leave requests, approval status, and absent days"
                     icon={<EventNoteIcon />}
                     onPdfClick={handleLeavesPdfClick} 
                     onExcelClick={handleLeavesExcelClick} 

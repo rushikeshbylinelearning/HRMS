@@ -6,14 +6,14 @@ import { Box, Typography } from '@mui/material';
 import '../styles/PageHeroHeader.css';
 
 const PageHeroHeader = ({
-  eyebrow,
+  eyebrow = null,
   title,
-  description,
-  icon,
-  actionArea,
-  stats,
-  children,
-  align
+  description = null,
+  icon = null,
+  actionArea = null,
+  stats = null,
+  children = null,
+  align = 'between',
 }) => {
   return (
     <header className={`page-hero-header ${align === 'center' ? 'page-hero-header--center' : ''}`}>
@@ -78,16 +78,6 @@ PageHeroHeader.propTypes = {
   })),
   children: PropTypes.node,
   align: PropTypes.oneOf(['between', 'center'])
-};
-
-PageHeroHeader.defaultProps = {
-  eyebrow: null,
-  description: null,
-  icon: null,
-  actionArea: null,
-  stats: null,
-  children: null,
-  align: 'between'
 };
 
 export default PageHeroHeader;

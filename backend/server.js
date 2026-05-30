@@ -45,6 +45,7 @@ require('./models/LeaveYear');
 require('./models/OfficeLocation');
 require('./models/LeaveLedger');
 require('./models/LeaveAccrualLock');
+require('./models/EmployeeResourceRequest');
 
 // Route Imports
 const authRoutes = require('./routes/auth');
@@ -59,6 +60,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const reportsRoutes = require('./routes/reports');
 const userRoutes = require('./routes/userRoutes');
 const newNotificationRoutes = require('./routes/newNotifications');
+const resourceRequestRoutes = require('./routes/resourceRequests');
 const officeLocationRoutes = require('./routes/officeLocations');
 const manageRoutes = require('./routes/manage');
 const payrollRoutes = require('./routes/payrollRoutes');
@@ -226,6 +228,10 @@ app.use('/api/sso', ssoRoutes);
 
 app.use('/api/auto-login', autoLoginRoutes);
 
+// Public form routes (no authentication required)
+const publicFormRoutes = require('./routes/publicForm');
+app.use('/api/public', publicFormRoutes);
+
 // ─── SSO MIDDLEWARE ────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/') ||
@@ -247,6 +253,7 @@ app.use('/api/leaves', leaveRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/new-notifications', newNotificationRoutes);
+app.use('/api/resource-requests', resourceRequestRoutes);
 app.use('/api/admin/employees', employeeRoutes);
 app.use('/api/admin/shifts', shiftRoutes);
 app.use('/api/admin/settings', settingsRoutes);
@@ -278,6 +285,9 @@ app.use('/api/policies-gridfs', policiesGridFSRoutes);
 
 const absentToLeaveRoutes = require('./routes/absent_to_leave_route');
 app.use('/api/admin', absentToLeaveRoutes);
+
+const publicFormAdminRoutes = require('./routes/admin/publicFormAdmin');
+app.use('/api/admin/public-form', publicFormAdminRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

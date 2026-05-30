@@ -1,6 +1,7 @@
 // src/components/AdminLeaveForm.jsx
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Divider, Box, Typography, Autocomplete, IconButton, Avatar, Alert } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Stack, Divider, Box, Typography, Autocomplete, IconButton, Avatar, Alert, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { getWorkingLeaveDateKeys } from '../utils/leaveDayAllocations';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -21,29 +22,87 @@ const initialFormState = {
     appliedDate: new Date(), // Employee applied date - default to today for new requests
 };
 
+const buildLeaveDateRangeFromRequest = (leaveDates) => {
+    if (!leaveDates?.length) return [null];
+    const sorted = [...leaveDates].map((d) => new Date(d)).sort((a, b) => a - b);
+    const start = sorted[0];
+    const end = sorted[sorted.length - 1];
+    if (start.getTime() === end.getTime()) return [start];
+    return [start, end];
+};
+
+const buildDayTypesFromRequest = (req, dateKeys) => {
+    const dayTypes = {};
+    dateKeys.forEach((key) => { dayTypes[key] = 'Loss of Pay'; });
+    (req?.dayTypeAllocations || []).forEach((a) => {
+        const d = new Date(a.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (dateKeys.includes(key)) dayTypes[key] = a.requestType;
+    });
+    return dayTypes;
+};
+
+const expandLeaveDatesToStrings = (leaveDates) => {
+    if (!leaveDates?.[0]) return [];
+    const pad = (n) => String(n).padStart(2, '0');
+    if (leaveDates[1]) {
+        const all = eachDayOfInterval({ start: leaveDates[0], end: leaveDates[1] });
+        return all.map((d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+    return [`${leaveDates[0].getFullYear()}-${pad(leaveDates[0].getMonth() + 1)}-${pad(leaveDates[0].getDate())}`];
+};
+
 const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving, error, onClearError }) => {
     const [formData, setFormData] = useState(initialFormState);
+    const [dayTypes, setDayTypes] = useState({});
     const isEditing = !!request;
 
     useEffect(() => {
         if (open) {
             if (isEditing) {
+                const range = buildLeaveDateRangeFromRequest(request.leaveDates);
+                const keys = getWorkingLeaveDateKeys(expandLeaveDatesToStrings(range));
                 setFormData({
                     _id: request._id,
                     employee: request.employee?._id || '',
                     requestType: request.requestType || 'Planned',
                     leaveType: request.leaveType || 'Full Day',
-                    leaveDates: request.leaveDates?.map(d => new Date(d)) || [null],
+                    leaveDates: range,
                     alternateDate: request.alternateDate ? new Date(request.alternateDate) : null,
                     reason: request.reason || '',
                     status: request.status || 'Pending',
                     appliedDate: request.createdAt ? new Date(request.createdAt) : null,
                 });
+                setDayTypes(buildDayTypesFromRequest(request, keys));
             } else {
                 setFormData(initialFormState);
+                setDayTypes({});
             }
         }
     }, [request, open, isEditing]);
+
+    const workingDayKeys = useMemo(() => {
+        if (formData.requestType !== 'Loss of Pay') return [];
+        return getWorkingLeaveDateKeys(expandLeaveDatesToStrings(formData.leaveDates));
+    }, [formData.requestType, formData.leaveDates]);
+
+    useEffect(() => {
+        if (!open) return;
+        if (formData.requestType !== 'Loss of Pay') {
+            setDayTypes({});
+            return;
+        }
+        setDayTypes((prev) => {
+            const next = { ...prev };
+            workingDayKeys.forEach((key) => {
+                if (!next[key]) next[key] = 'Loss of Pay';
+            });
+            Object.keys(next).forEach((key) => {
+                if (!workingDayKeys.includes(key)) delete next[key];
+            });
+            return next;
+        });
+    }, [workingDayKeys, formData.requestType, open]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -83,7 +142,12 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving, e
             console.error("Validation failed");
             return;
         }
-        onSave(formData);
+        const dayTypeAllocations = formData.requestType === 'Loss of Pay'
+            ? Object.entries(dayTypes)
+                .filter(([, type]) => type !== 'Loss of Pay')
+                .map(([date, requestType]) => ({ date, requestType }))
+            : [];
+        onSave({ ...formData, dayTypeAllocations });
     };
 
     // Get selected employee object for Autocomplete
@@ -561,6 +625,47 @@ const AdminLeaveForm = ({ open, onClose, onSave, request, employees, isSaving, e
                             />
                         </LocalizationProvider>
                     )}
+                    {formData.requestType === 'Loss of Pay' && workingDayKeys.length >= 2 && (
+                        <Box sx={{ p: 2, border: '1px solid #E5E7EB', borderRadius: '8px', bgcolor: '#F9FAFB' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Split LOP days (Planned / Casual)
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                                Assign working days to Planned or Casual; remaining days stay as LOP. Works for pending and approved leaves.
+                            </Typography>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Date</TableCell>
+                                        <TableCell>Effective type</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {workingDayKeys.map((dateKey) => (
+                                        <TableRow key={dateKey}>
+                                            <TableCell>{dateKey}</TableCell>
+                                            <TableCell>
+                                                <Select
+                                                    size="small"
+                                                    fullWidth
+                                                    value={dayTypes[dateKey] || 'Loss of Pay'}
+                                                    onChange={(e) => setDayTypes((prev) => ({
+                                                        ...prev,
+                                                        [dateKey]: e.target.value,
+                                                    }))}
+                                                >
+                                                    <MenuItem value="Loss of Pay">Loss of Pay</MenuItem>
+                                                    <MenuItem value="Planned">Planned</MenuItem>
+                                                    <MenuItem value="Casual">Casual</MenuItem>
+                                                </Select>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </Box>
+                    )}
+
                     {/* Reason Textarea */}
                     <TextField 
                         name="reason" 

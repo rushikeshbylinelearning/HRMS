@@ -13,6 +13,7 @@ import {
     MoreTime as MoreTimeIcon,
     HistoryEdu as HistoryEduIcon,
     Assessment as AssessmentIcon,
+    PersonOff as PersonOffIcon,
 } from '@mui/icons-material';
 import EmployeeListModal from '../components/EmployeeListModal';
 import EnhancedLeaveRequestModal from '../components/EnhancedLeaveRequestModal';
@@ -744,7 +745,7 @@ const AdminDashboardPage = () => {
                                     ))
                                 ) : (
                                     <div className="empty-state-small">
-                                        <NotesIcon/><p>No recent activity.</p>
+                                        <NotesIcon /><p>No recent activity.</p>
                                     </div>
                                 )}
                             </div>
@@ -756,10 +757,14 @@ const AdminDashboardPage = () => {
                                     <PeopleAltIcon />
                                     <span>Manage Employees</span>
                                 </a>
-                                <a href="/reports" className="quick-link-item">
-                                    <WorkIcon />
-                                    <span>View Reports</span>
-                                </a>
+                                <button
+                                    type="button"
+                                    className="quick-link-item"
+                                    onClick={() => handleCardClick('absent', 'Absent Today')}
+                                >
+                                    <PersonOffIcon />
+                                    <span>Absent Today</span>
+                                </button>
                                 <a href="/manage-section" className="quick-link-item">
                                     <AccessAlarmIcon />
                                     <span>Settings</span>

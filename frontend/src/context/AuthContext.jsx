@@ -7,6 +7,9 @@ import socket from '../socket';
 
 const AuthContext = createContext(null);
 
+// Shared across StrictMode re-runs so /api/auth/me is only called once per page load
+let authBootstrapPromise = null;
+
 // Auth status states: 'unknown' | 'authenticated' | 'unauthenticated'
 // 'unknown' = auth check in progress, UI should render with skeletons
 // 'authenticated' = user is authenticated (from backend confirmation)
@@ -41,7 +44,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAuthenticated(false);
         setAuthStatus('unauthenticated'); // Backend confirmed: logged out = unauthenticated
-        authInitializedRef.current = false; // Reset initialization flag
+        authInitializedRef.current = false;
+        authBootstrapPromise = null;
         
         // Disconnect socket if connected
         if (socket && socket.connected) {
@@ -62,16 +66,15 @@ export const AuthProvider = ({ children }) => {
     const authInitializedRef = React.useRef(false);
 
     const initializeAuth = useCallback(async () => {
-        // Prevent duplicate initialization calls
-        if (authInitializedRef.current) {
-            console.log('[AuthContext] ⚠️ Auth already initialized, skipping duplicate call');
-            return;
+        if (authBootstrapPromise) {
+            return authBootstrapPromise;
         }
 
+        authBootstrapPromise = (async () => {
         // NON-BLOCKING: Start with 'unknown' status - UI can render immediately
         // Backend remains the source of truth - we'll update status based on /api/auth/me response
         setAuthStatus('unknown');
-        authInitializedRef.current = true; // Mark as initialized to prevent duplicate calls
+        authInitializedRef.current = true;
 
         // Check for token in order: ams_token (SSO preference) > token
         // Note: SSO tokens are handled by LoginPage which validates and converts to AMS token
@@ -165,6 +168,9 @@ export const AuthProvider = ({ children }) => {
             // Clear the auth restoration flag
             window.__AUTH_RESTORING__ = false;
         }
+        })();
+
+        return authBootstrapPromise;
     }, [logout]);
 
     const loginWithToken = useCallback(async (token) => {

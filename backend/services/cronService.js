@@ -21,13 +21,8 @@ const REMINDER_WINDOW_DAYS = 7;
  * A daily job to check for employees whose probation or internship is ending soon.
  */
 const checkProbationAndInternshipEndings = async () => {
-    console.log(`[CRON] Running daily check for probation/internship endings at ${new Date().toLocaleString()}`);
-
     // Check if database is connected before running queries
-    if (mongoose.connection.readyState !== 1) {
-        console.log('[CRON] Database not connected, skipping daily check');
-        return;
-    }
+    if (mongoose.connection.readyState !== 1) return;
 
     try {
         // First try to get hiring-specific email setting
@@ -206,12 +201,7 @@ const checkProbationAndInternshipEndings = async () => {
  * Weekly job to check for employees with 3+ late days and send warnings
  */
 const checkWeeklyLateWarnings = async () => {
-    console.log(`[CRON] Running weekly late attendance check at ${new Date().toLocaleString()}`);
-    
-    if (mongoose.connection.readyState !== 1) {
-        console.log('[CRON] Database not connected, skipping weekly late check');
-        return;
-    }
+    if (mongoose.connection.readyState !== 1) return;
 
     try {
         await checkAndSendWeeklyLateWarnings();
@@ -229,7 +219,6 @@ const checkWeeklyLateWarnings = async () => {
 const checkProbationCompletions = async () => {
     // REMOVED: Legacy working-days-based probation completion check
     // Use /api/analytics/probation-tracker endpoint for accurate probation calculations
-    console.log('[CRON] Legacy probation completion check has been removed. Use /api/analytics/probation-tracker endpoint instead.');
 };
 
 /**
@@ -253,7 +242,6 @@ const startAutoLogoutJob = () => {
     }, AUTO_LOGOUT_INTERVAL_MS);
     
     console.log('✅ Auto-logout job started (runs every 5 minutes)');
-    console.log(`   First check will run in 2 seconds, then every ${AUTO_LOGOUT_INTERVAL_MS / 1000 / 60} minutes`);
     
     // Store interval ID for potential cleanup (if needed in future)
     return intervalId;
@@ -278,12 +266,7 @@ const startHalfDayConversionJob = () => {
     // Combined function to run both conversion and auto-revert
     const runDailyConversionChecks = async (dateStr) => {
         try {
-            // First, convert half-day leaves with no check-in to full-day LOP
-            console.log(`[cronService] Running half-day conversion for ${dateStr}`);
             await autoConvertHalfDayLeaves(dateStr);
-            
-            // Then, check for incorrectly converted leaves (where attendance was added later)
-            console.log(`[cronService] Running auto-revert check for ${dateStr}`);
             await autoRevertIncorrectConversions(dateStr);
         } catch (err) {
             console.error(`[cronService] Error in daily conversion checks for ${dateStr}:`, err);
@@ -293,12 +276,10 @@ const startHalfDayConversionJob = () => {
     // Run immediately on startup (with delay) for yesterday's data
     setTimeout(() => {
         const yesterday = getYesterdayDateString();
-        console.log(`[cronService] Running initial half-day conversion check for ${yesterday}`);
         runDailyConversionChecks(yesterday);
     }, 5000); // 5 second delay to ensure DB is ready
     
     // Schedule daily at 12:30 AM IST (00:30)
-    // Using setInterval for 24 hours
     const CONVERSION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
     
     // Calculate time until next 12:30 AM IST
@@ -316,20 +297,16 @@ const startHalfDayConversionJob = () => {
     // Schedule first run at 12:30 AM
     setTimeout(() => {
         const yesterday = getYesterdayDateString();
-        console.log(`[cronService] Running scheduled half-day conversion for ${yesterday}`);
         runDailyConversionChecks(yesterday);
         
         // Then run every 24 hours
         setInterval(() => {
             const yesterday = getYesterdayDateString();
-            console.log(`[cronService] Running scheduled half-day conversion for ${yesterday}`);
             runDailyConversionChecks(yesterday);
         }, CONVERSION_INTERVAL_MS);
     }, msUntilNextRun);
     
     console.log('✅ Half-day conversion job scheduled (runs daily at 12:30 AM IST)');
-    console.log(`   Initial check will run in 5 seconds for yesterday's data`);
-    console.log(`   Next scheduled run: ${nextRun.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
 };
 
 /**
@@ -417,7 +394,7 @@ const startLeaveAccrualJob = () => {
  *   3 poll opportunities for both preview and auto-send.
  */
 const startTeamsMorningReportJob = () => {
-    console.log('[CRON] Starting Teams dual attendance report job (morning + afternoon).');
+    // Teams dual attendance report job (morning + afternoon)
 
     const PREVIEW_NOTIF_SENT_KEY      = 'teamsPreviewNotifSentDate';
     const AFTERNOON_PREVIEW_SENT_KEY  = 'teamsAfternoonPreviewNotifSentDate';
@@ -546,8 +523,6 @@ const startTeamsMorningReportJob = () => {
 
     // Poll every 60 seconds
     setInterval(checkAndRun, 60 * 1000);
-
-    console.log('✅ Teams dual attendance report job scheduled (morning + afternoon, time controlled by DB teamsReportConfig).');
 };
 
 module.exports = { startScheduledJobs, checkProbationAndInternshipEndings, startLeaveAccrualJob, startTeamsMorningReportJob };

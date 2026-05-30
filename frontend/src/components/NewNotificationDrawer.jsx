@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText, Chip, Button, Tooltip, Divider, Alert } from '@mui/material';
+import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText, Chip, Button, Tooltip, Tabs, Tab } from '@mui/material';
 import {
     Close as CloseIcon, CheckCircle as CheckCircleIcon, Error as ErrorIcon, Info as InfoIcon,
     Warning as WarningIcon, NotificationsOffOutlined as NotificationsOffOutlinedIcon,
     Login as LoginIcon, Logout as LogoutIcon, Coffee as CoffeeIcon, EventNote as EventNoteIcon,
     DeleteSweep as DeleteSweepIcon, MarkEmailRead as MarkEmailReadIcon, PlayArrow as StartBreakIcon,
     Wifi as WifiIcon, Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon,
-    Groups as TeamsIcon, Preview as PreviewIcon,
+    Groups as TeamsIcon, Preview as PreviewIcon, Inventory2 as Inventory2Icon,
 } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
 import api from '../api/axios';
 import '../styles/NotificationDrawer.css';
 import TeamsNotificationModal from './TeamsAttendanceNotificationSettings';
+import { partitionNotifications, countUnread } from '../utils/requestNotifications';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatDistanceToNow = (dateString) => {
@@ -56,6 +57,8 @@ const getNotificationIcon = (type) => {
         policy_updated: <DescriptionIcon className="notification-icon warning" />,
         anonymous_feedback: <MessageIcon className="notification-icon info" />,
         teams_report_preview: <TeamsIcon className="notification-icon info" style={{ color: '#6264A7' }} />,
+        resource_request: <Inventory2Icon className="notification-icon info" />,
+        resource_request_status: <Inventory2Icon className="notification-icon success" />,
         success: <CheckCircleIcon className="notification-icon success" />,
         error: <ErrorIcon className="notification-icon error" />,
         warning: <WarningIcon className="notification-icon warning" />,
@@ -131,6 +134,8 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
             } else {
                 console.warn('[Notification] Profile update but no employeeId found');
             }
+        } else if (notification.type === 'resource_request' || notification.type === 'resource_request_status') {
+            onNavigate(notification.navigationData || {}, notification.type, notification.metadata);
         } else if (notification.type === 'early_checkout_request' || notification.metadata?.type === 'EARLY_CHECKOUT_REQUEST') {
             onNavigate(notification.navigationData || {}, notification.type, notification.metadata);
         } else if (notification.navigationData) {
@@ -159,6 +164,9 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
             <ListItemText
                 primary={
                     <Box>
+                        {notification.type === 'resource_request' && (
+                            <Chip size="small" label="Resource Request" color="primary" sx={{ mb: 0.5, fontWeight: 600 }} />
+                        )}
                         {notification.type === 'early_checkout_request' && (
                             <Chip size="small" label="Early Checkout Request" color="warning" sx={{ mb: 0.5, fontWeight: 600 }} />
                         )}
@@ -245,6 +253,41 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
     );
 };
 
+const NotificationList = ({
+    items, loadingNotifications, emptyTitle, emptySubtitle,
+    onMarkAsRead, onDelete, onNavigate, onStartBreak, onPromoteEmployee, onOverrideHalfDay, onOpenTeamsPreview,
+}) => {
+    if (loadingNotifications) {
+        return <Box className="flex-center" sx={{ height: '100%', py: 4 }}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></Box>;
+    }
+    if (items.length === 0) {
+        return (
+            <Box className="empty-notifications">
+                <NotificationsOffOutlinedIcon />
+                <Typography variant="h6">{emptyTitle}</Typography>
+                <Typography variant="body2">{emptySubtitle}</Typography>
+            </Box>
+        );
+    }
+    return (
+        <List className="notification-list">
+            {items.map((n) => (
+                <NotificationItem
+                    key={n.id}
+                    notification={n}
+                    onMarkAsRead={onMarkAsRead}
+                    onDelete={onDelete}
+                    onNavigate={onNavigate}
+                    onStartBreak={onStartBreak}
+                    onPromoteEmployee={onPromoteEmployee}
+                    onOverrideHalfDay={onOverrideHalfDay}
+                    onOpenTeamsPreview={onOpenTeamsPreview}
+                />
+            ))}
+        </List>
+    );
+};
+
 const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -255,6 +298,17 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
     } = useNewNotifications();
 
     const [teamsModalOpen, setTeamsModalOpen] = useState(false);
+    const isAdmin = ['Admin', 'HR'].includes(user?.role);
+    const [adminTab, setAdminTab] = useState(0);
+    const { attendance: attendanceNotifications, requests: requestNotifications } = partitionNotifications(notifications);
+    const attendanceUnread = countUnread(attendanceNotifications);
+    const requestsUnread = countUnread(requestNotifications);
+    const displayedNotifications = isAdmin
+        ? (adminTab === 0 ? attendanceNotifications : requestNotifications)
+        : notifications;
+    const displayedUnread = isAdmin
+        ? (adminTab === 0 ? attendanceUnread : requestsUnread)
+        : unreadCount;
 
     const handleOpenTeamsPreview = (notificationId) => {
         onClose();
@@ -346,6 +400,16 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
             }
         }
         
+        if (notificationType === 'resource_request' || notificationType === 'resource_request_status') {
+            const requestId = metadata?.requestId || navigationData?.params?.requestId;
+            if (isAdmin) {
+                navigate(requestId ? `/admin/requests?requestId=${requestId}` : '/admin/requests');
+            } else {
+                navigate(requestId ? `/requests?requestId=${requestId}` : '/requests');
+            }
+            return;
+        }
+
         // Handle LEAVE_REQUEST notifications
         if (notificationType === 'LEAVE_REQUEST') {
             const leaveId = metadata?.leaveId || navigationData?.leaveId;
@@ -430,6 +494,11 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
         }
     };
 
+    const handleMarkTabAsRead = async () => {
+        const unread = displayedNotifications.filter((n) => !n.read);
+        await Promise.all(unread.map((n) => markAsRead(n.id)));
+    };
+
     const handleOverrideHalfDay = async (attendanceLogId, notificationId) => {
         try {
             await markAsRead(notificationId);
@@ -464,39 +533,64 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
                 <IconButton onClick={onClose} sx={{ color: 'white' }}><CloseIcon /></IconButton>
             </Box>
             
+            {isAdmin && (
+                <Tabs
+                    value={adminTab}
+                    onChange={(_, v) => setAdminTab(v)}
+                    variant="fullWidth"
+                    className="notification-drawer-tabs"
+                >
+                    <Tab
+                        label={
+                            <Box className="notification-tab-label">
+                                Attendance
+                                {attendanceUnread > 0 && <Chip size="small" label={attendanceUnread} className="tab-unread-chip" />}
+                            </Box>
+                        }
+                    />
+                    <Tab
+                        label={
+                            <Box className="notification-tab-label">
+                                Requests
+                                {requestsUnread > 0 && <Chip size="small" label={requestsUnread} className="tab-unread-chip" />}
+                            </Box>
+                        }
+                    />
+                </Tabs>
+            )}
+
             {notifications.length > 0 && (
                 <Box className="drawer-actions">
-                    <Button size="small" startIcon={<MarkEmailReadIcon />} onClick={markAllAsRead} disabled={unreadCount === 0}>Mark All Read</Button>
+                    <Button
+                        size="small"
+                        startIcon={<MarkEmailReadIcon />}
+                        onClick={isAdmin ? handleMarkTabAsRead : markAllAsRead}
+                        disabled={displayedUnread === 0}
+                    >
+                        {isAdmin ? 'Mark Tab Read' : 'Mark All Read'}
+                    </Button>
                     <Button size="small" color="inherit" startIcon={<DeleteSweepIcon />} onClick={clearAllNotifications}>Clear All</Button>
                 </Box>
             )}
             
             <Box className="drawer-body">
-                {loadingNotifications ? (
-                    <Box className="flex-center" sx={{ height: '100%' }}><SkeletonBox width="24px" height="24px" borderRadius="50%" /></Box>
-                ) : notifications.length > 0 ? (
-                    <List className="notification-list">
-                        {notifications.map((n) => (
-                            <NotificationItem
-                                key={n.id}
-                                notification={n}
-                                onMarkAsRead={markAsRead}
-                                onDelete={deleteNotification}
-                                onNavigate={handleNavigate}
-                                onStartBreak={handleStartBreak}
-                                onPromoteEmployee={handlePromoteEmployee}
-                                onOverrideHalfDay={handleOverrideHalfDay}
-                                onOpenTeamsPreview={handleOpenTeamsPreview}
-                            />
-                        ))}
-                    </List>
-                ) : (
-                    <Box className="empty-notifications">
-                        <NotificationsOffOutlinedIcon />
-                        <Typography variant="h6">All Caught Up!</Typography>
-                        <Typography variant="body2">You have no new notifications.</Typography>
-                    </Box>
-                )}
+                <NotificationList
+                    items={displayedNotifications}
+                    loadingNotifications={loadingNotifications}
+                    emptyTitle={isAdmin && adminTab === 1 ? 'No Request Logs' : 'All Caught Up!'}
+                    emptySubtitle={
+                        isAdmin && adminTab === 1
+                            ? 'Employee resource requests will appear here.'
+                            : 'You have no new notifications.'
+                    }
+                    onMarkAsRead={markAsRead}
+                    onDelete={deleteNotification}
+                    onNavigate={handleNavigate}
+                    onStartBreak={handleStartBreak}
+                    onPromoteEmployee={handlePromoteEmployee}
+                    onOverrideHalfDay={handleOverrideHalfDay}
+                    onOpenTeamsPreview={handleOpenTeamsPreview}
+                />
             </Box>
         </Drawer>
         <TeamsNotificationModal

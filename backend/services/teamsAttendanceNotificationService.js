@@ -413,21 +413,19 @@ const sendEditedReport = async (sections, config, todayStr, reportLabel = '') =>
 // ─── Automatic reports ────────────────────────────────────────────────────────
 
 const sendMorningAttendanceReport = async () => {
-    console.log('[TeamsNotification] Running morning attendance report (Shift 1 & 2)...');
-    if (mongoose.connection.readyState !== 1) { console.log('[TeamsNotification] DB not connected.'); return; }
-    if (!isTodayWorkingDay())                  { console.log('[TeamsNotification] Sunday — skipping.'); return; }
+    if (mongoose.connection.readyState !== 1) { return; }
+    if (!isTodayWorkingDay())                  { return; }
 
     const todayStr = getISTDateString(getISTNow());
     const lastSent = await Setting.findOne({ key: MORNING_SENT_KEY });
-    if (lastSent?.value === todayStr) { console.log('[TeamsNotification] Morning report already sent today.'); return; }
+    if (lastSent?.value === todayStr) { return; }
 
     const webhookUrl = await getWebhookUrl();
-    if (!webhookUrl) { console.log('[TeamsNotification] No webhook URL configured.'); return; }
+    if (!webhookUrl) { return; }
 
     const config = await getReportConfig();
     try {
         const { sections } = await buildSections(todayStr, 'morning', config);
-        console.log(`[TeamsNotification][Morning] Present:${sections.present.length} Late:${sections.late.length} Leave:${sections.onLeave.length} Absent:${sections.absent.length}`);
         const payload = buildPayload(sections, config, todayStr, `Morning Report – ${config.reportTime} IST`);
         const response = await axios.post(webhookUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
         if (response.status !== 200 && response.status !== 202) throw new Error(`Webhook returned ${response.status}`);
@@ -439,24 +437,22 @@ const sendMorningAttendanceReport = async () => {
 };
 
 const sendAfternoonAttendanceReport = async () => {
-    console.log('[TeamsNotification] Running afternoon attendance report (All employees)...');
-    if (mongoose.connection.readyState !== 1) { console.log('[TeamsNotification] DB not connected.'); return; }
-    if (!isTodayWorkingDay())                  { console.log('[TeamsNotification] Sunday — skipping.'); return; }
+    if (mongoose.connection.readyState !== 1) { return; }
+    if (!isTodayWorkingDay())                  { return; }
 
     const todayStr = getISTDateString(getISTNow());
     const lastSent = await Setting.findOne({ key: AFTERNOON_SENT_KEY });
-    if (lastSent?.value === todayStr) { console.log('[TeamsNotification] Afternoon report already sent today.'); return; }
+    if (lastSent?.value === todayStr) { return; }
 
     const webhookUrl = await getWebhookUrl();
-    if (!webhookUrl) { console.log('[TeamsNotification] No webhook URL configured.'); return; }
+    if (!webhookUrl) { return; }
 
     const config = await getReportConfig();
-    if (!config.afternoonReportEnabled) { console.log('[TeamsNotification] Afternoon report disabled.'); return; }
+    if (!config.afternoonReportEnabled) { return; }
 
     try {
         // Scope 'afternoon' = all employees; shift-1/2 latecomers appear as Late
         const { sections } = await buildSections(todayStr, 'afternoon', config);
-        console.log(`[TeamsNotification][Afternoon] Present:${sections.present.length} Late:${sections.late.length} Leave:${sections.onLeave.length} Absent:${sections.absent.length}`);
         const payload = buildPayload(sections, config, todayStr, `Afternoon Report – ${config.afternoonReportTime} IST`);
         const response = await axios.post(webhookUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
         if (response.status !== 200 && response.status !== 202) throw new Error(`Webhook returned ${response.status}`);

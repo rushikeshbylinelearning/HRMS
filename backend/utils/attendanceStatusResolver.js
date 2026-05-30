@@ -304,14 +304,16 @@ function resolveAttendanceStatus({
                     const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY, MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY } = require('../config/shiftPolicy');
                     
                     // Calculate elapsed shift time (includes breaks)
+                    const shiftEnded = !!(attendanceLog.clockInTime && attendanceLog.clockOutTime);
                     let elapsedShiftHours = null;
-                    if (attendanceLog.clockInTime && attendanceLog.clockOutTime) {
+                    if (shiftEnded) {
                         const elapsedShiftMinutes = (new Date(attendanceLog.clockOutTime) - new Date(attendanceLog.clockInTime)) / (1000 * 60);
                         elapsedShiftHours = elapsedShiftMinutes / 60;
                     }
                     
-                    const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
-                    const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed
+                    // Shift ended with 0 elapsed (instant in/out) counts as checked out — not still working
+                    const hasCheckedOut = shiftEnded;
+                    const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed (includes 0)
                     const hasHalfDayHours = hasCheckedOut && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 to < 9 hrs elapsed
                     const hasSufficient = elapsedShiftHours != null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
                     const withinGrace = gracePeriodMinutes != null && (attendanceLog.lateMinutes || 0) <= gracePeriodMinutes;

@@ -118,8 +118,22 @@ const getISTNow = () => {
  */
 const getISTDateString = (date = null) => {
     try {
-        const targetDate = date || getISTNow();
-        
+        if (date == null) {
+            const partsMap = formatDatePartsFallback(getISTNow(), 'Asia/Kolkata');
+            return `${partsMap.year}-${partsMap.month}-${partsMap.day}`;
+        }
+        if (typeof date === 'string') {
+            const trimmed = date.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                return trimmed;
+            }
+            date = parseISTDate(trimmed);
+        }
+        const targetDate = date instanceof Date ? date : getISTNow();
+        if (!(targetDate instanceof Date) || isNaN(targetDate.getTime())) {
+            throw new Error('Invalid date');
+        }
+
         // Use safe fallback formatter
         const partsMap = formatDatePartsFallback(targetDate, 'Asia/Kolkata');
         

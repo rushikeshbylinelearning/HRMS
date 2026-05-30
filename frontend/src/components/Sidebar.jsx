@@ -16,6 +16,7 @@ import useNewNotifications from '../hooks/useNewNotifications';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PolicyIcon from '@mui/icons-material/Policy';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -52,6 +53,12 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             path: (user && ['Admin', 'HR'].includes(user.role)) ? '/admin/leaves' : '/leaves', 
             roles: ['Employee', 'Intern', 'HR', 'Admin'],
             permissionCheck: () => canAccess.leaves()
+        },
+        {
+            text: 'Requests',
+            icon: <Inventory2Icon />,
+            path: '/requests',
+            roles: ['Employee', 'Intern'],
         },
         { 
             text: 'Reports', 

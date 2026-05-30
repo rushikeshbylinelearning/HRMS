@@ -95,22 +95,8 @@ function calculateRequiredLogoutTime({
     // STEP 2: VALIDATE INPUTS
     // ============================================
     if (!clockInTime || !shift || !attendanceDate) {
-        console.log('[requiredLogoutService] Missing required parameters:', {
-            hasClockInTime: !!clockInTime,
-            hasShift: !!shift,
-            hasAttendanceDate: !!attendanceDate
-        });
         return null;
     }
-
-    console.log('[requiredLogoutService] Input parameters:', {
-        clockInTime: clockInTime.toISOString(),
-        shiftName: shift.shiftName,
-        shiftType: shift.shiftType,
-        totalPaidBreakMinutes,
-        totalUnpaidBreakMinutes,
-        attendanceDate
-    });
 
     // ============================================
     // STEP 3: CALCULATE EXCESS BREAK TIME
@@ -125,14 +111,6 @@ function calculateRequiredLogoutTime({
     const totalExtensionMinutes =
         excessPaidBreakMinutes + Math.floor(totalUnpaidBreakMinutes);
 
-    console.log('[requiredLogoutService] Break calculation:', {
-        totalPaidBreakMinutes,
-        totalUnpaidBreakMinutes,
-        allowedBreak: PAID_BREAK_ALLOWANCE_MINUTES,
-        excessPaidBreakMinutes,
-        totalExtensionMinutes
-    });
-
     // ============================================
     // STEP 4: CALCULATE DURATION-BASED LOGOUT
     // ============================================
@@ -140,13 +118,6 @@ function calculateRequiredLogoutTime({
     const durationLogout = moment(clockInTime)
         .add(SHIFT_TOTAL_MINUTES + totalExtensionMinutes, 'minutes')
         .toDate();
-
-    console.log('[requiredLogoutService] Duration-based logout:', {
-        clockInTime: clockInTime.toISOString(),
-        baseShiftMinutes: SHIFT_TOTAL_MINUTES,
-        extensionMinutes: totalExtensionMinutes,
-        durationLogout: durationLogout.toISOString()
-    });
 
     // ============================================
     // STEP 5: APPLY SHIFT-SPECIFIC BOUNDARY LOGIC
@@ -169,7 +140,6 @@ function calculateRequiredLogoutTime({
         ).toDate();
         
         boundaryReason = '10 AM shift - hard 7 PM floor';
-        console.log('[requiredLogoutService] 10 AM Shift detected - applying 7 PM boundary');
     }
 
     // ------------------------------------------------
@@ -198,12 +168,10 @@ function calculateRequiredLogoutTime({
             ).toDate();
             
             boundaryReason = '11 AM shift - early check-in (< 11 AM) - 7 PM floor';
-            console.log('[requiredLogoutService] 11 AM Shift with early check-in (< 11 AM) - applying 7 PM boundary');
         }
         // Case 2: Clock-in AT or AFTER 11:00 AM → duration-based only
         else {
             boundaryReason = '11 AM shift - on-time/late check-in (≥ 11 AM) - no floor';
-            console.log('[requiredLogoutService] 11 AM Shift with on-time/late check-in (≥ 11 AM) - no boundary floor');
         }
     }
 
@@ -234,24 +202,7 @@ function calculateRequiredLogoutTime({
     );
 
     // ============================================
-    // STEP 8: LOG FINAL RESULT
-    // ============================================
-    console.log('[requiredLogoutService] Calculation result:', {
-        shift: shift.shiftName,
-        clockInTime: clockInTime.toISOString(),
-        durationLogout: durationLogout.toISOString(),
-        boundaryLogout: boundaryLogout ? boundaryLogout.toISOString() : null,
-        boundaryReason,
-        requiredLogoutTime: requiredLogoutTime.toISOString(),
-        globalMinimum: globalMinimum.toISOString(),
-        finalRequiredLogoutTime: finalRequiredLogoutTime.toISOString(),
-        excessPaidBreakMinutes,
-        totalUnpaidBreakMinutes,
-        totalExtensionMinutes
-    });
-
-    // ============================================
-    // STEP 9: RETURN RESULT WITH BREAKDOWN
+    // STEP 8: RETURN RESULT WITH BREAKDOWN
     // ============================================
     return {
         requiredLogoutTime: finalRequiredLogoutTime,

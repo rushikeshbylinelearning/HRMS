@@ -76,11 +76,11 @@ const recalculateLateStatus = async (clockInTime, shift, gracePeriodMinutes = nu
     let halfDayReasonText = '';
 
     const withinGracePeriod = lateMinutes <= GRACE_PERIOD_MINUTES;
-    // Only check hours if clocked out (elapsedShiftHours > 0)
-    const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
+    // Shift ended when caller passed elapsed hours (including 0 for instant in/out)
+    const hasCheckedOut = elapsedShiftHours !== null;
     // NEW MODEL: Use elapsed shift time (includes breaks) for status determination
-    const hasFullDayHours = elapsedShiftHours !== null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
-    const belowHalfDayMinimum = elapsedShiftHours !== null && elapsedShiftHours > 0 && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed = Absent
+    const hasFullDayHours = hasCheckedOut && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
+    const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed = Absent (includes 0)
     // Half-day: elapsed shift time >= 5 hrs AND < 9 hrs
     const hasHalfDayHours = elapsedShiftHours !== null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 hrs to < 9 hrs elapsed
 
@@ -276,14 +276,6 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
         }
     }
 
-    // DEBUG: Log calculated values
-    console.log('[computeCalculatedLogoutTime] Aggregated break values:', {
-        paidBreakMinutesTaken,
-        unpaidBreakMinutesTaken,
-        breaksCount: breaks?.length || 0,
-        clockInTime: clockInTime.toISOString()
-    });
-
     // ============================================
     // USE AUTHORITATIVE POLICY CALCULATION
     // Half-day leave: base work = 300 min; full day: shift working minutes
@@ -304,19 +296,8 @@ const computeCalculatedLogoutTime = (sessions, breaks, attendanceLog, userShift,
     });
 
     if (!result) {
-        console.log('[computeCalculatedLogoutTime] calculateRequiredLogoutTime returned null');
         return null;
     }
-
-    // DEBUG: Log calculation result
-    console.log('[computeCalculatedLogoutTime] Calculation result:', {
-        paidBreakMinutesTaken,
-        unpaidBreakMinutesTaken,
-        excessPaidBreak: result.breakdown.excessPaidBreakMinutes,
-        totalExtension: result.breakdown.totalExtensionMinutes,
-        requiredLogoutTime: result.requiredLogoutTime.toISOString(),
-        requiredLogoutTimeIST: result.requiredLogoutTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-    });
 
     const requiredLogoutTime = result.requiredLogoutTime;
 

@@ -125,6 +125,7 @@ const shouldDisableWorkedDateCompOff = (date, holidays) => {
  * Regular Leave Dates: disable holidays and Sundays always
  * For LOP: allow all Saturdays and Mondays (no clubbing restrictions)
  * For Casual: allow working Saturdays, block non-working Saturdays
+ * For Planned: allow all Saturdays (Saturday clubbing handled by backend)
  * For other leave types: block all Saturdays
  * CRITICAL: Block Monday after non-working Saturday for Casual only (weekend clubbing prevention)
  */
@@ -141,6 +142,10 @@ const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPoli
         // For Casual, allow working Saturdays only
         if (requestType === 'Casual') {
             return !isWorkingSaturday(date, saturdayPolicy);
+        }
+        // For Planned (Earned Leave), allow Saturday clubbing (non-working Saturdays)
+        if (requestType === 'Planned') {
+            return false; // Allow Saturdays for Planned leave (clubbing handled by backend)
         }
         // For all other leave types, block all Saturdays
         return true;
@@ -214,7 +219,22 @@ const getInitialFormData = () => {
     };
 };
 
-const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] }) => {
+const mapCorrectionToFormData = (request) => {
+    if (!request) return getInitialFormData();
+    const dates = (request.leaveDates || []).map((d) => new Date(d)).sort((a, b) => a - b);
+    return {
+        requestType: request.requestType === 'Backdated Leave' ? 'Backdated Leave' : request.requestType,
+        leaveType: request.leaveType || 'Full Day',
+        startDate: dates[0] || null,
+        endDate: dates.length > 1 ? dates[dates.length - 1] : dates[0] || null,
+        alternateDate: request.alternateDate ? new Date(request.alternateDate) : null,
+        reason: request.reason || '',
+        medicalCertificate: null,
+        medicalCertificateUrl: request.medicalCertificate || null,
+    };
+};
+
+const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [], correctionRequest = null }) => {
     const { user } = useAuth();
     const [formData, setFormData] = useState(getInitialFormData);
     const [error, setError] = useState('');
@@ -233,8 +253,14 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
     // Remove planned leave history fetching - validation is server-side only
     useEffect(() => {
         if (open) {
-            // Reset planned leave history when form opens
             setPlannedLeaveHistory([]);
+
+            if (correctionRequest) {
+                setFormData(mapCorrectionToFormData(correctionRequest));
+                setShowDraftBanner(false);
+                setError('');
+                return;
+            }
 
             // Check if we have saved draft data and show banner
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -248,7 +274,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                 }
             }
         }
-    }, [open, user]);
+    }, [open, user, correctionRequest]);
 
     // Auto-save form data to localStorage with debouncing
     useEffect(() => {
@@ -492,12 +518,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                 setError('Leave Date and Worked Date must be different.');
                 return;
             }
-            const leaveD = new Date(formData.startDate.getFullYear(), formData.startDate.getMonth(), formData.startDate.getDate());
-            const workedD = new Date(formData.alternateDate.getFullYear(), formData.alternateDate.getMonth(), formData.alternateDate.getDate());
-            if (leaveD <= workedD) {
-                setError('Leave Date must be after Worked Date.');
-                return;
-            }
+
         }
         // Medical certificate is now OPTIONAL for Sick Leave
         // Certificate will be required only for consecutive SL >= threshold days (handled by backend)
@@ -532,12 +553,19 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
         };
 
         try {
-            const { data } = await api.post('/leaves/request', payload);
-            // Clear draft on successful submission
-            localStorage.removeItem(STORAGE_KEY);
-            setFormData(getInitialFormData());
-            setShowDraftBanner(false);
-            onSubmissionSuccess(data.request);
+            if (correctionRequest?._id) {
+                const { data } = await api.put(`/leaves/request/${correctionRequest._id}/correct`, payload);
+                localStorage.removeItem(STORAGE_KEY);
+                setFormData(getInitialFormData());
+                setShowDraftBanner(false);
+                onSubmissionSuccess(data.request);
+            } else {
+                const { data } = await api.post('/leaves/request', payload);
+                localStorage.removeItem(STORAGE_KEY);
+                setFormData(getInitialFormData());
+                setShowDraftBanner(false);
+                onSubmissionSuccess(data.request);
+            }
         } catch (err) {
             setError(err.response?.data?.error || err.response?.data?.errors?.join(' ') || 'Failed to submit request.');
         } finally {
@@ -579,10 +607,13 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
     };
 
     const isBackdateFlow = formData.requestType === 'Backdated Leave';
-    const modalTitle = 'Apply for Leave';
-    const descriptionText = isBackdateFlow
-        ? 'Apply for a leave of absence for a past date. This will be sent for approval.'
-        : 'Please fill out the details for your request.';
+    const isCorrection = Boolean(correctionRequest?._id);
+    const modalTitle = isCorrection ? 'Correct & Resubmit Leave' : 'Apply for Leave';
+    const descriptionText = isCorrection
+        ? 'Update your leave as requested by HR, then resubmit for approval.'
+        : isBackdateFlow
+            ? 'Apply for a leave of absence for a past date. This will be sent for approval.'
+            : 'Please fill out the details for your request.';
 
     return (
         // Modern white theme with red accents
@@ -634,7 +665,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                             mb: '4px'
                         }}
                     >
-                        Apply for Leave
+                        {modalTitle}
                     </Typography>
                     <Typography
                         id="leave-form-description"
@@ -644,7 +675,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                             fontSize: '14px'
                         }}
                     >
-                        Please fill out the details for your leave request.
+                        {descriptionText}
                     </Typography>
                 </Box>
                 <IconButton
@@ -681,8 +712,16 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                     autoComplete="off"
                 >
                     <Stack spacing={3}>
+                    {isCorrection && correctionRequest?.hrCorrectionNotes && (
+                        <Alert severity="warning" sx={{ borderRadius: '8px' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Note from HR
+                            </Typography>
+                            <Typography variant="body2">{correctionRequest.hrCorrectionNotes}</Typography>
+                        </Alert>
+                    )}
                     {/* Draft restored banner */}
-                    {showDraftBanner && (
+                    {showDraftBanner && !isCorrection && (
                         <Alert
                             severity="info"
                             sx={{
@@ -1309,7 +1348,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [] })
                             Submitting...
                         </Box>
                     ) : (
-                        'Submit Request'
+                        isCorrection ? 'Resubmit for Approval' : 'Submit Request'
                     )}
                 </Button>
             </DialogActions>

@@ -2,6 +2,7 @@
 const NewNotification = require('../models/NewNotification');
 const User = require('../models/User');
 const { getIO } = require('../socketManager');
+const { verboseLog } = require('../utils/logLevel');
 
 class NewNotificationService {
     static async createNotification(notificationData) {
@@ -9,7 +10,7 @@ class NewNotificationService {
             const generatedId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const notificationWithId = { ...notificationData, id: generatedId };
             const notification = await NewNotification.create(notificationWithId);
-            if (process.env.NODE_ENV !== 'production') console.log('[SVC] Step 1: Notification document created in DB. ID:', notification.id);
+            verboseLog('[SVC] Notification created in DB. ID:', notification.id);
             return notification;
         } catch (error) {
             // Handle Mongoose validation errors (enum validation failures)
@@ -35,9 +36,9 @@ class NewNotificationService {
             return;
         }
         const targetRoom = `user_${notification.userId}`;
-        if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Step 2: Emitting 'new_notification' event to room: ${targetRoom}`);
+        verboseLog(`[SVC] Emitting 'new_notification' to room: ${targetRoom}`);
         io.to(targetRoom).emit('new_notification', { ...notification.toObject() });
-        if (process.env.NODE_ENV !== 'production') console.log(`[SVC] Step 3: Event emitted successfully to ${targetRoom}.`);
+        verboseLog(`[SVC] Event emitted to ${targetRoom}`);
     }
 
     static async createAndEmitNotification(notificationData) {
@@ -211,23 +212,99 @@ class NewNotificationService {
     
     // This is user-facing, so it doesn't need the broadcast helper.
     static async notifyLeaveResponse(userId, userName, status, leaveType, rejectionNotes = null) {
-        let message = `Your ${leaveType} leave request has been ${status.toLowerCase()}.`;
-        
-        // Add rejection reason if provided
-        if (status === 'Rejected' && rejectionNotes) {
-            message += ` Reason: ${rejectionNotes}`;
+        const normalized = String(status || '').toLowerCase();
+        let message;
+        let type = 'leave_rejection';
+
+        if (normalized === 'approved') {
+            message = `Your ${leaveType} leave request has been approved.`;
+            type = 'leave_approval';
+        } else if (normalized === 'rejected') {
+            message = `Your ${leaveType} leave request has been rejected.`;
+            if (rejectionNotes) message += ` Reason: ${rejectionNotes}`;
+            type = 'leave_rejection';
+        } else if (normalized === 'deleted') {
+            message = `Your ${leaveType} leave request has been removed by HR.${rejectionNotes ? ` ${rejectionNotes}` : ''}`;
+            type = 'leave_revoked';
+        } else {
+            message = `Your ${leaveType} leave request has been ${normalized}.`;
+            if (rejectionNotes) message += ` ${rejectionNotes}`;
+            type = normalized === 'approved' ? 'leave_approval' : 'leave_rejection';
         }
-        
+
         await this.createAndEmitNotification({
-            message, userId, userName,
-            type: status === 'Approved' ? 'leave_approval' : 'leave_rejection',
-            recipientType: 'user', category: 'leave', priority: 'high',
+            message,
+            userId,
+            userName,
+            type,
+            recipientType: 'user',
+            category: 'leave',
+            priority: 'high',
             navigationData: { page: 'leaves' },
-            metadata: { 
+            metadata: {
                 fromAdmin: true,
-                ...(rejectionNotes ? { rejectionNotes } : {})
-            }
+                status,
+                ...(rejectionNotes ? { rejectionNotes } : {}),
+            },
         });
+    }
+
+    /** Notify employee when HR reverts an approved leave (edit to rejected/pending, delete, or date removal). */
+    static async notifyLeaveReverted(userId, userName, leaveType, action, detailMessage = null, requestId = null) {
+        const actionMessages = {
+            deleted: `Your approved ${leaveType} leave has been deleted by HR.`,
+            rejected: `Your approved ${leaveType} leave has been rejected by HR.`,
+            revoked: `Your approved ${leaveType} leave has been reverted by HR.`,
+            updated: `Your approved ${leaveType} leave has been updated by HR.`,
+        };
+        let message = actionMessages[action] || actionMessages.revoked;
+        if (detailMessage) message += ` ${detailMessage}`;
+
+        await this.createAndEmitNotification({
+            message,
+            userId,
+            userName,
+            type: 'leave_revoked',
+            recipientType: 'user',
+            category: 'leave',
+            priority: 'high',
+            navigationData: { page: 'leaves', params: requestId ? { requestId } : {} },
+            metadata: { fromAdmin: true, action, requestId },
+        });
+    }
+
+    static async notifyLeaveReturnedForCorrection(userId, userName, leaveType, hrNotes, requestId = null) {
+        const message = `Your ${leaveType} leave request needs correction. ${hrNotes ? `Note from HR: ${hrNotes}` : 'Please review and resubmit.'}`;
+        await this.createAndEmitNotification({
+            message,
+            userId,
+            userName,
+            type: 'leave_returned',
+            recipientType: 'user',
+            category: 'leave',
+            priority: 'high',
+            navigationData: { page: 'leaves', params: requestId ? { requestId } : {} },
+            metadata: {
+                fromAdmin: true,
+                hrCorrectionNotes: hrNotes,
+                requestId,
+            },
+        });
+    }
+
+    static async notifyLeaveResubmitted(userId, userName, leaveType, startDate, endDate, requestId = null) {
+        const message = `${userName} corrected and resubmitted a ${leaveType} leave request (${startDate} to ${endDate}).`;
+        await this.broadcastToAdmins({
+            message,
+            type: 'leave_resubmitted',
+            category: 'leave',
+            priority: 'high',
+            navigationData: {
+                page: 'admin/leaves',
+                params: requestId ? { requestId } : {},
+            },
+            metadata: { requestId, leaveType },
+        }, userId);
     }
 
     static async notifyExtraBreakRequest(userId, userName, reason) {

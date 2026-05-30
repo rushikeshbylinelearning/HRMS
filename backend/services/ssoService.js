@@ -20,7 +20,9 @@ const DEFAULT_SSO_ROLE = (() => {
 // Note: This service is legacy and uses old public key fetching.
 // New code should use jwtUtils.verifySSOTokenWithJWKS() for RS256 verification.
 
-class SSOService {
+class SSOService 
+{
+
     constructor() {
         this.publicKey = null;
         this.publicKeyUrl = process.env.SSO_PUBLIC_KEY_URL;
@@ -43,7 +45,6 @@ class SSOService {
         }
 
         try {
-            console.log(`[SSOService] Fetching public key from: ${this.publicKeyUrl}`);
             const response = await axios.get(this.publicKeyUrl, {
                 timeout: 10000, // 10 second timeout
                 headers: {
@@ -55,7 +56,6 @@ class SSOService {
             if (response.data && response.data.publicKey) {
                 this.publicKey = response.data.publicKey;
                 this.keyCacheExpiry = Date.now() + this.keyCacheDuration;
-                console.log('[SSOService] Public key fetched and cached successfully');
                 return this.publicKey;
             } else {
                 throw new Error('Invalid response format from SSO public key endpoint');
@@ -150,8 +150,6 @@ class SSOService {
             }).populate('shiftGroup');
 
             if (user) {
-                console.log(`[SSOService] Found existing user: ${ssoUser.email}`);
-                
                 // Update user data from SSO if needed
                 const needsUpdate = 
                     (ssoUser.department && user.department !== ssoUser.department) ||
@@ -172,8 +170,6 @@ class SSOService {
                         updateData,
                         { new: true }
                     ).populate('shiftGroup');
-
-                    console.log(`[SSOService] Updated user data for: ${ssoUser.email}`);
                 }
 
                 return user;
@@ -186,8 +182,6 @@ class SSOService {
             }
 
             // Auto-provision new user
-            console.log(`[SSOService] Auto-provisioning new user: ${ssoUser.email}`);
-            
             const newUser = new User({
                 email: ssoUser.email,
                 fullName: ssoUser.name,
@@ -218,7 +212,6 @@ class SSOService {
             });
 
             await newUser.save();
-            console.log(`[SSOService] Successfully created new user: ${ssoUser.email}`);
 
             return await User.findById(newUser._id).populate('shiftGroup');
 
@@ -234,18 +227,14 @@ class SSOService {
      */
     createAMSToken(user) {
         const payload = { 
-            userId: user._id.toString(), // Ensure userId is a string
+            userId: user._id.toString(),
             email: user.email, 
             role: user.role,
-            authMethod: 'SSO' // Flag to indicate this is an SSO login
+            authMethod: 'SSO'
         };
-        
-        console.log('[SSOService] Creating AMS token with payload:', payload);
         
         // Use jwtUtils.sign which handles RS256 signing with proper key pair
         const token = jwtUtils.sign(payload, { expiresIn: '7d' });
-        
-        console.log('[SSOService] ✅ AMS token created successfully');
         return token;
     }
 
@@ -260,7 +249,7 @@ class SSOService {
 
         try {
             await this.fetchPublicKey();
-            console.log('[SSOService] SSO service initialized successfully');
+            // SSO service initialized
         } catch (error) {
             console.error('[SSOService] Failed to initialize SSO service:', error.message);
             // Don't throw error here to prevent server startup failure

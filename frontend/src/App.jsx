@@ -47,7 +47,11 @@ const CIFManagementPage = lazy(() => import('./pages/CIFManagement'));
 const EmployeeCIFDetailsPage = lazy(() => import('./pages/EmployeeCIFDetails'));
 const SchedulingManagementPage = lazy(() => import('./pages/SchedulingManagementPage'));
 const ProbationPage = lazy(() => import('./pages/ProbationPage'));
+const RequestsPage = lazy(() => import('./pages/RequestsPage'));
+const AdminRequestsPage = lazy(() => import('./pages/AdminRequestsPage'));
 const HolidayManagementPage = lazy(() => import('./pages/admin/HolidayManagementPage'));
+// Static import - must render before auth resolves, no login required
+import PublicProfileForm from './pages/PublicProfileForm';
 
 // Import skeleton loaders
 import { PageSkeleton } from './components/SkeletonLoaders';
@@ -164,8 +168,12 @@ function App() {
             return;
         }
         
-        // Check for SSO token from SSO portal (only if not on login page)
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        // Check for SSO token from SSO portal (only if not on login page or public form)
+        if (
+            window.location.pathname !== '/login' &&
+            window.location.pathname !== '/' &&
+            window.location.pathname !== '/public-form'
+        ) {
             const ssoToken = urlParams.get('sso_token') || urlParams.get('token');
             if (ssoToken) {
                 // Mark as processed immediately to prevent re-execution
@@ -226,6 +234,9 @@ function App() {
                                         </Suspense>
                                     } />
                                     
+                                    {/* Public Profile Form - No authentication required */}
+                                    <Route path="/public-form" element={<PublicProfileForm />} />
+                                    
                                     {/* Root route - smart redirect based on authentication */}
                                     <Route path="/" element={<RootRoute />} />
                                     
@@ -250,6 +261,11 @@ function App() {
                                             </Suspense>
                                         } />
                                         <Route path="/profile" element={<ProfilePage />} />
+                                        <Route path="/requests" element={
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="list" /></DelayedFallback>}>
+                                                <RequestsPage />
+                                            </Suspense>
+                                        } />
                                         
                                         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
                                         <Route path="/admin/dashboard" element={
@@ -272,6 +288,7 @@ function App() {
                                                 <AdminLeavesPage />
                                             </Suspense>
                                         } />
+                                        <Route path="/admin/requests" element={<Navigate to="/activity-log?tab=requests" replace />} />
                                         <Route path="/reports" element={
                                             <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <PermissionProtectedRoute requiredPermission="viewReports">

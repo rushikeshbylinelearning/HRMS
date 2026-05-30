@@ -13,7 +13,9 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import LinkIcon from '@mui/icons-material/Link';
 import EmployeeForm from '../components/EmployeeForm';
+import PublicFormLinkGenerator from '../components/PublicFormLinkGenerator';
 import AdminEmployeeProfileDialog from '../components/AdminEmployeeProfileDialog';
 import PageHeroHeader from '../components/PageHeroHeader';
 import UserAvatar from '../components/common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
@@ -78,6 +80,7 @@ const EmployeesPage = () => {
     const [updatingStatus, setUpdatingStatus] = useState({});
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [profileDialog, setProfileDialog] = useState({ open: false, employee: null, mode: 'view' });
+    const [linkGeneratorDialog, setLinkGeneratorDialog] = useState({ open: false, employee: null });
     const initialLoadRef = useRef(true);
     const searchDebounceRef = useRef(null);
     const allEmployeesRef = useRef([]);
@@ -90,24 +93,21 @@ const EmployeesPage = () => {
     const [order, setOrder] = useState('asc');
     const [orderBy, setOrderBy] = useState('fullName');
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-    // Debounce search query
+    // Debounce: only update debouncedSearch after user stops typing for 400ms
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (searchQuery !== searchDebounceRef.current) {
-                searchDebounceRef.current = searchQuery;
-                setPage(0); // Reset to first page on search
-                // fetchInitialData will be triggered by page change or via the main effect below
-            }
-        }, 300);
-
+            setDebouncedSearch(searchQuery);
+            setPage(0);
+        }, 400);
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
     const fetchInitialData = useCallback(async () => {
         const useInitialLoader = initialLoadRef.current;
-        const currentSearch = searchDebounceRef.current || '';
+        const currentSearch = debouncedSearch;
         
         if (useInitialLoader) {
             setLoading(true);
@@ -145,7 +145,7 @@ const EmployeesPage = () => {
                 setIsRefreshing(false);
             }
         }
-    }, [page, rowsPerPage]);
+    }, [page, rowsPerPage, debouncedSearch]);
 
     // Fetch shifts ONCE on mount — they rarely change so no need to refetch on every data refresh
     useEffect(() => {
@@ -540,6 +540,20 @@ const EmployeesPage = () => {
                                             <EditOutlinedIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
+                                    <Tooltip title="Generate Profile Link">
+                                        <IconButton
+                                            size="small"
+                                            onClick={(e) => { e.stopPropagation(); setLinkGeneratorDialog({ open: true, employee }); }}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                                    '& svg': { color: '#667eea' }
+                                                }
+                                            }}
+                                        >
+                                            <LinkIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
                                     <Tooltip title="Delete"><IconButton size="small" onClick={() => setDeleteDialog({ open: true, employee })}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
                                 </div>
                             </div>
@@ -630,6 +644,14 @@ const EmployeesPage = () => {
                 }}
                 onOpenAdvancedEditor={profileDialog.employee ? handleOpenAdvancedEditor : undefined}
             />
+
+            {linkGeneratorDialog.open && (
+                <PublicFormLinkGenerator
+                    employeeId={linkGeneratorDialog.employee?.employeeCode}
+                    employeeName={linkGeneratorDialog.employee?.fullName}
+                    onClose={() => setLinkGeneratorDialog({ open: false, employee: null })}
+                />
+            )}
         </div>
     );
 };

@@ -45,17 +45,17 @@ class PerformanceMonitor {
 
   // Start performance monitoring
   startMonitoring() {
-    // Monitor memory usage every minute
+    // Monitor memory usage every minute (silent)
     setInterval(() => {
       this.updateMemoryMetrics();
     }, 60000);
 
-    // Monitor system resources every 5 minutes
+    // Monitor system resources every 30 minutes (reduced from 5 min)
     setInterval(() => {
       this.logSystemMetrics();
-    }, 300000);
+    }, 1800000);
 
-    // Clean up old metrics every hour
+    // Clean up old metrics every hour (silent)
     setInterval(() => {
       this.cleanupMetrics();
     }, 3600000);
@@ -179,31 +179,37 @@ class PerformanceMonitor {
       },
     };
 
-    // Alert if memory usage is high
-    if (this.metrics.memory.percentage > 80) {
-      console.warn(`⚠️  High memory usage: ${this.metrics.memory.percentage}%`);
+    // Only alert if memory usage is critically high (>90%)
+    if (this.metrics.memory.percentage > 90) {
+      console.warn(`⚠️  CRITICAL memory usage: ${this.metrics.memory.percentage}%`);
     }
   }
 
-  // Log system metrics
+  // Log system metrics - only in development or when issues detected
   async logSystemMetrics() {
     const cpuUsage = await this.getCpuUsage();
     const diskUsage = await this.getDiskUsage();
     
-    console.log('📊 System Metrics:', {
-      uptime: Math.round(process.uptime()),
-      memory: this.metrics.memory,
-      cpu: cpuUsage,
-      disk: diskUsage,
-      requests: {
-        total: this.metrics.requests.total,
-        averageResponseTime: Math.round(this.metrics.requests.averageResponseTime),
-        slowQueries: this.metrics.requests.slowQueries,
-      },
-      cache: {
-        hitRate: Math.round(this.metrics.cache.hitRate * 100) / 100,
-      },
-    });
+    // Only log if in development or if there are performance issues
+    const hasIssues = this.metrics.memory.percentage > 85 || 
+                      this.metrics.requests.averageResponseTime > 1000 ||
+                      this.metrics.errors.total > 50;
+    
+    if (hasIssues) {
+      console.log('📊 System Metrics:', {
+        uptime: Math.round(process.uptime()),
+        memory: this.metrics.memory,
+        cpu: cpuUsage,
+        requests: {
+          total: this.metrics.requests.total,
+          averageResponseTime: Math.round(this.metrics.requests.averageResponseTime),
+          slowQueries: this.metrics.requests.slowQueries,
+        },
+        cache: {
+          hitRate: Math.round(this.metrics.cache.hitRate * 100) / 100,
+        },
+      });
+    }
   }
 
   // Get CPU usage
@@ -282,18 +288,16 @@ class PerformanceMonitor {
       .slice(0, limit);
   }
 
-  // Cleanup old metrics
+  // Cleanup old metrics (silent)
   cleanupMetrics() {
     // Keep only last 24 hours of data
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
     this.slowQueries = this.slowQueries.filter(q => q.timestamp > oneDayAgo);
     this.errorLog = this.errorLog.filter(e => e.timestamp > oneDayAgo);
-    
-    console.log('🧹 Cleaned up old performance metrics');
   }
 
-  // Reset metrics
+  // Reset metrics (silent)
   resetMetrics() {
     this.metrics = {
       requests: { total: 0, successful: 0, failed: 0, averageResponseTime: 0, slowQueries: 0 },
@@ -307,8 +311,6 @@ class PerformanceMonitor {
     this.slowQueries = [];
     this.errorLog = [];
     this.startTime = Date.now();
-    
-    console.log('🔄 Performance metrics reset');
   }
 }
 

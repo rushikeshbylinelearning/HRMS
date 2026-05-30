@@ -109,14 +109,23 @@ export const getAttendanceStatus = (date, log, saturdayPolicy = 'All Saturdays W
     }
   }
   
-  // If there's a log, determine status based on sessions
+  // If there's a log with sessions, require meaningful shift time when shift has ended
   if (log && log.sessions && log.sessions.length > 0) {
-    // Check if it's a late arrival (this would need to be determined by comparing with shift start time)
-    // For now, just return Present
-    return { 
-      status: 'Present', 
-      color: '#27ae60', 
-      bgColor: '#eafaf1' 
+    const shiftEnded = log.clockInTime && log.clockOutTime;
+    if (shiftEnded) {
+      const elapsedHours = (new Date(log.clockOutTime) - new Date(log.clockInTime)) / (1000 * 60 * 60);
+      if (elapsedHours < 5) {
+        return {
+          status: 'Absent',
+          color: '#e74c3c',
+          bgColor: '#ffeaea'
+        };
+      }
+    }
+    return {
+      status: 'Present',
+      color: '#27ae60',
+      bgColor: '#eafaf1'
     };
   }
   

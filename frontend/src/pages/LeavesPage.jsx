@@ -1,11 +1,12 @@
 // src/pages/LeavesPage.jsx
 import React, { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
-import { Typography, Button, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, IconButton, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
-import { ArrowForward as ForwardIcon, CalendarToday, AccessTime, DateRange, Info, Cancel, Description, WorkOutline, BeachAccess, AttachMoney, Sick, CheckCircle, Pending, Close } from '@mui/icons-material';
+import { Typography, Button, Alert, Chip, Box, Snackbar, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Menu, MenuItem, ListItemIcon, ListItemText, Skeleton } from '@mui/material';
+import { ArrowForward as ForwardIcon, WorkOutline, BeachAccess, AttachMoney, Sick, CheckCircle } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { Calendar, Plus, FileText, Heart, Umbrella, Calendar as CalendarIcon, XCircle, Clock } from 'lucide-react';
 import LeaveRequestForm from '../components/LeaveRequestForm';
+import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import SaturdaySchedule from '../components/SaturdaySchedule';
 import { formatLeaveRequestType } from '../utils/saturdayUtils';
 import { normalizeEmploymentType } from '../utils/leaveTypePolicy';
@@ -54,6 +55,7 @@ const LeavesPage = () => {
     
     // Modal state for leave details
     const [viewDialog, setViewDialog] = useState({ open: false, request: null });
+    const [correctionRequest, setCorrectionRequest] = useState(null);
     
     // Carryforward state
     const [carryforwardStatus, setCarryforwardStatus] = useState(null);
@@ -225,15 +227,27 @@ const LeavesPage = () => {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
-    const handleOpenModal = () => setIsModalOpen(true);
-    const handleCloseModal = () => setIsModalOpen(false);
+    const handleOpenModal = () => {
+        setCorrectionRequest(null);
+        setIsModalOpen(true);
+    };
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setCorrectionRequest(null);
+    };
 
     const handleRequestSubmitted = useCallback((newRequest) => {
+        const wasCorrection = correctionRequest?._id;
         handleCloseModal();
-        setSnackbar({ open: true, message: 'Your request has been submitted successfully!' });
+        setSnackbar({
+            open: true,
+            message: wasCorrection
+                ? 'Leave updated and resubmitted for HR approval.'
+                : 'Your request has been submitted successfully!',
+        });
         invalidateLeavesCache('leaves:');
         fetchPageData(true);
-    }, [fetchPageData]);
+    }, [fetchPageData, correctionRequest]);
     
     const handlePageChange = (event, newPage) => {
         setPage(newPage);
@@ -400,6 +414,12 @@ const LeavesPage = () => {
         Approved: 'status-chip-approved',
         Rejected: 'status-chip-rejected',
         Pending: 'status-chip-pending',
+        Returned: 'status-chip-pending',
+    };
+
+    const handleCorrectLeave = (request) => {
+        setCorrectionRequest(request);
+        setIsModalOpen(true);
     };
 
 
@@ -613,7 +633,22 @@ const LeavesPage = () => {
                                             >
                                                 <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                                                 <TableCell>
-                                                    <Chip label={row.status} className={`status-chip ${statusStyles[row.status] || ''}`} />
+                                                    <Chip
+                                                        label={row.status === 'Returned' ? 'Needs correction' : row.status}
+                                                        className={`status-chip ${statusStyles[row.status] || ''}`}
+                                                        onClick={(e) => {
+                                                            if (row.status === 'Returned') {
+                                                                e.stopPropagation();
+                                                                handleCorrectLeave(row);
+                                                            }
+                                                        }}
+                                                        sx={row.status === 'Returned' ? { cursor: 'pointer' } : undefined}
+                                                    />
+                                                    {row.status === 'Returned' && row.hrCorrectionNotes && (
+                                                        <Typography variant="caption" display="block" color="warning.main" sx={{ mt: 0.5, maxWidth: 220 }}>
+                                                            HR: {row.hrCorrectionNotes}
+                                                        </Typography>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>{formatLeaveRequestType(row.requestType)}</TableCell>
                                                 <TableCell>{row.leaveType}</TableCell>
@@ -686,527 +721,19 @@ const LeavesPage = () => {
                 onClose={handleCloseModal}
                 onSubmissionSuccess={handleRequestSubmitted}
                 holidays={holidays}
+                correctionRequest={correctionRequest}
             />
 
-            {/* Leave Details Modal - Premium Enhanced */}
-            <Dialog 
-                open={viewDialog.open} 
-                onClose={() => setViewDialog({ open: false, request: null })} 
-                maxWidth="sm" 
-                fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: '16px',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
-                        maxWidth: { xs: '100%', sm: '640px' },
-                        maxHeight: { xs: '90vh', sm: 'auto' },
-                        margin: { xs: 0, sm: '32px auto' },
-                        display: 'flex',
-                        flexDirection: 'column',
-                        height: { xs: '100%', sm: 'auto' }
-                    }
+            <EmployeeLeaveDetailsModal
+                open={viewDialog.open}
+                request={viewDialog.request}
+                onClose={() => setViewDialog({ open: false, request: null })}
+                onEditResubmit={(req) => {
+                    setViewDialog({ open: false, request: null });
+                    handleCorrectLeave(req);
                 }}
-            >
-                {/* Header Section - Enhanced */}
-                <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    padding: '24px 24px 16px 24px',
-                    backgroundColor: '#FFFFFF',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                    position: 'relative'
-                }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Box sx={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: '#FFECEC',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
-                            <CalendarToday sx={{ fontSize: '20px', color: '#E53935' }} />
-                        </Box>
-                        <Typography sx={{ 
-                            fontSize: '18px', 
-                            fontWeight: 600, 
-                            color: '#1F2937',
-                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                        }}>
-                            Leave Request Details
-                        </Typography>
-                    </Box>
-                    <IconButton 
-                        onClick={() => setViewDialog({ open: false, request: null })}
-                        size="small"
-                        sx={{ 
-                            color: '#6B7280',
-                            transition: 'all 150ms ease',
-                            '&:hover': { 
-                                backgroundColor: '#FFECEC',
-                                color: '#E53935'
-                            }
-                        }}
-                    >
-                        <Close />
-                    </IconButton>
-                </Box>
-                
-                <DialogContent sx={{ 
-                    padding: '24px !important',
-                    flex: 1,
-                    overflow: 'auto',
-                    backgroundColor: '#FFFFFF'
-                }}>
-                    {viewDialog.request && (
-                        <Box>
-                            {/* Status Card - Premium */}
-                            <Box sx={{
-                                width: '100%',
-                                padding: '16px',
-                                borderRadius: '12px',
-                                background: viewDialog.request.status === 'Pending' 
-                                    ? 'linear-gradient(90deg, #FFECEC 0%, #FFFFFF 100%)'
-                                    : viewDialog.request.status === 'Approved'
-                                    ? 'linear-gradient(90deg, #E8F5E9 0%, #FFFFFF 100%)'
-                                    : 'linear-gradient(90deg, #FFEBEE 0%, #FFFFFF 100%)',
-                                borderLeft: '4px solid',
-                                borderLeftColor: viewDialog.request.status === 'Pending' 
-                                    ? '#E53935'
-                                    : viewDialog.request.status === 'Approved'
-                                    ? '#4CAF50'
-                                    : '#E53935',
-                                marginBottom: '24px',
-                                transition: 'all 200ms ease'
-                            }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <Box sx={{
-                                        width: '10px',
-                                        height: '10px',
-                                        borderRadius: '50%',
-                                        backgroundColor: viewDialog.request.status === 'Pending' 
-                                            ? '#E53935'
-                                            : viewDialog.request.status === 'Approved'
-                                            ? '#4CAF50'
-                                            : '#E53935',
-                                        animation: 'pulse 2s ease-in-out infinite',
-                                        '@keyframes pulse': {
-                                            '0%, 100%': {
-                                                opacity: 1,
-                                                transform: 'scale(1)'
-                                            },
-                                            '50%': {
-                                                opacity: 0.7,
-                                                transform: 'scale(1.1)'
-                                            }
-                                        }
-                                    }} />
-                                    <Box>
-                                        <Typography sx={{
-                                            fontSize: '15px',
-                                            fontWeight: 600,
-                                            color: viewDialog.request.status === 'Pending' 
-                                                ? '#E53935'
-                                                : viewDialog.request.status === 'Approved'
-                                                ? '#2E7D32'
-                                                : '#E53935',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif',
-                                            marginBottom: '2px'
-                                        }}>
-                                            {viewDialog.request.status === 'Pending' ? 'Pending Approval' : viewDialog.request.status}
-                                        </Typography>
-                                        <Typography sx={{
-                                            fontSize: '12px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            {viewDialog.request.status === 'Pending' 
-                                                ? 'Awaiting  review'
-                                                : viewDialog.request.status === 'Approved'
-                                                ? 'Your leave has been approved'
-                                                : 'Your leave request was rejected'}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Box>
+            />
 
-                            {/* Info Tiles Grid - Premium */}
-                            <Grid container spacing={2} sx={{ marginBottom: '24px' }}>
-                                <Grid item xs={12} sm={6}>
-                                    <Box sx={{
-                                        backgroundColor: '#FAFAFA',
-                                        borderRadius: '12px',
-                                        padding: '14px',
-                                        transition: 'all 150ms ease',
-                                        cursor: 'default',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                                            backgroundColor: '#FFFFFF'
-                                        }
-                                    }}>
-                                        <Typography sx={{
-                                            fontSize: '11px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            marginBottom: '6px',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            REQUEST TYPE
-                                        </Typography>
-                                        <Typography sx={{
-                                            fontSize: '15px',
-                                            fontWeight: 500,
-                                            color: '#1F2937',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            {formatLeaveRequestType(viewDialog.request.requestType)}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Box sx={{
-                                        backgroundColor: '#FAFAFA',
-                                        borderRadius: '12px',
-                                        padding: '14px',
-                                        transition: 'all 150ms ease',
-                                        cursor: 'default',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                                            backgroundColor: '#FFFFFF'
-                                        }
-                                    }}>
-                                        <Typography sx={{
-                                            fontSize: '11px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            marginBottom: '6px',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            LEAVE TYPE
-                                        </Typography>
-                                        <Typography sx={{
-                                            fontSize: '15px',
-                                            fontWeight: 500,
-                                            color: '#1F2937',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            {viewDialog.request.leaveType}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Box sx={{
-                                        backgroundColor: '#FAFAFA',
-                                        borderRadius: '12px',
-                                        padding: '14px',
-                                        transition: 'all 150ms ease',
-                                        cursor: 'default',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                                            backgroundColor: '#FFFFFF'
-                                        }
-                                    }}>
-                                        <Typography sx={{
-                                            fontSize: '11px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            marginBottom: '6px',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            SUBMITTED ON
-                                        </Typography>
-                                        <Typography sx={{
-                                            fontSize: '15px',
-                                            fontWeight: 600,
-                                            color: '#E53935',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            {formatPrettyDate(viewDialog.request.createdAt)}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Box sx={{
-                                        backgroundColor: '#FAFAFA',
-                                        borderRadius: '12px',
-                                        padding: '14px',
-                                        transition: 'all 150ms ease',
-                                        cursor: 'default',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                                            backgroundColor: '#FFFFFF'
-                                        }
-                                    }}>
-                                        <Typography sx={{
-                                            fontSize: '11px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            marginBottom: '6px',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            TOTAL DAYS
-                                        </Typography>
-                                        <Typography sx={{
-                                            fontSize: '15px',
-                                            fontWeight: 500,
-                                            color: '#1F2937',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            {viewDialog.request.leaveDates?.length || 0} day{viewDialog.request.leaveDates?.length !== 1 ? 's' : ''}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-
-                                {/* Leave Date(s) - Full Width with Premium Chips */}
-                                <Grid item xs={12}>
-                                    <Box>
-                                        <Typography sx={{
-                                            fontSize: '11px',
-                                            fontWeight: 400,
-                                            color: '#6B7280',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            marginBottom: '10px',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                                        }}>
-                                            LEAVE DATE(S)
-                                        </Typography>
-                                        {viewDialog.request.requestType === 'Compensatory' && viewDialog.request.alternateDate ? (
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                <Chip
-                                                    icon={<CalendarToday sx={{ fontSize: '16px !important', color: '#FFFFFF !important' }} />}
-                                                    label={formatPrettyDate(viewDialog.request.leaveDates[0])}
-                                                    sx={{
-                                                        background: 'linear-gradient(135deg, #E53935 0%, #C62828 100%)',
-                                                        color: '#FFFFFF',
-                                                        borderRadius: '24px',
-                                                        fontSize: '14px',
-                                                        fontWeight: 600,
-                                                        height: '40px',
-                                                        fontFamily: 'system-ui, -apple-system, sans-serif',
-                                                        boxShadow: '0 2px 8px rgba(229, 57, 53, 0.3)',
-                                                        transition: 'all 150ms ease',
-                                                        '&:hover': {
-                                                            boxShadow: '0 4px 12px rgba(229, 57, 53, 0.4)',
-                                                            transform: 'translateY(-1px)'
-                                                        },
-                                                        '& .MuiChip-icon': {
-                                                            marginLeft: '12px'
-                                                        }
-                                                    }}
-                                                />
-                                                <Chip
-                                                    icon={<CalendarToday sx={{ fontSize: '16px !important', color: '#FFFFFF !important' }} />}
-                                                    label={`Worked: ${formatPrettyDate(viewDialog.request.alternateDate)}`}
-                                                    sx={{
-                                                        background: 'linear-gradient(135deg, #E53935 0%, #C62828 100%)',
-                                                        color: '#FFFFFF',
-                                                        borderRadius: '24px',
-                                                        fontSize: '14px',
-                                                        fontWeight: 600,
-                                                        height: '40px',
-                                                        fontFamily: 'system-ui, -apple-system, sans-serif',
-                                                        boxShadow: '0 2px 8px rgba(229, 57, 53, 0.3)',
-                                                        transition: 'all 150ms ease',
-                                                        '&:hover': {
-                                                            boxShadow: '0 4px 12px rgba(229, 57, 53, 0.4)',
-                                                            transform: 'translateY(-1px)'
-                                                        },
-                                                        '& .MuiChip-icon': {
-                                                            marginLeft: '12px'
-                                                        }
-                                                    }}
-                                                />
-                                            </Box>
-                                        ) : (
-                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                                {viewDialog.request.leaveDates.map((date, idx) => (
-                                                    <Chip
-                                                        key={idx}
-                                                        icon={<CalendarToday sx={{ fontSize: '16px !important', color: '#FFFFFF !important' }} />}
-                                                        label={formatPrettyDate(date)}
-                                                        sx={{
-                                                            background: 'linear-gradient(135deg, #E53935 0%, #C62828 100%)',
-                                                            color: '#FFFFFF',
-                                                            borderRadius: '24px',
-                                                            fontSize: '14px',
-                                                            fontWeight: 600,
-                                                            height: '40px',
-                                                            fontFamily: 'system-ui, -apple-system, sans-serif',
-                                                            boxShadow: '0 2px 8px rgba(229, 57, 53, 0.3)',
-                                                            transition: 'all 150ms ease',
-                                                            '&:hover': {
-                                                                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.4)',
-                                                                transform: 'translateY(-1px)'
-                                                            },
-                                                            '& .MuiChip-icon': {
-                                                                marginLeft: '12px'
-                                                            }
-                                                        }}
-                                                    />
-                                                ))}
-                                            </Box>
-                                        )}
-                                    </Box>
-                                </Grid>
-                            </Grid>
-
-                            {/* Reason Section - Premium Card */}
-                            <Box sx={{ marginBottom: viewDialog.request.rejectionNotes ? '24px' : '0' }}>
-                                <Typography sx={{
-                                    fontSize: '11px',
-                                    fontWeight: 400,
-                                    color: '#6B7280',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
-                                    marginBottom: '10px',
-                                    fontFamily: 'system-ui, -apple-system, sans-serif'
-                                }}>
-                                    REASON FOR LEAVE
-                                </Typography>
-                                <Box sx={{
-                                    backgroundColor: '#FFFFFF',
-                                    border: '1px solid #E5E7EB',
-                                    borderRadius: '12px',
-                                    padding: '16px 20px',
-                                    minHeight: '100px',
-                                    maxHeight: '200px',
-                                    overflow: 'auto',
-                                    position: 'relative',
-                                    boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)',
-                                    '&::before': {
-                                        content: '"\\201C"',
-                                        position: 'absolute',
-                                        top: '12px',
-                                        left: '16px',
-                                        fontSize: '48px',
-                                        color: '#FFECEC',
-                                        fontFamily: 'Georgia, serif',
-                                        lineHeight: 1
-                                    }
-                                }}>
-                                    <Typography sx={{
-                                        fontSize: '14px',
-                                        fontWeight: 400,
-                                        color: '#374151',
-                                        lineHeight: 1.7,
-                                        whiteSpace: 'pre-wrap',
-                                        wordWrap: 'break-word',
-                                        fontFamily: 'system-ui, -apple-system, sans-serif',
-                                        margin: 0,
-                                        paddingLeft: '24px'
-                                    }}>
-                                        {viewDialog.request.reason || 'No reason provided'}
-                                    </Typography>
-                                </Box>
-                            </Box>
-
-                            {/* Rejection Notes - Premium */}
-                            {viewDialog.request.rejectionNotes && (
-                                <Box>
-                                    <Typography sx={{
-                                        fontSize: '11px',
-                                        fontWeight: 400,
-                                        color: '#6B7280',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.05em',
-                                        marginBottom: '10px',
-                                        fontFamily: 'system-ui, -apple-system, sans-serif'
-                                    }}>
-                                        REJECTION NOTES
-                                    </Typography>
-                                    <Box sx={{
-                                        backgroundColor: '#FFEBEE',
-                                        border: '1px solid #E53935',
-                                        borderRadius: '12px',
-                                        padding: '16px 20px',
-                                        minHeight: '100px',
-                                        maxHeight: '200px',
-                                        overflow: 'auto',
-                                        boxShadow: 'inset 0 2px 4px rgba(229, 57, 53, 0.05)'
-                                    }}>
-                                        <Typography sx={{
-                                            fontSize: '14px',
-                                            fontWeight: 400,
-                                            color: '#C62828',
-                                            lineHeight: 1.7,
-                                            whiteSpace: 'pre-wrap',
-                                            wordWrap: 'break-word',
-                                            fontFamily: 'system-ui, -apple-system, sans-serif',
-                                            margin: 0
-                                        }}>
-                                            {viewDialog.request.rejectionNotes}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            )}
-                        </Box>
-                    )}
-                </DialogContent>
-                
-                {/* Footer Actions - Premium Button */}
-                <Box sx={{
-                    padding: '20px 24px',
-                    borderTop: '1px solid #E5E7EB',
-                    display: 'flex',
-                    justifyContent: { xs: 'stretch', sm: 'flex-end' },
-                    backgroundColor: '#FFFFFF'
-                }}>
-                    <Button 
-                        onClick={() => setViewDialog({ open: false, request: null })}
-                        variant="contained"
-                        fullWidth
-                        sx={{
-                            background: 'linear-gradient(135deg, #E53935 0%, #C62828 100%)',
-                            color: '#FFFFFF',
-                            borderRadius: '12px',
-                            padding: '12px 32px',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            fontFamily: 'system-ui, -apple-system, sans-serif',
-                            boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
-                            height: '44px',
-                            transition: 'all 150ms ease',
-                            maxWidth: { xs: '100%', sm: 'auto' },
-                            '&:hover': {
-                                background: 'linear-gradient(135deg, #C62828 0%, #B71C1C 100%)',
-                                boxShadow: '0 6px 16px rgba(229, 57, 53, 0.4)',
-                                transform: 'translateY(-2px)'
-                            },
-                            '&:active': {
-                                transform: 'translateY(0px)',
-                                boxShadow: '0 2px 8px rgba(229, 57, 53, 0.3)'
-                            },
-                            '&:focus': {
-                                outline: '2px solid #E53935',
-                                outlineOffset: '2px'
-                            }
-                        }}
-                    >
-                        Close
-                    </Button>
-                </Box>
-            </Dialog>
 
             {/* Carryforward/Encashment Modal */}
             <Dialog 

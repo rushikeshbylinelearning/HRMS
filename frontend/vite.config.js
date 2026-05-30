@@ -57,6 +57,13 @@ export default defineConfig({
       overlay: true,
     },
     proxy: {
+      // --- WebSocket proxy MUST come before /api to avoid being intercepted ---
+      '/api/socket.io': {
+        target: 'http://127.0.0.1:3001',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
       // --- Development proxy configuration ---
       '/api': {
         target: 'http://127.0.0.1:3001',
@@ -87,14 +94,6 @@ export default defineConfig({
             });
           });
         },
-      },
-      // --- WebSocket proxy for development ---
-      '/api/socket.io': {
-        target: 'http://127.0.0.1:3001',
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-        timeout: 10000,
       },
       // --- Avatar images proxy for development ---
       '/avatars': {
@@ -231,12 +230,24 @@ export default defineConfig({
   },
   // Resolve configuration to prevent React duplication
   resolve: {
-    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', 'react-is', 'prop-types'],
+    dedupe: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      '@emotion/react',
+      '@emotion/styled',
+      'react-is',
+      'prop-types',
+    ],
     alias: {
       react: path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime.js'),
+      'react/jsx-dev-runtime': path.resolve(__dirname, 'node_modules/react/jsx-dev-runtime.js'),
       '@emotion/react': path.resolve(__dirname, 'node_modules/@emotion/react'),
       '@emotion/styled': path.resolve(__dirname, 'node_modules/@emotion/styled'),
+      'react-is': path.resolve(__dirname, 'node_modules/react-is'),
       'prop-types': path.resolve(__dirname, 'node_modules/prop-types'),
     },
   },

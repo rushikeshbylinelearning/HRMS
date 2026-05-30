@@ -65,6 +65,8 @@ const createCardStyles = (accent = 'rgba(229, 57, 53, 0.12)') => ({
 
 const normalizeRole = (role) => (role && role.trim()) || 'Employee';
 const getPrivilegeLevel = (user) => user?.featurePermissions?.privilegeLevel || 'normal';
+const isAdminAccount = (user) => normalizeRole(user?.role) === 'Admin';
+const filterManageableUsers = (list) => (Array.isArray(list) ? list.filter((u) => !isAdminAccount(u)) : []);
 
 const ManageSectionPage = () => {
   const [users, setUsers] = useState([]);
@@ -124,8 +126,9 @@ const ManageSectionPage = () => {
       setLoading(true);
       setError(null);
       const response = await api.get('/admin/manage');
-      setUsers(response.data);
-      setOriginalUsers(JSON.parse(JSON.stringify(response.data))); // Deep copy for comparison
+      const manageableUsers = filterManageableUsers(response.data);
+      setUsers(manageableUsers);
+      setOriginalUsers(JSON.parse(JSON.stringify(manageableUsers))); // Deep copy for comparison
       setUnsavedChanges({}); // Clear unsaved changes when fetching fresh data
     } catch (err) {
       setError('Failed to fetch users and permissions');
@@ -272,12 +275,6 @@ const privilegeOptions = useMemo(() => {
     [users]
   );
 
-  const adminRoleCount = useMemo(
-    () =>
-      users.filter((user) => normalizeRole(user.role).toLowerCase().includes('admin')).length,
-    [users]
-  );
-
   // Save user permissions
   const saveUserPermissions = useCallback(async (userId) => {
     const user = users.find(u => u._id === userId);
@@ -310,7 +307,7 @@ const privilegeOptions = useMemo(() => {
       setSuccess(`Permissions saved for ${updatedUser.fullName}. The user will see changes on their next page refresh.`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
-      setError('Failed to save user permissions');
+      setError(err.response?.data?.error || 'Failed to save user permissions');
       console.error('Error saving permissions:', err);
     } finally {
       setSaving(prev => ({ ...prev, [userId]: false }));
@@ -1900,7 +1897,7 @@ const privilegeOptions = useMemo(() => {
           {
             label: 'Total Users',
             value: users.length,
-            helper: `${adminRoleCount} admin${adminRoleCount === 1 ? '' : 's'}`,
+            helper: 'Team members',
             icon: <PeopleAltIcon />,
           },
           {

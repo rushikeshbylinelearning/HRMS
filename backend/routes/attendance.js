@@ -1724,14 +1724,15 @@ router.get('/summary', authenticateToken, async (req, res) => {
                             const { MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY, MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY } = require('../config/shiftPolicy');
                             
                             // Calculate elapsed shift time (includes breaks)
+                            const shiftEnded = !!(log.clockInTime && log.clockOutTime);
                             let elapsedShiftHours = null;
-                            if (log.clockInTime && log.clockOutTime) {
+                            if (shiftEnded) {
                                 const elapsedShiftMinutes = (new Date(log.clockOutTime) - new Date(log.clockInTime)) / (1000 * 60);
                                 elapsedShiftHours = elapsedShiftMinutes / 60;
                             }
                             
-                            const hasCheckedOut = elapsedShiftHours != null && elapsedShiftHours > 0;
-                            const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed
+                            const hasCheckedOut = shiftEnded;
+                            const belowHalfDayMinimum = hasCheckedOut && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY; // < 5 hrs elapsed (includes 0)
                             const hasHalfDayHours = hasCheckedOut && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_HALF_DAY && elapsedShiftHours < MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // 5 to < 9 hrs elapsed
                             const hasFullDayHours = elapsedShiftHours != null && elapsedShiftHours >= MINIMUM_ELAPSED_SHIFT_HOURS_FOR_FULL_DAY; // >= 9 hrs elapsed
                             const withinGracePeriod = recalculatedLateMinutes <= gracePeriodMinutes;

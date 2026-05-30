@@ -20,11 +20,20 @@ const ProfilePage = () => {
     const { user, refreshUserData } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const [formData, setFormData] = useState({
-        bloodGroup: '', phoneNumber: '', phoneCountryCode: '+91',
+        // Personal
+        dateOfBirth: '', gender: '', bloodGroup: '', maritalStatus: '',
+        // Contact
+        phoneNumber: '', phoneCountryCode: '+91',
+        alternatePhone: '', personalEmail: '',
+        // Address
+        addressFlat: '', addressArea: '', addressCity: '', addressState: '', addressPincode: '',
+        // Emergency contact
         emergencyContactName: '', emergencyContactNumber: '', emergencyContactCountryCode: '+91',
-        personalEmail: '', addressFlat: '', addressArea: '', addressCity: '',
-        addressState: '', addressPincode: '', aadhaarNumber: '', panCardNumber: '',
-        bankName: '', accountNumber: '', ifscCode: ''
+        emergencyContactRelationship: '', emergencyContactEmail: '',
+        // Identity & Bank
+        aadhaarNumber: '', panCardNumber: '',
+        bankName: '', accountNumber: '', ifscCode: '', bankBranch: '',
+        uanNumber: '', pfAccountNumber: '',
     });
     const [saving, setSaving] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -45,23 +54,37 @@ const ProfilePage = () => {
             
             // Set form data synchronously to prevent layout shift
             setFormData({
-                bloodGroup: user.personalDetails?.bloodGroup || '',
-                phoneNumber: user.personalDetails?.phoneNumber || '',
+                // Personal
+                dateOfBirth:   user.personalDetails?.dateOfBirth   || '',
+                gender:        user.personalDetails?.gender        || '',
+                bloodGroup:    user.personalDetails?.bloodGroup    || '',
+                maritalStatus: user.personalDetails?.maritalStatus || '',
+                // Contact
+                phoneNumber:      user.personalDetails?.phoneNumber      || '',
                 phoneCountryCode: user.personalDetails?.phoneCountryCode || '+91',
-                emergencyContactName: user.personalDetails?.emergencyContactName || '',
-                emergencyContactNumber: user.personalDetails?.emergencyContactNumber || '',
-                emergencyContactCountryCode: user.personalDetails?.emergencyContactCountryCode || '+91',
-                personalEmail: user.personalDetails?.personalEmail || '',
-                addressFlat: user.personalDetails?.address?.flat || '',
-                addressArea: user.personalDetails?.address?.area || '',
-                addressCity: user.personalDetails?.address?.city || '',
-                addressState: user.personalDetails?.address?.state || '',
+                alternatePhone:   user.personalDetails?.alternatePhone   || '',
+                personalEmail:    user.personalDetails?.personalEmail    || '',
+                // Address
+                addressFlat:    user.personalDetails?.address?.flat    || '',
+                addressArea:    user.personalDetails?.address?.area    || '',
+                addressCity:    user.personalDetails?.address?.city    || '',
+                addressState:   user.personalDetails?.address?.state   || '',
                 addressPincode: user.personalDetails?.address?.pincode || '',
-                aadhaarNumber: user.identityDetails?.aadhaarNumber || '',
-                panCardNumber: user.identityDetails?.panCardNumber || '',
-                bankName: user.identityDetails?.bankName || '',
-                accountNumber: user.identityDetails?.accountNumber || '',
-                ifscCode: user.identityDetails?.ifscCode || ''
+                // Emergency contact
+                emergencyContactName:         user.personalDetails?.emergencyContactName         || '',
+                emergencyContactNumber:       user.personalDetails?.emergencyContactNumber       || '',
+                emergencyContactCountryCode:  user.personalDetails?.emergencyContactCountryCode  || '+91',
+                emergencyContactRelationship: user.personalDetails?.emergencyContactRelationship || '',
+                emergencyContactEmail:        user.personalDetails?.emergencyContactEmail        || '',
+                // Identity & Bank
+                aadhaarNumber:   user.identityDetails?.aadhaarNumber   || '',
+                panCardNumber:   user.identityDetails?.panCardNumber   || '',
+                bankName:        user.identityDetails?.bankName        || '',
+                accountNumber:   user.identityDetails?.accountNumber   || '',
+                ifscCode:        user.identityDetails?.ifscCode        || '',
+                bankBranch:      user.identityDetails?.bankBranch      || '',
+                uanNumber:       user.identityDetails?.uanNumber       || '',
+                pfAccountNumber: user.identityDetails?.pfAccountNumber || '',
             });
 
             // Load policies asynchronously WITHOUT affecting layout
@@ -146,23 +169,32 @@ const ProfilePage = () => {
         
         // Update form data with latest user data
         setFormData({
-            bloodGroup: user.personalDetails?.bloodGroup || '',
-            phoneNumber: user.personalDetails?.phoneNumber || '',
+            dateOfBirth:   user.personalDetails?.dateOfBirth   || '',
+            gender:        user.personalDetails?.gender        || '',
+            bloodGroup:    user.personalDetails?.bloodGroup    || '',
+            maritalStatus: user.personalDetails?.maritalStatus || '',
+            phoneNumber:      user.personalDetails?.phoneNumber      || '',
             phoneCountryCode: user.personalDetails?.phoneCountryCode || '+91',
-            emergencyContactName: user.personalDetails?.emergencyContactName || '',
-            emergencyContactNumber: user.personalDetails?.emergencyContactNumber || '',
-            emergencyContactCountryCode: user.personalDetails?.emergencyContactCountryCode || '+91',
-            personalEmail: user.personalDetails?.personalEmail || '',
-            addressFlat: user.personalDetails?.address?.flat || '',
-            addressArea: user.personalDetails?.address?.area || '',
-            addressCity: user.personalDetails?.address?.city || '',
-            addressState: user.personalDetails?.address?.state || '',
+            alternatePhone:   user.personalDetails?.alternatePhone   || '',
+            personalEmail:    user.personalDetails?.personalEmail    || '',
+            addressFlat:    user.personalDetails?.address?.flat    || '',
+            addressArea:    user.personalDetails?.address?.area    || '',
+            addressCity:    user.personalDetails?.address?.city    || '',
+            addressState:   user.personalDetails?.address?.state   || '',
             addressPincode: user.personalDetails?.address?.pincode || '',
-            aadhaarNumber: user.identityDetails?.aadhaarNumber || '',
-            panCardNumber: user.identityDetails?.panCardNumber || '',
-            bankName: user.identityDetails?.bankName || '',
-            accountNumber: user.identityDetails?.accountNumber || '',
-            ifscCode: user.identityDetails?.ifscCode || ''
+            emergencyContactName:         user.personalDetails?.emergencyContactName         || '',
+            emergencyContactNumber:       user.personalDetails?.emergencyContactNumber       || '',
+            emergencyContactCountryCode:  user.personalDetails?.emergencyContactCountryCode  || '+91',
+            emergencyContactRelationship: user.personalDetails?.emergencyContactRelationship || '',
+            emergencyContactEmail:        user.personalDetails?.emergencyContactEmail        || '',
+            aadhaarNumber:   user.identityDetails?.aadhaarNumber   || '',
+            panCardNumber:   user.identityDetails?.panCardNumber   || '',
+            bankName:        user.identityDetails?.bankName        || '',
+            accountNumber:   user.identityDetails?.accountNumber   || '',
+            ifscCode:        user.identityDetails?.ifscCode        || '',
+            bankBranch:      user.identityDetails?.bankBranch      || '',
+            uanNumber:       user.identityDetails?.uanNumber       || '',
+            pfAccountNumber: user.identityDetails?.pfAccountNumber || '',
         });
     }, [user?.personalDetails, user?.identityDetails, user?.reportingPerson]);
 
@@ -171,28 +203,37 @@ const ProfilePage = () => {
         try {
             const payload = {
                 personalDetails: {
-                    bloodGroup: formData.bloodGroup,
-                    phoneNumber: formData.phoneNumber,
+                    dateOfBirth:   formData.dateOfBirth,
+                    gender:        formData.gender,
+                    bloodGroup:    formData.bloodGroup,
+                    maritalStatus: formData.maritalStatus,
+                    phoneNumber:      formData.phoneNumber,
                     phoneCountryCode: formData.phoneCountryCode,
-                    emergencyContactName: formData.emergencyContactName,
-                    emergencyContactNumber: formData.emergencyContactNumber,
-                    emergencyContactCountryCode: formData.emergencyContactCountryCode,
-                    personalEmail: formData.personalEmail,
+                    alternatePhone:   formData.alternatePhone,
+                    personalEmail:    formData.personalEmail,
                     address: {
-                        flat: formData.addressFlat,
-                        area: formData.addressArea,
-                        city: formData.addressCity,
-                        state: formData.addressState,
-                        pincode: formData.addressPincode
-                    }
+                        flat:    formData.addressFlat,
+                        area:    formData.addressArea,
+                        city:    formData.addressCity,
+                        state:   formData.addressState,
+                        pincode: formData.addressPincode,
+                    },
+                    emergencyContactName:         formData.emergencyContactName,
+                    emergencyContactNumber:       formData.emergencyContactNumber,
+                    emergencyContactCountryCode:  formData.emergencyContactCountryCode,
+                    emergencyContactRelationship: formData.emergencyContactRelationship,
+                    emergencyContactEmail:        formData.emergencyContactEmail,
                 },
                 identityDetails: {
-                    aadhaarNumber: formData.aadhaarNumber,
-                    panCardNumber: formData.panCardNumber,
-                    bankName: formData.bankName,
-                    accountNumber: formData.accountNumber,
-                    ifscCode: formData.ifscCode
-                }
+                    aadhaarNumber:   formData.aadhaarNumber,
+                    panCardNumber:   formData.panCardNumber,
+                    bankName:        formData.bankName,
+                    accountNumber:   formData.accountNumber,
+                    ifscCode:        formData.ifscCode,
+                    bankBranch:      formData.bankBranch,
+                    uanNumber:       formData.uanNumber,
+                    pfAccountNumber: formData.pfAccountNumber,
+                },
             };
             
             await api.put('/user/update-profile', payload);

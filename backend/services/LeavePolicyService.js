@@ -91,7 +91,7 @@ class LeavePolicyService {
 
         const query = {
             employee: employeeId,
-            status: { $in: ['Pending', 'Approved'] },
+            status: { $in: ['Pending', 'Approved', 'Returned'] },
             requestType: { $ne: 'YEAR_END' }
         };
         if (excludeRequestId) {
@@ -349,16 +349,6 @@ class LeavePolicyService {
             const today = parseISTDate(getISTDateString());
             const dayOfWeek = today.getDay();
 
-            // Rule 1: Must be submitted by Thursday of same week
-            if (dayOfWeek > 4) { // Friday, Saturday, Sunday
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                return {
-                    allowed: false,
-                    reason: `Comp-Off requests must be submitted by Thursday of the same week. Today is ${dayNames[dayOfWeek]}, which is past the deadline.`,
-                    rule: 'COMPOFF_THURSDAY_DEADLINE'
-                };
-            }
-
             if (!alternateDate) {
                 return {
                     allowed: false,
@@ -372,13 +362,40 @@ class LeavePolicyService {
             const currentYear = today.getFullYear();
             const workedDayOfWeek = workedDate.getDay();
 
-            // Rule 2: Worked date must be from current month only
-            if (workedDate.getMonth() !== currentMonth || workedDate.getFullYear() !== currentYear) {
+            // Determine if the worked date is in a future week (start of week = Monday)
+            const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const workedMidnight = new Date(workedDate.getFullYear(), workedDate.getMonth(), workedDate.getDate());
+            // Get Monday of current week
+            const currentWeekMonday = new Date(todayMidnight);
+            currentWeekMonday.setDate(todayMidnight.getDate() - ((todayMidnight.getDay() + 6) % 7));
+            // Get Monday of worked date's week
+            const workedWeekMonday = new Date(workedMidnight);
+            workedWeekMonday.setDate(workedMidnight.getDate() - ((workedMidnight.getDay() + 6) % 7));
+
+            const isWorkedDateInFutureWeek = workedWeekMonday > currentWeekMonday;
+            const isWorkedDateInCurrentWeek = workedWeekMonday.getTime() === currentWeekMonday.getTime();
+
+            // Rule 1: Thursday deadline only applies when the worked date is in the current week
+            // If the worked date is in a future week, the deadline check is not relevant yet
+            if (!isWorkedDateInFutureWeek && dayOfWeek > 4) { // Friday, Saturday, Sunday of current week
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                return {
+                    allowed: false,
+                    reason: `Comp-Off requests must be submitted by Thursday of the same week. Today is ${dayNames[dayOfWeek]}, which is past the deadline.`,
+                    rule: 'COMPOFF_THURSDAY_DEADLINE'
+                };
+            }
+
+            // Rule 2: Worked date must be from current or future month only (not past months)
+            const workedMonth = workedDate.getMonth();
+            const workedYear = workedDate.getFullYear();
+            const isPastMonth = workedYear < currentYear || (workedYear === currentYear && workedMonth < currentMonth);
+            if (isPastMonth) {
                 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                                    'July', 'August', 'September', 'October', 'November', 'December'];
                 return {
                     allowed: false,
-                    reason: `Worked date (Saturday or Sunday) must be from the current month (${monthNames[currentMonth]} ${currentYear}). You cannot claim Comp-Off for weekend days from other months.`,
+                    reason: `Worked date (Saturday or Sunday) must be from the current or a future month. You cannot claim Comp-Off for weekend days from past months.`,
                     rule: 'COMPOFF_CURRENT_MONTH_ONLY'
                 };
             }
@@ -402,14 +419,16 @@ class LeavePolicyService {
                 };
             }
 
-            // Rule 5: Max 2 Comp-Off requests per month
-            const monthStart = new Date(currentYear, currentMonth, 1);
-            const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+            // Rule 5: Max 2 Comp-Off requests per month (check against the worked date's month)
+            const limitMonth = workedMonth;
+            const limitYear = workedYear;
+            const monthStart = new Date(limitYear, limitMonth, 1);
+            const monthEnd = new Date(limitYear, limitMonth + 1, 0, 23, 59, 59, 999);
 
             const existingCompOffRequests = await LeaveRequest.find({
                 employee: employee._id,
                 requestType: 'Compensatory',
-                status: { $in: ['Pending', 'Approved'] },
+                status: { $in: ['Pending', 'Approved', 'Returned'] },
                 createdAt: { $gte: monthStart, $lte: monthEnd }
             });
 
@@ -418,7 +437,7 @@ class LeavePolicyService {
                                    'July', 'August', 'September', 'October', 'November', 'December'];
                 return {
                     allowed: false,
-                    reason: `You have already submitted ${existingCompOffRequests.length} Comp-Off requests for ${monthNames[currentMonth]} ${currentYear}. Maximum allowed is 2 per month.`,
+                    reason: `You have already submitted ${existingCompOffRequests.length} Comp-Off requests for ${monthNames[limitMonth]} ${limitYear}. Maximum allowed is 2 per month.`,
                     rule: 'COMPOFF_MONTHLY_LIMIT'
                 };
             }
@@ -700,7 +719,7 @@ class LeavePolicyService {
         // Exclude the current request if excludeRequestId is provided (e.g., when approving/updating existing request)
         const query = {
             employee: employeeId,
-            status: { $in: ['Pending', 'Approved'] },
+            status: { $in: ['Pending', 'Approved', 'Returned'] },
             requestType: { $nin: ['Compensatory', 'Comp-Off'] }, // Comp-Off has separate limit
             leaveDates: {
                 $elemMatch: {
@@ -1077,15 +1096,27 @@ class LeavePolicyService {
 
             // Block Friday (day 5) - EXCEPT Planned Leave when Saturday clubbing applies OR Casual/LOP with working Saturday
             if (dayOfWeek === 5) { // Friday
-                // Check if Planned Leave and Saturday is a week off (Saturday clubbing allowed)
+                // CRITICAL FIX: For Planned Leave, check Saturday after Friday
                 if (requestType === 'Planned' && saturdayPolicy !== 'All Saturdays Working') {
                     const saturdayAfterFriday = new Date(date);
                     saturdayAfterFriday.setDate(saturdayAfterFriday.getDate() + 1);
                     const saturdayDate = parseISTDate(getISTDateString(saturdayAfterFriday));
-                    if (this.isSaturdayOff(saturdayDate, saturdayPolicy)) {
-                        // Planned leave on Friday with Saturday week off - allow (Saturday will be clubbed)
+                    
+                    // ALLOW Friday for Planned Leave in two scenarios:
+                    // 1. Saturday after is a WORKING day (no clubbing risk)
+                    // 2. Saturday after is a WEEK OFF (Saturday will be clubbed automatically)
+                    if (this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
+                        // Saturday is working - no clubbing risk, allow Friday
+                        continue;
+                    } else if (this.isSaturdayOff(saturdayDate, saturdayPolicy)) {
+                        // Saturday is week off - allow Friday (Saturday will be clubbed)
                         continue;
                     }
+                }
+                
+                // For 'All Saturdays Working' policy, Planned Leave on Friday is always allowed
+                if (requestType === 'Planned' && saturdayPolicy === 'All Saturdays Working') {
+                    continue; // Allow Friday for Planned Leave
                 }
 
                 // NEW: Allow Friday for Casual/LOP if the Saturday after is a working Saturday in the leave span
@@ -1116,15 +1147,27 @@ class LeavePolicyService {
             
             // Block Monday (day 1) - EXCEPT Planned Leave when Saturday clubbing applies OR Casual/LOP with working Saturday
             if (dayOfWeek === 1) { // Monday
-                // Check if Planned Leave and Saturday is a week off (Saturday clubbing allowed)
+                // CRITICAL FIX: For Planned Leave, check Saturday before Monday
                 if (requestType === 'Planned' && saturdayPolicy !== 'All Saturdays Working') {
                     const saturdayBeforeMonday = new Date(date);
                     saturdayBeforeMonday.setDate(saturdayBeforeMonday.getDate() - 2);
                     const saturdayDate = parseISTDate(getISTDateString(saturdayBeforeMonday));
-                    if (this.isSaturdayOff(saturdayDate, saturdayPolicy)) {
-                        // Planned leave on Monday with Saturday week off - allow (Saturday will be clubbed)
+                    
+                    // ALLOW Monday for Planned Leave in two scenarios:
+                    // 1. Saturday before is a WORKING day (no clubbing risk)
+                    // 2. Saturday before is a WEEK OFF (Saturday will be clubbed automatically)
+                    if (this.isWorkingSaturday(saturdayDate, saturdayPolicy)) {
+                        // Saturday is working - no clubbing risk, allow Monday
+                        continue;
+                    } else if (this.isSaturdayOff(saturdayDate, saturdayPolicy)) {
+                        // Saturday is week off - allow Monday (Saturday will be clubbed)
                         continue;
                     }
+                }
+                
+                // For 'All Saturdays Working' policy, Planned Leave on Monday is always allowed
+                if (requestType === 'Planned' && saturdayPolicy === 'All Saturdays Working') {
+                    continue; // Allow Monday for Planned Leave
                 }
 
                 // NEW: For Casual/LOP, check Saturday before Monday

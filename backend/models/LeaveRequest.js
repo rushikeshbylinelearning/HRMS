@@ -18,9 +18,25 @@ const leaveRequestSchema = new mongoose.Schema({
     reason: { type: String, required: true },
     status: {
         type: String,
-        enum: ['Pending', 'Approved', 'Rejected'],
+        enum: ['Pending', 'Approved', 'Rejected', 'Returned'],
         default: 'Pending',
     },
+    // HR returned request for employee correction (wrong leave type, etc.)
+    hrCorrectionNotes: { type: String },
+    returnedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    returnedAt: { type: Date },
+    employeeCorrectedAt: { type: Date },
+    // Admin splits LOP days into Planned / Casual / LOP per date (approval deducts per effective type)
+    dayTypeAllocations: [{
+        date: { type: Date, required: true },
+        requestType: {
+            type: String,
+            enum: ['Planned', 'Casual', 'Loss of Pay'],
+            required: true,
+        },
+    }],
+    dayAllocationsUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    dayAllocationsUpdatedAt: { type: Date },
     isBackdated: { type: Boolean, default: false },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },

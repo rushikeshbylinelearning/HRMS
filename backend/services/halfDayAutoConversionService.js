@@ -18,6 +18,7 @@ const SystemAuditLog = require('../models/SystemAuditLog');
 const User = require('../models/User');
 const { syncAttendanceOnLeaveApproval } = require('./leaveAttendanceSyncService');
 const { getISTDateString, parseISTDate, startOfISTDay } = require('../utils/istTime');
+const { verboseLog } = require('../utils/logLevel');
 
 const BATCH_SIZE = 100; // Process max 100 leaves per run (performance constraint)
 
@@ -156,7 +157,7 @@ const logConversionEvent = async (conversionData) => {
             error: conversionData.error || null
         };
         
-        console.log('[HalfDayConversion] Audit Log:', JSON.stringify(auditEntry, null, 2));
+        verboseLog('[HalfDayConversion] Audit Log:', JSON.stringify(auditEntry, null, 2));
         await SystemAuditLog.create(auditEntry);
     } catch (error) {
         console.error('[HalfDayConversion] Error logging audit event:', error);
@@ -186,7 +187,7 @@ const logRevertEvent = async (revertData) => {
             error: revertData.error || null,
             performedBy: revertData.performedBy || null,
         };
-        console.log('[HalfDayConversion] Revert Audit:', JSON.stringify(auditEntry, null, 2));
+        // Revert audit entry logged to DB
         await SystemAuditLog.create(auditEntry);
     } catch (error) {
         console.error('[HalfDayConversion] Error logging revert event:', error);
@@ -208,7 +209,7 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
         details: []
     };
     
-    console.log(`[HalfDayConversion] Starting auto-conversion for date: ${targetDate}`);
+    verboseLog(`[HalfDayConversion] Starting auto-conversion for date: ${targetDate}`);
     
     // Validate target date is in the past (safety check)
     const targetDateObj = parseISTDate(targetDate);
@@ -237,7 +238,7 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
             .limit(BATCH_SIZE)
             .lean();
         
-        console.log(`[HalfDayConversion] Found ${halfDayLeaves.length} half-day leaves for ${targetDate}`);
+        verboseLog(`[HalfDayConversion] Found ${halfDayLeaves.length} half-day leaves for ${targetDate}`);
         
         // Process each leave in a separate transaction for isolation
         for (const leave of halfDayLeaves) {
@@ -325,7 +326,7 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
                     // Invalidate employee dashboard cache
                     cache.delete(`employee_dashboard:${leave.employee._id}:${targetDate}`);
                     
-                    console.log(`[HalfDayConversion] Cache invalidated for user ${leave.employee._id} on ${targetDate}`);
+                    // Cache invalidated after conversion
                 } catch (cacheError) {
                     // Don't fail conversion if cache invalidation fails
                     console.error('[HalfDayConversion] Error invalidating cache:', cacheError);
@@ -347,7 +348,7 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
                             timestamp: new Date().toISOString(),
                             message: 'Leave auto-converted to Full Day LOP (no check-in)',
                         });
-                        console.log(`[HalfDayConversion] 📡 Emitted leave_request_updated for leave ${leave._id}`);
+                        verboseLog(`[HalfDayConversion] Emitted leave_request_updated for leave ${leave._id}`);
                     }
                 } catch (socketErr) {
                     console.error('[HalfDayConversion] Failed to emit leave_request_updated:', socketErr.message);
@@ -376,7 +377,7 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
                     success: true
                 });
                 
-                console.log(`[HalfDayConversion] ✅ Converted leave ${leave._id} for ${employee.fullName}`);
+                verboseLog(`[HalfDayConversion] Converted leave ${leave._id} for ${employee.fullName}`);
                 
             } catch (error) {
                 await session.abortTransaction();
@@ -407,12 +408,13 @@ const autoConvertHalfDayLeaves = async (targetDate) => {
             }
         }
         
-        console.log(`[HalfDayConversion] Summary for ${targetDate}:`, {
-            processed: summary.processed,
-            converted: summary.converted,
-            skipped: summary.skipped,
-            errors: summary.errors
-        });
+        if (summary.converted > 0 || summary.errors > 0) {
+            if (summary.converted > 0 || summary.errors > 0) {
+                console.log(`[HalfDayConversion] ${targetDate}: converted=${summary.converted}, skipped=${summary.skipped}, errors=${summary.errors}`);
+            } else {
+                verboseLog(`[HalfDayConversion] ${targetDate}: no conversions (skipped=${summary.skipped})`);
+            }
+        }
         
         return summary;
         
@@ -545,7 +547,7 @@ const autoRevertIncorrectConversions = async (targetDate) => {
         details: []
     };
     
-    console.log(`[HalfDayConversion] Checking for incorrect conversions on ${targetDate}`);
+    verboseLog(`[HalfDayConversion] Checking for incorrect conversions on ${targetDate}`);
     
     try {
         const targetDateObj = parseISTDate(targetDate);
@@ -563,7 +565,7 @@ const autoRevertIncorrectConversions = async (targetDate) => {
             .populate('employee', 'fullName employeeCode')
             .lean();
         
-        console.log(`[HalfDayConversion] Found ${convertedLeaves.length} auto-converted leaves for ${targetDate}`);
+        if (convertedLeaves.length > 0) verboseLog(`[HalfDayConversion] Checking ${convertedLeaves.length} auto-converted leave(s) for ${targetDate}`);
         
         for (const leave of convertedLeaves) {
             summary.checked++;
@@ -579,7 +581,6 @@ const autoRevertIncorrectConversions = async (targetDate) => {
             const hasActualCheckIn = attendance && attendance.clockInTime != null && !wasVoidedByLeaveApproval;
             
             if (hasActualCheckIn) {
-                console.log(`[HalfDayConversion] Found incorrect conversion for leave ${leave._id} - employee has check-in`);
                 
                 try {
                     // Revert using the existing revert function
@@ -594,7 +595,7 @@ const autoRevertIncorrectConversions = async (targetDate) => {
                         reason: 'Employee has check-in record'
                     });
                     
-                    console.log(`[HalfDayConversion] ✅ Auto-reverted leave ${leave._id} for ${leave.employee.fullName}`);
+                    console.log(`[HalfDayConversion] Auto-reverted leave ${leave._id} for ${leave.employee.fullName}`);
                 } catch (error) {
                     summary.errors++;
                     summary.details.push({
@@ -610,11 +611,11 @@ const autoRevertIncorrectConversions = async (targetDate) => {
             }
         }
         
-        console.log(`[HalfDayConversion] Auto-revert summary for ${targetDate}:`, {
-            checked: summary.checked,
-            reverted: summary.reverted,
-            errors: summary.errors
-        });
+        if (summary.reverted > 0 || summary.errors > 0) {
+            if (summary.reverted > 0 || summary.errors > 0) {
+                console.log(`[HalfDayConversion] Auto-revert ${targetDate}: reverted=${summary.reverted}, errors=${summary.errors}`);
+            }
+        }
         
         return summary;
         

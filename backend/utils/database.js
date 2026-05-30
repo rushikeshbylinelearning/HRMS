@@ -1,5 +1,6 @@
 // Database optimization utilities
 const mongoose = require('mongoose');
+const { verboseLog } = require('./logLevel');
 
 // Cache for frequently accessed data
 const cache = new Map();
@@ -174,31 +175,31 @@ const createIndexes = async () => {
         });
         
         if (existingIndex) {
-          console.log(`ℹ️  Index already exists with name: ${existingIndex.name} (key: ${indexKeyString})`);
+          verboseLog(`ℹ️  Index already exists with name: ${existingIndex.name} (key: ${indexKeyString})`);
           return;
         }
         
         // Check if an index with the same name already exists
         const indexWithSameName = existingIndexes.find(index => index.name === indexName);
         if (indexWithSameName) {
-          console.log(`ℹ️  Index with name ${indexName} already exists but with different key pattern`);
+          verboseLog(`ℹ️  Index with name ${indexName} already exists but with different key pattern`);
           return;
         }
         
         // Create the index if it doesn't exist
         await collection.createIndex(indexSpec, options);
-        console.log(`✅ Created index: ${indexName}`);
+        verboseLog(`✅ Created index: ${indexName}`);
         
       } catch (error) {
         // Handle specific MongoDB index conflict errors
         if (error.code === 85 || error.codeName === 'IndexOptionsConflict') {
-          console.log(`ℹ️  Index conflict resolved - index already exists: ${indexName}`);
+          verboseLog(`ℹ️  Index conflict resolved - index already exists: ${indexName}`);
           return;
         }
         
         // Handle invalid index specification errors
         if (error.code === 67 || error.codeName === 'CannotCreateIndex') {
-          console.log(`⚠️  Skipping invalid index: ${indexName} - ${error.message}`);
+          verboseLog(`⚠️  Skipping invalid index: ${indexName} - ${error.message}`);
           return;
         }
         
@@ -207,7 +208,7 @@ const createIndexes = async () => {
       }
     };
 
-    console.log('🚀 Creating database indexes for performance optimization...');
+    verboseLog('🚀 Creating database indexes for performance optimization...');
 
     // User indexes - Critical for authentication and user queries
     await createIndexIfNotExists(User.collection, { email: 1 }, { unique: true, name: "email_unique" });
@@ -279,7 +280,7 @@ const createIndexes = async () => {
     await createIndexIfNotExists(ExcelLog.collection, { logType: 1, createdAt: -1 }, { name: "logType_created" });
     await createIndexIfNotExists(ExcelLog.collection, { synced: 1, createdAt: 1 }, { name: "synced_created" });
 
-    console.log('✅ All database indexes created successfully');
+    verboseLog('✅ All database indexes created successfully');
   } catch (error) {
     console.error('❌ Error creating database indexes:', error);
     throw error;

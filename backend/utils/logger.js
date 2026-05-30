@@ -60,31 +60,35 @@ const performanceLogger = {
   }
 };
 
-// Request logging middleware
+// Request logging middleware - only log errors and slow requests in production
 const requestLogger = (req, res, next) => {
-  const start = Date.now();
+  // Skip logging in production for health checks and static assets
+  const skipPaths = ['/health', '/metrics', '/cache-stats', '/api/socket.io'];
+  const isStaticAsset = req.url.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/);
   
-  // Log request
-  logger.info('Request', {
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
-  });
+  if (process.env.NODE_ENV === 'production' && (skipPaths.some(p => req.url.startsWith(p)) || isStaticAsset)) {
+    return next();
+  }
+
+  const start = Date.now();
 
   // Override res.end to log response
   const originalEnd = res.end;
   res.end = function(chunk, encoding) {
     const duration = Date.now() - start;
     
-    logger.info('Response', {
-      method: req.method,
-      url: req.url,
-      statusCode: res.statusCode,
-      duration: `${duration}ms`,
-      contentLength: res.get('Content-Length') || 0
-    });
+    // Only log errors (4xx, 5xx) or slow requests (>1s)
+    const shouldLog = res.statusCode >= 400 || duration > 1000;
+    
+    if (shouldLog) {
+      logger.info('Request', {
+        method: req.method,
+        url: req.url,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        ip: req.ip
+      });
+    }
 
     originalEnd.call(this, chunk, encoding);
   };

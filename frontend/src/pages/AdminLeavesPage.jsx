@@ -39,6 +39,9 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ReplyIcon from '@mui/icons-material/Reply';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import { getWorkingLeaveDateKeys, addLeaveToBreakdown } from '../utils/leaveDayAllocations';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 import { filterActiveEmployees, filterEmployeesByRole } from '../utils/employeeFilterUtils';
@@ -603,20 +606,13 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
             
             empLeaves.forEach(leave => {
                 if (leave.status === 'Approved' && leave.leaveDates) {
-                    // Count days within the date range
+                    const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
+                    addLeaveToBreakdown(leaveTypeBreakdown, leave, startDate, endDate, multiplier);
                     const daysInRange = leave.leaveDates.filter(date => {
                         const leaveDate = new Date(date);
                         return leaveDate >= startDate && leaveDate <= endDate;
                     }).length;
-                    
-                    // Adjust for half days
-                    const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
-                    const adjustedDays = daysInRange * multiplier;
-                    totalLeaveDays += adjustedDays;
-                    
-                    // Track by request type
-                    const reqType = leave.requestType || 'Unknown';
-                    leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
+                    totalLeaveDays += daysInRange * multiplier;
                 }
             });
             
@@ -1110,15 +1106,14 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
             )}
             
             {/* Employee Leave List */}
-            <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="requests-card">
                 <Paper 
                     elevation={0} 
                     sx={{ 
                         borderRadius: 0, 
-                        overflow: 'hidden',
+                        overflow: 'visible',
                         border: 'none',
                         boxShadow: 'none',
-                        flex: 1,
                         display: 'flex',
                         flexDirection: 'column'
                     }}
@@ -1270,9 +1265,8 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
                                         hover
                                         sx={{
                                             '&:hover': {
-                                                bgcolor: '#f8f9fa',
-                                                transform: 'scale(1.001)',
-                                                transition: 'all 0.2s ease'
+                                                bgcolor: '#f0f4f8',
+                                                transition: 'background-color 0.15s ease'
                                             },
                                             '&:nth-of-type(even)': {
                                                 bgcolor: '#fafafa'
@@ -1712,15 +1706,13 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                 const leaveTypeBreakdown = {};
                 empLeaves.forEach(leave => {
                     if (leave.status === 'Approved' && leave.leaveDates) {
+                        const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
+                        addLeaveToBreakdown(leaveTypeBreakdown, leave, startDate, endDate, multiplier);
                         const daysInRange = leave.leaveDates.filter(date => {
                             const leaveDate = new Date(date);
                             return leaveDate >= startDate && leaveDate <= endDate;
                         }).length;
-                        const multiplier = leave.leaveType === 'Full Day' ? 1 : 0.5;
-                        const adjustedDays = daysInRange * multiplier;
-                        totalLeaveDays += adjustedDays;
-                        const reqType = leave.requestType || 'Unknown';
-                        leaveTypeBreakdown[reqType] = (leaveTypeBreakdown[reqType] || 0) + adjustedDays;
+                        totalLeaveDays += daysInRange * multiplier;
                     }
                 });
                 const empAnalytics = analyticsData[emp._id] || {};
@@ -2207,15 +2199,14 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
             )}
             
             {/* Intern Leave List */}
-            <div className="requests-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="requests-card">
                 <Paper 
                     elevation={0} 
                     sx={{ 
                         borderRadius: 0, 
-                        overflow: 'hidden',
+                        overflow: 'visible',
                         border: 'none',
                         boxShadow: 'none',
-                        flex: 1,
                         display: 'flex',
                         flexDirection: 'column'
                     }}
@@ -2367,9 +2358,8 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
                                         hover
                                         sx={{
                                             '&:hover': {
-                                                bgcolor: '#f8f9fa',
-                                                transform: 'scale(1.001)',
-                                                transition: 'all 0.2s ease'
+                                                bgcolor: '#f0f4f8',
+                                                transition: 'background-color 0.15s ease'
                                             },
                                             '&:nth-of-type(even)': {
                                                 bgcolor: '#fafafa'
@@ -2876,8 +2866,11 @@ const countLeaveDays = (dateStrings) => {
     return dateStrings.length;
 };
 
-const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onViewDetails }) => {
-    const statusColors = { Pending: 'warning', Approved: 'success', Rejected: 'error' };
+const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onViewDetails, onReturnForCorrection, onSplitLopDays }) => {
+    const statusColors = { Pending: 'warning', Approved: 'success', Rejected: 'error', Returned: 'info' };
+    const workingDayCount = getWorkingLeaveDateKeys(request.leaveDates).length;
+    const showLopSplit = request.requestType === 'Loss of Pay' && workingDayCount >= 2
+        && ['Pending', 'Approved'].includes(request.status);
 
     return (
         <TableRow 
@@ -2930,7 +2923,12 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
                 )}
             </TableCell>
             <TableCell>
-                <Chip label={request.status} color={statusColors[request.status] || 'default'} size="small" />
+                <Chip label={request.status === 'Returned' ? 'Needs correction' : request.status} color={statusColors[request.status] || 'default'} size="small" />
+                {request.dayTypeAllocations?.length > 0 && (
+                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Split: {request.dayTypeAllocations.filter((a) => a.requestType === 'Planned').length} Planned, {request.dayTypeAllocations.filter((a) => a.requestType === 'Casual').length} Casual
+                    </Typography>
+                )}
             </TableCell>
             <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                 <div className="actions-cell">
@@ -2950,18 +2948,32 @@ const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onV
                                     <CheckCircleOutlineIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>
-                            <Tooltip title="Reject">
-                                <IconButton 
-                                    size="small" 
-                                    color="error"
+                            <Tooltip title="Return for correction">
+                                <IconButton
+                                    size="small"
+                                    color="info"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onStatusChange(request._id, 'Rejected', '');
+                                        onReturnForCorrection(request);
                                     }}
                                 >
-                                    <CancelIcon fontSize="small" />
+                                    <ReplyIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>
+                            {showLopSplit && (
+                                <Tooltip title="Split LOP days (Planned / Casual)">
+                                    <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSplitLopDays(request);
+                                        }}
+                                    >
+                                        <CallSplitIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
                         </>
                     )}
                     <Tooltip title="Delete"><IconButton size="small" onClick={() => onDelete(request)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
@@ -2985,6 +2997,8 @@ const AdminLeavesPage = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [deleteDialog, setDeleteDialog] = useState({ open: false, request: null });
+    const [returnDialog, setReturnDialog] = useState({ open: false, request: null, notes: '' });
+    const [allocationDialog, setAllocationDialog] = useState({ open: false, request: null, dayTypes: {} });
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
     const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -3290,9 +3304,10 @@ const AdminLeavesPage = () => {
                 appliedDate.setHours(0, 0, 0, 0); // Set to start of day
                 payload.appliedDate = appliedDate.toISOString();
             }
-            
-            // 🔍 DEBUG: Log payload before sending
-            console.log("Submitting leave payload:", payload);
+
+            if (formData.requestType === 'Loss of Pay' && Array.isArray(formData.dayTypeAllocations)) {
+                payload.dayTypeAllocations = formData.dayTypeAllocations;
+            }
             
             if (formData._id) {
                 await api.put(`/admin/leaves/${formData._id}`, payload);
@@ -3339,6 +3354,61 @@ const AdminLeavesPage = () => {
             setLeaveCountsDirty(true);
         } catch (err) {
             setSnackbar({ open: true, message: err.response?.data?.error || 'Action failed.', severity: 'error' });
+        }
+    };
+
+    const handleReturnForCorrection = (request) => {
+        setReturnDialog({ open: true, request, notes: '' });
+    };
+
+    const submitReturnForCorrection = async () => {
+        if (!returnDialog.request?._id) return;
+        const notes = returnDialog.notes.trim();
+        if (!notes) {
+            setSnackbar({ open: true, message: 'Please enter a note for the employee.', severity: 'warning' });
+            return;
+        }
+        try {
+            await api.patch(`/admin/leaves/${returnDialog.request._id}/return-for-correction`, { notes });
+            setReturnDialog({ open: false, request: null, notes: '' });
+            setSnackbar({ open: true, message: 'Leave returned to employee for correction.', severity: 'success' });
+            invalidateLeavesCache('leaves:');
+            fetchInitialData(true);
+        } catch (err) {
+            setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to return leave.', severity: 'error' });
+        }
+    };
+
+    const handleSplitLopDays = (request) => {
+        const dayTypes = {};
+        getWorkingLeaveDateKeys(request.leaveDates).forEach((key) => {
+            const existing = request.dayTypeAllocations?.find((a) => {
+                const d = new Date(a.date);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}` === key;
+            });
+            dayTypes[key] = existing?.requestType || 'Loss of Pay';
+        });
+        setAllocationDialog({ open: true, request, dayTypes });
+    };
+
+    const submitDayAllocations = async () => {
+        if (!allocationDialog.request?._id) return;
+        const allocations = Object.entries(allocationDialog.dayTypes)
+            .filter(([, type]) => type !== 'Loss of Pay')
+            .map(([date, requestType]) => ({ date, requestType }));
+        try {
+            await api.patch(`/admin/leaves/${allocationDialog.request._id}/day-allocations`, { allocations });
+            setAllocationDialog({ open: false, request: null, dayTypes: {} });
+            setSnackbar({ open: true, message: 'Day allocations saved. Approve to apply balance deductions.', severity: 'success' });
+            invalidateLeavesCache('leaves:');
+            invalidateLeavesCache('leaves:analytics:');
+            fetchInitialData(true);
+            setLeaveCountsDirty(true);
+        } catch (err) {
+            setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to save allocations.', severity: 'error' });
         }
     };
     
@@ -3600,23 +3670,24 @@ const AdminLeavesPage = () => {
             
             {/* Tab Content Container - Dynamic height wrapper for smooth transitions */}
             <Box
+                className="leave-tabs-content"
                 sx={{
                     position: 'relative',
-                    flex: 1,
+                    flex: '0 1 auto',
                     width: '100%',
-                    overflow: 'hidden',
+                    overflow: 'visible',
                     display: 'flex',
                     flexDirection: 'column',
                 }}
             >
                 {/* Leave Requests Tab - Always mounted, visibility toggled */}
                 <Box
+                    className="leave-tab-panel--fit"
                     sx={{
                         position: currentTab === 0 ? 'relative' : 'absolute',
                         top: 0,
                         left: 0,
                         right: 0,
-                        bottom: 0,
                         opacity: currentTab === 0 ? 1 : 0,
                         transform: currentTab === 0 ? 'translateY(0)' : 'translateY(8px)',
                         pointerEvents: currentTab === 0 ? 'auto' : 'none',
@@ -3626,7 +3697,8 @@ const AdminLeavesPage = () => {
                         visibility: currentTab === 0 ? 'visible' : 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
-                        overflow: 'hidden',
+                        overflow: 'visible',
+                        width: '100%',
                     }}
                 >
                     <div className="requests-card">
@@ -3653,6 +3725,8 @@ const AdminLeavesPage = () => {
                                             onDelete={handleDelete}
                                             onStatusChange={handleStatusChange}
                                             onViewDetails={handleViewDetails}
+                                            onReturnForCorrection={handleReturnForCorrection}
+                                            onSplitLopDays={handleSplitLopDays}
                                         />
                                     ))}
                                 </TableBody>
@@ -4176,6 +4250,83 @@ const AdminLeavesPage = () => {
                 </DialogActions>
             </Dialog>
             
+            {/* Return for correction */}
+            <Dialog
+                open={returnDialog.open}
+                onClose={() => setReturnDialog({ open: false, request: null, notes: '' })}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>Return for correction</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        The employee can edit and resubmit this request. Your note will appear on their leave page.
+                    </Typography>
+                    <TextField
+                        label="Note for employee"
+                        placeholder="e.g. You applied LOP — please use Planned leave for these dates instead."
+                        multiline
+                        minRows={3}
+                        fullWidth
+                        value={returnDialog.notes}
+                        onChange={(e) => setReturnDialog((prev) => ({ ...prev, notes: e.target.value }))}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setReturnDialog({ open: false, request: null, notes: '' })}>Cancel</Button>
+                    <Button variant="contained" color="primary" onClick={submitReturnForCorrection}>Send back</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* LOP day split */}
+            <Dialog
+                open={allocationDialog.open}
+                onClose={() => setAllocationDialog({ open: false, request: null, dayTypes: {} })}
+                fullWidth
+                maxWidth="md"
+            >
+                <DialogTitle>Split LOP days</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Assign specific working days to Planned or Casual leave. Remaining days stay as Loss of Pay. This affects balance deduction on approval and leave summary counts.
+                    </Typography>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Date</TableCell>
+                                <TableCell>Leave type for this day</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {Object.keys(allocationDialog.dayTypes).sort().map((dateKey) => (
+                                <TableRow key={dateKey}>
+                                    <TableCell>{dateKey}</TableCell>
+                                    <TableCell>
+                                        <FormControl size="small" fullWidth>
+                                            <Select
+                                                value={allocationDialog.dayTypes[dateKey] || 'Loss of Pay'}
+                                                onChange={(e) => setAllocationDialog((prev) => ({
+                                                    ...prev,
+                                                    dayTypes: { ...prev.dayTypes, [dateKey]: e.target.value },
+                                                }))}
+                                            >
+                                                <MenuItem value="Loss of Pay">Loss of Pay</MenuItem>
+                                                <MenuItem value="Planned">Planned</MenuItem>
+                                                <MenuItem value="Casual">Casual</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setAllocationDialog({ open: false, request: null, dayTypes: {} })}>Cancel</Button>
+                    <Button variant="contained" onClick={submitDayAllocations}>Save allocations</Button>
+                </DialogActions>
+            </Dialog>
+
             {/* Enhanced Leave Request Modal */}
             <EnhancedLeaveRequestModal
                 open={viewDialog.open}
@@ -4190,8 +4341,7 @@ const AdminLeavesPage = () => {
                 open={snackbar.open && !isFormOpen} 
                 autoHideDuration={4000} 
                 onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                sx={{ top: '24px !important' }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
                 <Alert 
                     onClose={() => setSnackbar({ ...snackbar, open: false })} 

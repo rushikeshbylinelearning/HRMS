@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  CardContent,
   Typography,
   Box,
   Chip,
@@ -10,9 +8,14 @@ import {
   Alert
 } from '@mui/material';
 import {
-  Warning as WarningIcon
+  WarningAmber as WarningIcon
 } from '@mui/icons-material';
 import api from '../../api/axios';
+
+const RED = '#E53935';
+const RED_BG = '#FDECEC';
+const BLACK = '#1A1A1A';
+const GREY = '#6B7280';
 
 const CIFSummaryCard = ({ employeeId }) => {
   const [summary, setSummary] = useState(null);
@@ -58,97 +61,183 @@ const CIFSummaryCard = ({ employeeId }) => {
     });
   };
 
+  const cardBase = {
+    background: '#fff',
+    borderRadius: '16px',
+    padding: '20px 24px',
+    border: '1px solid #E5E7EB',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+    '&:hover': {
+      boxShadow: '0 6px 20px rgba(0,0,0,0.10)',
+      transform: 'translateY(-1px)'
+    }
+  };
+
   if (loading) {
     return (
-      <Card elevation={1}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-            <CircularProgress size={30} />
-          </Box>
-        </CardContent>
-      </Card>
+      <Box sx={cardBase}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={28} sx={{ color: RED }} />
+        </Box>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Card elevation={1}>
-        <CardContent>
-          <Alert severity="error" variant="outlined">
-            {error}
-          </Alert>
-        </CardContent>
-      </Card>
+      <Box sx={cardBase}>
+        <Alert severity="error" variant="outlined" sx={{ borderRadius: '12px' }}>
+          {error}
+        </Alert>
+      </Box>
     );
   }
 
   if (!summary || summary.total === 0) {
     return (
-      <Card elevation={1}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <WarningIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            <Typography variant="h6">CIF Summary</Typography>
+      <Box sx={{ ...cardBase, background: RED_BG, border: `1px solid #FBBCBC` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: '#FBBCBC',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <WarningIcon sx={{ fontSize: 20, color: RED }} />
           </Box>
-          <Typography variant="body2" color="textSecondary">
-            No CIF records found for this employee.
-          </Typography>
-        </CardContent>
-      </Card>
+          <Box>
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: BLACK }}>CIF Summary</Typography>
+            <Typography sx={{ fontSize: '13px', color: GREY, mt: 0.25 }}>
+              No CIF records found for this employee.
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <Card elevation={1}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <WarningIcon sx={{ mr: 1, color: 'warning.main' }} />
-            <Typography variant="h6">CIF Summary</Typography>
+    <Box
+      sx={{
+        ...cardBase,
+        background: RED_BG,
+        border: `1px solid #FBBCBC`,
+        borderLeft: `4px solid ${RED}`
+      }}
+    >
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: '#FBBCBC',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <WarningIcon sx={{ fontSize: 20, color: RED }} />
           </Box>
-          <Chip
-            label={`Risk: ${summary.riskLevel.toUpperCase()}`}
-            color={getRiskColor(summary.riskLevel)}
-            size="small"
-          />
+          <Typography sx={{ fontWeight: 700, fontSize: '15px', color: BLACK }}>
+            CIF Summary
+          </Typography>
         </Box>
+        <Chip
+          label={`Risk: ${summary.riskLevel.toUpperCase()}`}
+          size="small"
+          color={getRiskColor(summary.riskLevel)}
+          sx={{
+            fontWeight: 700,
+            fontSize: '11px',
+            borderRadius: '8px',
+            height: 26
+          }}
+        />
+      </Box>
 
-        <Grid container spacing={2}>
-          <Grid item xs={6}>
-            <Typography variant="caption" color="textSecondary">
+      {/* Stats Grid */}
+      <Grid container spacing={2}>
+        <Grid item xs={6}>
+          <Box
+            sx={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #E5E7EB'
+            }}
+          >
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Total Cases
             </Typography>
-            <Typography variant="h5" fontWeight={600}>
+            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: BLACK, lineHeight: 1 }}>
               {summary.total}
             </Typography>
-          </Grid>
-          <Grid item xs={6}>
-            <Typography variant="caption" color="textSecondary">
+          </Box>
+        </Grid>
+        <Grid item xs={6}>
+          <Box
+            sx={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #E5E7EB'
+            }}
+          >
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Open Cases
             </Typography>
-            <Typography variant="h5" fontWeight={600} color="warning.main">
+            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#F59E0B', lineHeight: 1 }}>
               {summary.open}
             </Typography>
-          </Grid>
-          <Grid item xs={6}>
-            <Typography variant="caption" color="textSecondary">
+          </Box>
+        </Grid>
+        <Grid item xs={6}>
+          <Box
+            sx={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #E5E7EB'
+            }}
+          >
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               High Severity
             </Typography>
-            <Typography variant="h5" fontWeight={600} color="error.main">
+            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: RED, lineHeight: 1 }}>
               {summary.highCount}
             </Typography>
-          </Grid>
-          <Grid item xs={6}>
-            <Typography variant="caption" color="textSecondary">
+          </Box>
+        </Grid>
+        <Grid item xs={6}>
+          <Box
+            sx={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #E5E7EB'
+            }}
+          >
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Last Incident
             </Typography>
-            <Typography variant="body2" fontWeight={500}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: BLACK, lineHeight: 1.3, mt: 0.5 }}>
               {formatDate(summary.lastIncidentDate)}
             </Typography>
-          </Grid>
+          </Box>
         </Grid>
-      </CardContent>
-    </Card>
+      </Grid>
+    </Box>
   );
 };
 

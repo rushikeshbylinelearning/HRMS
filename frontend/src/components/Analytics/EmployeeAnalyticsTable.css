@@ -85,13 +85,13 @@
     background-color: #f0f9ff;
 }
 
-.employee-name {
+.employee-analytics-table .analytics-employee-name {
     font-weight: 500;
     color: #1f2937;
     text-align: center;
 }
 
-.employee-code {
+.employee-analytics-table .analytics-employee-code {
     font-size: 12px;
     color: #6b7280;
     margin-top: 4px;

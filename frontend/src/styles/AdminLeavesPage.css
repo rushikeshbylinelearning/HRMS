@@ -99,21 +99,23 @@
   border-radius: 0;
   border: 1px solid #e0e0e0;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
 }
 
 .admin-leaves-page .table-container {
-  flex: 1;
+  flex: 0 0 auto;
   overflow: auto;
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
+  max-height: calc(100vh - 380px);
+  min-height: 0;
 }
 
 /* Make table responsive and fit within container */
@@ -225,6 +227,22 @@
   font-size: 0.65rem !important;
 }
 
+/* Employee Leave Count: avoid inner scrollbars in desktop layout */
+.admin-leaves-page .employee-leave-summary-table {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+.admin-leaves-page .employee-leave-summary-table .MuiTable-root {
+  min-width: 100% !important;
+  table-layout: fixed;
+}
+
+.admin-leaves-page .employee-leave-summary-table .MuiTableCell-root {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
 /* Table Row and Cell Styling */
 .admin-leaves-page .employee-name {
     font-weight: 500;
@@ -255,6 +273,87 @@
 
 .admin-leaves-page .actions-cell .MuiIconButton-root {
     padding: 4px !important;
+}
+
+/* --- Leave Requests table polish (visual only) --- */
+.admin-leaves-page .requests-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.admin-leaves-page .requests-card .table-container {
+  border-top: 1px solid #f1f5f9;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: calc(100vh - 380px);
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Shrink-wrap table card — no dead space below rows */
+.admin-leaves-page .leave-tabs-content {
+  flex: 0 1 auto !important;
+  align-self: flex-start;
+  width: 100%;
+}
+
+.admin-leaves-page .leave-tab-panel--fit {
+  flex: 0 1 auto !important;
+  height: auto !important;
+}
+
+.admin-leaves-page .requests-card .requests-table-head .MuiTableCell-root {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  color: #334155;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-leaves-page .requests-card .request-table-row .MuiTableCell-root {
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-leaves-page .requests-card .request-table-row:nth-of-type(even) {
+  background-color: #fcfdff;
+}
+
+.admin-leaves-page .requests-card .request-table-row:hover {
+  background-color: #f8fbff !important;
+  transition: background-color 160ms ease-in-out;
+}
+
+.admin-leaves-page .requests-card .employee-name {
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.admin-leaves-page .requests-card .employee-code {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+.admin-leaves-page .requests-card .actions-cell {
+  gap: 6px;
+}
+
+.admin-leaves-page .requests-card .actions-cell .MuiIconButton-root {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: all 140ms ease-in-out;
+}
+
+.admin-leaves-page .requests-card .actions-cell .MuiIconButton-root:hover {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+  transform: translateY(-1px);
 }
 
 /* --- Tabs Styling --- */
@@ -330,14 +429,21 @@
     padding: 0 6px !important;
 }
 
-/* Ensure table pagination fits */
+/* Ensure table pagination fits and stays stable */
 .admin-leaves-page .MuiTablePagination-root {
     overflow-x: auto;
+    flex-shrink: 0;
+    border-top: 1px solid #e0e0e0;
 }
 
 .admin-leaves-page .MuiTablePagination-toolbar {
-    min-height: 48px;
+    min-height: 52px;
     padding: 0 8px;
+}
+
+/* Prevent table rows from causing layout shifts on hover */
+.admin-leaves-page .MuiTableBody-root .MuiTableRow-root {
+    will-change: background-color;
 }
 
 .admin-leaves-page .MuiTablePagination-selectLabel,

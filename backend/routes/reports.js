@@ -9,6 +9,8 @@ const AttendanceLog = require('../models/AttendanceLog');
 const LeaveRequest = require('../models/LeaveRequest');
 const Holiday = require('../models/Holiday');
 const Shift = require('../models/Shift');
+const AttendanceSummaryService = require('../services/AttendanceSummaryService');
+const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 
 const isAdminOrHr = (req, res, next) => {
     if (!['Admin', 'HR'].includes(req.user.role)) {
@@ -307,26 +309,88 @@ router.post('/attendance', [authenticateToken, isAdminOrHr], async (req, res) =>
     }
 });
 
-// @route   POST /api/admin/reports/leaves (Unchanged)
+// @route   POST /api/admin/reports/leaves
+// @desc    Leave requests (by submission date) plus absent days (by attendance date)
 router.post('/leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { startDate, endDate, employeeIds, status } = req.body;
     if (!startDate || !endDate || !employeeIds || employeeIds.length === 0) {
         return res.status(400).json({ error: 'Start date, end date, and at least one employee are required.' });
     }
     try {
+        const rangeEnd = new Date(endDate);
+        rangeEnd.setHours(23, 59, 59, 999);
+
         const objectIdArray = employeeIds.map(id => new mongoose.Types.ObjectId(id));
         const matchQuery = {
             employee: { $in: objectIdArray },
-            createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+            createdAt: { $gte: new Date(startDate), $lte: rangeEnd }
         };
         if (status && status !== 'All') {
             matchQuery.status = status;
         }
-        const leaveData = await LeaveRequest.find(matchQuery)
-            .populate('employee', 'fullName employeeCode')
-            .sort({ createdAt: -1 })
-            .lean();
-        res.json(leaveData);
+
+        const [leaveData, employees, sharedHolidays, sharedGracePeriod] = await Promise.all([
+            LeaveRequest.find(matchQuery)
+                .populate('employee', 'fullName employeeCode')
+                .sort({ createdAt: -1 })
+                .lean(),
+            User.find(
+                { _id: { $in: objectIdArray }, isActive: true },
+                { fullName: 1, employeeCode: 1 }
+            ).lean(),
+            AttendanceSummaryService.fetchHolidaysForDateRange(startDate, endDate),
+            getGracePeriodMinutes()
+        ]);
+
+        const sharedData = {
+            holidays: sharedHolidays,
+            gracePeriodMinutes: sharedGracePeriod
+        };
+
+        const employeeMap = new Map(employees.map(emp => [emp._id.toString(), emp]));
+
+        const absentSummaries = await Promise.all(
+            objectIdArray.map(async (employeeId) => {
+                const employee = employeeMap.get(employeeId.toString());
+                if (!employee) return [];
+
+                const summary = await AttendanceSummaryService.getEmployeeAttendanceSummary(
+                    employeeId,
+                    startDate,
+                    endDate,
+                    sharedData
+                );
+
+                return summary
+                    .filter(day => day.isAbsent || day.finalStatus === 'Absent')
+                    .map(day => ({
+                        recordType: 'absent',
+                        date: day.date,
+                        employee: {
+                            _id: employee._id,
+                            fullName: employee.fullName,
+                            employeeCode: employee.employeeCode
+                        },
+                        status: 'Absent',
+                        reason: '-'
+                    }));
+            })
+        );
+
+        const leaveRecords = leaveData.map(row => ({ ...row, recordType: 'leave' }));
+        const absentRecords = absentSummaries.flat();
+
+        const combined = [...leaveRecords, ...absentRecords].sort((a, b) => {
+            const dateA = a.recordType === 'absent' ? a.date : a.createdAt;
+            const dateB = b.recordType === 'absent' ? b.date : b.createdAt;
+            const diff = new Date(dateB) - new Date(dateA);
+            if (diff !== 0) return diff;
+            const nameA = a.employee?.fullName || '';
+            const nameB = b.employee?.fullName || '';
+            return nameA.localeCompare(nameB);
+        });
+
+        res.json(combined);
     } catch (error) {
         console.error('Error generating leave report:', error);
         res.status(500).json({ error: 'Server error while generating report.' });

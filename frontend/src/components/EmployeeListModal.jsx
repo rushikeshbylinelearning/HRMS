@@ -76,6 +76,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
             case 'Present': return 'default';
             case 'Late': return 'default';
             case 'On Leave': return 'default';
+            case 'Absent': return 'error';
             default: return 'default';
         }
     };
@@ -100,6 +101,12 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
                     color: 'white',
                     border: '1px solid #D32F2F'
                 };
+            case 'Absent':
+                return {
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: '1px solid #ef4444'
+                };
             default: 
                 return { 
                     backgroundColor: '#757575', 
@@ -114,6 +121,7 @@ const EmployeeListModal = ({ open, onClose, cardType, cardTitle }) => {
             case 'Present': return <WorkIcon fontSize="small" />;
             case 'Late': return <AccessTimeIcon fontSize="small" />;
             case 'On Leave': return <PersonIcon fontSize="small" />;
+            case 'Absent': return <PersonIcon fontSize="small" />;
             default: return <PersonIcon fontSize="small" />;
         }
     };

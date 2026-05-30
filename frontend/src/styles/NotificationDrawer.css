@@ -51,6 +51,33 @@
     font-size: 0.8rem;
 }
 
+.notification-drawer-tabs {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    min-height: 48px;
+}
+
+.notification-drawer-tabs .MuiTab-root {
+    text-transform: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-height: 48px;
+}
+
+.notification-tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tab-unread-chip {
+    height: 20px !important;
+    min-width: 20px !important;
+    background-color: #D32F2F !important;
+    color: white !important;
+    font-size: 0.7rem !important;
+}
+
 .drawer-body {
     flex: 1;
     overflow-y: auto;

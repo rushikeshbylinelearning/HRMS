@@ -14,6 +14,35 @@
     box-sizing: border-box;
 }
 
+/* Activity Log tabs — indicator aligned to active tab only */
+.activity-logs-page .activity-log-tabs {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    box-shadow: none !important;
+}
+
+.activity-logs-page .activity-log-tabs .MuiTabs-root {
+    min-height: 48px;
+}
+
+.activity-logs-page .activity-log-tabs .MuiTab-root {
+    text-transform: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #64748b;
+    max-width: none;
+}
+
+.activity-logs-page .activity-log-tabs .MuiTab-root.Mui-selected {
+    color: #2563eb;
+}
+
+.activity-logs-page .activity-log-tabs .MuiTabs-indicator {
+    height: 3px;
+    background-color: #3498db;
+    border-radius: 3px 3px 0 0;
+}
+
 .activity-overview {
     display: flex;
     flex-direction: column;

@@ -1,7 +1,8 @@
 // frontend/src/pages/NewActivityLogPage.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField, TablePagination, FormControl, InputLabel, Select, MenuItem, Grid, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider, Paper, Stack, LinearProgress } from '@mui/material';
+import { Typography, Button, Alert, Chip, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Box, Avatar, Tooltip, IconButton, TextField, TablePagination, FormControl, InputLabel, Select, MenuItem, Grid, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider, Paper, Stack, LinearProgress, Tabs, Tab } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -15,6 +16,7 @@ import {
 import '../styles/ActivityLogsPage.css';
 import PageHeroHeader from '../components/PageHeroHeader';
 import socket from '../socket';
+import AdminRequestsPage from './AdminRequestsPage';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const formatDate = (dateString) => {
@@ -43,6 +45,8 @@ const getCategoryColor = (category = '') => ({
 }[category] || 'default');
 
 const NewActivityLogPage = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -54,7 +58,24 @@ const NewActivityLogPage = () => {
     const [filters, setFilters] = useState({ type: '', category: '', priority: '', startDate: null, endDate: null });
     const [viewDialog, setViewDialog] = useState({ open: false, log: null });
     const [showFilters, setShowFilters] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
     const fetchLogsRef = useRef(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        setActiveTab(params.get('tab') === 'requests' ? 1 : 0);
+    }, [location.search]);
+
+    const handleTabChange = (_, value) => {
+        setActiveTab(value);
+        const params = new URLSearchParams(location.search);
+        if (value === 1) {
+            params.set('tab', 'requests');
+        } else {
+            params.delete('tab');
+        }
+        navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`, { replace: true });
+    };
 
     const fetchLogs = useCallback(async () => {
         setLoading(true);
@@ -229,6 +250,22 @@ const NewActivityLogPage = () => {
                     </Button>
                 }
             />
+            <Paper className="activity-log-tabs" sx={{ mb: 2, borderRadius: 2 }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={handleTabChange}
+                    variant="fullWidth"
+                    textColor="primary"
+                    indicatorColor="primary"
+                >
+                    <Tab label="Activity Timeline" />
+                    <Tab label="Resource Requests" />
+                </Tabs>
+            </Paper>
+
+            {activeTab === 1 && <AdminRequestsPage embedded />}
+            {activeTab === 0 && (
+                <>
 
             {error && <Alert severity="error" className="error-alert">{error}</Alert>}
 
@@ -623,6 +660,8 @@ const NewActivityLogPage = () => {
             </Dialog>
 
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}><Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled">{snackbar.message}</Alert></Snackbar>
+                </>
+            )}
         </div>
     );
 };

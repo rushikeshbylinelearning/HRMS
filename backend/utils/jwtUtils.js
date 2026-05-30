@@ -16,34 +16,17 @@ const client = jwksClient({
   jwksRequestsTimeout: 10000 // 10 second timeout
 });
 
-console.log('[JWT Utils] JWKS client initialized');
-console.log('[JWT Utils] JWKS URL:', jwksUri);
-console.log('[JWT Utils] Cache enabled: true, TTL: 15 minutes');
-
 function getKey(header, callback) {
-  // Validate header and kid before proceeding
   if (!header || !header.kid) {
-    console.error('[JWT Utils] Missing kid in token header');
     return callback(new Error('Missing key ID (kid) in token header'));
   }
-  
-  const kid = header.kid;
-  console.log('[JWT Utils] Fetching signing key for kid:', kid);
-  
-  client.getSigningKey(kid, (err, key) => {
+  client.getSigningKey(header.kid, (err, key) => {
     if (err) {
-      console.error('[JWT Utils] Error getting signing key for kid:', kid);
-      console.error('[JWT Utils] Error details:', err.message);
+      console.error('[JWT Utils] Error getting signing key:', err.message);
       return callback(err);
     }
-    
     const pubKey = key.publicKey || key.rsaPublicKey;
-    if (!pubKey) {
-      console.error('[JWT Utils] Public key not found in JWK');
-      return callback(new Error('Public key not found in JWK'));
-    }
-    
-    console.log('[JWT Utils] ✅ Signing key retrieved successfully for kid:', kid);
+    if (!pubKey) return callback(new Error('Public key not found in JWK'));
     callback(null, pubKey);
   });
 }
@@ -91,45 +74,27 @@ function sign(payload, options = {}) {
   try {
     const privateKey = getPrivateKey();
 
-    console.log('[JWT Debug] Signing AMS token with keyId:', keyid);
-    console.log('[JWT Debug] Private key length:', privateKey.length);
-    console.log('[JWT Debug] Payload:', { userId: payload.userId, email: payload.email, role: payload.role });
-
     const token = jwt.sign(payload, privateKey, {
       algorithm: 'RS256',
       expiresIn,
       keyid,
-      header: {
-        kid: keyid,
-        alg: 'RS256',
-        typ: 'JWT'
-      }
+      header: { kid: keyid, alg: 'RS256', typ: 'JWT' }
     });
 
-    // Verify the token we just created (self-test)
+    // Self-test: verify the token we just created
     try {
       const publicKey = getPublicKey();
       jwt.verify(token, publicKey, { algorithms: ['RS256'] });
-      console.log('[JWT Debug] ✅ Token signed successfully and verified with matching public key');
     } catch (verifyError) {
-      console.error('[JWT Debug] ❌ Token signed but verification failed:', verifyError.message);
       throw new Error(`Token signing failed self-verification: ${verifyError.message}`);
     }
 
     return token;
   } catch (error) {
-    console.error('[JWT Debug] Signing error:', error.message);
-
     const fallbackSecret = process.env.JWT_SECRET;
-    if (!fallbackSecret) {
-      throw error;
-    }
-
-    console.warn('[JWT Debug] ⚠️ Falling back to HS256 signing using JWT_SECRET');
-    return jwt.sign(payload, fallbackSecret, {
-      algorithm: 'HS256',
-      expiresIn
-    });
+    if (!fallbackSecret) throw error;
+    console.warn('[JWT] ⚠️ RS256 signing failed, falling back to HS256:', error.message);
+    return jwt.sign(payload, fallbackSecret, { algorithm: 'HS256', expiresIn });
   }
 }
 
@@ -146,76 +111,26 @@ function verify(token, options = {}) {
     const tokenAlg = decodedHeader.header.alg;
     const tokenKid = decodedHeader.header.kid;
 
-    console.log('[JWT Utils] Verifying AMS token');
-    console.log('[JWT Utils] Token header - kid:', tokenKid || 'MISSING', 'alg:', tokenAlg || 'MISSING');
-
     if (tokenAlg === 'RS256') {
-      console.log('[JWT Utils] Verification method: Local AMS public key');
-
-      if (!tokenKid) {
-        throw new Error('Missing kid (key ID) in token header');
-      }
-
-      if (tokenKid !== 'ams-key' && tokenKid !== (process.env.JWT_KEY_ID || 'ams-key')) {
-        console.warn('[JWT Utils] ⚠️ Unexpected kid for AMS token:', tokenKid, '- expected ams-key');
-        // Still proceed - might be valid AMS key
-      }
+      if (!tokenKid) throw new Error('Missing kid (key ID) in token header');
 
       const publicKey = getPublicKey();
-      console.log('[JWT Utils] Public key length:', publicKey.length);
-
       const decoded = jwt.verify(token, publicKey, {
         algorithms: ['RS256'],
         ...(options || {})
       });
-
-      console.log('[JWT Utils] ✅ AMS token verified successfully');
-      console.log('[JWT Utils] Decoded payload:', {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-        authMethod: decoded.authMethod
-      });
-
       return decoded;
     }
 
     if (tokenAlg === 'HS256') {
       const fallbackSecret = process.env.JWT_SECRET;
-      if (!fallbackSecret) {
-        throw new Error('Cannot verify HS256 token: JWT_SECRET is not configured');
-      }
-
-      console.log('[JWT Utils] Verification method: JWT_SECRET (HS256 fallback)');
-      const decoded = jwt.verify(token, fallbackSecret, {
-        algorithms: ['HS256'],
-        ...(options || {})
-      });
-
-      console.log('[JWT Utils] ✅ HS256 token verified successfully');
-      return decoded;
+      if (!fallbackSecret) throw new Error('Cannot verify HS256 token: JWT_SECRET is not configured');
+      return jwt.verify(token, fallbackSecret, { algorithms: ['HS256'], ...(options || {}) });
     }
 
     throw new Error(`Invalid algorithm: ${tokenAlg}. Only RS256 or HS256 (fallback) are supported.`);
   } catch (error) {
-    console.error('[JWT Utils] ❌ AMS token verification failed');
-    console.error('[JWT Utils] Error:', error.message);
-    console.error('[JWT Utils] Token preview:', token ? token.substring(0, 50) + '...' : 'null');
-
-    // If verification fails, try to decode and log more info
-    try {
-      const decoded = jwt.decode(token, { complete: true });
-      if (decoded && decoded.header) {
-        console.error('[JWT Utils] Token header:', {
-          alg: decoded.header.alg,
-          kid: decoded.header.kid || 'MISSING',
-          typ: decoded.header.typ
-        });
-      }
-    } catch (decodeError) {
-      console.error('[JWT Utils] Could not decode token:', decodeError.message);
-    }
-
+    console.error('[JWT Utils] ❌ Token verification failed:', error.message);
     throw error;
   }
 }
@@ -239,23 +154,14 @@ async function verifySSOTokenWithJWKS(token) {
       const kid = decodedHeader.header.kid;
       const alg = decodedHeader.header.alg;
       
-      console.log('[JWT Utils] Verifying SSO token');
-      console.log('[JWT Utils] Token header - kid:', kid || 'MISSING', 'alg:', alg || 'MISSING');
-      
       if (!kid) {
         return reject(new Error('Missing kid (key ID) in token header'));
-      }
-      
-      if (!kid.startsWith('sso-key-')) {
-        console.warn('[JWT Utils] ⚠️ Unexpected kid format:', kid, '- expected sso-key-*');
-        // Still proceed - might be valid SSO key with different format
       }
       
       if (alg !== 'RS256') {
         return reject(new Error(`Invalid algorithm: ${alg}. Only RS256 is supported for SSO tokens.`));
       }
     } catch (headerError) {
-      console.error('[JWT Utils] Could not decode token header:', headerError.message);
       return reject(new Error('Invalid token format: ' + headerError.message));
     }
     
@@ -266,45 +172,14 @@ async function verifySSOTokenWithJWKS(token) {
       ignoreExpiration: false
     }, (err, decoded) => {
       if (err) {
-        console.error('[JWT Utils] ❌ SSO token verification failed');
-        console.error('[JWT Utils] Error name:', err.name);
-        console.error('[JWT Utils] Error message:', err.message);
-        
-        // Try to decode to show token details even on verification failure
-        try {
-          const decodedForDebug = jwt.decode(token, { complete: true });
-          if (decodedForDebug && decodedForDebug.payload) {
-            console.error('[JWT Utils] Token details:', {
-              iss: decodedForDebug.payload.iss,
-              aud: decodedForDebug.payload.aud,
-              exp: decodedForDebug.payload.exp ? new Date(decodedForDebug.payload.exp * 1000).toISOString() : 'missing'
-            });
-          }
-        } catch (decodeError) {
-          // Ignore decode errors
-        }
-        
+        console.error('[JWT Utils] ❌ SSO token verification failed:', err.message);
         return reject(err);
       }
       
       // Manual audience verification after successful signature verification
       if (decoded.aud !== 'sso-apps') {
-        console.warn(`[JWT Utils] ⚠️ Unexpected audience: ${decoded.aud} (expected: sso-apps)`);
-        console.warn('[JWT Utils] Token was signed correctly but audience does not match expected value');
         return reject(new Error(`Invalid SSO audience: expected 'sso-apps', got '${decoded.aud}'`));
       }
-      
-      console.log('[JWT Utils] ✅ Token verified successfully (RS256, audience: ' + decoded.aud + ')');
-      console.log('[JWT Utils] Verification method: JWKS (SSO public key)');
-      console.log('[JWT Utils] Token claims:', {
-        iss: decoded.iss,
-        aud: decoded.aud,
-        sub: decoded.sub,
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-        exp: new Date(decoded.exp * 1000).toISOString()
-      });
       
       resolve(decoded);
     });

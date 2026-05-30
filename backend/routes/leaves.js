@@ -448,6 +448,150 @@ router.get('/my-requests', authenticateToken, async (req, res) => {
     }
 });
 
+// PUT /api/leaves/request/:id/correct — employee updates a Returned request and resubmits
+router.put('/request/:id/correct', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { requestType, leaveType, leaveDates, alternateDate, reason, medicalCertificate } = req.body;
+    const { userId } = req.user;
+
+    if (!requestType || !leaveDates || leaveDates.length === 0 || !reason || !leaveType) {
+        return res.status(400).json({ error: 'Missing required fields for the request.' });
+    }
+
+    const dateNorm = normalizeLeaveDatesForApi(leaveDates);
+    if (!dateNorm.valid) {
+        return res.status(400).json({ error: dateNorm.error });
+    }
+
+    try {
+        const existing = await LeaveRequest.findOne({ _id: id, employee: userId });
+        if (!existing) {
+            return res.status(404).json({ error: 'Leave request not found.' });
+        }
+        if (existing.status !== 'Returned') {
+            return res.status(400).json({ error: 'Only requests returned for correction can be updated.' });
+        }
+
+        const employee = await User.findById(userId);
+        if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+        const validation = await LeaveValidationService.validateLeaveRequest(
+            employee,
+            requestType,
+            dateNorm.dateStrings,
+            leaveType,
+            medicalCertificate,
+            alternateDate,
+            { excludeRequestId: existing._id },
+            reason
+        );
+
+        if (!validation.valid) {
+            return res.status(400).json({
+                error: validation.errors.join(' '),
+                errors: validation.errors,
+                warnings: validation.warnings || [],
+            });
+        }
+
+        const finalRequestType = requestType === 'Backdate' ? 'Backdated Leave' : requestType;
+        let leaveDatesArray = dateNorm.dateStrings.map((d) => parseISTDate(d));
+
+        if (finalRequestType === 'Planned') {
+            const clubbedDates = LeavePolicyService.clubSaturdayInLeaveDates(
+                employee,
+                leaveDatesArray,
+                finalRequestType,
+                new Date()
+            );
+            leaveDatesArray = clubbedDates.map((d) => parseISTDate(d));
+        }
+
+        const { startOfISTDay } = require('../utils/istTime');
+        const today = startOfISTDay();
+        const firstLeaveDate = startOfISTDay(leaveDatesArray[0]);
+        const isBackdated = firstLeaveDate < today;
+
+        existing.requestType = finalRequestType;
+        existing.leaveType = leaveType;
+        existing.leaveDates = leaveDatesArray;
+        existing.alternateDate = alternateDate ? parseISTDate(alternateDate) : null;
+        existing.reason = reason;
+        existing.isBackdated = isBackdated;
+        existing.status = 'Pending';
+        existing.employeeCorrectedAt = new Date();
+        existing.dayTypeAllocations = [];
+        existing.dayAllocationsUpdatedBy = undefined;
+        existing.dayAllocationsUpdatedAt = undefined;
+
+        if (finalRequestType === 'Sick') {
+            if (medicalCertificate) {
+                existing.medicalCertificate = medicalCertificate;
+                existing.medicalCertificateUploadedAt = new Date();
+            }
+            if (validation.medicalProofStatus) {
+                existing.medicalProofStatus = validation.medicalProofStatus;
+                existing.medicalProofRequired = validation.medicalProofRequired || false;
+                existing.medicalProofDeadline = validation.medicalProofDeadline || null;
+            }
+            existing.appliedAfterReturn = validation.appliedAfterReturn || false;
+        }
+
+        if (finalRequestType === 'Planned' && validation.halfYearPeriod) {
+            existing.halfYearPeriod = validation.halfYearPeriod;
+        }
+
+        await existing.save();
+
+        try {
+            const cacheService = require('../services/cacheService');
+            cacheService.invalidatePendingLeaves(getTodayISTKey());
+            cacheService.invalidateLeaveAnalytics();
+        } catch (e) { /* non-fatal */ }
+
+        const savedLeaveDates = existing.leaveDates;
+        const startDate = formatISTDate(parseISTDate(savedLeaveDates[0]));
+        const endDate = savedLeaveDates.length === 1
+            ? startDate
+            : formatISTDate(parseISTDate(savedLeaveDates[savedLeaveDates.length - 1]));
+
+        NewNotificationService.notifyLeaveResubmitted(
+            userId,
+            employee.fullName,
+            finalRequestType,
+            startDate,
+            endDate,
+            existing._id.toString()
+        ).catch((err) => console.error('Error sending resubmit notification:', err));
+
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('leave_request_updated', {
+                    leaveId: existing._id,
+                    employeeId: userId,
+                    status: 'Pending',
+                    requestType: existing.requestType,
+                    timestamp: new Date().toISOString(),
+                    message: 'Leave corrected and resubmitted',
+                });
+            }
+        } catch (socketError) {
+            console.error('Failed to emit Socket.IO event:', socketError);
+        }
+
+        res.json({
+            message: 'Leave request updated and resubmitted for approval.',
+            request: existing,
+            warnings: validation.warnings || [],
+        });
+    } catch (error) {
+        console.error('Error correcting leave request:', error);
+        res.status(500).json({ error: 'Internal server error while updating request.' });
+    }
+});
+
 // POST /api/leaves/year-end-request
 // Employee submits Year-End leave request (Carry Forward or Encash)
 router.post('/year-end-request', authenticateToken, async (req, res) => {

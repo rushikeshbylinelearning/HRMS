@@ -60,6 +60,28 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
 
                 <div className="pm-form-grid">
                     <div className="pm-field pm-field--sm">
+                        <label className="pm-label">Date of Birth</label>
+                        <input
+                            className="pm-input"
+                            type="date"
+                            value={formData.dateOfBirth}
+                            onChange={(e) => onFieldChange('dateOfBirth', e.target.value)}
+                        />
+                    </div>
+                    <div className="pm-field pm-field--sm">
+                        <label className="pm-label">Gender</label>
+                        <select
+                            className="pm-input"
+                            value={formData.gender}
+                            onChange={(e) => onFieldChange('gender', e.target.value)}
+                        >
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div className="pm-field pm-field--sm">
                         <label className="pm-label">Blood Group</label>
                         <input
                             className="pm-input"
@@ -68,6 +90,20 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                             onChange={(e) => onFieldChange('bloodGroup', e.target.value)}
                             placeholder="e.g. A+"
                         />
+                    </div>
+                    <div className="pm-field pm-field--sm">
+                        <label className="pm-label">Marital Status</label>
+                        <select
+                            className="pm-input"
+                            value={formData.maritalStatus}
+                            onChange={(e) => onFieldChange('maritalStatus', e.target.value)}
+                        >
+                            <option value="">Select</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Divorced">Divorced</option>
+                            <option value="Widowed">Widowed</option>
+                        </select>
                     </div>
 
                     <div className="pm-field pm-field--phone">
@@ -88,6 +124,18 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                                 maxLength={10}
                             />
                         </div>
+                    </div>
+
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">Alternate Phone</label>
+                        <input
+                            className="pm-input"
+                            type="tel"
+                            value={formData.alternatePhone}
+                            onChange={(e) => onFieldChange('alternatePhone', e.target.value)}
+                            placeholder="10-digit number"
+                            maxLength={10}
+                        />
                     </div>
 
                     <div className="pm-field pm-field--md">
@@ -117,6 +165,17 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                         />
                     </div>
 
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">Relationship</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.emergencyContactRelationship}
+                            onChange={(e) => onFieldChange('emergencyContactRelationship', e.target.value)}
+                            placeholder="e.g. Father, Spouse"
+                        />
+                    </div>
+
                     <div className="pm-field pm-field--phone">
                         <label className="pm-label">Contact Number</label>
                         <div className="pm-phone-row">
@@ -135,6 +194,17 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                                 maxLength={10}
                             />
                         </div>
+                    </div>
+
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">Contact Email</label>
+                        <input
+                            className="pm-input"
+                            type="email"
+                            value={formData.emergencyContactEmail}
+                            onChange={(e) => onFieldChange('emergencyContactEmail', e.target.value)}
+                            placeholder="email@example.com"
+                        />
                     </div>
                 </div>
 
@@ -279,6 +349,37 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                             onChange={(e) => onFieldChange('ifscCode', e.target.value.toUpperCase())}
                             placeholder="SBIN0001234"
                             maxLength={11}
+                        />
+                    </div>
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">Branch Name</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.bankBranch}
+                            onChange={(e) => onFieldChange('bankBranch', e.target.value)}
+                            placeholder="Branch name"
+                        />
+                    </div>
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">UAN Number</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.uanNumber}
+                            onChange={(e) => onFieldChange('uanNumber', e.target.value)}
+                            placeholder="9–12 digit UAN"
+                            maxLength={12}
+                        />
+                    </div>
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">PF Account Number</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.pfAccountNumber}
+                            onChange={(e) => onFieldChange('pfAccountNumber', e.target.value)}
+                            placeholder="PF account number"
                         />
                     </div>
                 </div>

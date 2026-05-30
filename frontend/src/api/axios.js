@@ -110,6 +110,7 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       window.location.pathname !== '/login' &&
+      window.location.pathname !== '/public-form' &&
       !isLoggingOut
     ) {
       const isAuthRestoring = window.__AUTH_RESTORING__ === true;
@@ -129,7 +130,7 @@ api.interceptors.response.use(
         delete api.defaults.headers.common['Authorization'];
         window.dispatchEvent(authErrorEvent);
         setTimeout(() => {
-          if (window.location.pathname !== '/login') window.location.href = '/login';
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/public-form') window.location.href = '/login';
         }, 100);
         return Promise.reject(error);
       }
@@ -178,7 +179,7 @@ api.interceptors.response.use(
           delete api.defaults.headers.common['Authorization'];
           window.dispatchEvent(authErrorEvent);
           setTimeout(() => {
-            if (window.location.pathname !== '/login') window.location.href = '/login';
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/public-form') window.location.href = '/login';
           }, 100);
         }
         return Promise.reject(refreshError);

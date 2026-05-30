@@ -180,7 +180,6 @@ const sendHRWeeklyLateNotification = async (user, lateCount) => {
 // Check and send weekly late warnings
 const checkAndSendWeeklyLateWarnings = async () => {
   try {
-    console.log('Checking for weekly late warnings...');
     
     // Get current week start and end dates
     const now = new Date();

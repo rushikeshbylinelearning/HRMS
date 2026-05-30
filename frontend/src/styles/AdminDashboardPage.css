@@ -478,6 +478,12 @@
     background-color: var(--theme-white);
 }
 
+button.quick-link-item {
+    font-family: inherit;
+    width: 100%;
+    cursor: pointer;
+}
+
 .quick-link-item:hover {
     border-color: var(--theme-red);
     background-color: var(--theme-red-light);

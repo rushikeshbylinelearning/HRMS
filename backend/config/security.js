@@ -11,10 +11,10 @@ const corsOptions = {
     
     const allowedOrigins = [
       'https://attendance.bylinelms.com', // Production AMS frontend domain
-      'https://attendance-test.bylinelms.com', //Not needed, frontend and backend are same domain
+      'https://https://attendance-test.bylinelms.com', // Production AMS frontend (legato)
       'https://sso.legatolxp.online', // Production SSO domain (for SSO integration)
       'https://sso.bylinelms.com', // Production SSO portal (for SSO integration)
-      process.env.FRONTEND_URL,
+      process.env.FRONTEND_URL?.startsWith('http') ? process.env.FRONTEND_URL : `https://${process.env.FRONTEND_URL}`,
       // Development origins (only allow in development mode)
       ...(process.env.NODE_ENV === 'development' ? [
       'http://localhost:3000',

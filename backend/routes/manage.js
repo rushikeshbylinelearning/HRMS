@@ -16,6 +16,77 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
+/** Strip Mongo subdocument _id fields from permission payloads sent by the client. */
+const stripNestedIds = (obj) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+    const { _id, ...rest } = obj;
+    return rest;
+};
+
+/** Merge incoming feature permissions onto existing values (plain objects). */
+const mergeFeaturePermissions = (existing, incoming) => {
+    const base = existing && typeof existing === 'object'
+        ? (typeof existing.toObject === 'function' ? existing.toObject() : { ...existing })
+        : {};
+
+    const updated = {
+        ...base,
+        restrictedFeatures: { ...(base.restrictedFeatures || {}) },
+        advancedFeatures: { ...(base.advancedFeatures || {}) }
+    };
+
+    for (const [key, value] of Object.entries(incoming)) {
+        if (value === undefined) continue;
+        if (key === 'restrictedFeatures' && typeof value === 'object' && value !== null) {
+            updated.restrictedFeatures = {
+                ...updated.restrictedFeatures,
+                ...stripNestedIds(value)
+            };
+        } else if (key === 'advancedFeatures' && typeof value === 'object' && value !== null) {
+            updated.advancedFeatures = {
+                ...updated.advancedFeatures,
+                ...stripNestedIds(value)
+            };
+        } else if (key === 'breakWindows' && Array.isArray(value)) {
+            updated.breakWindows = value.map((w) => stripNestedIds(w));
+        } else {
+            updated[key] = value;
+        }
+    }
+
+    return updated;
+};
+
+/** Active users shown in Manage Section (admin accounts are excluded). */
+const MANAGE_SECTION_USER_FILTER = { isActive: true, role: { $ne: 'Admin' } };
+
+const DEFAULT_FEATURE_PERMISSIONS = {
+    leaves: true,
+    breaks: true,
+    extraFeatures: false,
+    maxBreaks: 2,
+    breakAfterHours: 2,
+    breakWindows: [],
+    canCheckIn: true,
+    canCheckOut: true,
+    canTakeBreak: true,
+    canViewAnalytics: false,
+    privilegeLevel: 'normal',
+    restrictedFeatures: {
+        canViewReports: false,
+        canViewOtherLogs: false,
+        canEditProfile: true,
+        canRequestExtraBreak: true
+    },
+    advancedFeatures: {
+        canBulkActions: false,
+        canExportData: false
+    },
+    autoBreakOnInactivity: false,
+    inactivityThresholdMinutes: 5,
+    lateArrivalMarksHalfDay: false
+};
+
 // Test route to verify the endpoint is accessible
 router.get('/test', (req, res) => {
     res.json({ message: 'Manage endpoint is working' });
@@ -26,7 +97,7 @@ router.get('/test', (req, res) => {
 router.get('/', [authenticateToken, isAdmin], async (req, res) => {
     try {
         console.log('Manage endpoint accessed by user:', req.user?.userId);
-        const users = await User.find({ isActive: true })
+        const users = await User.find(MANAGE_SECTION_USER_FILTER)
             .select('fullName email employeeCode role department designation featurePermissions')
             .sort({ fullName: 1 })
             .lean();
@@ -223,7 +294,7 @@ router.put('/bulk', [authenticateToken, isAdmin], async (req, res) => {
 
         if (applyToAll) {
             // Get all active user IDs
-            const allUsers = await User.find({ isActive: true }).select('_id');
+            const allUsers = await User.find(MANAGE_SECTION_USER_FILTER).select('_id');
             targetUserIds = allUsers.map(user => user._id);
         } else if (userIds && Array.isArray(userIds) && userIds.length > 0) {
             targetUserIds = userIds;
@@ -358,41 +429,25 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
             }
         }
 
-        const user = await User.findById(req.params.userId);
+        const user = await User.findById(req.params.userId).select('featurePermissions');
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Update feature permissions with safe merging for nested objects
-        const updatedPermissions = { 
-            ...user.featurePermissions,
-            // Ensure nested objects are properly initialized
-            restrictedFeatures: user.featurePermissions.restrictedFeatures || {},
-            advancedFeatures: user.featurePermissions.advancedFeatures || {}
-        };
-        
-        // Handle top-level properties
-        for (const [key, value] of Object.entries(featurePermissions)) {
-            if (value !== undefined) {
-                if (key === 'restrictedFeatures' && typeof value === 'object' && value !== null) {
-                    updatedPermissions.restrictedFeatures = {
-                        ...updatedPermissions.restrictedFeatures,
-                        ...value
-                    };
-                } else if (key === 'advancedFeatures' && typeof value === 'object' && value !== null) {
-                    updatedPermissions.advancedFeatures = {
-                        ...updatedPermissions.advancedFeatures,
-                        ...value
-                    };
-                } else {
-                    updatedPermissions[key] = value;
-                }
-            }
-        }
-        
-        user.featurePermissions = updatedPermissions;
+        const updatedPermissions = mergeFeaturePermissions(user.featurePermissions, featurePermissions);
 
-        await user.save();
+        // Use $set so only featurePermissions is validated (not legacy invalid role values on the user doc)
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.userId,
+            { $set: { featurePermissions: updatedPermissions } },
+            { new: true, runValidators: true }
+        )
+            .select('fullName email employeeCode role department designation featurePermissions')
+            .lean();
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
 
         // Invalidate user cache to ensure fresh data on next request
         const cacheService = require('../services/cacheService');
@@ -414,11 +469,6 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
             });
         }
 
-        // Return updated user data
-        const updatedUser = await User.findById(req.params.userId)
-            .select('fullName email employeeCode role department designation featurePermissions')
-            .lean();
-
         res.json({
             message: 'User permissions updated successfully.',
             user: {
@@ -435,6 +485,9 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
 
     } catch (error) {
         logError(error, { operation: 'update_user_permissions', userId: req.params.userId, body: req.body });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Failed to update user permissions.' });
     }
 });
@@ -442,37 +495,15 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
 // POST /api/admin/manage/:userId/reset - Reset user's feature permissions to defaults
 router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
-        if (!user) {
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.userId,
+            { $set: { featurePermissions: DEFAULT_FEATURE_PERMISSIONS } },
+            { new: true, runValidators: true }
+        ).select('_id');
+
+        if (!updatedUser) {
             return res.status(404).json({ error: 'User not found.' });
         }
-
-        // Reset to default permissions
-        user.featurePermissions = {
-            leaves: true,
-            breaks: true,
-            extraFeatures: false,
-            maxBreaks: 2,
-            breakAfterHours: 2,
-            canCheckIn: true,
-            canCheckOut: true,
-            canTakeBreak: true,
-            canViewAnalytics: false,
-            privilegeLevel: 'normal',
-            restrictedFeatures: {
-                canViewReports: false,
-                canViewOtherLogs: false,
-                canEditProfile: true,
-                canRequestExtraBreak: true
-            },
-            advancedFeatures: {
-                canBulkActions: false,
-                canExportData: false
-            },
-            lateArrivalMarksHalfDay: false
-        };
-
-        await user.save();
 
         // Invalidate user cache to ensure fresh data on next request
         const cacheService = require('../services/cacheService');
@@ -497,6 +528,9 @@ router.post('/:userId/reset', [authenticateToken, isAdmin], async (req, res) => 
 
     } catch (error) {
         logError(error, { operation: 'reset_user_permissions', userId: req.params.userId });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Failed to reset user permissions.' });
     }
 });

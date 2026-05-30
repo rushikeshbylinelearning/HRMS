@@ -18,9 +18,9 @@ const EmployeeRow = React.memo(function EmployeeRow({ employee, index, onRowClic
             className="clickable-row"
         >
             <td className="number rank">{employee.rank || index + 1}</td>
-            <td className="employee-name">
+            <td className="analytics-employee-name">
                 {employee.employeeName || 'N/A'}
-                <div className="employee-code">{employee.employeeCode || ''}</div>
+                <div className="analytics-employee-code">{employee.employeeCode || ''}</div>
             </td>
             <td>{employee.department || 'N/A'}</td>
             <td className="number">{formatNumber(employee.presentDays)}</td>

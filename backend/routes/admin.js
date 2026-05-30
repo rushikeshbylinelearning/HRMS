@@ -21,10 +21,13 @@ const earlyCheckoutService = require('../services/earlyCheckoutService');
 const Holiday = require('../models/Holiday');
 const Setting = require('../models/Setting');
 const NewNotificationService = require('../services/NewNotificationService');
+const { applyBalanceOnStatusChange, validateApprovalBalances, reconcileApprovedDayAllocations } = require('../services/leaveBalanceOnStatusChange');
+const { validateDayAllocations, computeEffectiveDeductions } = require('../utils/leaveDayAllocations');
 const { getUserDailyStatus, recalculateLateStatus, computeCalculatedLogoutTime } = require('../services/dailyStatusService');
 const { syncAttendanceOnLeaveApproval, syncAttendanceOnLeaveRejection } = require('../services/leaveAttendanceSyncService');
 const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 const { getTodayISTKey, getISTDateString, parseISTDate, startOfISTDay, endOfISTDay, getShiftDateTimeIST, normalizeLeaveDatesForApi } = require('../utils/istTime');
+const { perfLog, verboseLog } = require('../utils/logLevel');
 
 // ── HELPER: count only Monday–Friday dates in a leaveDates array ─────────────
 // Saturday-clubbing may have added weekend dates to the array. When deducting
@@ -640,6 +643,7 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
         const leaveTypeChanged = req.body.leaveType && req.body.leaveType !== originalRequest.leaveType;
         const wasApproved = originalRequest.status === 'Approved';
         const willBeApproved = req.body.status === 'Approved' || (!req.body.status && wasApproved);
+        const allocationsInBody = req.body.dayTypeAllocations !== undefined;
 
         const employee = await User.findById(originalRequest.employee).session(session);
         if (!employee) {
@@ -649,7 +653,7 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
 
         // Normalize leaveDates at API boundary (YYYY-MM-DD only)
         // Only allow specific fields to be updated
-        const allowedUpdateFields = ['employee', 'requestType', 'leaveType', 'leaveDates', 'alternateDate', 'reason', 'status', 'createdAt'];
+        const allowedUpdateFields = ['employee', 'requestType', 'leaveType', 'leaveDates', 'alternateDate', 'reason', 'status', 'createdAt', 'dayTypeAllocations'];
         let bodyToApply = {};
         
         // Copy only allowed fields from req.body
@@ -676,6 +680,27 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
             bodyToApply.alternateDate = null;
         }
         
+        if (allocationsInBody) {
+            const effectiveType = bodyToApply.requestType ?? originalRequest.requestType;
+            if (effectiveType !== 'Loss of Pay') {
+                await session.abortTransaction();
+                return res.status(400).json({ error: 'Day allocations apply only to Loss of Pay requests.' });
+            }
+            const tempForValidation = {
+                ...originalRequest.toObject(),
+                leaveDates: bodyToApply.leaveDates ?? originalRequest.leaveDates,
+                requestType: 'Loss of Pay',
+            };
+            const allocValidation = validateDayAllocations(tempForValidation, req.body.dayTypeAllocations);
+            if (!allocValidation.valid) {
+                await session.abortTransaction();
+                return res.status(400).json({ error: allocValidation.error });
+            }
+            bodyToApply.dayTypeAllocations = allocValidation.allocations;
+            bodyToApply.dayAllocationsUpdatedBy = req.user.userId;
+            bodyToApply.dayAllocationsUpdatedAt = new Date();
+        }
+
         // Handle createdAt (applied date) update - only allow admin to update this field
         let createdAtToUpdate = null;
         if (bodyToApply.createdAt) {
@@ -752,8 +777,44 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
         const oldLeaveField = LeavePolicyService.getBalanceField(oldReqTypeNorm);
         const newLeaveField = LeavePolicyService.getBalanceField(newReqTypeNorm);
 
-        // Handle balance updates
-        if (employee.leaveBalances && wasApproved) {
+        const allocationsChanged = allocationsInBody && JSON.stringify(
+            (originalRequest.dayTypeAllocations || []).map((a) => ({
+                d: getISTDateString(a.date),
+                t: a.requestType,
+            }))
+        ) !== JSON.stringify(
+            (bodyToApply.dayTypeAllocations || []).map((a) => ({
+                d: getISTDateString(a.date),
+                t: a.requestType,
+            }))
+        );
+
+        // Status transition balance (e.g. Approved → Rejected: restore balances)
+        if (statusChanged && wasApproved !== willBeApproved) {
+            const balanceResult = await applyBalanceOnStatusChange(
+                originalRequest,
+                employee,
+                originalRequest.status,
+                updatedRequest.status,
+                session
+            );
+            if (!balanceResult.ok) {
+                await session.abortTransaction();
+                return res.status(400).json({ error: balanceResult.error });
+            }
+        } else if (wasApproved && willBeApproved && allocationsChanged && updatedRequest.requestType === 'Loss of Pay') {
+            const balanceResult = await reconcileApprovedDayAllocations(
+                employee._id,
+                updatedRequest,
+                originalRequest.dayTypeAllocations,
+                bodyToApply.dayTypeAllocations,
+                session
+            );
+            if (!balanceResult.ok) {
+                await session.abortTransaction();
+                return res.status(400).json({ error: balanceResult.error });
+            }
+        } else if (employee.leaveBalances && wasApproved && willBeApproved) {
             if (typeof employee.leaveBalances.sick === 'undefined') employee.leaveBalances.sick = 0;
             if (typeof employee.leaveBalances.casual === 'undefined') employee.leaveBalances.casual = 0;
             if (typeof employee.leaveBalances.paid === 'undefined') employee.leaveBalances.paid = 0;
@@ -926,6 +987,38 @@ router.put('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) => 
         cacheServicePut.invalidateDashboard(todayIST);
         cacheServicePut.invalidateLeaveAnalytics();
 
+        const employeeDoc = await User.findById(updatedRequest.employee).lean();
+        if (employeeDoc) {
+            if (statusChanged && wasApproved && !willBeApproved) {
+                const action = updatedRequest.status === 'Rejected' ? 'rejected' : 'revoked';
+                NewNotificationService.notifyLeaveReverted(
+                    updatedRequest.employee,
+                    employeeDoc.fullName,
+                    updatedRequest.requestType,
+                    action,
+                    null,
+                    updatedRequest._id.toString()
+                ).catch((err) => console.error('Error sending leave revert notification:', err));
+            } else if (wasApproved && willBeApproved && (datesChanged || requestTypeChanged || allocationsChanged)) {
+                NewNotificationService.notifyLeaveReverted(
+                    updatedRequest.employee,
+                    employeeDoc.fullName,
+                    updatedRequest.requestType,
+                    'updated',
+                    datesChanged ? 'Some leave dates or types were changed.' : 'Your leave details were updated.',
+                    updatedRequest._id.toString()
+                ).catch((err) => console.error('Error sending leave update notification:', err));
+            } else if (statusChanged && !wasApproved && willBeApproved) {
+                NewNotificationService.notifyLeaveResponse(
+                    updatedRequest.employee,
+                    employeeDoc.fullName,
+                    'Approved',
+                    updatedRequest.requestType,
+                    null
+                ).catch((err) => console.error('Error sending leave approval notification:', err));
+            }
+        }
+
         res.json({
             message: 'Request updated successfully.',
             request: updatedRequest,
@@ -952,42 +1045,20 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
             return res.status(404).json({ error: 'Request not found.' });
         }
         
-        // CRITICAL FIX: If leave was approved, restore leave balance and revert attendance
         if (deletedRequest.status === 'Approved') {
             const employee = await User.findById(deletedRequest.employee).session(session);
             if (employee) {
-                // Use working-day count only (exclude any auto-clubbed Saturdays/Sundays)
-                const workingDayCount = countWorkingDaysInLeaveDates(deletedRequest.leaveDates);
-                const leaveDuration = workingDayCount * (deletedRequest.leaveType === 'Full Day' ? 1 : 0.5);
-                
-                // Map leave types to balance fields; Backdated Leave uses stored breakdown
-                const reqTypeNorm = LeavePolicyService.normalizeRequestType(deletedRequest.requestType);
-                if (reqTypeNorm === 'Backdated Leave' && (deletedRequest.backdatedSickDeducted > 0 || deletedRequest.backdatedCasualDeducted > 0)) {
-                    const update = { $inc: {} };
-                    if (deletedRequest.backdatedSickDeducted > 0) update.$inc['leaveBalances.sick'] = deletedRequest.backdatedSickDeducted;
-                    if (deletedRequest.backdatedCasualDeducted > 0) update.$inc['leaveBalances.casual'] = deletedRequest.backdatedCasualDeducted;
-                    await User.findByIdAndUpdate(employee._id, update, { session });
-                    if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_BALANCE] Deleted approved Backdated Leave: Restored sick=${deletedRequest.backdatedSickDeducted}, casual=${deletedRequest.backdatedCasualDeducted} for employee ${employee._id}`);
-                } else {
-                    let leaveField;
-                    switch (reqTypeNorm) {
-                        case 'Sick': leaveField = 'sick'; break;
-                        case 'Planned': leaveField = 'paid'; break;
-                        case 'Casual': leaveField = 'casual'; break;
-                        default: leaveField = null;
-                    }
-                    if (leaveField && employee.leaveBalances) {
-                        if (typeof employee.leaveBalances[leaveField] === 'undefined') {
-                            employee.leaveBalances[leaveField] = 0;
-                        }
-                        employee.leaveBalances[leaveField] += leaveDuration;
-                        await employee.save({ session });
-                        if (process.env.NODE_ENV !== 'production') console.log(`[LEAVE_BALANCE] Deleted approved leave: Restored ${leaveDuration} ${leaveField} days for employee ${employee._id}. New balance: ${employee.leaveBalances[leaveField]}`);
-                    }
+                const balanceResult = await applyBalanceOnStatusChange(
+                    deletedRequest,
+                    employee,
+                    'Approved',
+                    'Rejected',
+                    session
+                );
+                if (!balanceResult.ok) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ error: balanceResult.error });
                 }
-                
-                // Revert attendance records
-                const { syncAttendanceOnLeaveRejection } = require('../services/leaveAttendanceSyncService');
                 await syncAttendanceOnLeaveRejection(deletedRequest, session);
             }
         }
@@ -1025,18 +1096,17 @@ router.delete('/leaves/:id', [authenticateToken, isAdminOrHr], async (req, res) 
             console.error('Failed to emit Socket.IO event on leave delete:', socketError);
         }
 
-        // Send notification
-        const NewNotificationService = require('../services/NewNotificationService');
         if (deletedRequest.status === 'Approved') {
             const employee = await User.findById(deletedRequest.employee);
             if (employee) {
-                NewNotificationService.notifyLeaveResponse(
-                    deletedRequest.employee, 
-                    employee.fullName, 
-                    'Deleted', 
-                    deletedRequest.requestType, 
-                    'Leave request has been deleted by Admin.'
-                ).catch(err => console.error('Error sending leave deletion notification:', err));
+                NewNotificationService.notifyLeaveReverted(
+                    deletedRequest.employee,
+                    employee.fullName,
+                    deletedRequest.requestType,
+                    'deleted',
+                    'Your leave has been removed from the system.',
+                    deletedRequest._id.toString()
+                ).catch((err) => console.error('Error sending leave deletion notification:', err));
             }
         }
         
@@ -1194,12 +1264,17 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         const requestTypeNormalized = LeavePolicyService.normalizeRequestType(request.requestType);
         const leaveField = LeavePolicyService.getBalanceField(requestTypeNormalized);
 
+        if (oldStatus === 'Returned') {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'This request was returned to the employee for correction. Approve after they resubmit.' });
+        }
+
         if (newStatus === 'Approved') {
             // CRITICAL FIX: If admin provides overrideReason, skip policy validations
             // Admin can approve at any time regardless of advance notice, weekday restrictions, etc.
             if (overrideReason) {
                 // Only check balance sufficiency (cannot override insufficient balance without explicit handling)
-                const approvalCheck = LeavePolicyService.validateApproval(request, employee);
+                const approvalCheck = validateApprovalBalances(request, employee);
                 if (!approvalCheck.allowed) {
                     // Allow admin to override balance check as well with explicit override
                     console.warn(`[Admin Override] Balance check failed but overridden: ${approvalCheck.reason}`);
@@ -1213,7 +1288,7 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
             } else {
                 // No override - run full validation
                 // Re-validate approval: balance must be sufficient at approval time
-                const approvalCheck = LeavePolicyService.validateApproval(request, employee);
+                const approvalCheck = validateApprovalBalances(request, employee);
                 if (!approvalCheck.allowed) {
                     await session.abortTransaction();
                     return res.status(400).json({ error: approvalCheck.reason });
@@ -1262,90 +1337,11 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
             }
         }
 
-        // Atomic balance update: single-field (sick/paid/casual) or Backdated Leave (sick + casual)
-        if (leaveField && newStatus !== oldStatus) {
-            if (leaveField === 'backdated') {
-                // Backdated Leave: deduct Sick first then Casual (Permanent); Intern/Probation no deduction
-                const resolved = LeavePolicyService.resolveBalanceForBackdatedLeave(employee, leaveDuration);
-                if (resolved.deduct === false) {
-                    // No deduction (Intern/Probation)
-                } else if (resolved.allowed === true && resolved.deductions && resolved.deductions.length > 0) {
-                    if (newStatus === 'Approved' && oldStatus !== 'Approved') {
-                        const conditions = { _id: employee._id };
-                        resolved.deductions.forEach(({ field, amount }) => {
-                            conditions[`leaveBalances.${field}`] = { $gte: amount };
-                        });
-                        const update = { $inc: {} };
-                        resolved.deductions.forEach(({ field, amount }) => {
-                            update.$inc[`leaveBalances.${field}`] = -amount;
-                        });
-                        const updated = await User.findOneAndUpdate(conditions, update, { session, new: true });
-                        if (!updated) {
-                            await session.abortTransaction();
-                            return res.status(400).json({ error: 'Insufficient leave balance at approval time (or concurrent update).' });
-                        }
-                        const sickD = resolved.deductions.find(d => d.field === 'sick');
-                        const casualD = resolved.deductions.find(d => d.field === 'casual');
-                        request.backdatedSickDeducted = sickD ? sickD.amount : 0;
-                        request.backdatedCasualDeducted = casualD ? casualD.amount : 0;
-                    }
-                }
-            } else if (leaveField !== 'backdated') {
-                const updatePath = `leaveBalances.${leaveField}`;
-                if (newStatus === 'Approved' && oldStatus !== 'Approved') {
-                    // Get current balance from database to ensure accuracy
-                    const currentBalanceDoc = await User.findById(employee._id).select(`leaveBalances.${leaveField}`).session(session).lean();
-                    const currentBalance = currentBalanceDoc?.leaveBalances?.[leaveField];
-                    const effectiveBalance = (currentBalance === undefined || currentBalance === null) ? 0 : currentBalance;
-                    
-                    // Check balance sufficiency
-                    if (effectiveBalance < leaveDuration) {
-                        await session.abortTransaction();
-                        return res.status(400).json({ 
-                            error: `Insufficient leave balance at approval time. Required ${leaveDuration} day(s), available ${effectiveBalance}.` 
-                        });
-                    }
-                    
-                    // Initialize field if it doesn't exist
-                    if (currentBalance === undefined || currentBalance === null) {
-                        await User.findByIdAndUpdate(
-                            employee._id,
-                            { $set: { [updatePath]: 0 } },
-                            { session }
-                        );
-                    }
-                    
-                    // Perform atomic update
-                    const updated = await User.findOneAndUpdate(
-                        { _id: employee._id, [updatePath]: { $gte: leaveDuration } },
-                        { $inc: { [updatePath]: -leaveDuration } },
-                        { session, new: true }
-                    );
-                    if (!updated) {
-                        await session.abortTransaction();
-                        return res.status(400).json({ 
-                            error: `Insufficient leave balance at approval time (or concurrent update). Required ${leaveDuration} day(s), available ${effectiveBalance}.` 
-                        });
-                    }
-                } else if (newStatus !== 'Approved' && oldStatus === 'Approved') {
-                    await User.findByIdAndUpdate(
-                        employee._id,
-                        { $inc: { [updatePath]: leaveDuration } },
-                        { session }
-                    );
-                }
-            }
-        }
-
-        // Restore balance when reverting Approved -> Rejected for Backdated Leave (use stored breakdown)
-        if (leaveField === 'backdated' && newStatus !== 'Approved' && oldStatus === 'Approved') {
-            const sickRestore = request.backdatedSickDeducted ?? 0;
-            const casualRestore = request.backdatedCasualDeducted ?? 0;
-            if (sickRestore > 0 || casualRestore > 0) {
-                const update = { $inc: {} };
-                if (sickRestore > 0) update.$inc['leaveBalances.sick'] = sickRestore;
-                if (casualRestore > 0) update.$inc['leaveBalances.casual'] = casualRestore;
-                await User.findByIdAndUpdate(employee._id, update, { session });
+        if (newStatus !== oldStatus) {
+            const balanceResult = await applyBalanceOnStatusChange(request, employee, oldStatus, newStatus, session);
+            if (!balanceResult.ok) {
+                await session.abortTransaction();
+                return res.status(400).json({ error: balanceResult.error });
             }
         }
 
@@ -1370,8 +1366,19 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
 
         await session.commitTransaction();
 
-        NewNotificationService.notifyLeaveResponse(request.employee, employee.fullName, newStatus, request.requestType, request.rejectionNotes)
-            .catch(err => console.error('Error sending leave response notification:', err));
+        if (oldStatus === 'Approved' && newStatus !== 'Approved') {
+            NewNotificationService.notifyLeaveReverted(
+                request.employee,
+                employee.fullName,
+                request.requestType,
+                newStatus === 'Rejected' ? 'rejected' : 'revoked',
+                request.rejectionNotes || null,
+                request._id.toString()
+            ).catch((err) => console.error('Error sending leave revert notification:', err));
+        } else {
+            NewNotificationService.notifyLeaveResponse(request.employee, employee.fullName, newStatus, request.requestType, request.rejectionNotes)
+                .catch((err) => console.error('Error sending leave response notification:', err));
+        }
 
         // Emit Socket.IO event to notify all clients about the leave status change
         try {
@@ -1421,6 +1428,157 @@ router.patch('/leaves/:id/status', [authenticateToken, isAdminOrHr], async (req,
         res.status(500).json({ error: 'Failed to update request status.' });
     } finally {
         session.endSession();
+    }
+});
+
+// PATCH /leaves/:id/return-for-correction — send back to employee with HR note (editable resubmit)
+router.patch('/leaves/:id/return-for-correction', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : '';
+
+    if (!trimmedNotes) {
+        return res.status(400).json({ error: 'A correction note for the employee is required.' });
+    }
+
+    try {
+        const request = await LeaveRequest.findById(id);
+        if (!request) return res.status(404).json({ error: 'Request not found.' });
+        if (request.requestType === 'YEAR_END') {
+            return res.status(400).json({ error: 'Year-End requests cannot be returned through this action.' });
+        }
+        if (request.status !== 'Pending') {
+            return res.status(400).json({ error: 'Only pending requests can be returned for correction.' });
+        }
+
+        const employee = await User.findById(request.employee);
+        if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+        request.status = 'Returned';
+        request.hrCorrectionNotes = trimmedNotes;
+        request.returnedBy = req.user.userId;
+        request.returnedAt = new Date();
+        request.rejectionNotes = undefined;
+        await request.save();
+
+        NewNotificationService.notifyLeaveReturnedForCorrection(
+            request.employee,
+            employee.fullName,
+            request.requestType,
+            trimmedNotes,
+            request._id.toString()
+        ).catch((err) => console.error('Error sending return-for-correction notification:', err));
+
+        try {
+            const { getIO } = require('../socketManager');
+            const io = getIO();
+            if (io) {
+                io.emit('leave_request_updated', {
+                    leaveId: request._id,
+                    employeeId: request.employee,
+                    status: request.status,
+                    requestType: request.requestType,
+                    hrCorrectionNotes: trimmedNotes,
+                    timestamp: new Date().toISOString(),
+                    message: 'Leave returned for correction',
+                });
+            }
+        } catch (socketError) {
+            console.error('Failed to emit Socket.IO event:', socketError);
+        }
+
+        const cacheService = require('../services/cacheService');
+        const todayStr = getTodayISTKey();
+        cacheService.invalidatePendingLeaves(todayStr);
+        cacheService.invalidateDashboard(todayStr);
+        cacheService.invalidateLeaveAnalytics();
+
+        res.json({ message: 'Leave request returned to employee for correction.', request });
+    } catch (error) {
+        console.error(`Error returning leave ${id} for correction:`, error);
+        res.status(500).json({ error: 'Failed to return leave for correction.' });
+    }
+});
+
+// PATCH /leaves/:id/day-allocations — split LOP days into Planned / Casual / LOP
+router.patch('/leaves/:id/day-allocations', [authenticateToken, isAdminOrHr], async (req, res) => {
+    const { id } = req.params;
+    const { allocations } = req.body;
+
+    try {
+        const request = await LeaveRequest.findById(id);
+        if (!request) return res.status(404).json({ error: 'Request not found.' });
+        if (request.requestType !== 'Loss of Pay') {
+            return res.status(400).json({ error: 'Day allocations apply only to Loss of Pay requests.' });
+        }
+        if (!['Pending', 'Approved'].includes(request.status)) {
+            return res.status(400).json({ error: 'Allocations can only be set on pending or approved requests.' });
+        }
+        const validation = validateDayAllocations(request, allocations);
+        if (!validation.valid) {
+            return res.status(400).json({ error: validation.error });
+        }
+
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const employee = await User.findById(request.employee).session(session);
+            if (!employee) {
+                await session.abortTransaction();
+                return res.status(404).json({ error: 'Employee not found.' });
+            }
+
+            if (request.status === 'Approved') {
+                const balanceResult = await reconcileApprovedDayAllocations(
+                    employee._id,
+                    request,
+                    request.dayTypeAllocations,
+                    validation.allocations,
+                    session
+                );
+                if (!balanceResult.ok) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ error: balanceResult.error });
+                }
+            }
+
+            request.dayTypeAllocations = validation.allocations;
+            request.dayAllocationsUpdatedBy = req.user.userId;
+            request.dayAllocationsUpdatedAt = new Date();
+            await request.save({ session });
+            await session.commitTransaction();
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            session.endSession();
+        }
+
+        const cacheService = require('../services/cacheService');
+        cacheService.invalidateLeaveAnalytics();
+
+        const { breakdown } = computeEffectiveDeductions(request);
+        if (request.status === 'Approved') {
+            const employee = await User.findById(request.employee);
+            if (employee) {
+                NewNotificationService.notifyLeaveReverted(
+                    request.employee,
+                    employee.fullName,
+                    request.requestType,
+                    'updated',
+                    'HR adjusted how your LOP days apply to Planned/Casual balance.',
+                    request._id.toString()
+                ).catch((err) => console.error('Error sending allocation update notification:', err));
+            }
+        }
+        res.json({
+            message: 'Day allocations saved.',
+            request,
+            effectiveBreakdown: breakdown,
+        });
+    } catch (error) {
+        console.error(`Error saving day allocations for leave ${id}:`, error);
+        res.status(500).json({ error: 'Failed to save day allocations.' });
     }
 });
 
@@ -2345,6 +2503,103 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
 
 // --- DASHBOARD & LOGS ROUTES ---
 
+const TEAMS_STATUS_OVERRIDES_KEY = 'teamsStatusOverrides';
+
+/** Active employees absent today (no clock-in, not on leave, working day per policy). */
+async function fetchAbsentTodayEmployees(today) {
+    const holidays = await Holiday.find({ isTentative: { $ne: true } }).select('date').lean();
+    const isCompanyHoliday = (holidays || []).some((h) => getISTDateString(h.date) === today);
+    if (isCompanyHoliday) return [];
+
+    const todayDate = parseISTDate(today);
+    const [year, month, day] = today.split('-').map(Number);
+    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    if (dayOfWeek === 0) return [];
+
+    const todayStart = startOfISTDay(todayDate);
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const isSaturday = dayOfWeek === 6;
+
+    const employees = await User.find({ isActive: true, role: { $ne: 'Admin' } })
+        .select('fullName employeeCode designation department profileImageUrl alternateSaturdayPolicy')
+        .lean();
+
+    let filtered = employees;
+    if (isSaturday) {
+        filtered = employees.filter((emp) => {
+            const policy = emp.alternateSaturdayPolicy || 'All Saturdays Working';
+            return !LeavePolicyService.isSaturdayOff(todayDate, policy);
+        });
+    }
+
+    const employeeIds = filtered.map((e) => e._id);
+    if (employeeIds.length === 0) return [];
+
+    const todayLogs = await AttendanceLog.find({
+        user: { $in: employeeIds },
+        attendanceDate: today,
+        clockInTime: { $exists: true, $ne: null },
+    })
+        .select('user')
+        .lean();
+
+    const clockedInSet = new Set((todayLogs || []).map((l) => l.user.toString()));
+
+    const approvedLeaves = await LeaveRequest.find({
+        employee: { $in: employeeIds },
+        status: 'Approved',
+        leaveDates: { $elemMatch: { $gte: todayStart, $lt: todayEnd } },
+    })
+        .select('employee')
+        .lean();
+
+    const onLeaveSet = new Set((approvedLeaves || []).map((l) => l.employee.toString()));
+
+    const overrideSetting = await Setting.findOne({ key: TEAMS_STATUS_OVERRIDES_KEY }).lean();
+    const overrideMap = new Map();
+    for (const o of Array.isArray(overrideSetting?.value) ? overrideSetting.value : []) {
+        if (o.date === today && o.employeeId) {
+            overrideMap.set(o.employeeId.toString(), { status: o.status });
+        }
+    }
+
+    const absent = [];
+    for (const emp of filtered) {
+        const id = emp._id.toString();
+        const override = overrideMap.get(id);
+
+        if (override) {
+            if (override.status === 'absent') {
+                absent.push({
+                    _id: emp._id,
+                    fullName: emp.fullName,
+                    employeeCode: emp.employeeCode,
+                    designation: emp.designation,
+                    department: emp.department,
+                    profileImageUrl: emp.profileImageUrl,
+                    status: 'Absent',
+                });
+            }
+            continue;
+        }
+
+        if (onLeaveSet.has(id) || clockedInSet.has(id)) continue;
+
+        absent.push({
+            _id: emp._id,
+            fullName: emp.fullName,
+            employeeCode: emp.employeeCode,
+            designation: emp.designation,
+            department: emp.department,
+            profileImageUrl: emp.profileImageUrl,
+            status: 'Absent',
+        });
+    }
+
+    absent.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+    return absent;
+}
+
 // Lightweight endpoint for delta updates: pending leaves only (used by socket-driven refresh).
 // Optional cache: TTL 45s; invalidated on leave create/approve/reject/delete.
 router.get('/dashboard-pending-leaves', [authenticateToken, isAdminOrHr], async (req, res) => {
@@ -2403,8 +2658,6 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
     const today = getTodayISTKey();
     const { includePendingLeaves } = req.query;
     const shouldIncludePendingLeaves = includePendingLeaves === 'true' || includePendingLeaves === true;
-    const perfLog = process.env.NODE_ENV !== 'production' || process.env.PERF_LOG === 'true';
-
     try {
         const cacheService = require('../services/cacheService');
         let cachedSummary = null;
@@ -2416,13 +2669,17 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 console.warn('[dashboard-summary] Cache get failed, falling back to full computation:', cacheErr?.message);
             }
         }
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache_lookup took ${Date.now() - t0}ms`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] cache_lookup took ${Date.now() - t0}ms`);
         if (cachedSummary && !shouldIncludePendingLeaves) {
-            if (perfLog) {
-                if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=hit includePendingLeaves=false ms=', Date.now() - startMs);
+            verboseLog('[dashboard-summary] cache=hit includePendingLeaves=false ms=', Date.now() - startMs);
+            let absentTodayList = cachedSummary.absentTodayList;
+            if (!Array.isArray(absentTodayList)) {
+                absentTodayList = await fetchAbsentTodayEmployees(today);
             }
             const normalized = {
                 ...cachedSummary,
+                absentCount: absentTodayList.length,
+                absentTodayList,
                 whosInList: normalizeWhosInListLogoutTo7PM(cachedSummary.whosInList, today)
             };
             return res.json(normalized);
@@ -2439,12 +2696,16 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     .populate('employee', 'fullName employeeCode')
                     .sort({ createdAt: 1 })
                     .lean();
-                if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] pending_leaves_query took ${Date.now() - t1}ms`);
-                if (perfLog) {
-                    if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=hit includePendingLeaves=true ms=', Date.now() - startMs);
+                perfLog(`[ADMIN_DASHBOARD_TIMING] pending_leaves_query took ${Date.now() - t1}ms`);
+                verboseLog('[dashboard-summary] cache=hit includePendingLeaves=true ms=', Date.now() - startMs);
+                let absentTodayList = cachedSummary.absentTodayList;
+                if (!Array.isArray(absentTodayList)) {
+                    absentTodayList = await fetchAbsentTodayEmployees(today);
                 }
                 const normalizedSummary = {
                     ...cachedSummary,
+                    absentCount: absentTodayList.length,
+                    absentTodayList,
                     whosInList: normalizeWhosInListLogoutTo7PM(cachedSummary.whosInList, today)
                 };
                 return res.json({
@@ -2455,8 +2716,14 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 if (process.env.NODE_ENV !== 'production') {
                     console.warn('[dashboard-summary] Pending leaves fetch failed, returning cached summary only:', leaveError?.message);
                 }
+                let absentTodayList = cachedSummary.absentTodayList;
+                if (!Array.isArray(absentTodayList)) {
+                    absentTodayList = await fetchAbsentTodayEmployees(today);
+                }
                 const normalizedSummary = {
                     ...cachedSummary,
+                    absentCount: absentTodayList.length,
+                    absentTodayList,
                     whosInList: normalizeWhosInListLogoutTo7PM(cachedSummary.whosInList, today)
                 };
                 return res.json({
@@ -2467,10 +2734,8 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
         }
 
         // CACHE MISS: Compute base dashboard summary (no N+1 in Who's In)
-        if (perfLog) {
-            if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss computing full summary');
-        }
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache=miss, starting full computation`);
+        verboseLog('[dashboard-summary] cache=miss computing full summary');
+        perfLog(`[ADMIN_DASHBOARD_TIMING] cache=miss, starting full computation`);
         // Filter: Exclude Admin role and inactive users (business rule: only active employees/interns should appear in counts)
         const t2 = Date.now();
         const totalEmployeesPromise = User.countDocuments({ role: { $ne: 'Admin' }, isActive: true }).lean();
@@ -2569,12 +2834,12 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             backdatedLeavesPromise,
             pendingEarlyCheckoutPromise
         ]);
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] parallel_queries took ${Date.now() - t2}ms`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] parallel_queries took ${Date.now() - t2}ms`);
 
         // PERFORMANCE FIX: Batch-load all data for Who's In list to eliminate N+1 queries
         const t3 = Date.now();
         const rawList = Array.isArray(whosInListRaw) ? whosInListRaw : [];
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_count=${rawList.length}`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] whosInList_count=${rawList.length}`);
         
         // Check cache first for all employees
         const uncachedEmployees = [];
@@ -2598,7 +2863,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             }
         }
         
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] cache_hits=${rawList.length - uncachedEmployees.length} cache_misses=${uncachedEmployees.length}`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] cache_hits=${rawList.length - uncachedEmployees.length} cache_misses=${uncachedEmployees.length}`);
         
         // For uncached employees, batch-load all required data in 3 parallel queries
         if (uncachedEmployees.length > 0) {
@@ -2646,7 +2911,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 usersMap.set(user._id.toString(), user);
             });
             
-            if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] batch_queries took ${Date.now() - t3a}ms`);
+            perfLog(`[ADMIN_DASHBOARD_TIMING] batch_queries took ${Date.now() - t3a}ms`);
             
             // Now process each uncached employee with pre-loaded data (no DB calls)
             const t3b = Date.now();
@@ -2696,16 +2961,16 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     activeBreak
                 });
             }
-            if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] uncached_processing took ${Date.now() - t3b}ms`);
+            perfLog(`[ADMIN_DASHBOARD_TIMING] uncached_processing took ${Date.now() - t3b}ms`);
         }
         
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] whosInList_enrichment took ${Date.now() - t3}ms`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] whosInList_enrichment took ${Date.now() - t3}ms`);
 
         const t4 = Date.now();
         let presentCount = 0;
         let lateCount = 0;
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] count_calculation_start took ${Date.now() - t4}ms`);
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_DEBUG] todayLogs.length=${(todayLogs || []).length}`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] count_calculation_start took ${Date.now() - t4}ms`);
+        perfLog(`[ADMIN_DASHBOARD_DEBUG] todayLogs.length=${(todayLogs || []).length}`);
 
         // Count ALL employees who clocked in as present (both on-time and late)
         // Late employees are a subset of present employees
@@ -2718,7 +2983,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             }
         });
         
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_DEBUG] After forEach: presentCount=${presentCount}, lateCount=${lateCount}`);
+        perfLog(`[ADMIN_DASHBOARD_DEBUG] After forEach: presentCount=${presentCount}, lateCount=${lateCount}`);
 
         if ((todayLogs || []).length === 0) {
             const logIds = await AttendanceLog.find({ attendanceDate: today }).select('_id').lean();
@@ -2751,7 +3016,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 }
             }
         });
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] onLeaveCount_query took ${Date.now() - t5}ms`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] onLeaveCount_query took ${Date.now() - t5}ms`);
 
         const statusCounts = {
             'Present': presentCount,
@@ -2794,11 +3059,16 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
         const recentActivity = [...mappedNotes, ...mappedBreakRequests, ...mappedLeaveRequests, ...mappedEarlyCheckouts]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+        const absentTodayList = await fetchAbsentTodayEmployees(today);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] absentTodayList_count=${absentTodayList.length} took ${Date.now() - t6}ms`);
+
         const summary = {
             totalEmployees: totalEmployees ?? 0,
             presentCount: statusCounts['Present'],
             lateCount: statusCounts['Late'],
             onLeaveCount: statusCounts['On Leave'],
+            absentCount: absentTodayList.length,
+            absentTodayList,
             whosInList: normalizeWhosInListLogoutTo7PM(whosInList || [], today),
             recentActivity: recentActivity || []
         };
@@ -2810,7 +3080,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                 console.warn('[dashboard-summary] Cache set failed:', setCacheErr?.message);
             }
         }
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] summary_assembly_and_cache_set took ${Date.now() - t6}ms`);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] summary_assembly_and_cache_set took ${Date.now() - t6}ms`);
 
         if (shouldIncludePendingLeaves) {
             try {
@@ -2821,9 +3091,7 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
                     .populate('employee', 'fullName employeeCode')
                     .sort({ createdAt: 1 })
                     .lean();
-                if (perfLog) {
-                    if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss includePendingLeaves=true ms=', Date.now() - startMs);
-                }
+                verboseLog('[dashboard-summary] cache=miss includePendingLeaves=true ms=', Date.now() - startMs);
                 return res.json({
                     summary,
                     pendingLeaveRequests: Array.isArray(pendingLeaveRequests) ? pendingLeaveRequests : []
@@ -2839,13 +3107,11 @@ router.get('/dashboard-summary', [authenticateToken, isAdminOrHr], async (req, r
             }
         }
 
-        if (perfLog) {
-            if (process.env.NODE_ENV !== 'production') console.log('[dashboard-summary] cache=miss ms=', Date.now() - startMs);
-        }
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] TOTAL_TIME=${Date.now() - startMs}ms`);
+        verboseLog('[dashboard-summary] cache=miss ms=', Date.now() - startMs);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] TOTAL_TIME=${Date.now() - startMs}ms`);
         res.json(summary);
     } catch (error) {
-        if (perfLog) console.log(`[ADMIN_DASHBOARD_TIMING] ERROR after ${Date.now() - startMs}ms:`, error.message);
+        perfLog(`[ADMIN_DASHBOARD_TIMING] ERROR after ${Date.now() - startMs}ms:`, error.message);
         if (process.env.NODE_ENV !== 'production') {
             console.error('[dashboard-summary] Error:', error);
         }
@@ -3034,6 +3300,10 @@ router.get('/dashboard-employees/:type', [authenticateToken, isAdminOrHr], async
                     employmentStatus: emp.employmentStatus,
                     joiningDate: emp.joiningDate
                 }));
+                break;
+
+            case 'absent':
+                employees = await fetchAbsentTodayEmployees(today);
                 break;
 
             default:
