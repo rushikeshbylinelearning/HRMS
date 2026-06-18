@@ -16,6 +16,7 @@ const AnnouncementDropdown = () => {
   const [lastReadTimeLoading, setLastReadTimeLoading] = useState(true); // NEW: Prevent race condition
   const dropdownRef = useRef(null);
   const channelRef = useRef(null);
+  const seenAnnouncementIdsRef = useRef(new Set());
   const { user } = useAuth();
   const { showAnnouncementNotification, requestPermission } = useDesktopNotification();
 
@@ -208,6 +209,11 @@ const AnnouncementDropdown = () => {
   // Listen for real-time announcements to update badge, play sound, and show desktop notification
   useEffect(() => {
     const handleNewAnnouncement = (msg) => {
+      if (!msg?._id || seenAnnouncementIdsRef.current.has(msg._id)) {
+        return;
+      }
+      seenAnnouncementIdsRef.current.add(msg._id);
+
       // Only show notification if dropdown is closed and message is from another user
       if (!open) {
         const senderId = msg.sender?._id || msg.sender?.id;

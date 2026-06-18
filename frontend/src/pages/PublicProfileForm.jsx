@@ -5,7 +5,7 @@ import axios from 'axios';
 import './PublicProfileForm.css';
 
 // Plain axios — no auth interceptors
-const API_BASE_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_BASE_URL || 'https://attendance-test.bylinelms.com');
+const API_BASE_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com');
 const publicApi = axios.create({ baseURL: API_BASE_URL, withCredentials: false, headers: { 'Content-Type': 'application/json' } });
 
 // ── Default state (flat field names matching the rest of the app) ──

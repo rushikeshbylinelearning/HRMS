@@ -22,6 +22,23 @@ const announcementMessageSchema = new mongoose.Schema(
       enum: ["general", "important", "holiday", "policy"],
       default: "general",
     },
+    isTEABreak: {
+      type: Boolean,
+      default: false,
+    },
+    teaBreakStartedAt: {
+      type: Date,
+      default: null,
+    },
+    teaBreakType: {
+      type: String,
+      enum: ["morning", "evening"],
+      default: null,
+    },
+    teaBreakStoppedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

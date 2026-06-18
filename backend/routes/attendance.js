@@ -18,6 +18,7 @@ const LeavePolicyService = require('../services/LeavePolicyService');
 const cache = require('../utils/cache');
 const { getISTNow, getISTDateString, parseISTDate, startOfISTDay, endOfISTDay, getShiftDateTimeIST, formatISTTime, getAttendanceDate } = require('../utils/istTime');
 const { getGracePeriodMinutes } = require('../utils/gracePeriod');
+const { isHalfDayLeaveType } = require('../utils/halfDayLeave');
 
 const router = express.Router();
 
@@ -59,11 +60,19 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         return res.status(401).json({ error: 'Authentication required.' });
     }
     const todayStr = getAttendanceDate(userId);
+    const todayStart = startOfISTDay(todayStr);
+    const todayEnd = endOfISTDay(todayStr);
     try {
-        const [user, todayLog, GRACE_PERIOD_MINUTES] = await Promise.all([
+        const [user, todayLog, GRACE_PERIOD_MINUTES, approvedHalfDayLeaveDoc] = await Promise.all([
             User.findById(userId).populate('shiftGroup'),
             AttendanceLog.findOne({ user: userId, attendanceDate: todayStr }),
-            getGracePeriodMinutes()
+            getGracePeriodMinutes(),
+            LeaveRequest.findOne({
+                employee: userId,
+                status: 'Approved',
+                leaveType: { $in: ['Half Day - First Half', 'Half Day - Second Half'] },
+                leaveDates: { $elemMatch: { $gte: todayStart, $lte: todayEnd } }
+            }).select('_id leaveType').lean()
         ]);
 
         if (!user) { return res.status(404).json({ error: 'User not found.' }); }
@@ -77,15 +86,13 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             return res.status(400).json({ error: 'Cannot clock in. Invalid shift configuration.' });
         }
         
-        // PHASE 6: Check if today is an approved leave day
+        // PHASE 6: Block check-in only for approved FULL-DAY leave (half-day employees work the other half)
         if (todayLog && todayLog.attendanceStatus === 'Leave') {
-            // Check if leave is still active
-            const LeaveRequest = require('../models/LeaveRequest');
             if (todayLog.leaveRequest) {
-                const leaveRequest = await LeaveRequest.findById(todayLog.leaveRequest);
-                if (leaveRequest && leaveRequest.status === 'Approved') {
-                    return res.status(400).json({ 
-                        error: 'Cannot clock in. You have an approved leave for today. Please contact HR if you need to work on a leave day.' 
+                const leaveRequest = await LeaveRequest.findById(todayLog.leaveRequest).select('status leaveType').lean();
+                if (leaveRequest && leaveRequest.status === 'Approved' && !isHalfDayLeaveType(leaveRequest.leaveType)) {
+                    return res.status(400).json({
+                        error: 'Cannot clock in. You have an approved leave for today. Please contact HR if you need to work on a leave day.'
                     });
                 }
             }
@@ -94,7 +101,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         let attendanceLog = todayLog;
         if (!attendanceLog) {
             try {
-                attendanceLog = await AttendanceLog.create({
+                const createPayload = {
                     user: userId,
                     attendanceDate: todayStr,
                     clockInTime: getISTNow(),
@@ -102,7 +109,11 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
                     penaltyMinutes: 0,
                     paidBreakMinutesTaken: 0,
                     unpaidBreakMinutesTaken: 0,
-                });
+                };
+                if (approvedHalfDayLeaveDoc?._id) {
+                    createPayload.leaveRequest = approvedHalfDayLeaveDoc._id;
+                }
+                attendanceLog = await AttendanceLog.create(createPayload);
             } catch (createErr) {
                 if (createErr.code === 11000) {
                     // Duplicate key: another request created the log (race). Reload and continue.
@@ -123,6 +134,9 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         
         const activeSession = await AttendanceSession.findOne({ attendanceLog: attendanceLog._id, endTime: null });
         if (activeSession) { return res.status(400).json({ error: 'You are already clocked in.' }); }
+
+        const priorSessionCount = await AttendanceSession.countDocuments({ attendanceLog: attendanceLog._id });
+        const isFirstCheckIn = priorSessionCount === 0;
         
         let newSession;
         try {
@@ -142,12 +156,9 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
 
         // --- ANALYTICS: Check for late login and update status ---
         // CRITICAL FIX: Use FIRST check-in time for late calculation, not latest
-        // If this is the first check-in, use current time. If subsequent check-in, use first session's startTime
         let clockInTimeForLateCalc;
-        const isFirstCheckIn = !todayLog; // Log was just created, so this is first check-in
         
         if (isFirstCheckIn) {
-            // First check-in: use current time
             clockInTimeForLateCalc = getISTNow();
         } else {
             // Subsequent check-in: get first session's startTime (authoritative first check-in)
@@ -205,11 +216,18 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
             }
             
             const updateData = {
+                clockInTime,
                 isLate,
                 isHalfDay,
                 lateMinutes,
                 attendanceStatus
             };
+            if (!attendanceLog.shiftDurationMinutes) {
+                updateData.shiftDurationMinutes = shiftDurationMinutes;
+            }
+            if (!attendanceLog.leaveRequest && approvedHalfDayLeaveDoc?._id) {
+                updateData.leaveRequest = approvedHalfDayLeaveDoc._id;
+            }
             if (!attendanceLog.overriddenByAdmin) {
                 updateData.halfDayReasonCode = null;
                 updateData.halfDayReasonText = '';

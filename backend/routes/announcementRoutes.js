@@ -64,7 +64,7 @@ router.get("/", authenticateToken, async (req, res) => {
 // Post message
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { message, type } = req.body;
+    const { message, type, isTEABreak, teaBreakType } = req.body;
 
     if (!message || message.trim() === "") {
       return res.status(400).json({ message: "Message is required" });
@@ -81,11 +81,26 @@ router.post("/", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const newMessage = await AnnouncementMessage.create({
+    const createPayload = {
       sender: user._id,
       message: message.trim(),
       type: type || "general",
-    });
+    };
+
+    if (isTEABreak === true) {
+      if (!['Admin', 'HR'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Only Admin/HR can post tea break announcements" });
+      }
+      if (!teaBreakType || !['morning', 'evening'].includes(teaBreakType)) {
+        return res.status(400).json({ message: "teaBreakType must be 'morning' or 'evening'" });
+      }
+      const { getISTNow } = require('../utils/istTime');
+      createPayload.isTEABreak = true;
+      createPayload.teaBreakType = teaBreakType;
+      createPayload.teaBreakStartedAt = getISTNow();
+    }
+
+    const newMessage = await AnnouncementMessage.create(createPayload);
 
     const populated = await newMessage.populate(
       "sender",
@@ -102,6 +117,45 @@ router.post("/", authenticateToken, async (req, res) => {
 
     // Invalidate list cache so next GET reflects new message immediately
     invalidateAnnouncementsCache();
+
+    // Server-side broadcast — do not rely on the sender's browser socket.emit
+    try {
+      const { getIO } = require('../socketManager');
+      const io = getIO();
+      if (io) {
+        io.to('announcements')
+          .except(`user_${req.user.userId}`)
+          .emit('receiveAnnouncement', msgObj);
+      }
+    } catch (socketErr) {
+      console.error('[Announcements] receiveAnnouncement emit failed:', socketErr.message);
+    }
+
+    if (msgObj.isTEABreak && msgObj.teaBreakStartedAt) {
+      const teaPayload = {
+        announcementId: msgObj._id,
+        teaBreakStartedAt: msgObj.teaBreakStartedAt,
+        teaBreakType: msgObj.teaBreakType,
+        durationMinutes: 10,
+      };
+
+      try {
+        const { getIO } = require('../socketManager');
+        const io = getIO();
+        if (io) {
+          io.to('announcements').emit('tea_break_started', teaPayload);
+        }
+      } catch (socketErr) {
+        console.error('[Announcements] tea_break_started emit failed:', socketErr.message);
+      }
+
+      try {
+        const { scheduleTeaBreakEnforcement } = require('../jobs/teaBreakEnforcer');
+        scheduleTeaBreakEnforcement(msgObj._id, msgObj.teaBreakStartedAt);
+      } catch (jobErr) {
+        console.error('[Announcements] tea break enforcer schedule failed:', jobErr.message);
+      }
+    }
 
     res.status(201).json(msgObj);
   } catch (err) {

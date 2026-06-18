@@ -58,7 +58,7 @@ const sendLeaveNotificationEmails = async (request, employee) => {
                             <p style="padding: 15px; background-color: #f9f9f9; border-left: 4px solid #D32F2F; margin: 10px 0 0 0;">${reasonText}</p>
                         </div>
                         <div style="text-align: center; margin-top: 30px;">
-                            <a href="${process.env.FRONTEND_URL || 'https://attendance-test.bylinelms.com'}/admin/leaves" style="background-color: #D32F2F; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Review Request</a>
+                            <a href="${process.env.FRONTEND_URL || 'https://attendance.bylinelms.com'}/admin/leaves" style="background-color: #D32F2F; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Review Request</a>
                         </div>
                     </div>
                     <div style="background-color: #f2f2f2; padding: 10px; text-align: center; font-size: 12px; color: #777;">

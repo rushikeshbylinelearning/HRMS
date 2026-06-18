@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const AttendanceLog = require('../models/AttendanceLog');
 const User = require('../models/User');
 const { recalculateLateStatus } = require('./dailyStatusService');
+const { isHalfDayLeaveType } = require('../utils/halfDayLeave');
 
 /**
  * Sync attendance records when a leave is approved.
@@ -50,6 +51,8 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
         }
     }
 
+    const isHalfDayLeave = isHalfDayLeaveType(leaveRequest.leaveType);
+
     for (const leaveDate of leaveDates) {
         // Normalize date to YYYY-MM-DD format
         // Handle both Date objects and date strings
@@ -81,13 +84,22 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
         }).session(session);
 
         if (existingLog) {
-            // Log exists - update it to Leave status
-            // But preserve clock-in data if it exists (edge case: employee clocked in then leave approved)
             const hasClockIn = existingLog.clockInTime && existingLog.clockInTime instanceof Date;
 
-            if (hasClockIn) {
-                // STRICT POLICY: NO HYBRID STATES
-                // Void the attendance but keep audit trail in notes
+            if (isHalfDayLeave) {
+                // Half-day: employee works the other half — link leave only, never void working attendance
+                existingLog.leaveRequest = leaveRequest._id;
+                if (!hasClockIn) {
+                    // Do not block check-in: clear legacy full-day Leave marker if present
+                    if (existingLog.attendanceStatus === 'Leave') {
+                        existingLog.attendanceStatus = 'Absent';
+                        existingLog.isLate = false;
+                        existingLog.isHalfDay = false;
+                        existingLog.lateMinutes = 0;
+                    }
+                }
+            } else if (hasClockIn) {
+                // Full-day: STRICT POLICY — void attendance but keep audit trail in notes
                 const auditNote = `[AUTO-VOID] Leave Approved. Voided Clock-In: ${existingLog.clockInTime?.toISOString()} - ${existingLog.clockOutTime?.toISOString() || 'Active'}`;
 
                 existingLog.notes = existingLog.notes ? existingLog.notes + '; ' + auditNote : auditNote;
@@ -96,16 +108,13 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
                 existingLog.attendanceStatus = 'Leave';
                 existingLog.leaveRequest = leaveRequest._id;
 
-                // Reset stats
                 existingLog.totalWorkingHours = 0;
                 existingLog.lateMinutes = 0;
                 existingLog.isLate = false;
                 existingLog.isHalfDay = false;
             } else {
-                // No clock-in - safe to mark as Leave
                 existingLog.attendanceStatus = 'Leave';
                 existingLog.leaveRequest = leaveRequest._id;
-                // Clear any derived status fields since this is a leave day
                 existingLog.isLate = false;
                 existingLog.isHalfDay = false;
                 existingLog.lateMinutes = 0;
@@ -113,9 +122,8 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
 
             await existingLog.save({ session });
             updatedLogs.push(existingLog._id);
-        } else {
-            // No log exists - create new AttendanceLog for leave day
-            // Note: clockInTime is optional in schema for leave days
+        } else if (!isHalfDayLeave) {
+            // Full-day only: pre-create Leave log. Half-day leave is tracked via LeaveRequest until check-in.
             const newLogData = {
                 user: employeeId,
                 attendanceDate: dateStr,
@@ -131,8 +139,6 @@ const syncAttendanceOnLeaveApproval = async (leaveRequest, session) => {
                 totalWorkingHours: 0
             };
 
-            // Only set clockInTime/clockOutTime to null explicitly if needed
-            // Leave them undefined to avoid validation issues
             const newLog = await AttendanceLog.create([newLogData], { session });
 
             updatedLogs.push(newLog[0]._id);

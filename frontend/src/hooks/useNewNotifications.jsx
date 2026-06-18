@@ -115,11 +115,10 @@ export const NewNotificationProvider = ({ children }) => {
         
         const title = notification.category?.charAt(0).toUpperCase() + notification.category?.slice(1) || 'Notification';
         showNotification(title, notification.message, { data: notification });
-    }, [showNotification, user]);
+    }, [showNotification, user?.role, user?._id, user?.id]);
 
     useEffect(() => {
         if (authLoading || !user || !token) {
-            if (socket.connected) socket.disconnect();
             return;
         }
 
@@ -127,14 +126,11 @@ export const NewNotificationProvider = ({ children }) => {
         // Token should be raw JWT (not Bearer prefix for socket.auth)
         const rawToken = typeof token === 'string' && token.includes('.') ? token : null;
         if (!rawToken) {
-            console.warn('[useNewNotifications] No valid token available, skipping socket connection');
-            if (socket.connected) socket.disconnect();
+            console.warn('[useNewNotifications] No valid token available, skipping socket listeners');
             return;
         }
 
-        // Note: Socket connection is now managed by AuthContext after /api/auth/me succeeds
-        // This hook should not connect socket directly - it waits for AuthContext
-        // Only set up socket listeners here
+        // Socket connection is managed by AuthContext — only register listeners here
         
         requestPermission();
         fetchNotifications();
@@ -153,9 +149,8 @@ export const NewNotificationProvider = ({ children }) => {
             socket.off('disconnect', onDisconnect);
             socket.off('connect_error', onConnectError);
             socket.off('new_notification', handleNewNotification);
-            if (socket.connected) socket.disconnect();
         };
-    }, [user?.id, user?._id, token, authLoading, fetchNotifications, handleNewNotification, requestPermission]); // Use user IDs instead of full object
+    }, [user?.id, user?._id, token, authLoading, fetchNotifications, handleNewNotification, requestPermission]);
 
     const value = {
         notifications,

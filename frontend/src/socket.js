@@ -25,7 +25,7 @@ const getSocketURL = () => {
         return window.location.origin;
     }
     
-    return 'https://attendance-test.bylinelms.com'; // Fallback
+    return 'https://attendance.bylinelms.com'; // Fallback
 };
 
 const URL = getSocketURL();
@@ -34,14 +34,14 @@ const URL = getSocketURL();
 const socket = io(URL, {
     autoConnect: false,
     path: '/api/socket.io',
-    transports: ['websocket'], // WebSocket first, polling as fallback
-    timeout: 20000,
+    transports: ['polling', 'websocket'],
+    timeout: 30000,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
+    reconnectionDelayMax: 15000,
     upgrade: true,
-    rememberUpgrade: true, // Remember successful WebSocket upgrade
+    rememberUpgrade: false,
     withCredentials: true,
     closeOnBeforeunload: false,
 });

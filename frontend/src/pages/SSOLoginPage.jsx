@@ -25,7 +25,7 @@ const SSOLoginPage = () => {
           ? 'http://localhost:3001/api'
           : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
               ? import.meta.env.VITE_API_BASE_URL
-              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance-test.bylinelms.com'}/api`);
+              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
 
         if (!token) {
           // No token means direct redirect from SSO - check if session exists

@@ -11,6 +11,7 @@ import {
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useBreakUI } from '../context/BreakUIContext';
+import { useTeaBreak } from '../context/TeaBreakContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useBreakWindowScheduler } from '../hooks/useBreakWindowScheduler';
 import { getCurrentLocation, getCachedLocationOnly } from '../services/locationService';
@@ -80,6 +81,7 @@ const getLocalDateString = (date = new Date()) => {
 const EmployeeDashboardPage = () => {
     const { user: contextUser, updateUserContext, loading: authLoading } = useAuth();
     const { uiBreakState, startUiBreak, endUiBreak, setUiBreakState, reconcileFromBackend } = useBreakUI();
+    const { teaBreakData, clearTeaBreak } = useTeaBreak();
     const { canAccess, breakLimits, privilegeLevel } = usePermissions();
     const location = useLocation();
     const [dailyData, setDailyData] = useState(null);
@@ -117,11 +119,11 @@ const EmployeeDashboardPage = () => {
     const lastFetchTimeRef = useRef(0);
 
     const isOnBreakUI = !!uiBreakState;
+    const isOnTeaBreak = !!teaBreakData;
     // NOTE: Break UI is intentionally driven by uiBreakState (optimistic + single authority).
-    // The previous implementation rendered break UI from dailyData.status / dailyData.breaks,
-    // which could be overwritten by stale cached backend responses (status cache TTL) and delayed refetch/socket timing.
-    const displayStatus = isOnBreakUI ? 'On Break' : dailyData?.status;
-    const statusForUi = isOnBreakUI ? 'On Break' : dailyData?.status;
+    const isShowingBreakTimer = isOnBreakUI || isOnTeaBreak;
+    const displayStatus = isShowingBreakTimer ? 'On Break' : dailyData?.status;
+    const statusForUi = isShowingBreakTimer ? 'On Break' : dailyData?.status;
     const breaksForUi = useMemo(() => {
         const base = Array.isArray(dailyData?.breaks) ? dailyData.breaks : [];
         if (!uiBreakState) return base;
@@ -139,7 +141,7 @@ const EmployeeDashboardPage = () => {
     }, [dailyData?.breaks, uiBreakState]);
 
     // Stable: only show timer/progress bar as "visible" when dailyData exists and status is explicitly Clocked In (or on break). Prevents flash when clocked out.
-    const isClockedInSession = Boolean(dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI));
+    const isClockedInSession = Boolean(dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI || isOnTeaBreak));
 
     const dataReady = !!dailyData;
     const timeTrackingReady = dataReady && !loading && hasInitialLoadFinished;
@@ -427,10 +429,28 @@ const EmployeeDashboardPage = () => {
     const [tickNow, setTickNow] = useState(() => new Date());
     useEffect(() => {
         const isClockedInOrBreak = statusForUi === 'Clocked In' || statusForUi === 'On Break';
-        if (!isClockedInOrBreak || !dailyData?.sessions?.length) return;
+        const needsTick = isClockedInOrBreak || isOnTeaBreak;
+        if (!needsTick) return;
+        if (isClockedInOrBreak && !dailyData?.sessions?.length && !isOnTeaBreak) return;
         const intervalId = setInterval(() => setTickNow(new Date()), 1000);
         return () => clearInterval(intervalId);
-    }, [statusForUi, dailyData?.sessions?.length]);
+    }, [statusForUi, dailyData?.sessions?.length, isOnTeaBreak]);
+
+    const TEA_BREAK_DURATION_SEC = 10 * 60;
+
+    const teaBreakElapsedSec = useMemo(() => {
+        if (!teaBreakData?.startedAt) return 0;
+        return Math.max(0, Math.floor((tickNow - new Date(teaBreakData.startedAt)) / 1000));
+    }, [teaBreakData, tickNow]);
+
+    const teaBreakRemainingSec = useMemo(() => {
+        if (!teaBreakData?.startedAt) return TEA_BREAK_DURATION_SEC;
+        return Math.max(0, TEA_BREAK_DURATION_SEC - teaBreakElapsedSec);
+    }, [teaBreakData, teaBreakElapsedSec]);
+
+    // Tea break: show End Break only in the last minute (never Check Out).
+    const canEndTeaBreak = isOnTeaBreak && !isOnBreakUI && teaBreakRemainingSec <= 60;
+    const showEndBreakButton = isOnBreakUI || canEndTeaBreak;
 
     const unifiedState = useMemo(() => {
         const clockIn = dailyData?.sessions?.[0]?.startTime;
@@ -696,6 +716,26 @@ const EmployeeDashboardPage = () => {
         }
     };
 
+    const handleEndTeaBreak = async () => {
+        if (breakActionInFlightRef.current || !teaBreakData?.announcementId) return;
+        breakActionInFlightRef.current = true;
+        setError('');
+        try {
+            await api.post('/tea-break/end', { announcementId: teaBreakData.announcementId });
+            clearTeaBreak();
+            setSnackbar({ open: true, message: 'Tea break ended successfully!' });
+            invalidateEmployeeDashboardCache();
+            if (fetchAllDataRef.current) {
+                await fetchAllDataRef.current(true, true);
+            }
+        } catch (err) {
+            console.error('End tea break error:', err);
+            setError(err.response?.data?.message || 'Failed to end tea break.');
+        } finally {
+            breakActionInFlightRef.current = false;
+        }
+    };
+
     const handleEndBreak = async () => {
         if (breakActionInFlightRef.current) return;
         breakActionInFlightRef.current = true;
@@ -826,12 +866,17 @@ const EmployeeDashboardPage = () => {
                                                 unifiedState={unifiedState}
                                             />
                                             <Box sx={{ mb: 2, textAlign: 'center' }}>
-                                                {isOnBreakUI ? (
+                                                {isShowingBreakTimer ? (
                                                     <MemoizedBreakTimer
                                                         breaks={breaksForUi}
                                                         paidBreakAllowance={paidBreakAllowance}
                                                         activeBreakOverride={activeBreakOverride}
                                                         unifiedDisplay={true}
+                                                        teaBreakOverride={
+                                                            isOnTeaBreak && !isOnBreakUI
+                                                                ? { startTime: teaBreakData.startedAt, breakType: 'Unpaid' }
+                                                                : null
+                                                        }
                                                     />
                                                 ) : (
                                                     <MemoizedWorkTimeTracker
@@ -851,7 +896,7 @@ const EmployeeDashboardPage = () => {
                                                         letterSpacing: '0.05em'
                                                     }}
                                                 >
-                                                    {isOnBreakUI ? 'BREAK TIME' : 'WORK DURATION'}
+                                                    {isShowingBreakTimer ? 'BREAK TIME' : 'WORK DURATION'}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -866,8 +911,19 @@ const EmployeeDashboardPage = () => {
                                                 ) : (
                                                     <Button fullWidth disabled className="theme-button-red">Check In (Disabled)</Button>
                                                 )
-                                            ) : isOnBreakUI ? (
-                                                <Button fullWidth variant="contained" color="success" className="theme-button-break-end" onClick={handleEndBreak} startIcon={<PlayArrowIcon />}>End Break</Button>
+                                            ) : showEndBreakButton ? (
+                                                <Button
+                                                    fullWidth
+                                                    variant="contained"
+                                                    color="success"
+                                                    className="theme-button-break-end"
+                                                    onClick={isOnBreakUI ? handleEndBreak : handleEndTeaBreak}
+                                                    startIcon={<PlayArrowIcon />}
+                                                >
+                                                    End Break
+                                                </Button>
+                                            ) : isOnTeaBreak ? (
+                                                null
                                             ) : dailyData.status === 'Clocked In' ? (
                                                 <>
                                                     <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">

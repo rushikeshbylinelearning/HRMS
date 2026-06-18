@@ -10,7 +10,7 @@ const baseURL = import.meta.env.DEV
       ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api')
           ? import.meta.env.VITE_API_BASE_URL
           : `${import.meta.env.VITE_API_BASE_URL}/api`)
-      : 'https://attendance-test.bylinelms.com/api');
+      : 'https://attendance.bylinelms.com/api');
 
 const api = axios.create({
   baseURL,

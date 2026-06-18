@@ -1,5 +1,6 @@
 // backend/controllers/publicFormController.js
 const publicFormService = require('../services/publicFormService');
+const { resolvePublicFormBaseUrl } = require('../utils/frontendUrl');
 
 class PublicFormController {
   /**
@@ -111,12 +112,7 @@ class PublicFormController {
         }
       );
 
-      // Generate full URL
-      const baseUrl = process.env.FRONTEND_URL || 
-                      (process.env.NODE_ENV === 'production' 
-                        ? 'https://attendance-test.bylinelms.com'
-                        : 'http://localhost:5173');
-      
+      const baseUrl = resolvePublicFormBaseUrl(req);
       const formUrl = `${baseUrl}/public-form?token=${result.token}`;
 
       return res.json({
@@ -162,11 +158,7 @@ class PublicFormController {
         }
       );
 
-      // Add URLs to results
-      const baseUrl = process.env.FRONTEND_URL || 
-                      (process.env.NODE_ENV === 'production' 
-                        ? 'https://attendance-test.bylinelms.com'
-                        : 'http://localhost:5173');
+      const baseUrl = resolvePublicFormBaseUrl(req);
 
       const resultsWithUrls = results.map(r => ({
         ...r,

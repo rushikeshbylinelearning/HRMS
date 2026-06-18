@@ -12,6 +12,7 @@
  *   extraBreakTime           = max(0, actualPaidBreakTaken - allowedPaidBreakDuration)
  *                             Break overuse extends shift so logout time is fair:
  *                             if you take more than allowed paid break, you stay longer.
+ *   breakExceededMinutes     = extraBreakTime + floor(actualUnpaidBreakTaken) — total logout extension (UI warning)
  *   effectiveShiftDuration   = scheduledShiftDuration + extraBreakTime + actualUnpaidBreakTaken
  *                             Required time on the clock before logout.
  *   requiredLogoutTime       = clockInTime + effectiveShiftDuration
@@ -123,8 +124,8 @@ export function getUnifiedShiftTimeState(clockInTime, sessions, breaks, now, opt
         requiredLogoutTime,
         progress,
         actualWorkTime,
-        // For UX: minutes by which paid break exceeded allowance (for subtle warning)
-        breakExceededMinutes: extraBreakTime,
+        // Total logout extension beyond scheduled shift (excess paid + all unpaid), for warning copy
+        breakExceededMinutes: extraBreakTime + unpaidExtension,
     };
 }
 

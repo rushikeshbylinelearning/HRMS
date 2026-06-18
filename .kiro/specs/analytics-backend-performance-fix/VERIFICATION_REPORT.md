@@ -79,7 +79,7 @@ Or update `backend/scripts/create-analytics-indexes.js` to include this index an
 **Reason**: Cannot execute API timing test without:
 1. Running backend server
 2. Valid JWT bearer token
-3. Network access to https://attendance-test.bylinelms.com
+3. Network access to https://attendance.bylinelms.com
 
 **Manual Verification Steps**:
 1. Restart backend server: `npm start` or `pm2 restart attendance-backend`

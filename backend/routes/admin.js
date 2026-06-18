@@ -89,6 +89,25 @@ const isAdminOrHr = async (req, res, next) => {
 
 // --- LEAVE MANAGEMENT ROUTES ---
 
+// Build optional employee/leave search match for leaves/all aggregation (after $lookup + $unwind).
+function buildLeaveListSearchMatch(search) {
+    const term = (search || '').trim();
+    if (!term) return null;
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    return {
+        $or: [
+            { 'employeeData.fullName': regex },
+            { 'employeeData.employeeCode': regex },
+            { 'employeeData.department': regex },
+            { requestType: regex },
+            { leaveType: regex },
+            { status: regex },
+            { reason: regex },
+        ],
+    };
+}
+
 // GET /api/admin/leaves/all
 router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
@@ -96,6 +115,7 @@ router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => 
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const { role } = req.query; // Optional: 'Employee' or 'Intern' to filter by role
+        const searchMatch = buildLeaveListSearchMatch(req.query.search);
 
         // Exclude YEAR_END requests from normal leave requests
         const baseQuery = { requestType: { $ne: 'YEAR_END' } };
@@ -118,6 +138,7 @@ router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => 
                 { $unwind: '$employeeData' },
                 // Filter: Exclude Admin role and inactive users (business rule: only active employees/interns should appear in lists)
                 { $match: { 'employeeData.role': role, 'employeeData.isActive': true } },
+                ...(searchMatch ? [{ $match: searchMatch }] : []),
                 {
                     $project: {
                         employee: {
@@ -177,6 +198,7 @@ router.get('/leaves/all', [authenticateToken, isAdminOrHr], async (req, res) => 
                 { $unwind: '$employeeData' },
                 // Filter: Exclude Admin role and inactive users
                 { $match: { 'employeeData.role': { $ne: 'Admin' }, 'employeeData.isActive': true } },
+                ...(searchMatch ? [{ $match: searchMatch }] : []),
                 {
                     $project: {
                         employee: {

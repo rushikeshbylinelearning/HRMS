@@ -22,7 +22,7 @@ export default defineConfig({
           if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
             const allowedOrigins = process.env.NODE_ENV === 'development' 
               ? "http://localhost:5173"
-              : "https://attendance-test.bylinelms.com";
+              : "https://attendance.bylinelms.com";
             
             const existingCSP = res.getHeader('Content-Security-Policy') || '';
             if (existingCSP && !existingCSP.includes('frame-ancestors')) {

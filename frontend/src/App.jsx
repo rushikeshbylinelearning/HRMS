@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BreakUIProvider } from './context/BreakUIContext';
+import { TeaBreakProvider } from './context/TeaBreakContext';
 import { ActiveYearProvider } from './context/ActiveYearContext';
 import { NewNotificationProvider } from './hooks/useNewNotifications.jsx'; // Corrected import path
 import { CssBaseline, ThemeProvider, Box } from '@mui/material';
@@ -222,6 +223,7 @@ function App() {
                     <AuthProvider>
                         <ActiveYearProvider>
                             <BreakUIProvider>
+                                <TeaBreakProvider>
                                 <NewNotificationProvider> {/* <-- CORRECT NESTING */}
                                     <IdleDetectionProvider>
                                         <Routes>
@@ -375,6 +377,7 @@ function App() {
                                 </Routes>
                             </IdleDetectionProvider>
                         </NewNotificationProvider>
+                                </TeaBreakProvider>
                     </BreakUIProvider>
                 </ActiveYearProvider>
             </AuthProvider>

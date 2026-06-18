@@ -11,7 +11,7 @@
 require('dotenv').config();
 const axios = require('axios');
 
-const BASE_URL = process.env.BASE_URL || 'https://attendance-test.bylinelms.com';
+const BASE_URL = process.env.BASE_URL || 'https://attendance.bylinelms.com';
 const TEST_EMAIL = process.env.TEST_EMAIL || 'admin@legatolxp.online';
 const TEST_PASSWORD = process.env.TEST_PASSWORD;
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from '
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Typography, Button, Alert, Chip, Box, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination, Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton, Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse } from '@mui/material';
+import { Typography, Button, Alert, Chip, Box, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Paper, Grid, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, IconButton, Stack, TablePagination, Menu, MenuItem, ListItemIcon, ListItemText, Tabs, Tab, Switch, FormControlLabel, Skeleton, Card, CardContent, InputLabel, Select, FormControl, Avatar, Collapse, InputAdornment, OutlinedInput } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -268,7 +268,7 @@ const datePickerSlotProps = {
 // --- Leave Count Summary Tab Component ---
 // Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
 // refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
-const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }) => {
+const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [], headerSearchTerm = '' }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
@@ -630,19 +630,21 @@ const LeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }
             };
         });
         
-        // Apply search filter
+        // Apply search filter (header bar + optional expanded filters)
         let filtered = aggregated;
-        if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
+        const effectiveSearch = (headerSearchTerm || searchTerm).trim();
+        if (effectiveSearch) {
+            const searchLower = effectiveSearch.toLowerCase();
             filtered = aggregated.filter(item => {
                 const name = item.employee?.fullName?.toLowerCase() || '';
                 const code = item.employee?.employeeCode?.toLowerCase() || '';
-                return name.includes(searchLower) || code.includes(searchLower);
+                const dept = item.employee?.department?.toLowerCase() || '';
+                return name.includes(searchLower) || code.includes(searchLower) || dept.includes(searchLower);
             });
         }
         
         setFilteredData(filtered);
-    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, headerSearchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
     
     // Calculate KPIs
     const kpis = useMemo(() => {
@@ -1401,7 +1403,7 @@ LeaveCountSummaryTab.displayName = 'LeaveCountSummaryTab';
 // --- Intern Leave Count Summary Tab Component ---
 // Performance: uses single backend analytics endpoint when available; falls back to legacy fetch-all loop for safety.
 // refetchRef: optional ref for parent to trigger loadLeaveCounts when tab becomes visible after a mutation.
-const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [] }) => {
+const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp = [], headerSearchTerm = '' }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [employees, setEmployees] = useState([]);
@@ -1729,16 +1731,18 @@ const InternLeaveCountSummaryTab = memo(({ refetchRef, employees: employeesProp 
             });
         
         let filtered = aggregated;
-        if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
+        const effectiveSearch = (headerSearchTerm || searchTerm).trim();
+        if (effectiveSearch) {
+            const searchLower = effectiveSearch.toLowerCase();
             filtered = aggregated.filter(item => {
                 const name = item.employee?.fullName?.toLowerCase() || '';
                 const code = item.employee?.employeeCode?.toLowerCase() || '';
-                return name.includes(searchLower) || code.includes(searchLower);
+                const dept = item.employee?.department?.toLowerCase() || '';
+                return name.includes(searchLower) || code.includes(searchLower) || dept.includes(searchLower);
             });
         }
         setFilteredData(filtered);
-    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
+    }, [employees, allLeaveRequests, analyticsCounts, selectedMonth, dateRange, searchTerm, headerSearchTerm, selectedLeaveType, loading, analyticsData, totalWorkingDays, monthlyContextDays]);
     
     const kpis = useMemo(() => {
         if (!filteredData.length) {
@@ -2866,6 +2870,12 @@ const countLeaveDays = (dateStrings) => {
     return dateStrings.length;
 };
 
+const matchesTabSearchQuery = (query, ...fields) => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return true;
+    return fields.some((field) => String(field ?? '').toLowerCase().includes(q));
+};
+
 const RequestRow = memo(({ request, index, onEdit, onDelete, onStatusChange, onViewDetails, onReturnForCorrection, onSplitLopDays }) => {
     const statusColors = { Pending: 'warning', Approved: 'success', Rejected: 'error', Returned: 'info' };
     const workingDayCount = getWorkingLeaveDateKeys(request.leaveDates).length;
@@ -3020,6 +3030,8 @@ const AdminLeavesPage = () => {
     const [highlightedActionId, setHighlightedActionId] = useState(null);
     const [yearEndFeatureEnabled, setYearEndFeatureEnabled] = useState(false);
     const [featureToggleLoading, setFeatureToggleLoading] = useState(false);
+    const [tabSearchQuery, setTabSearchQuery] = useState('');
+    const [debouncedTabSearch, setDebouncedTabSearch] = useState('');
     
     // Year-end view dialog state
     const [yearEndViewDialog, setYearEndViewDialog] = useState({ open: false, action: null });
@@ -3034,6 +3046,9 @@ const AdminLeavesPage = () => {
     const [leaveCountsDirty, setLeaveCountsDirty] = useState(false);
     const refetchLeaveCountTab2Ref = useRef(null);
     const refetchLeaveCountTab3Ref = useRef(null);
+    const hasCompletedInitialLoadRef = useRef(false);
+    const prevDebouncedTabSearchRef = useRef('');
+    const employeesForCacheRef = useRef([]);
 
     const applyInitialData = useCallback((data) => {
         if (!data) return;
@@ -3042,11 +3057,49 @@ const AdminLeavesPage = () => {
             setRequests(Array.isArray(reqs) ? reqs : []);
             setTotalCount(tot ?? 0);
         }
-        if (emps) setEmployees(filterActiveEmployees(emps));
+        if (emps) {
+            const active = filterActiveEmployees(emps);
+            setEmployees(active);
+            employeesForCacheRef.current = active;
+        }
     }, []);
 
+    useEffect(() => {
+        employeesForCacheRef.current = employees;
+    }, [employees]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedTabSearch(tabSearchQuery.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [tabSearchQuery]);
+
+    useEffect(() => {
+        if (currentTab !== 0) return;
+        if (prevDebouncedTabSearchRef.current === debouncedTabSearch) return;
+        prevDebouncedTabSearchRef.current = debouncedTabSearch;
+        if (page !== 0) setPage(0);
+    }, [debouncedTabSearch, currentTab, page]);
+
+    const filteredYearEndActions = useMemo(() => {
+        if (!debouncedTabSearch) return yearEndActions;
+        return yearEndActions.filter((action) =>
+            matchesTabSearchQuery(
+                debouncedTabSearch,
+                action.employee?.fullName,
+                action.employee?.employeeCode,
+                action.employee?.department,
+                action.yearEndLeaveType,
+                action.status,
+                action.yearEndSubType,
+                String(action.yearEndYear ?? '')
+            )
+        );
+    }, [yearEndActions, debouncedTabSearch]);
+
+    const leaveListSearch = currentTab === 0 ? debouncedTabSearch : '';
+
     const fetchInitialData = useCallback(async (forceRefresh = false) => {
-        const cacheKey = getAdminLeavesCacheKey(page + 1, rowsPerPage);
+        const cacheKey = getAdminLeavesCacheKey(page + 1, rowsPerPage, leaveListSearch);
         const now = Date.now();
 
         if (pendingFetchRef.current && pendingFetchRef.current.key === cacheKey && !forceRefresh) {
@@ -3068,6 +3121,10 @@ const AdminLeavesPage = () => {
             applyInitialData(cached.data);
             setIsInitialLoading(false);
             setIsBackgroundRefreshing(true);
+        } else if (hasCompletedInitialLoadRef.current) {
+            // Search/pagination after first paint: keep UI mounted, refresh in background
+            setIsInitialLoading(false);
+            setIsBackgroundRefreshing(true);
         } else {
             setIsInitialLoading(true);
             setIsBackgroundRefreshing(false);
@@ -3075,26 +3132,38 @@ const AdminLeavesPage = () => {
 
         const promise = (async () => {
             try {
-                const [reqRes, empRes] = await Promise.all([
-                    api.get(`/admin/leaves/all?page=${page + 1}&limit=${rowsPerPage}`),
-                    api.get('/admin/employees?all=true')
-                ]);
-                const rawEmps = empRes.data.employees
-                    ? (Array.isArray(empRes.data.employees) ? empRes.data.employees : [])
-                    : (Array.isArray(empRes.data) ? empRes.data : []);
+                const searchParam = leaveListSearch
+                    ? `&search=${encodeURIComponent(leaveListSearch)}`
+                    : '';
+                const fetches = [
+                    api.get(`/admin/leaves/all?page=${page + 1}&limit=${rowsPerPage}${searchParam}`),
+                ];
+                if (!hasCompletedInitialLoadRef.current || forceRefresh) {
+                    fetches.push(api.get('/admin/employees?all=true'));
+                }
+                const [reqRes, empRes] = await Promise.all(fetches);
                 const requestsList = reqRes.data.requests
                     ? (Array.isArray(reqRes.data.requests) ? reqRes.data.requests : [])
                     : (Array.isArray(reqRes.data) ? reqRes.data : []);
                 const total = reqRes.data.totalCount ?? 0;
                 setRequests(requestsList);
                 setTotalCount(total);
-                setEmployees(filterActiveEmployees(rawEmps));
-                setLeavesCache(cacheKey, { requests: requestsList, totalCount: total, employees: filterActiveEmployees(rawEmps) });
+                let empsForCache = employeesForCacheRef.current;
+                if (empRes) {
+                    const rawEmps = empRes.data.employees
+                        ? (Array.isArray(empRes.data.employees) ? empRes.data.employees : [])
+                        : (Array.isArray(empRes.data) ? empRes.data : []);
+                    empsForCache = filterActiveEmployees(rawEmps);
+                    setEmployees(empsForCache);
+                    employeesForCacheRef.current = empsForCache;
+                }
+                setLeavesCache(cacheKey, { requests: requestsList, totalCount: total, employees: empsForCache });
                 lastRefetchTimeRef.current = Date.now();
                 setError('');
             } catch (err) {
                 setError('Failed to fetch leave management data.');
             } finally {
+                hasCompletedInitialLoadRef.current = true;
                 setIsInitialLoading(false);
                 setIsBackgroundRefreshing(false);
                 if (pendingFetchRef.current?.key === cacheKey) pendingFetchRef.current = null;
@@ -3103,7 +3172,7 @@ const AdminLeavesPage = () => {
 
         pendingFetchRef.current = { key: cacheKey, promise };
         return promise;
-    }, [page, rowsPerPage, applyInitialData]);
+    }, [page, rowsPerPage, leaveListSearch, applyInitialData]);
 
     fetchInitialDataRef.current = fetchInitialData;
     
@@ -3626,46 +3695,109 @@ const AdminLeavesPage = () => {
             {error && <Alert severity="error" className="error-alert">{error}</Alert>}
             
             <Paper elevation={0} sx={{ mb: 3 }}>
-                <Tabs 
-                    value={currentTab} 
-                    onChange={(e, newValue) => setCurrentTab(newValue)}
+                <Box
                     sx={{
-                        '& .MuiTabs-indicator': {
-                            backgroundColor: '#1976d2',
-                            transition: 'all 0.3s ease-in-out',
-                        },
-                        '& .MuiTab-root': {
-                            transition: 'color 0.2s ease-in-out',
-                            border: 'none !important',
-                            borderTop: 'none !important',
-                            borderRight: 'none !important',
-                            borderBottom: 'none !important',
-                            borderLeft: 'none !important',
-                            outline: 'none !important',
-                            boxShadow: 'none !important',
-                            '&.Mui-selected': {
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 2,
+                        px: { xs: 1, sm: 2 },
+                        pt: 1,
+                    }}
+                >
+                    <Tabs 
+                        value={currentTab} 
+                        onChange={(e, newValue) => setCurrentTab(newValue)}
+                        sx={{
+                            flex: '1 1 auto',
+                            minWidth: 0,
+                            '& .MuiTabs-indicator': {
+                                backgroundColor: '#1976d2',
+                                transition: 'all 0.3s ease-in-out',
+                            },
+                            '& .MuiTab-root': {
+                                transition: 'color 0.2s ease-in-out',
                                 border: 'none !important',
                                 borderTop: 'none !important',
                                 borderRight: 'none !important',
                                 borderBottom: 'none !important',
                                 borderLeft: 'none !important',
                                 outline: 'none !important',
-                                boxShadow: 'none !important'
-                            },
-                            '&::before': {
-                                display: 'none !important'
-                            },
-                            '&::after': {
-                                display: 'none !important'
+                                boxShadow: 'none !important',
+                                '&.Mui-selected': {
+                                    border: 'none !important',
+                                    borderTop: 'none !important',
+                                    borderRight: 'none !important',
+                                    borderBottom: 'none !important',
+                                    borderLeft: 'none !important',
+                                    outline: 'none !important',
+                                    boxShadow: 'none !important'
+                                },
+                                '&::before': {
+                                    display: 'none !important'
+                                },
+                                '&::after': {
+                                    display: 'none !important'
+                                }
                             }
+                        }}
+                    >
+                        <Tab label="Leave Requests" />
+                        <Tab label="Year-End Requests" />
+                        <Tab label="Employee Leave Count" />
+                        <Tab label="Intern Leave Count" />
+                    </Tabs>
+                    <OutlinedInput
+                        size="small"
+                        placeholder={
+                            currentTab === 0
+                                ? 'Search leave requests...'
+                                : currentTab === 1
+                                    ? 'Search year-end requests...'
+                                    : 'Search by name or code...'
                         }
-                    }}
-                >
-                    <Tab label="Leave Requests" />
-                    <Tab label="Year-End Requests" />
-                    <Tab label="Employee Leave Count" />
-                    <Tab label="Intern Leave Count" />
-                </Tabs>
+                        value={tabSearchQuery}
+                        onChange={(e) => setTabSearchQuery(e.target.value)}
+                        startAdornment={
+                            <InputAdornment position="start">
+                                <SearchIcon sx={{ color: '#6c757d', fontSize: '1.2rem' }} />
+                            </InputAdornment>
+                        }
+                        endAdornment={
+                            tabSearchQuery ? (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setTabSearchQuery('')}
+                                        edge="end"
+                                        aria-label="Clear search"
+                                        sx={{ padding: '4px' }}
+                                    >
+                                        <ClearIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                </InputAdornment>
+                            ) : null
+                        }
+                        sx={{
+                            flex: '0 0 auto',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            minWidth: { xs: '100%', sm: '280px' },
+                            maxWidth: { sm: '320px' },
+                            '& .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#dee2e6',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#adb5bd',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#1976d2',
+                                borderWidth: '2px',
+                            },
+                        }}
+                    />
+                </Box>
             </Paper>
             
             {/* Tab Content Container - Dynamic height wrapper for smooth transitions */}
@@ -3811,16 +3943,18 @@ const AdminLeavesPage = () => {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {yearEndActions.length === 0 ? (
+                                    {filteredYearEndActions.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    No year-end leave requests found.
+                                                    {debouncedTabSearch
+                                                        ? 'No year-end requests match your search.'
+                                                        : 'No year-end leave requests found.'}
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        yearEndActions.map((action) => (
+                                        filteredYearEndActions.map((action) => (
                                             <TableRow 
                                                 key={action._id} 
                                                 id={`action-${action._id}`}
@@ -3986,7 +4120,11 @@ const AdminLeavesPage = () => {
                         overflow: 'hidden',
                     }}
                 >
-                    <LeaveCountSummaryTab refetchRef={refetchLeaveCountTab2Ref} employees={employees} />
+                    <LeaveCountSummaryTab
+                        refetchRef={refetchLeaveCountTab2Ref}
+                        employees={employees}
+                        headerSearchTerm={debouncedTabSearch}
+                    />
                 </Box>
                 
                 {/* Intern Leave Count Summary Tab - Always mounted, visibility toggled */}
@@ -4009,7 +4147,11 @@ const AdminLeavesPage = () => {
                         overflow: 'hidden',
                     }}
                 >
-                    <InternLeaveCountSummaryTab refetchRef={refetchLeaveCountTab3Ref} employees={employees} />
+                    <InternLeaveCountSummaryTab
+                        refetchRef={refetchLeaveCountTab3Ref}
+                        employees={employees}
+                        headerSearchTerm={debouncedTabSearch}
+                    />
                 </Box>
             </Box>
 

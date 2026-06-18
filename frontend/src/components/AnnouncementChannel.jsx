@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Fragment } from "react";
 import api from "../api/axios";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
@@ -15,9 +15,46 @@ const AnnouncementChannel = ({ onClose }) => {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [menuOpen, setMenuOpen] = useState(null);
+  const [isTeaBreakAnnouncement, setIsTeaBreakAnnouncement] = useState(false);
+  const [teaBreakType, setTeaBreakType] = useState("morning");
+  const [activeTeaBreak, setActiveTeaBreak] = useState(null);
+  const [stoppingTeaBreak, setStoppingTeaBreak] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const { user, token } = useAuth();
+
+  const isAdminOrHr = ['Admin', 'HR'].includes(user?.role);
+
+  const fetchActiveTeaBreak = async () => {
+    if (!isAdminOrHr) return;
+    try {
+      const { data } = await api.get("/tea-break/active");
+      if (data?.active) {
+        setActiveTeaBreak(data);
+      } else {
+        setActiveTeaBreak(null);
+      }
+    } catch {
+      setActiveTeaBreak(null);
+    }
+  };
+
+  const handleStopTeaBreak = async () => {
+    if (stoppingTeaBreak) return;
+    try {
+      setStoppingTeaBreak(true);
+      await api.post("/tea-break/stop", activeTeaBreak?.announcementId
+        ? { announcementId: activeTeaBreak.announcementId }
+        : {});
+      setActiveTeaBreak(null);
+      setIsTeaBreakAnnouncement(false);
+    } catch (error) {
+      console.error("Error stopping tea break:", error);
+      alert(error.response?.data?.message || "Failed to stop tea break");
+    } finally {
+      setStoppingTeaBreak(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,6 +63,7 @@ const AnnouncementChannel = ({ onClose }) => {
   useEffect(() => {
     // Fetch messages on mount
     fetchMessages();
+    fetchActiveTeaBreak();
     
     // Connect socket with authentication
     if (token && !socket.connected) {
@@ -67,16 +105,27 @@ const AnnouncementChannel = ({ onClose }) => {
       });
     };
 
+    const handleTeaBreakStarted = () => {
+      fetchActiveTeaBreak();
+    };
+    const handleTeaBreakStopped = () => {
+      setActiveTeaBreak(null);
+    };
+
     socket.on("receiveAnnouncement", handleNewAnnouncement);
     socket.on("announcementUpdated", handleAnnouncementUpdated);
     socket.on("announcementDeleted", handleAnnouncementDeleted);
     socket.on("announcementPinned", handleAnnouncementPinned);
+    socket.on("tea_break_started", handleTeaBreakStarted);
+    socket.on("tea_break_stopped", handleTeaBreakStopped);
 
     return () => {
       socket.off("receiveAnnouncement", handleNewAnnouncement);
       socket.off("announcementUpdated", handleAnnouncementUpdated);
       socket.off("announcementDeleted", handleAnnouncementDeleted);
       socket.off("announcementPinned", handleAnnouncementPinned);
+      socket.off("tea_break_started", handleTeaBreakStarted);
+      socket.off("tea_break_stopped", handleTeaBreakStopped);
     };
   }, [token]); // Only depend on token
 
@@ -101,17 +150,24 @@ const AnnouncementChannel = ({ onClose }) => {
 
     try {
       setSending(true);
-      const { data } = await api.post("/announcements", {
-        message: input.trim(),
-      });
+      const postBody = { message: input.trim() };
+      if (isAdminOrHr && isTeaBreakAnnouncement) {
+        postBody.isTEABreak = true;
+        postBody.teaBreakType = teaBreakType;
+      }
+
+      const { data } = await api.post("/announcements", postBody);
 
       // Add message immediately to local state for instant feedback
       setMessages((prev) => [...prev, data]);
       setTimeout(scrollToBottom, 100);
 
-      // Broadcast to other users via socket
-      socket.emit("sendAnnouncement", data);
+      // Real-time delivery is handled server-side on POST /announcements
+      if (data.isTEABreak) {
+        fetchActiveTeaBreak();
+      }
       setInput("");
+      setIsTeaBreakAnnouncement(false);
     } catch (error) {
       console.error("Error sending announcement:", error);
       alert(error.response?.data?.message || "Failed to send message");
@@ -212,20 +268,59 @@ const AnnouncementChannel = ({ onClose }) => {
     }
   };
 
-  const formatTime = (timestamp) => {
+  const istDateKey = (timestamp) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(timestamp));
+
+  const isSameISTDay = (a, b) => istDateKey(a) === istDateKey(b);
+
+  const formatMessageTime = (timestamp) =>
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(timestamp));
+
+  const formatDateDivider = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const key = istDateKey(date);
+    const todayKey = istDateKey(now);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    if (key === todayKey) return 'Today';
+
+    const yesterday = new Date(now.getTime() - 86400000);
+    if (key === istDateKey(yesterday)) return 'Yesterday';
+
+    const msgYear = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+    }).format(date);
+    const currentYear = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+    }).format(now);
+
+    if (msgYear === currentYear) {
+      return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }).format(date);
+    }
+
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
   };
 
   return (
@@ -258,7 +353,9 @@ const AnnouncementChannel = ({ onClose }) => {
             }
             
             const isOwn = isCurrentUser(msg.sender._id);
-            const showAvatar = index === 0 || messages[index - 1]?.sender?._id !== msg.sender._id;
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            const showDateDivider = !prevMsg || !isSameISTDay(msg.createdAt, prevMsg.createdAt);
+            const showAvatar = showDateDivider || index === 0 || messages[index - 1]?.sender?._id !== msg.sender._id;
             const showName = showAvatar;
             const isEditing = editingId === msg._id;
             
@@ -268,8 +365,13 @@ const AnnouncementChannel = ({ onClose }) => {
               : msg.sender.fullName || 'Unknown User';
             
             return (
+              <Fragment key={msg._id}>
+              {showDateDivider && (
+                <div className="announcement-date-divider" role="separator">
+                  <span>{formatDateDivider(msg.createdAt)}</span>
+                </div>
+              )}
               <div 
-                key={msg._id} 
                 className={`announcement-message-wrapper ${isOwn ? 'own-message' : 'other-message'}`}
               >
                 {!isOwn && showAvatar && (
@@ -345,18 +447,71 @@ const AnnouncementChannel = ({ onClose }) => {
                         )}
                       </div>
                       <div className={`announcement-message-time ${isOwn ? 'own' : ''}`}>
-                        {formatTime(msg.createdAt)}
-                        {msg.updatedAt && msg.updatedAt !== msg.createdAt && ' (edited)'}
+                        <span className="announcement-message-time-value">{formatMessageTime(msg.createdAt)}</span>
+                        {msg.updatedAt && msg.updatedAt !== msg.createdAt && (
+                          <span className="announcement-message-edited">edited</span>
+                        )}
                       </div>
                     </>
                   )}
                 </div>
               </div>
+              </Fragment>
             );
           })
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {isAdminOrHr && activeTeaBreak && (
+        <div className="announcement-tea-break-active">
+          <div className="announcement-tea-break-active-label">
+            Tea break in progress ({activeTeaBreak.teaBreakType === 'evening' ? 'Evening' : 'Morning'})
+          </div>
+          <button
+            type="button"
+            onClick={handleStopTeaBreak}
+            disabled={stoppingTeaBreak}
+            className="announcement-tea-break-stop-btn"
+          >
+            {stoppingTeaBreak ? 'Stopping…' : 'Stop Tea Break for Everyone'}
+          </button>
+        </div>
+      )}
+
+      {isAdminOrHr && (
+        <div className="announcement-tea-break-options">
+          <label className="announcement-tea-break-checkbox">
+            <input
+              type="checkbox"
+              checked={isTeaBreakAnnouncement}
+              onChange={(e) => setIsTeaBreakAnnouncement(e.target.checked)}
+            />
+            <span className="announcement-tea-break-checkbox-box" aria-hidden="true" />
+            <span className="announcement-tea-break-checkbox-label">This is a Tea Break announcement</span>
+          </label>
+          {isTeaBreakAnnouncement && (
+            <div className="announcement-tea-break-selector" role="group" aria-label="Tea break type">
+              <button
+                type="button"
+                className={`announcement-tea-break-option${teaBreakType === 'morning' ? ' active' : ''}`}
+                onClick={() => setTeaBreakType('morning')}
+                aria-pressed={teaBreakType === 'morning'}
+              >
+                Morning Break
+              </button>
+              <button
+                type="button"
+                className={`announcement-tea-break-option${teaBreakType === 'evening' ? ' active' : ''}`}
+                onClick={() => setTeaBreakType('evening')}
+                aria-pressed={teaBreakType === 'evening'}
+              >
+                Evening Break
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="announcement-input-container">
         <button

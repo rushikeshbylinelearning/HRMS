@@ -23,9 +23,10 @@ export function getEmployeeLeavesCacheKey(userId, page = 1, limit = 10) {
  * Build a stable cache key for admin Leaves list (main requests list).
  * Key format: leaves:admin:{year}:{page}:{limit}
  */
-export function getAdminLeavesCacheKey(page = 1, limit = 10) {
+export function getAdminLeavesCacheKey(page = 1, limit = 10, search = '') {
   const year = new Date().getFullYear();
-  return `leaves:admin:${year}:${page}:${limit}`;
+  const searchKey = (search || '').trim().toLowerCase();
+  return `leaves:admin:${year}:${page}:${limit}:${searchKey}`;
 }
 
 /**

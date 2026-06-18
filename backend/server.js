@@ -107,7 +107,7 @@ app.set('trust proxy', 1);
 // Determine allowed iframe origins once at startup, not per-request.
 const FRAME_ANCESTORS = process.env.NODE_ENV === 'development'
     ? ["'self'", "http://localhost:5173"]
-    : ["'self'", "https://attendance-test.bylinelms.com"];
+    : ["'self'", "https://attendance.bylinelms.com"];
 
 const defaultDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
 delete defaultDirectives['frame-ancestors'];
@@ -274,6 +274,9 @@ app.use('/api/admin/leave-accrual', leaveAccrualRoutes);
 const announcementRoutes = require('./routes/announcementRoutes');
 app.use('/api/announcements', announcementRoutes);
 
+const teaBreakRoutes = require('./routes/teaBreakRoutes');
+app.use('/api/tea-break', teaBreakRoutes);
+
 const cifRoutes = require('./modules/cif/cif.routes');
 app.use('/api/admin/cif', cifRoutes);
 
@@ -433,6 +436,13 @@ const startServer = async () => {
     }
 
     startScheduledJobs();
+
+    try {
+      const { restoreActiveTeaBreakJobs } = require('./jobs/teaBreakEnforcer');
+      await restoreActiveTeaBreakJobs();
+    } catch (teaErr) {
+      console.error('[TeaBreak] Failed to restore active jobs:', teaErr.message);
+    }
 
     const activeYearCache = require('./services/activeYearCache');
     require('./services/attendanceSync');

@@ -11,6 +11,7 @@ const breakLogSchema = new mongoose.Schema({
   durationMinutes: { type: Number, default: 0 },
   reason: { type: String },
   isAutoBreak: { type: Boolean, default: false },
+  isAutoCreatedFromTeaBreak: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // Index for $lookup joins in attendance summary aggregate

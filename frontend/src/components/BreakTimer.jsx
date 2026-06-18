@@ -11,7 +11,13 @@ const formatCountdown = (totalSeconds) => {
 
 const UNPAID_BREAK_ALLOWANCE_MINUTES = 10;
 
-const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = null, unifiedDisplay = false }) => {
+const BreakTimer = ({
+    breaks,
+    paidBreakAllowance = 30,
+    activeBreakOverride = null,
+    unifiedDisplay = false,
+    teaBreakOverride = null,
+}) => {
     const [countdown, setCountdown] = useState(0);
     const [overtime, setOvertime] = useState(0);
     const intervalRef = useRef(null);
@@ -19,10 +25,17 @@ const BreakTimer = ({ breaks, paidBreakAllowance = 30, activeBreakOverride = nul
     const lastValuesRef = useRef({ countdown: 0, overtime: 0 });
     const activeBreakIdRef = useRef(null);
 
-    const activeBreak = useMemo(
-        () => activeBreakOverride || breaks?.find(b => !b.endTime),
-        [breaks, activeBreakOverride]
-    );
+    const activeBreak = useMemo(() => {
+        if (teaBreakOverride?.startTime) {
+            return {
+                _id: 'tea-break',
+                breakType: teaBreakOverride.breakType || 'Unpaid',
+                startTime: teaBreakOverride.startTime,
+                endTime: null,
+            };
+        }
+        return activeBreakOverride || breaks?.find(b => !b.endTime);
+    }, [breaks, activeBreakOverride, teaBreakOverride]);
 
     const paidMinutesAlreadyTaken = useMemo(() => {
         if (!activeBreak || activeBreak.breakType !== 'Paid') return 0;

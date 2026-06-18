@@ -6,7 +6,7 @@ console.log('=== API Configuration Test ===\n');
 // Simulate Vite environment variables
 const mockEnv = {
   DEV: true,
-  VITE_API_BASE_URL: 'https://attendance-test.bylinelms.com'
+  VITE_API_BASE_URL: 'https://attendance.bylinelms.com'
 };
 
 console.log('Environment Variables:');
@@ -21,7 +21,7 @@ const baseURL = mockEnv.DEV
       ? (mockEnv.VITE_API_BASE_URL.endsWith('/api') 
           ? mockEnv.VITE_API_BASE_URL 
           : `${mockEnv.VITE_API_BASE_URL}/api`)
-      : 'https://attendance-test.bylinelms.com/api');
+      : 'https://attendance.bylinelms.com/api');
 
 console.log('Calculated baseURL:', baseURL);
 console.log('');
@@ -51,8 +51,8 @@ console.log('   - Backend: http://127.0.0.1:3001');
 console.log('   - Proxy: /api → http://127.0.0.1:3001/api');
 console.log('');
 console.log('✅ Production Mode:');
-console.log('   - Frontend: https://attendance-test.bylinelms.com');
-console.log('   - Backend: https://attendance-test.bylinelms.com/api');
+console.log('   - Frontend: https://attendance.bylinelms.com');
+console.log('   - Backend: https://attendance.bylinelms.com/api');
 console.log('   - Direct: No proxy needed');
 console.log('');
 

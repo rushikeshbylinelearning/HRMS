@@ -54,7 +54,7 @@ const productionConfig = {
     
     // CORS settings
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://attendance-test.bylinelms.com'],
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://attendance.bylinelms.com'],
       credentials: true,
       optionsSuccessStatus: 200,
     },
@@ -176,7 +176,7 @@ const productionConfig = {
     maxHttpBufferSize: 1e6, // 1MB
     allowEIO3: true,
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://attendance-test.bylinelms.com'],
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://attendance.bylinelms.com'],
       methods: ['GET', 'POST'],
       credentials: true,
     },
