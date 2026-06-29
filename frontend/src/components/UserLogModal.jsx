@@ -1,6 +1,6 @@
 // src/components/UserLogModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, Paper, Stack, Chip, Divider, Alert, Grid } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, Typography, Box, IconButton, Paper, Stack, Chip, Divider, Alert } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import WorkIcon from '@mui/icons-material/Work';
@@ -336,73 +336,63 @@ const UserLogModal = ({ open, onClose, log, date, loading = false, holiday, leav
                 ) : (
                     <Box className="audit-timeline-container">
                         {/* Summary Cards */}
-                        <Grid container spacing={2} className="summary-cards-container">
-                            <Grid item xs={12} sm={6} md={2.4}>
-                                <Paper className="summary-stat-card">
-                                    <Box className="summary-stat-content">
-                                        <WorkIcon className="summary-stat-icon summary-stat-icon-primary" />
-                                        <Box className="summary-stat-text">
-                                            <Typography className="summary-stat-label">Total Work Time</Typography>
-                                            <Typography className="summary-stat-value">
-                                                {formatDuration(calculateStats.totalWorkMinutes)}
-                                            </Typography>
-                                        </Box>
+                        <Box className="summary-cards-container">
+                            <Paper className="summary-stat-card">
+                                <Box className="summary-stat-content">
+                                    <WorkIcon className="summary-stat-icon summary-stat-icon-primary" />
+                                    <Box className="summary-stat-text">
+                                        <Typography className="summary-stat-label">Total Work Time</Typography>
+                                        <Typography className="summary-stat-value">
+                                            {formatDuration(calculateStats.totalWorkMinutes)}
+                                        </Typography>
                                     </Box>
-                                </Paper>
-                            </Grid>
-                            <Grid item xs={12} sm={6} md={2.4}>
-                                <Paper className="summary-stat-card">
-                                    <Box className="summary-stat-content">
-                                        <TimerIcon className="summary-stat-icon summary-stat-icon-warning" />
-                                        <Box className="summary-stat-text">
-                                            <Typography className="summary-stat-label">Total Breaks</Typography>
-                                            <Typography className="summary-stat-value">
-                                                {formatDuration(calculateStats.totalBreakMinutes)}
-                                            </Typography>
-                                        </Box>
+                                </Box>
+                            </Paper>
+                            <Paper className="summary-stat-card">
+                                <Box className="summary-stat-content">
+                                    <TimerIcon className="summary-stat-icon summary-stat-icon-warning" />
+                                    <Box className="summary-stat-text">
+                                        <Typography className="summary-stat-label">Total Breaks</Typography>
+                                        <Typography className="summary-stat-value">
+                                            {formatDuration(calculateStats.totalBreakMinutes)}
+                                        </Typography>
                                     </Box>
-                                </Paper>
-                            </Grid>
-                            <Grid item xs={12} sm={6} md={2.4}>
-                                <Paper className="summary-stat-card">
-                                    <Box className="summary-stat-content">
-                                        <WatchLaterIcon className="summary-stat-icon summary-stat-icon-info" />
-                                        <Box className="summary-stat-text">
-                                            <Typography className="summary-stat-label">Paid Breaks</Typography>
-                                            <Typography className="summary-stat-value">
-                                                {formatDuration(calculateStats.paidBreakMinutes)}
-                                            </Typography>
-                                        </Box>
+                                </Box>
+                            </Paper>
+                            <Paper className="summary-stat-card">
+                                <Box className="summary-stat-content">
+                                    <WatchLaterIcon className="summary-stat-icon summary-stat-icon-info" />
+                                    <Box className="summary-stat-text">
+                                        <Typography className="summary-stat-label">Paid Breaks</Typography>
+                                        <Typography className="summary-stat-value">
+                                            {formatDuration(calculateStats.paidBreakMinutes)}
+                                        </Typography>
                                     </Box>
-                                </Paper>
-                            </Grid>
-                            <Grid item xs={12} sm={6} md={2.4}>
-                                <Paper className="summary-stat-card">
-                                    <Box className="summary-stat-content">
-                                        <AccessTimeIcon className="summary-stat-icon summary-stat-icon-success" />
-                                        <Box className="summary-stat-text">
-                                            <Typography className="summary-stat-label">First Check-in</Typography>
-                                            <Typography className="summary-stat-value">
-                                                {formatTimeForDisplay(calculateStats.firstCheckIn) || '--:--'}
-                                            </Typography>
-                                        </Box>
+                                </Box>
+                            </Paper>
+                            <Paper className="summary-stat-card">
+                                <Box className="summary-stat-content">
+                                    <AccessTimeIcon className="summary-stat-icon summary-stat-icon-success" />
+                                    <Box className="summary-stat-text">
+                                        <Typography className="summary-stat-label">First Check-in</Typography>
+                                        <Typography className="summary-stat-value">
+                                            {formatTimeForDisplay(calculateStats.firstCheckIn) || '--:--'}
+                                        </Typography>
                                     </Box>
-                                </Paper>
-                            </Grid>
-                            <Grid item xs={12} sm={6} md={2.4}>
-                                <Paper className="summary-stat-card">
-                                    <Box className="summary-stat-content">
-                                        <AccessTimeIcon className="summary-stat-icon summary-stat-icon-error" />
-                                        <Box className="summary-stat-text">
-                                            <Typography className="summary-stat-label">Last Check-out</Typography>
-                                            <Typography className="summary-stat-value">
-                                                {formatTimeForDisplay(calculateStats.lastCheckOut) || '--:--'}
-                                            </Typography>
-                                        </Box>
+                                </Box>
+                            </Paper>
+                            <Paper className="summary-stat-card">
+                                <Box className="summary-stat-content">
+                                    <AccessTimeIcon className="summary-stat-icon summary-stat-icon-error" />
+                                    <Box className="summary-stat-text">
+                                        <Typography className="summary-stat-label">Last Check-out</Typography>
+                                        <Typography className="summary-stat-value">
+                                            {formatTimeForDisplay(calculateStats.lastCheckOut) || '--:--'}
+                                        </Typography>
                                     </Box>
-                                </Paper>
-                            </Grid>
-                        </Grid>
+                                </Box>
+                            </Paper>
+                        </Box>
 
                         {/* Leave reason: Display when log exists and has leave information */}
                         {(log?.attendanceStatus === 'Leave' || log?.leaveInfo || log?.leaveReason || leave) && (

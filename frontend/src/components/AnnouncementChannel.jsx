@@ -3,10 +3,11 @@ import api from "../api/axios";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./common/UserAvatar";
-import { Send, X, Megaphone, Smile, MoreVertical, Edit2, Trash2, Pin, PinOff } from "lucide-react";
+import PollMessage from "./announcements/PollMessage";
+import { Send, X, Megaphone, Smile, MoreVertical, Edit2, Trash2, Pin, PinOff, Eye, Lock } from "lucide-react";
 import EmojiPicker from "./EmojiPicker";
 
-const AnnouncementChannel = ({ onClose }) => {
+const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAdminViewReceipts }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -112,12 +113,17 @@ const AnnouncementChannel = ({ onClose }) => {
       setActiveTeaBreak(null);
     };
 
+    const handlePollUpdated = (msg) => {
+      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
+    };
+
     socket.on("receiveAnnouncement", handleNewAnnouncement);
     socket.on("announcementUpdated", handleAnnouncementUpdated);
     socket.on("announcementDeleted", handleAnnouncementDeleted);
     socket.on("announcementPinned", handleAnnouncementPinned);
     socket.on("tea_break_started", handleTeaBreakStarted);
     socket.on("tea_break_stopped", handleTeaBreakStopped);
+    socket.on("poll_updated", handlePollUpdated);
 
     return () => {
       socket.off("receiveAnnouncement", handleNewAnnouncement);
@@ -126,8 +132,13 @@ const AnnouncementChannel = ({ onClose }) => {
       socket.off("announcementPinned", handleAnnouncementPinned);
       socket.off("tea_break_started", handleTeaBreakStarted);
       socket.off("tea_break_stopped", handleTeaBreakStopped);
+      socket.off("poll_updated", handlePollUpdated);
     };
   }, [token]); // Only depend on token
+
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   useEffect(() => {
     scrollToBottom();
@@ -165,6 +176,9 @@ const AnnouncementChannel = ({ onClose }) => {
       // Real-time delivery is handled server-side on POST /announcements
       if (data.isTEABreak) {
         fetchActiveTeaBreak();
+        if (data._id) {
+          sessionStorage.setItem(`tea_break_notified_${data._id}`, '1');
+        }
       }
       setInput("");
       setIsTeaBreakAnnouncement(false);
@@ -268,6 +282,21 @@ const AnnouncementChannel = ({ onClose }) => {
     }
   };
 
+  const handleClosePoll = async (msgId) => {
+    if (!window.confirm("Close this poll? No more votes will be accepted.")) return;
+    try {
+      const { data } = await api.patch(`/announcements/${msgId}/poll/close`);
+      setMessages((prev) => prev.map((m) => (m._id === msgId ? data : m)));
+      setMenuOpen(null);
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to close poll");
+    }
+  };
+
+  const handlePollVoted = (updated) => {
+    setMessages((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
+  };
+
   const istDateKey = (timestamp) =>
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
@@ -324,7 +353,8 @@ const AnnouncementChannel = ({ onClose }) => {
   };
 
   return (
-    <div className="announcement-channel">
+    <div className={`announcement-channel${embedded ? " embedded" : ""}`}>
+      {!embedded && (
       <div className="announcement-header">
         <div className="announcement-header-content">
           <Megaphone size={18} />
@@ -334,6 +364,7 @@ const AnnouncementChannel = ({ onClose }) => {
           <X size={18} />
         </button>
       </div>
+      )}
 
       <div className="announcement-messages">
         {loading ? (
@@ -410,10 +441,18 @@ const AnnouncementChannel = ({ onClose }) => {
                   ) : (
                     <>
                       <div className="announcement-bubble-wrapper group">
+                        {msg.contentType === "poll" ? (
+                          <PollMessage
+                            msg={msg}
+                            isOwn={isOwn}
+                            onVoted={handlePollVoted}
+                          />
+                        ) : (
                         <div className={`announcement-message-bubble ${isOwn ? 'own' : ''} ${msg.pinned ? 'pinned' : ''}`}>
                           {msg.message}
                         </div>
-                        {(canEditDelete(msg) || canPin()) && (
+                        )}
+                        {(canEditDelete(msg) || canPin() || (isAdminOrHr && onAdminViewReceipts)) && (
                           <>
                             <button 
                               className="message-menu-btn"
@@ -425,7 +464,17 @@ const AnnouncementChannel = ({ onClose }) => {
                             
                             {menuOpen === msg._id && (
                               <div className="message-menu">
-                                {canEditDelete(msg) && (
+                                {isAdminOrHr && onAdminViewReceipts && (
+                                  <button onClick={() => { onAdminViewReceipts(msg._id); setMenuOpen(null); }}>
+                                    <Eye size={13} /> View read receipts
+                                  </button>
+                                )}
+                                {isAdminOrHr && msg.contentType === "poll" && !msg.poll?.isClosed && (
+                                  <button onClick={() => handleClosePoll(msg._id)}>
+                                    <Lock size={13} /> Close poll
+                                  </button>
+                                )}
+                                {canEditDelete(msg) && msg.contentType !== "poll" && (
                                   <>
                                     <button onClick={() => handleEdit(msg)}>
                                       <Edit2 size={13} /> Edit
@@ -434,6 +483,11 @@ const AnnouncementChannel = ({ onClose }) => {
                                       <Trash2 size={13} /> Delete
                                     </button>
                                   </>
+                                )}
+                                {canEditDelete(msg) && msg.contentType === "poll" && (
+                                  <button onClick={() => handleDelete(msg._id)} className="delete-btn">
+                                    <Trash2 size={13} /> Delete
+                                  </button>
                                 )}
                                 {canPin() && (
                                   <button onClick={() => handlePin(msg)}>

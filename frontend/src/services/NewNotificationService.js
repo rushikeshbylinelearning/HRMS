@@ -1,6 +1,7 @@
 // frontend/src/services/NewNotificationService.js
 import { io } from 'socket.io-client';
 import soundService from './soundService';
+import { openAnnouncementHub } from '../utils/announcementHubEvents';
 
 class NewNotificationService {
     constructor() {
@@ -15,7 +16,7 @@ class NewNotificationService {
         // Get backend URL - use same origin if not specified (for same-domain deployments)
         // If VITE_SOCKET_URL is set, use it; otherwise use window.location.origin
         this.backendUrl = import.meta.env.VITE_SOCKET_URL || 
-            (typeof window !== 'undefined' ? window.location.origin : 'https://attendance.bylinelms.com');
+            (typeof window !== 'undefined' ? window.location.origin : '');
         
         console.log('[NewNotificationService] Backend URL:', this.backendUrl);
     }
@@ -280,6 +281,14 @@ class NewNotificationService {
         const isAdmin = ['Admin', 'HR', 'Manager'].includes(
             JSON.parse(sessionStorage.getItem('user') || '{}').role
         );
+
+        if (navigationData.page === 'announcements') {
+            openAnnouncementHub({
+                tab: navigationData.params?.tab || 'insights',
+                announcementId: navigationData.params?.announcementId || metadata?.announcementId || null,
+            });
+            return;
+        }
 
         let url = '/dashboard';
         switch (navigationData.page) {

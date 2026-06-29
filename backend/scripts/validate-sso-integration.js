@@ -11,7 +11,7 @@ const jwksClient = require('jwks-rsa');
 
 // Configuration
 const SSO_BACKEND_URL = 'http://localhost:3003';
-const AMS_BACKEND_URL = 'http://localhost:3001';
+const AMS_BACKEND_URL = 'http://localhost:3011';
 const AMS_FRONTEND_URL = 'http://localhost:5173';
 
 // Test results tracking

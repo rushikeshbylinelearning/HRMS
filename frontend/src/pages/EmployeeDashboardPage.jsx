@@ -119,8 +119,9 @@ const EmployeeDashboardPage = () => {
     const lastFetchTimeRef = useRef(0);
 
     const isOnBreakUI = !!uiBreakState;
-    const isOnTeaBreak = !!teaBreakData;
-    // NOTE: Break UI is intentionally driven by uiBreakState (optimistic + single authority).
+    const isClockedInForWork = dailyData?.status === 'Clocked In' || isOnBreakUI;
+    // Tea break state is only applied server-side for clocked-in employees; gate UI defensively too.
+    const isOnTeaBreak = !!teaBreakData && isClockedInForWork;
     const isShowingBreakTimer = isOnBreakUI || isOnTeaBreak;
     const displayStatus = isShowingBreakTimer ? 'On Break' : dailyData?.status;
     const statusForUi = isShowingBreakTimer ? 'On Break' : dailyData?.status;
@@ -140,8 +141,10 @@ const EmployeeDashboardPage = () => {
         ];
     }, [dailyData?.breaks, uiBreakState]);
 
-    // Stable: only show timer/progress bar as "visible" when dailyData exists and status is explicitly Clocked In (or on break). Prevents flash when clocked out.
-    const isClockedInSession = Boolean(dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI || isOnTeaBreak));
+    // Only show timer when actually in a work session (not merely logged in while clocked out).
+    const isClockedInSession = Boolean(
+        dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI || isOnTeaBreak)
+    );
 
     const dataReady = !!dailyData;
     const timeTrackingReady = dataReady && !loading && hasInitialLoadFinished;
@@ -438,15 +441,14 @@ const EmployeeDashboardPage = () => {
 
     const TEA_BREAK_DURATION_SEC = 10 * 60;
 
-    const teaBreakElapsedSec = useMemo(() => {
-        if (!teaBreakData?.startedAt) return 0;
-        return Math.max(0, Math.floor((tickNow - new Date(teaBreakData.startedAt)) / 1000));
-    }, [teaBreakData, tickNow]);
-
     const teaBreakRemainingSec = useMemo(() => {
+        if (teaBreakData?.endsAt) {
+            return Math.max(0, Math.floor((new Date(teaBreakData.endsAt).getTime() - tickNow) / 1000));
+        }
         if (!teaBreakData?.startedAt) return TEA_BREAK_DURATION_SEC;
-        return Math.max(0, TEA_BREAK_DURATION_SEC - teaBreakElapsedSec);
-    }, [teaBreakData, teaBreakElapsedSec]);
+        const elapsed = Math.max(0, Math.floor((tickNow - new Date(teaBreakData.startedAt)) / 1000));
+        return Math.max(0, TEA_BREAK_DURATION_SEC - elapsed);
+    }, [teaBreakData, tickNow]);
 
     // Tea break: show End Break only in the last minute (never Check Out).
     const canEndTeaBreak = isOnTeaBreak && !isOnBreakUI && teaBreakRemainingSec <= 60;
@@ -575,6 +577,7 @@ const EmployeeDashboardPage = () => {
 
                 // Refresh data from server (non-blocking for UI)
                 invalidateEmployeeDashboardCache();
+                window.dispatchEvent(new CustomEvent('dashboard-refresh-requested'));
                 if (fetchAllDataRef.current) {
                     fetchAllDataRef.current(false).catch(err => {
                         console.error('Failed to refresh data after clock-in:', err);
@@ -605,6 +608,7 @@ const EmployeeDashboardPage = () => {
         setSnackbar({ open: true, message: 'Checked out successfully!' });
         try {
             await api.post('/attendance/clock-out');
+            clearTeaBreak();
             invalidateEmployeeDashboardCache();
             if (fetchAllDataRef.current) fetchAllDataRef.current(false).catch(() => {});
         } catch (err) {
@@ -874,7 +878,11 @@ const EmployeeDashboardPage = () => {
                                                         unifiedDisplay={true}
                                                         teaBreakOverride={
                                                             isOnTeaBreak && !isOnBreakUI
-                                                                ? { startTime: teaBreakData.startedAt, breakType: 'Unpaid' }
+                                                                ? {
+                                                                    startTime: teaBreakData.startedAt,
+                                                                    endsAt: teaBreakData.endsAt,
+                                                                    breakType: 'Unpaid',
+                                                                }
                                                                 : null
                                                         }
                                                     />

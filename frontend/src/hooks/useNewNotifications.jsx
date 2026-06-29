@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useContext, createContext } fr
 import { useAuth } from '../context/AuthContext';
 import socket from '../socket';
 import useDesktopNotifications from './useDesktopNotifications.jsx';
+import { openAnnouncementHub } from '../utils/announcementHubEvents';
 import api from '../api/axios';
 
 const NewNotificationContext = createContext();
@@ -113,6 +114,49 @@ export const NewNotificationProvider = ({ children }) => {
             return;
         }
         
+        const isTeaBreakNotification = notification.metadata?.type === 'TEA_BREAK_STARTED';
+        if (isTeaBreakNotification) {
+            const initiatorId = notification.metadata?.initiatedByUserId;
+            const currentUserId = user?._id || user?.id;
+            if (initiatorId && currentUserId && String(initiatorId) === String(currentUserId)) {
+                return;
+            }
+
+            const announcementId = notification.metadata?.announcementId;
+            const notifiedKey = announcementId ? `tea_break_notified_${announcementId}` : null;
+            if (notifiedKey && sessionStorage.getItem(notifiedKey) === '1') {
+                return;
+            }
+            const shown = showNotification('☕ Tea Break Started!', notification.message, {
+                data: notification,
+                useTitleDirectly: true,
+                tag: announcementId ? `tea-break-${announcementId}` : undefined,
+            });
+            if (shown && notifiedKey) {
+                sessionStorage.setItem(notifiedKey, '1');
+            }
+            return;
+        }
+
+        const isTeaBreakEnded = notification.metadata?.type === 'TEA_BREAK_ENDED';
+        if (isTeaBreakEnded) {
+            if (!isAdmin) return;
+
+            const announcementId = notification.metadata?.announcementId;
+            showNotification('☕ Tea Break Update', notification.message, {
+                data: notification,
+                useTitleDirectly: true,
+                tag: announcementId ? `tea-break-end-${announcementId}` : undefined,
+                onClick: () => {
+                    openAnnouncementHub({
+                        tab: 'insights',
+                        announcementId: announcementId || null,
+                    });
+                },
+            });
+            return;
+        }
+
         const title = notification.category?.charAt(0).toUpperCase() + notification.category?.slice(1) || 'Notification';
         showNotification(title, notification.message, { data: notification });
     }, [showNotification, user?.role, user?._id, user?.id]);

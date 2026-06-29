@@ -1,16 +1,11 @@
 // frontend/src/api/axios.js
 import axios from 'axios';
+import { getApiBaseUrl } from '../utils/apiBaseUrl';
 
 const authErrorEvent = new Event('auth-error');
 
 // ─── Base URL ────────────────────────────────────────────────────────────────
-const baseURL = import.meta.env.DEV
-  ? '/api'
-  : (import.meta.env.VITE_API_BASE_URL
-      ? (import.meta.env.VITE_API_BASE_URL.endsWith('/api')
-          ? import.meta.env.VITE_API_BASE_URL
-          : `${import.meta.env.VITE_API_BASE_URL}/api`)
-      : 'https://attendance.bylinelms.com/api');
+const baseURL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL,

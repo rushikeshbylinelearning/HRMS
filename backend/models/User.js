@@ -126,6 +126,15 @@ const userSchema = new mongoose.Schema({
     
     // Analytics access control
     canViewAnalytics: { type: Boolean, default: false },
+
+    // Live attendance board (view-only, delegated access)
+    canViewLiveAttendance: { type: Boolean, default: false },
+
+    // Resource request management (delegated HR / staff access)
+    canManageResourceRequests: { type: Boolean, default: false },
+
+    // Bulk attendance actions on admin summary (live refresh, end breaks)
+    canManageBulkAttendanceActions: { type: Boolean, default: false },
     
     // Privilege levels: 'restricted', 'normal', 'advanced'
     privilegeLevel: { 

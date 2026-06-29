@@ -65,7 +65,7 @@ echo # Production Environment Variables
 echo # Copy this to .env and fill in your values
 echo.
 echo NODE_ENV=production
-echo PORT=3001
+echo PORT=3011
 echo.
 echo # Database
 echo MONGODB_URI=your_mongodb_connection_string_here

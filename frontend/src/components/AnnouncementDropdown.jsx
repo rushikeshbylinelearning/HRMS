@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { Megaphone } from "lucide-react";
-import AnnouncementChannel from "./AnnouncementChannel";
+import AnnouncementModal from "./announcements/AnnouncementModal";
+import AnnouncementHub from "./announcements/AnnouncementHub";
 import api from "../api/axios";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
 import soundManager from "../services/NotificationSoundManager";
 import useDesktopNotification from "../hooks/useDesktopNotification";
+import { OPEN_ANNOUNCEMENT_HUB_EVENT } from "../utils/announcementHubEvents";
 import "../styles/AnnouncementDropdown.css";
 
 const AnnouncementDropdown = () => {
   const [open, setOpen] = useState(false);
+  const [hubState, setHubState] = useState({ tab: "feed", announcementId: null });
   const [hasUnread, setHasUnread] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [lastReadTime, setLastReadTime] = useState(null);
@@ -19,6 +22,20 @@ const AnnouncementDropdown = () => {
   const seenAnnouncementIdsRef = useRef(new Set());
   const { user } = useAuth();
   const { showAnnouncementNotification, requestPermission } = useDesktopNotification();
+
+  // Open hub from desktop notifications or deep links
+  useEffect(() => {
+    const handleOpenHub = (event) => {
+      const { tab = "insights", announcementId = null } = event.detail || {};
+      setHubState({ tab, announcementId });
+      setOpen(true);
+      setHasUnread(false);
+      setUnreadCount(0);
+    };
+
+    window.addEventListener(OPEN_ANNOUNCEMENT_HUB_EVENT, handleOpenHub);
+    return () => window.removeEventListener(OPEN_ANNOUNCEMENT_HUB_EVENT, handleOpenHub);
+  }, []);
 
   // Load last read time from backend (with localStorage fallback) and request notification permission
   useEffect(() => {
@@ -235,11 +252,13 @@ const AnnouncementDropdown = () => {
           // Play announcement sound
           soundManager.playAnnouncement();
           
-          // Show desktop notification
-          showAnnouncementNotification(msg, () => {
-            // When notification is clicked, open the dropdown
-            setOpen(true);
-          });
+          // Tea break desktop toast is handled by TeaBreakContext (☕ Tea Break Started!)
+          if (!msg.isTEABreak) {
+            showAnnouncementNotification(msg, () => {
+              // When notification is clicked, open the dropdown
+              setOpen(true);
+            });
+          }
         }
       }
     };
@@ -252,7 +271,7 @@ const AnnouncementDropdown = () => {
   }, [open, user, showAnnouncementNotification]);
 
   const handleOpen = async () => {
-    // Open dropdown first
+    setHubState({ tab: "feed", announcementId: null });
     setOpen(true);
     
     // Immediately hide badge
@@ -285,6 +304,7 @@ const AnnouncementDropdown = () => {
   };
 
   const handleClose = async () => {
+    if (!open) return;
     setOpen(false);
     
     // Update lastReadTime again when closing to ensure it's saved
@@ -300,23 +320,6 @@ const AnnouncementDropdown = () => {
       console.error('[AnnouncementDropdown] Error marking as read on close:', error);
     }
   };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        handleClose();
-      }
-    };
-
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [open]);
 
   return (
     <div className="announcement-dropdown-container" ref={dropdownRef}>
@@ -336,11 +339,17 @@ const AnnouncementDropdown = () => {
         )}
       </button>
 
-      {open && (
-        <div className="announcement-dropdown-panel">
-          <AnnouncementChannel onClose={handleClose} />
-        </div>
-      )}
+      <AnnouncementModal
+        open={open}
+        onClose={handleClose}
+        ariaLabel="Company announcements"
+      >
+        <AnnouncementHub
+          onClose={handleClose}
+          initialTab={hubState.tab}
+          initialAnnouncementId={hubState.announcementId}
+        />
+      </AnnouncementModal>
     </div>
   );
 };

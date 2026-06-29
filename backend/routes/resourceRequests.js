@@ -2,23 +2,50 @@
 const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/authenticateToken');
+const requireResourceRequestAccess = require('../middleware/requireResourceRequestAccess');
 const EmployeeResourceRequest = require('../models/EmployeeResourceRequest');
 const { CATEGORIES, STATUSES } = require('../models/EmployeeResourceRequest');
 const User = require('../models/User');
 const NewNotificationService = require('../services/NewNotificationService');
-
-const isAdminOrHr = (req, res, next) => {
-    if (!['Admin', 'HR'].includes(req.user.role)) {
-        return res.status(403).json({ error: 'Access forbidden: Requires Admin or HR role.' });
-    }
-    next();
-};
 
 const formatCategoryLabel = (req) => {
     if (req.category === 'Other' && req.customCategory) {
         return req.customCategory;
     }
     return req.category;
+};
+
+const userCanManageResourceRequests = async (req) => {
+    if (req.user.role === 'Admin') return true;
+    const dbUser = await User.findById(req.user.userId)
+        .select('featurePermissions isActive')
+        .lean();
+    return Boolean(
+        dbUser?.isActive !== false
+        && dbUser?.featurePermissions?.canManageResourceRequests === true
+    );
+};
+
+const attachProfileImages = async (requests) => {
+    if (!requests?.length) return requests;
+    const userIds = [...new Set(requests.map((r) => r.userId?.toString()).filter(Boolean))];
+    const users = await User.find({ _id: { $in: userIds } })
+        .select('_id profileImageUrl')
+        .lean();
+    const imageByUserId = new Map(users.map((u) => [u._id.toString(), u.profileImageUrl || '']));
+    return requests.map((request) => ({
+        ...request,
+        profileImageUrl: imageByUserId.get(request.userId?.toString()) || '',
+    }));
+};
+
+const attachProfileImage = async (request) => {
+    if (!request?.userId) return { ...request, profileImageUrl: '' };
+    const user = await User.findById(request.userId).select('profileImageUrl').lean();
+    return {
+        ...request,
+        profileImageUrl: user?.profileImageUrl || '',
+    };
 };
 
 // POST /api/resource-requests — employee submits a request
@@ -59,13 +86,13 @@ router.post('/', authenticateToken, async (req, res) => {
         });
 
         const categoryLabel = formatCategoryLabel(newRequest);
-        await NewNotificationService.broadcastToAdmins({
+        await NewNotificationService.broadcastToResourceRequestManagers({
             message: `${employee.fullName} requested ${categoryLabel}: "${newRequest.title}"`,
             type: 'resource_request',
             category: 'request',
             priority: newRequest.priority === 'high' ? 'high' : 'medium',
             navigationData: {
-                page: '/admin/requests',
+                page: '/resource-requests/manage',
                 params: { requestId: newRequest._id.toString() },
             },
             metadata: {
@@ -96,8 +123,8 @@ router.get('/mine', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/resource-requests — admin list
-router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
+// GET /api/resource-requests — admin / delegated manager list
+router.get('/', [authenticateToken, requireResourceRequestAccess], async (req, res) => {
     try {
         const page = parseInt(req.query.page, 10) || 1;
         const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
@@ -125,8 +152,10 @@ router.get('/', [authenticateToken, isAdminOrHr], async (req, res) => {
             EmployeeResourceRequest.countDocuments(query),
         ]);
 
+        const requestsWithProfiles = await attachProfileImages(requests);
+
         res.json({
-            requests,
+            requests: requestsWithProfiles,
             totalCount,
             currentPage: page,
             totalPages: Math.ceil(totalCount / limit),
@@ -148,20 +177,21 @@ router.get('/:id', authenticateToken, async (req, res) => {
         }
 
         const isOwner = request.userId.toString() === req.user.userId;
-        const isAdmin = ['Admin', 'HR'].includes(req.user.role);
-        if (!isOwner && !isAdmin) {
+        const canManage = await userCanManageResourceRequests(req);
+        if (!isOwner && !canManage) {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        res.json({ request });
+        const requestWithProfile = await attachProfileImage(request);
+        res.json({ request: requestWithProfile });
     } catch (error) {
         console.error('Error fetching resource request:', error);
         res.status(500).json({ error: 'Failed to fetch request.' });
     }
 });
 
-// PATCH /api/resource-requests/:id/status — admin updates status
-router.patch('/:id/status', [authenticateToken, isAdminOrHr], async (req, res) => {
+// PATCH /api/resource-requests/:id/status — admin / delegated manager updates status
+router.patch('/:id/status', [authenticateToken, requireResourceRequestAccess], async (req, res) => {
     try {
         const { status, adminNotes } = req.body;
         if (!status || !STATUSES.includes(status)) {

@@ -4,7 +4,7 @@ const axios = require('axios');
 
 // Test configuration
 const TEST_CONFIG = {
-  backendUrl: process.env.BACKEND_URL || 'http://localhost:3001',
+  backendUrl: process.env.BACKEND_URL || 'http://localhost:3011',
   ssoSecret: process.env.SSO_SECRET || 'sso-secret-key-change-in-production',
   ssoIssuer: process.env.SSO_ISSUER || 'sso-portal',
   ssoAudience: process.env.SSO_AUDIENCE || 'sso-apps'

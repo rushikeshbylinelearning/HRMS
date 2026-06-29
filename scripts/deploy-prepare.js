@@ -111,7 +111,7 @@ Generated: ${new Date().toISOString()}
    
    Required:
    - NODE_ENV=production
-   - PORT=3001 (or your preferred port)
+   - PORT=3011 (or your preferred port)
    - MONGODB_URI=<your-mongodb-connection-string>
    - JWT_SECRET=<your-secure-jwt-secret>
    

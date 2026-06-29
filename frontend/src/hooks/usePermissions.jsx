@@ -10,35 +10,49 @@ import { getISTNow } from '../utils/istTime';
 export const usePermissions = () => {
   const { user } = useAuth();
 
-  // Memoize permissions to avoid unnecessary recalculations
   const permissions = useMemo(() => {
-    if (!user || !user.featurePermissions) {
-      // Default permissions if not set
-      return {
-        leaves: true,
-        breaks: true,
-        extraFeatures: false,
-        maxBreaks: 2,
-        breakAfterHours: 2,
-        canCheckIn: true,
-        canCheckOut: true,
-        canTakeBreak: true,
-        canViewAnalytics: false, // New field for analytics access
-        privilegeLevel: 'normal',
-        restrictedFeatures: {
-          canViewReports: false,
-          canViewOtherLogs: false,
-          canEditProfile: true,
-          canRequestExtraBreak: true
-        },
-        advancedFeatures: {
-          canBulkActions: false,
-          canExportData: false
-        }
-      };
+    const defaults = {
+      leaves: true,
+      breaks: true,
+      extraFeatures: false,
+      maxBreaks: 2,
+      breakAfterHours: 2,
+      canCheckIn: true,
+      canCheckOut: true,
+      canTakeBreak: true,
+      canViewAnalytics: false,
+      canViewLiveAttendance: false,
+      canManageResourceRequests: false,
+      canManageBulkAttendanceActions: false,
+      privilegeLevel: 'normal',
+      restrictedFeatures: {
+        canViewReports: false,
+        canViewOtherLogs: false,
+        canEditProfile: true,
+        canRequestExtraBreak: true,
+      },
+      advancedFeatures: {
+        canBulkActions: false,
+        canExportData: false,
+      },
+    };
+
+    if (!user?.featurePermissions) {
+      return defaults;
     }
 
-    return user.featurePermissions;
+    return {
+      ...defaults,
+      ...user.featurePermissions,
+      restrictedFeatures: {
+        ...defaults.restrictedFeatures,
+        ...(user.featurePermissions.restrictedFeatures || {}),
+      },
+      advancedFeatures: {
+        ...defaults.advancedFeatures,
+        ...(user.featurePermissions.advancedFeatures || {}),
+      },
+    };
   }, [user]);
 
   // Permission check functions
@@ -107,8 +121,29 @@ export const usePermissions = () => {
         return true;
       }
       return false; // Only users with explicit permission can view analytics
-    }
-  }), [permissions]);
+    },
+
+    viewLiveAttendance: () => {
+      if (['Admin', 'HR'].includes(user?.role)) {
+        return false;
+      }
+      return permissions.canViewLiveAttendance === true;
+    },
+
+    manageResourceRequests: () => {
+      if (user?.role === 'Admin') {
+        return true;
+      }
+      return permissions.canManageResourceRequests === true;
+    },
+
+    manageBulkAttendanceActions: () => {
+      if (user?.role === 'Admin') {
+        return true;
+      }
+      return permissions.canManageBulkAttendanceActions === true;
+    },
+  }), [permissions, user?.role]);
 
   // Break management helpers - Time-based restrictions
   const breakLimits = useMemo(() => {

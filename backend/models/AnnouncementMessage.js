@@ -39,6 +39,43 @@ const announcementMessageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    contentType: {
+      type: String,
+      enum: ["text", "poll"],
+      default: "text",
+    },
+    poll: {
+      title: { type: String, maxlength: 200, trim: true },
+      questions: [
+        {
+          text: { type: String, required: true, maxlength: 500, trim: true },
+          type: {
+            type: String,
+            enum: ["multiple_choice", "text"],
+            default: "multiple_choice",
+          },
+          options: [
+            {
+              text: { type: String, maxlength: 200, trim: true },
+              voteCount: { type: Number, default: 0, min: 0 },
+            },
+          ],
+          allowMultiple: { type: Boolean, default: false },
+        },
+      ],
+      // Legacy single-question fields (kept for backward compatibility)
+      question: { type: String, maxlength: 500, trim: true },
+      options: [
+        {
+          text: { type: String, maxlength: 200, trim: true },
+          voteCount: { type: Number, default: 0, min: 0 },
+        },
+      ],
+      allowMultiple: { type: Boolean, default: false },
+      isClosed: { type: Boolean, default: false },
+      closesAt: { type: Date, default: null },
+      totalVotes: { type: Number, default: 0, min: 0 },
+    },
   },
   { timestamps: true }
 );

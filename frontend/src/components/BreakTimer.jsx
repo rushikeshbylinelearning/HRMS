@@ -85,10 +85,18 @@ const BreakTimer = ({
         }
 
         const startMs = new Date(activeBreak.startTime).getTime();
+        const endsAtMs = teaBreakOverride?.endsAt
+            ? new Date(teaBreakOverride.endsAt).getTime()
+            : null;
 
         const tick = () => {
-            const elapsedSeconds = Math.floor((Date.now() - startMs) / 1000);
-            const remainingSeconds = allowanceSeconds - elapsedSeconds;
+            let remainingSeconds;
+            if (endsAtMs) {
+                remainingSeconds = Math.floor((endsAtMs - Date.now()) / 1000);
+            } else {
+                const elapsedSeconds = Math.floor((Date.now() - startMs) / 1000);
+                remainingSeconds = allowanceSeconds - elapsedSeconds;
+            }
             const nextCountdown = remainingSeconds > 0 ? remainingSeconds : 0;
             const nextOvertime = remainingSeconds < 0 ? Math.abs(remainingSeconds) : 0;
 
@@ -112,7 +120,7 @@ const BreakTimer = ({
         }, 1000);
 
         return clearTimer;
-    }, [activeBreak, allowanceSeconds, clearTimer]);
+    }, [activeBreak, allowanceSeconds, clearTimer, teaBreakOverride?.endsAt]);
 
     if (!activeBreak) {
         return null;

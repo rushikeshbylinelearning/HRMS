@@ -92,13 +92,13 @@ Test the API endpoints:
 
 ```bash
 # Get all leave years (Admin/HR only)
-curl http://localhost:3001/api/admin/leave-years
+curl http://localhost:3011/api/admin/leave-years
 
 # Get active leave year (Public)
-curl http://localhost:3001/api/admin/leave-years/active
+curl http://localhost:3011/api/admin/leave-years/active
 
 # Get holidays for active year (Employee view)
-curl http://localhost:3001/api/holidays
+curl http://localhost:3011/api/holidays
 ```
 
 #### Frontend Verification:

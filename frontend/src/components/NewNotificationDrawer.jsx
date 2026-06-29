@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openAnnouncementHub } from '../utils/announcementHubEvents';
 import { useAuth } from '../context/AuthContext';
-import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText, Chip, Button, Tooltip, Tabs, Tab } from '@mui/material';
+import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemIcon, ListItemText, Button, Tabs, Tab } from '@mui/material';
 import {
     Close as CloseIcon, CheckCircle as CheckCircleIcon, Error as ErrorIcon, Info as InfoIcon,
     Warning as WarningIcon, NotificationsOffOutlined as NotificationsOffOutlinedIcon,
     Login as LoginIcon, Logout as LogoutIcon, Coffee as CoffeeIcon, EventNote as EventNoteIcon,
-    DeleteSweep as DeleteSweepIcon, MarkEmailRead as MarkEmailReadIcon, PlayArrow as StartBreakIcon,
-    Wifi as WifiIcon, Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon,
+    PlayArrow as StartBreakIcon,
+    Person as PersonIcon, Description as DescriptionIcon, Message as MessageIcon,
     Groups as TeamsIcon, Preview as PreviewIcon, Inventory2 as Inventory2Icon,
 } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
+import { usePermissions } from '../hooks/usePermissions';
 import api from '../api/axios';
 import '../styles/NotificationDrawer.css';
 import TeamsNotificationModal from './TeamsAttendanceNotificationSettings';
@@ -155,25 +157,23 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
 
     return (
         <ListItem
-            className={`notification-item ${!notification.read ? 'unread' : ''}`}
+            className={`notification-item ${!notification.read ? 'unread' : ''} ${notification.type === 'teams_report_preview' ? 'featured' : ''}`}
             onClick={handleClick}
         >
             <ListItemIcon className="notification-icon-container">
                 {getNotificationIcon(notification.type)}
             </ListItemIcon>
             <ListItemText
+                className="notification-content"
                 primary={
                     <Box>
                         {notification.type === 'resource_request' && (
-                            <Chip size="small" label="Resource Request" color="primary" sx={{ mb: 0.5, fontWeight: 600 }} />
+                            <span className="notification-type-tag">Request</span>
                         )}
                         {notification.type === 'early_checkout_request' && (
-                            <Chip size="small" label="Early Checkout Request" color="warning" sx={{ mb: 0.5, fontWeight: 600 }} />
+                            <span className="notification-type-tag">Early checkout</span>
                         )}
-                        {notification.type === 'normal_checkout' && (
-                            <Chip size="small" label="Normal Checkout" variant="outlined" sx={{ mb: 0.5 }} />
-                        )}
-                        <Typography className="notification-message">{notification.message}</Typography>
+                        <Typography className="notification-message" component="span">{notification.message}</Typography>
                     </Box>
                 }
                 secondaryTypographyProps={{ component: 'div' }}
@@ -232,11 +232,11 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete, onNavigate, on
                         {notification.type === 'teams_report_preview' && (
                             <Box sx={{ mt: 1.5 }}>
                                 <Button
+                                    className="teams-preview-button"
                                     variant="contained"
                                     size="small"
                                     startIcon={<PreviewIcon />}
                                     onClick={(e) => { e.stopPropagation(); onOpenTeamsPreview && onOpenTeamsPreview(notification.id); }}
-                                    sx={{ bgcolor: '#6264A7', color: 'white', textTransform: 'none', fontWeight: 600, borderRadius: '8px', '&:hover': { bgcolor: '#464775' } }}
                                 >
                                     Preview & Edit Report
                                 </Button>
@@ -263,9 +263,11 @@ const NotificationList = ({
     if (items.length === 0) {
         return (
             <Box className="empty-notifications">
-                <NotificationsOffOutlinedIcon />
-                <Typography variant="h6">{emptyTitle}</Typography>
-                <Typography variant="body2">{emptySubtitle}</Typography>
+                <Box className="empty-notifications-icon">
+                    <NotificationsOffOutlinedIcon />
+                </Box>
+                <Typography variant="h6" className="empty-notifications-title">{emptyTitle}</Typography>
+                <Typography variant="body2" className="empty-notifications-subtitle">{emptySubtitle}</Typography>
             </Box>
         );
     }
@@ -291,6 +293,7 @@ const NotificationList = ({
 const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { canAccess } = usePermissions();
     const {
         notifications, unreadCount, isConnected, loadingNotifications,
         markAllAsRead, deleteNotification, clearAllNotifications,
@@ -402,8 +405,10 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
         
         if (notificationType === 'resource_request' || notificationType === 'resource_request_status') {
             const requestId = metadata?.requestId || navigationData?.params?.requestId;
-            if (isAdmin) {
+            if (user?.role === 'Admin') {
                 navigate(requestId ? `/admin/requests?requestId=${requestId}` : '/admin/requests');
+            } else if (canAccess.manageResourceRequests()) {
+                navigate(requestId ? `/resource-requests/manage?requestId=${requestId}` : '/resource-requests/manage');
             } else {
                 navigate(requestId ? `/requests?requestId=${requestId}` : '/requests');
             }
@@ -423,6 +428,19 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
             }
         }
         
+        // Tea break return — open announcements insights modal
+        if (metadata?.type === 'TEA_BREAK_ENDED' || navigationData?.page === 'announcements') {
+            if (!isAdmin) {
+                navigate('/dashboard');
+                return;
+            }
+            openAnnouncementHub({
+                tab: navigationData?.params?.tab || 'insights',
+                announcementId: navigationData?.params?.announcementId || metadata?.announcementId || null,
+            });
+            return;
+        }
+
         // Default navigation handling
         const path = navigationData?.page;
         console.log('[Notification] Default navigation - path:', path);
@@ -523,55 +541,80 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
             PaperProps={{ className: 'notification-drawer' }}
         >
             <Box className="drawer-header">
-                <Typography variant="h6">Notifications</Typography>
-                {unreadCount > 0 && <Chip label={unreadCount} className="unread-chip" size="small" />}
-                <Tooltip title={isConnected ? 'Real-time connection active' : 'Connection offline'}>
-                    <Box component="span">
-                        <WifiIcon className={`connection-icon ${isConnected ? 'connected' : ''}`} />
-                    </Box>
-                </Tooltip>
-                <IconButton onClick={onClose} sx={{ color: 'white' }}><CloseIcon /></IconButton>
-            </Box>
-            
-            {isAdmin && (
-                <Tabs
-                    value={adminTab}
-                    onChange={(_, v) => setAdminTab(v)}
-                    variant="fullWidth"
-                    className="notification-drawer-tabs"
-                >
-                    <Tab
-                        label={
-                            <Box className="notification-tab-label">
-                                Attendance
-                                {attendanceUnread > 0 && <Chip size="small" label={attendanceUnread} className="tab-unread-chip" />}
-                            </Box>
-                        }
-                    />
-                    <Tab
-                        label={
-                            <Box className="notification-tab-label">
-                                Requests
-                                {requestsUnread > 0 && <Chip size="small" label={requestsUnread} className="tab-unread-chip" />}
-                            </Box>
-                        }
-                    />
-                </Tabs>
-            )}
-
-            {notifications.length > 0 && (
-                <Box className="drawer-actions">
-                    <Button
-                        size="small"
-                        startIcon={<MarkEmailReadIcon />}
-                        onClick={isAdmin ? handleMarkTabAsRead : markAllAsRead}
-                        disabled={displayedUnread === 0}
-                    >
-                        {isAdmin ? 'Mark Tab Read' : 'Mark All Read'}
-                    </Button>
-                    <Button size="small" color="inherit" startIcon={<DeleteSweepIcon />} onClick={clearAllNotifications}>Clear All</Button>
+                <Box className="drawer-header-top">
+                    <Typography variant="h6" className="drawer-title">
+                        Notifications
+                        {!isAdmin && unreadCount > 0 && (
+                            <span className="drawer-title-count">{unreadCount}</span>
+                        )}
+                    </Typography>
+                    <IconButton className="drawer-close-btn" onClick={onClose} size="small" aria-label="Close">
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
                 </Box>
-            )}
+
+                {isAdmin && (
+                    <Box className="drawer-toolbar">
+                        <Tabs
+                            value={adminTab}
+                            onChange={(_, v) => setAdminTab(v)}
+                            className="notification-drawer-tabs"
+                            TabIndicatorProps={{ className: 'notification-tab-indicator' }}
+                            slotProps={{ indicator: { className: 'notification-tab-indicator' } }}
+                            sx={{
+                                '& .MuiTab-root': {
+                                    outline: 'none',
+                                    '&:focus, &:focus-visible, &.Mui-focusVisible': {
+                                        outline: 'none',
+                                        boxShadow: 'none',
+                                    },
+                                },
+                            }}
+                        >
+                            <Tab
+                                label={
+                                    <span className="notification-tab-label">
+                                        Attendance
+                                        {attendanceUnread > 0 && <span className="tab-count">{attendanceUnread}</span>}
+                                    </span>
+                                }
+                            />
+                            <Tab
+                                label={
+                                    <span className="notification-tab-label">
+                                        Requests
+                                        {requestsUnread > 0 && <span className="tab-count">{requestsUnread}</span>}
+                                    </span>
+                                }
+                            />
+                        </Tabs>
+                    </Box>
+                )}
+
+                {notifications.length > 0 && (
+                    <Box className="drawer-actions">
+                        <button
+                            type="button"
+                            className="drawer-text-action"
+                            onClick={isAdmin ? handleMarkTabAsRead : markAllAsRead}
+                            disabled={displayedUnread === 0}
+                        >
+                            Mark read
+                        </button>
+                        <span className="drawer-action-divider" />
+                        <button
+                            type="button"
+                            className="drawer-text-action drawer-text-action--muted"
+                            onClick={clearAllNotifications}
+                        >
+                            Clear all
+                        </button>
+                        {isConnected && (
+                            <span className="drawer-live-dot" title="Live" />
+                        )}
+                    </Box>
+                )}
+            </Box>
             
             <Box className="drawer-body">
                 <NotificationList

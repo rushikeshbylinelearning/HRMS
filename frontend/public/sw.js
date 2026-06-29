@@ -155,33 +155,63 @@ async function syncAttendanceData() {
     console.log('[SW] Syncing attendance data');
 }
 
-// Handle push notifications
+// Handle push notifications (Web Push — works when app tab is in background)
 self.addEventListener('push', (event) => {
-    console.log('[SW] Push notification received');
+    let data = {
+        title: 'Byline Attendance',
+        body: '',
+        url: '/dashboard',
+        tag: 'ams-push',
+        icon: '/BL.svg',
+    };
 
-    if (event.data) {
-        const data = event.data.json();
-
-        const options = {
-            body: data.body,
-            icon: '/icon-192x192.png',
-            badge: '/icon-192x192.png',
-            data: data.url,
-        };
-
-        event.waitUntil(
-            self.registration.showNotification(data.title, options)
-        );
+    try {
+        if (event.data) {
+            data = { ...data, ...event.data.json() };
+        }
+    } catch (_) {
+        /* use defaults */
     }
+
+    const options = {
+        body: data.body || '',
+        icon: data.icon || '/BL.svg',
+        badge: '/BL.svg',
+        tag: data.tag || 'ams-push',
+        requireInteraction: Boolean(data.requireInteraction),
+        data: {
+            url: data.url || '/dashboard',
+            announcementId: data.announcementId || null,
+            type: data.type || null,
+        },
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'Byline Attendance', options)
+    );
 });
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notification clicked');
-
     event.notification.close();
 
+    const targetUrl = event.notification.data?.url || '/dashboard';
+    const absoluteUrl = targetUrl.startsWith('http')
+        ? targetUrl
+        : new URL(targetUrl, self.location.origin).href;
+
     event.waitUntil(
-        clients.openWindow(event.notification.data || '/')
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            for (const client of clients) {
+                if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+                    client.postMessage({
+                        type: 'PUSH_NOTIFICATION_CLICK',
+                        data: event.notification.data,
+                    });
+                    return client.focus();
+                }
+            }
+            return self.clients.openWindow(absoluteUrl);
+        })
     );
 });

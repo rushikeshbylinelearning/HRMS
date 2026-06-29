@@ -107,7 +107,7 @@ app.set('trust proxy', 1);
 // Determine allowed iframe origins once at startup, not per-request.
 const FRAME_ANCESTORS = process.env.NODE_ENV === 'development'
     ? ["'self'", "http://localhost:5173"]
-    : ["'self'", "https://attendance.bylinelms.com"];
+    : ["'self'", "https://attendance-test.bylinelms.com"];
 
 const defaultDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
 delete defaultDirectives['frame-ancestors'];
@@ -277,6 +277,9 @@ app.use('/api/announcements', announcementRoutes);
 const teaBreakRoutes = require('./routes/teaBreakRoutes');
 app.use('/api/tea-break', teaBreakRoutes);
 
+const pushSubscriptionRoutes = require('./routes/pushSubscriptions');
+app.use('/api/push', pushSubscriptionRoutes);
+
 const cifRoutes = require('./modules/cif/cif.routes');
 app.use('/api/admin/cif', cifRoutes);
 
@@ -357,7 +360,23 @@ app.use('/api', (req, res) => {
 const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
 
-// Frontend static serving
+// Frontend static serving — supports frontend/dist (local build) or frontend/ (A2 deploy)
+const fs = require('fs');
+const resolveFrontendDir = () => {
+  if (process.env.FRONTEND_DIST_PATH) {
+    return path.resolve(__dirname, process.env.FRONTEND_DIST_PATH);
+  }
+  const candidates = [
+    path.join(__dirname, '../frontend/dist'),
+    path.join(__dirname, '../frontend'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
+  }
+  return candidates[0];
+};
+const FRONTEND_DIR = resolveFrontendDir();
+
 const frontendStaticOptions = {
     setHeaders: (res, filepath) => {
         res.removeHeader('X-Frame-Options');
@@ -381,7 +400,7 @@ const frontendStaticOptions = {
     index: false,
 };
 
-app.use(express.static(path.join(__dirname, '../frontend/dist'), frontendStaticOptions));
+app.use(express.static(FRONTEND_DIR, frontendStaticOptions));
 
 // SPA fallback
 app.use((req, res, next) => {
@@ -395,12 +414,11 @@ app.use((req, res, next) => {
 
   res.removeHeader('X-Frame-Options');
 
-  const indexPath = path.join(__dirname, '../frontend/dist/index.html');
-  const fs = require('fs');
+  const indexPath = path.join(FRONTEND_DIR, 'index.html');
   if (!fs.existsSync(indexPath)) {
     res.set('Cache-Control', 'no-cache');
     return res.status(503).send(
-      '<!DOCTYPE html><html><body><h1>Frontend not built</h1><p>Deploy frontend/dist or set up the frontend URL.</p></body></html>'
+      '<!DOCTYPE html><html><body><h1>Frontend not built</h1><p>Deploy frontend/dist (or frontend/) or set FRONTEND_DIST_PATH.</p></body></html>'
     );
   }
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -409,7 +427,7 @@ app.use((req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3011;
 const httpServer = require('http').createServer(app);
 
 const { init } = require('./socket');
@@ -467,6 +485,8 @@ const startServer = async () => {
     else console.log('✅ Private key found');
     if (!fs.existsSync(publicKeyPath)) console.error('❌ Public key MISSING at:', publicKeyPath);
     else console.log('✅ Public key found');
+
+    console.log(`📁 Frontend static dir: ${FRONTEND_DIR}`);
 
     const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
     httpServer.listen(PORT, HOST, () => {

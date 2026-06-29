@@ -25,7 +25,7 @@ if (!envExists) {
 
 # Database Configuration
 MONGODB_URI=mongodb://localhost:27017/attendance_system
-PORT=3001
+PORT=3011
 NODE_ENV=development
 
 # SSO Configuration
@@ -111,7 +111,7 @@ if (!ssoKeysExist) {
       console.log('\n🎯 Configuration Complete!');
       console.log('📋 Next Steps:');
       console.log('1. Restart AMS backend: npm run dev');
-      console.log('2. Check health endpoint: http://localhost:3001/health');
+      console.log('2. Check health endpoint: http://localhost:3011/health');
       console.log('3. Test SSO auto-login from SSO portal');
       
     } catch (error) {

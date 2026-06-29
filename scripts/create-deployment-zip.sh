@@ -55,7 +55,7 @@ cat > "$TEMP_DIR/backend/.env.example" << 'EOF'
 # Copy this to .env and fill in your values
 
 NODE_ENV=production
-PORT=3001
+PORT=3011
 
 # Database
 MONGODB_URI=your_mongodb_connection_string_here

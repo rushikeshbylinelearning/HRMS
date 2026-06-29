@@ -14,7 +14,7 @@ const axios = require('axios');
 const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3011';
 const TEST_EMAIL = process.env.TEST_EMAIL || 'admin@example.com';
 const TEST_PASSWORD = process.env.TEST_PASSWORD || 'admin123';
 

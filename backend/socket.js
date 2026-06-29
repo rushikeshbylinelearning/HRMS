@@ -14,7 +14,7 @@ const init = (httpServer) => {
         path: '/api/socket.io/',
         cors: {
             origin: [
-                "https://attendance.bylinelms.com",
+                "https://attendance-test.bylinelms.com",
                 process.env.FRONTEND_URL?.startsWith('http') ? process.env.FRONTEND_URL : `https://${process.env.FRONTEND_URL}`,
                 // Development origins
                 "http://localhost:5173",
@@ -102,8 +102,19 @@ const init = (httpServer) => {
                         if (mongoose.connection.readyState !== 1) {
                             throw new Error('MongoDB not connected - cannot query user');
                         }
+
+                        const { normalizeEmail } = require('./utils/emailUtils');
+                        const normalizedEmail = normalizeEmail(userEmail);
+                        const rawLowerEmail = String(userEmail).toLowerCase();
                         
-                        user = await User.findOne({ email: userEmail }).lean();
+                        user = await User.findOne({
+                            isActive: { $ne: false },
+                            $or: [
+                                { email: normalizedEmail },
+                                { email: rawLowerEmail },
+                                { email: userEmail },
+                            ],
+                        }).lean();
                         if (!user) {
                             throw new Error('User not found for SSO token email: ' + userEmail);
                         }

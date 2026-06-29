@@ -3,7 +3,7 @@
 
 :root {
   --accent-blue: #2563eb;
-  --sidebar-bg: #1a237e;
+  --sidebar-bg: #192a56;
   --sidebar-active: #2336a3;
   --sidebar-icon: #e3f2fd;
   --sidebar-icon-hover: #fff;
@@ -29,7 +29,7 @@
 
 [data-theme="dark"] {
   --accent-blue: #90caf9;
-  --sidebar-bg: #111b3a;
+  --sidebar-bg: #192a56;
   --sidebar-active: #2336a3;
   --sidebar-icon: #bbdefb;
   --sidebar-icon-hover: #fff;

@@ -191,3 +191,36 @@ export const isSameDateIST = (date1, date2) => {
     return getISTDateString(date1) === getISTDateString(date2);
 };
 
+/** Matches the fixed labels on the attendance summary time axis (10 AM – 7 PM). */
+export const TIMELINE_AXIS_START_HOUR = 10;
+export const TIMELINE_AXIS_END_HOUR = 19;
+export const TIMELINE_AXIS_DURATION_HOURS = TIMELINE_AXIS_END_HOUR - TIMELINE_AXIS_START_HOUR;
+
+/**
+ * Decimal hour-of-day in IST (e.g. 14.5 = 2:30 PM).
+ */
+export const getISTDecimalHours = (dateTime) => {
+    if (!dateTime) return 0;
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+    }).formatToParts(new Date(dateTime));
+
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+    const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+    return hour + minute / 60;
+};
+
+/**
+ * Map an IST clock time to a percentage on the 10 AM – 7 PM summary axis.
+ * Times before 10 AM clamp to 0%; times after 7 PM can exceed 100%.
+ */
+export const timeToTimelinePercentage = (dateTime) => {
+    if (!dateTime || TIMELINE_AXIS_DURATION_HOURS <= 0) return 0;
+    const decimalHours = getISTDecimalHours(dateTime);
+    const percentage = ((decimalHours - TIMELINE_AXIS_START_HOUR) / TIMELINE_AXIS_DURATION_HOURS) * 100;
+    return Math.max(0, percentage);
+};
+

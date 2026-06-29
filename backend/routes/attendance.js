@@ -21,6 +21,27 @@ const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 const { isHalfDayLeaveType } = require('../utils/halfDayLeave');
 
 const router = express.Router();
+const requireLiveAttendanceAccess = require('../middleware/requireLiveAttendanceAccess');
+const { getLiveAttendanceOverview } = require('../services/liveAttendanceService');
+
+// GET /api/attendance/live-overview — view-only real-time attendance board (permission-gated)
+router.get('/live-overview', authenticateToken, requireLiveAttendanceAccess, async (req, res) => {
+    try {
+        const leaveRange = req.query.leaveRange || 'today';
+        const cacheKey = `live_attendance_overview:${leaveRange}`;
+        const cached = cache.get(cacheKey);
+        if (cached !== null) {
+            return res.json(cached);
+        }
+
+        const overview = await getLiveAttendanceOverview({ leaveRange });
+        cache.set(cacheKey, overview, 15000);
+        return res.json(overview);
+    } catch (error) {
+        console.error('Error fetching live attendance overview:', error);
+        return res.status(500).json({ error: 'Failed to fetch live attendance overview.' });
+    }
+});
 
 // GET /api/attendance/status
 router.get('/status', authenticateToken, async (req, res) => {
@@ -324,6 +345,7 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         cache.delete(cacheKey);
         // Also invalidate dashboard summary cache (utils/cache)
         cache.deletePattern(`dashboard-summary:*`);
+        cache.deletePattern('live_attendance_overview:*');
         // CRITICAL: Invalidate real dashboard cache (cacheService stores dashboard_${date})
         const cacheService = require('../services/cacheService');
         cacheService.invalidateDashboard(todayStr);
@@ -553,6 +575,7 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         cache.delete(cacheKey);
         // Also invalidate dashboard summary cache (utils/cache)
         cache.deletePattern(`dashboard-summary:*`);
+        cache.deletePattern('live_attendance_overview:*');
         // CRITICAL: Invalidate real dashboard cache (cacheService stores dashboard_${date})
         const cacheService = require('../services/cacheService');
         cacheService.invalidateDashboard(today);

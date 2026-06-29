@@ -122,11 +122,11 @@ echo     instances: 'max',
 echo     exec_mode: 'cluster',
 echo     env: {
 echo       NODE_ENV: 'production',
-echo       PORT: 3001
+echo       PORT: 3011
 echo     },
 echo     env_production: {
 echo       NODE_ENV: 'production',
-echo       PORT: 3001
+echo       PORT: 3011
 echo     },
 echo     error_file: './logs/err.log',
 echo     out_file: './logs/out.log',

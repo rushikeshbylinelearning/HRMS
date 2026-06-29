@@ -126,6 +126,7 @@ const userSchema = new mongoose.Schema({
     
     // Analytics access control
     canViewAnalytics: { type: Boolean, default: false },
+    canViewLiveAttendance: { type: Boolean, default: false },
     
     // Privilege levels: 'restricted', 'normal', 'advanced'
     privilegeLevel: { 

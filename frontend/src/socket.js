@@ -25,7 +25,7 @@ const getSocketURL = () => {
         return window.location.origin;
     }
     
-    return 'https://attendance.bylinelms.com'; // Fallback
+    return ''; // SSR fallback; browser path above uses window.location.origin
 };
 
 const URL = getSocketURL();

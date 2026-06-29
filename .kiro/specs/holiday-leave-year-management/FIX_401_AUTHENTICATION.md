@@ -72,7 +72,7 @@ const response = await api.get('/admin/leave-years/active');
 
 The `api` instance from `../api/axios`:
 - ✅ Automatically includes `Authorization: Bearer <token>` header
-- ✅ Uses Vite proxy in development (`/api` → `http://localhost:3001`)
+- ✅ Uses Vite proxy in development (`/api` → `http://localhost:3011`)
 - ✅ Handles token refresh on 401 errors
 - ✅ Includes request/response interceptors
 - ✅ Properly configured for both dev and production

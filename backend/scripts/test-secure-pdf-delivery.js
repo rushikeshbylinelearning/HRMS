@@ -14,7 +14,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3011';
 const TEST_TOKEN = process.env.TEST_TOKEN || ''; // Set valid JWT token for testing
 
 async function runTests() {

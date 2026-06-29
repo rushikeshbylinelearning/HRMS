@@ -11,7 +11,8 @@ const PermissionProtectedRoute = ({
   children, 
   requiredPermission, 
   fallbackPath = '/dashboard',
-  showAccessDenied = true 
+  showAccessDenied = true,
+  adminBypass = true,
 }) => {
   const { isAuthenticated, user, authStatus } = useAuth();
   const { canAccess } = usePermissions();
@@ -36,8 +37,8 @@ const PermissionProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  // Admin always has access to everything
-  if (user?.role === 'Admin') {
+  // Admin always has access unless explicitly disabled for this route
+  if (adminBypass && user?.role === 'Admin') {
     return children;
   }
 

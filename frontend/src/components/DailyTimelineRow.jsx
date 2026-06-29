@@ -1,7 +1,6 @@
 // src/components/DailyTimelineRow.jsx - IST-ENFORCED, BACKEND-DRIVEN
 import React, { Fragment, useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Typography, Box, Chip } from '@mui/material';
-import dayjs from 'dayjs';
 import { 
     getISTNow, 
     getISTDateString, 
@@ -12,92 +11,26 @@ import {
     formatTimeForDisplay,
     formatDuration,
     formatDurationWithSeconds,
-    isTodayIST
+    isTodayIST,
+    timeToTimelinePercentage
 } from '../utils/attendanceRenderUtils';
 
-// Configuration
-const FULL_DAY_MINUTES = 480; // 8 hours * 60 minutes
-
 /**
- * Parses a time string in "HH:mm" format and returns hours as a decimal number.
+ * End-of-row reference for open breaks/sessions on past days (never use "now" for history).
  */
-const parseTimeString = (timeStr) => {
-    if (!timeStr) return 0;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours + (minutes || 0) / 60;
+const getRowEndReference = (log, checkOutTime, isToday, hasActiveSession, nowIST) => {
+    if (checkOutTime) return checkOutTime;
+    if (isToday && hasActiveSession) return nowIST;
+
+    const sessions = log?.sessions || [];
+    const lastSession = sessions[sessions.length - 1];
+    return lastSession?.endTime || log?.lastOut || sessions[0]?.startTime || null;
 };
 
-/**
- * Creates a dayjs object for a time on a specific date in IST.
- */
-const createTimeOnDate = (date, timeStr) => {
-    if (!timeStr) return null;
-    const dateStr = getISTDateString(date);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    // Create date at specific time in IST
-    const istISOString = `${dateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+05:30`;
-    return dayjs(new Date(istISOString));
-};
-
-/**
- * Normalizes a time relative to shift start, handling overnight shifts.
- */
-const normalizeTimeToShift = (dateTime, shiftStart, shiftInfo) => {
-    if (!dateTime || !shiftStart || !shiftInfo) return 0;
-    
-    let time = dayjs(dateTime);
-    const startHours = parseTimeString(shiftInfo.startTime);
-    const endHours = parseTimeString(shiftInfo.endTime);
-    const isOvernightShift = endHours < startHours;
-    
-    let diffMs = time.diff(shiftStart);
-    let diffHours = diffMs / (1000 * 60 * 60);
-    
-    if (isOvernightShift) {
-        const timeHours = time.hour() + time.minute() / 60;
-        const daysDiff = time.diff(shiftStart, 'day');
-        
-        if (daysDiff === 1 && timeHours < endHours) {
-            diffHours = (24 - startHours) + timeHours;
-        } else if (daysDiff === 0 && diffHours < 0) {
-            return 0;
-        }
-    }
-    
-    return Math.max(0, diffHours);
-};
-
-/**
- * Converts a datetime to a percentage position on the timeline.
- */
-const timeToPercentage = (dateTime, shiftInfo, attendanceDate, shiftDurationHours) => {
-    if (!dateTime || !shiftInfo || !shiftInfo.startTime || shiftDurationHours <= 0) return 0;
-    
-    const shiftStart = createTimeOnDate(attendanceDate, shiftInfo.startTime);
-    if (!shiftStart) return 0;
-    
-    const normalizedHours = normalizeTimeToShift(dateTime, shiftStart, shiftInfo);
-    const percentage = (normalizedHours / shiftDurationHours) * 100;
-    
-    return Math.max(0, percentage);
-};
-
-/**
- * Calculates shift duration in hours.
- */
-const calculateShiftDuration = (shiftInfo) => {
-    if (!shiftInfo || !shiftInfo.startTime || !shiftInfo.endTime) {
-        return 8;
-    }
-    
-    const startHours = parseTimeString(shiftInfo.startTime);
-    const endHours = parseTimeString(shiftInfo.endTime);
-    
-    if (endHours < startHours) {
-        return (24 - startHours) + endHours;
-    } else {
-        return endHours - startHours;
-    }
+const resolveBreakEndTime = (breakItem, rowEndReference, isToday, hasActiveSession, nowIST) => {
+    if (breakItem.endTime) return breakItem.endTime;
+    if (isToday && hasActiveSession) return nowIST;
+    return rowEndReference;
 };
 
 /**
@@ -139,7 +72,7 @@ const getDurationInfo = (log, nowIST) => {
     };
 };
 
-const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
+const DailyTimelineRow = ({ dayData, onClick }) => {
     const { date, log, status, leave } = dayData;
     const [nowIST, setNowIST] = useState(getISTNow());
     const intervalRef = useRef(null);
@@ -207,8 +140,6 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
         day: 'numeric'
     }).format(date));
     
-    const shiftDurationHours = calculateShiftDuration(shiftInfo);
-
     // Check if this day should be clickable in IST
     const todayIST = getISTNow();
     const todayStr = getISTDateString(todayIST);
@@ -237,11 +168,10 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
             const sessions = log.sessions;
             const checkInTime = log.firstIn || sessions[0]?.startTime;
             const checkOutTime = log.lastOut || (sessions[sessions.length - 1]?.endTime);
-            
-            const effectiveShiftInfo = shiftInfo || { startTime: '09:00', endTime: '18:00' };
-            
-            const maxEndTime = checkOutTime || nowIST;
-            const maxEndPercentage = timeToPercentage(maxEndTime, effectiveShiftInfo, date, shiftDurationHours);
+            const rowEndReference = getRowEndReference(log, checkOutTime, isToday, hasActiveSession, nowIST);
+
+            const maxEndTime = rowEndReference;
+            const maxEndPercentage = timeToTimelinePercentage(maxEndTime);
             const timelineWidth = Math.max(100, maxEndPercentage);
             
             return (
@@ -324,14 +254,14 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                         isHalfDayMarked ? { borderTop: '2px dashed #d32f2f' } : {}
                     }>
                         {checkInTime && (
-                            <div className="timeline-marker check-in-marker" style={{ left: `${timeToPercentage(checkInTime, effectiveShiftInfo, date, shiftDurationHours)}%` }}>
+                            <div className="timeline-marker check-in-marker" style={{ left: `${timeToTimelinePercentage(checkInTime)}%` }}>
                                 <div className="marker-dot"></div>
                             </div>
                         )}
                         
                         {(() => {
                             const workSegments = [];
-                            const checkInPos = timeToPercentage(checkInTime, effectiveShiftInfo, date, shiftDurationHours);
+                            const checkInPos = timeToTimelinePercentage(checkInTime);
                             let currentStart = checkInPos;
                             
                             // Ensure breaks is an array (backend provides both breaks array and breaksSummary object)
@@ -341,8 +271,9 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                             );
                             
                             sortedBreaks.forEach(breakItem => {
-                                const breakStartPos = timeToPercentage(breakItem.startTime, effectiveShiftInfo, date, shiftDurationHours);
-                                const breakEndPos = timeToPercentage(breakItem.endTime || nowIST, effectiveShiftInfo, date, shiftDurationHours);
+                                const breakEndTime = resolveBreakEndTime(breakItem, rowEndReference, isToday, hasActiveSession, nowIST);
+                                const breakStartPos = timeToTimelinePercentage(breakItem.startTime);
+                                const breakEndPos = timeToTimelinePercentage(breakEndTime);
                                 
                                 if (breakStartPos > currentStart) {
                                     workSegments.push({
@@ -351,12 +282,10 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                                     });
                                 }
                                 
-                                currentStart = breakEndPos;
+                                currentStart = Math.max(currentStart, breakEndPos);
                             });
                             
-                            const finalEndPos = checkOutTime ? 
-                                timeToPercentage(checkOutTime, effectiveShiftInfo, date, shiftDurationHours) : 
-                                timeToPercentage(nowIST, effectiveShiftInfo, date, shiftDurationHours);
+                            const finalEndPos = timeToTimelinePercentage(rowEndReference);
                             
                             if (currentStart < finalEndPos) {
                                 workSegments.push({
@@ -378,8 +307,9 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                         })()}
                         
                         {Array.isArray(log.breaks) && log.breaks.length > 0 && log.breaks.map((br, index) => {
-                            const breakStartPercentage = timeToPercentage(br.startTime, effectiveShiftInfo, date, shiftDurationHours);
-                            const breakEndPercentage = timeToPercentage(br.endTime || nowIST, effectiveShiftInfo, date, shiftDurationHours);
+                            const breakEndTime = resolveBreakEndTime(br, rowEndReference, isToday, hasActiveSession, nowIST);
+                            const breakStartPercentage = timeToTimelinePercentage(br.startTime);
+                            const breakEndPercentage = timeToTimelinePercentage(breakEndTime);
                             const breakWidth = breakEndPercentage - breakStartPercentage;
                             
                             return (
@@ -413,13 +343,13 @@ const DailyTimelineRow = ({ dayData, onClick, shiftInfo }) => {
                         })}
                         
                         {checkOutTime && (
-                            <div className="timeline-marker check-out-marker" style={{ left: `${timeToPercentage(checkOutTime, effectiveShiftInfo, date, shiftDurationHours)}%` }}>
+                            <div className="timeline-marker check-out-marker" style={{ left: `${timeToTimelinePercentage(checkOutTime)}%` }}>
                                 <div className="marker-dot"></div>
                             </div>
                         )}
                         
                         {isToday && !checkOutTime && (
-                            <div className="current-time-indicator" style={{ left: `${timeToPercentage(nowIST, effectiveShiftInfo, date, shiftDurationHours)}%` }}>
+                            <div className="current-time-indicator" style={{ left: `${timeToTimelinePercentage(nowIST)}%` }}>
                                 <div className="current-time-line"></div>
                                 <div className="current-time-dot"></div>
                             </div>

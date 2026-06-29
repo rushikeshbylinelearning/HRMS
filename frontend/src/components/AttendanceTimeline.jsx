@@ -130,11 +130,17 @@ const AttendanceTimeline = ({ logs, currentDate, onDayClick, saturdayPolicy = 'A
                 ))}
             </div>
 
-            {/* Time Axis */}
+            {/* Time Axis — aligned with the timeline track in each daily row */}
             <div className="time-axis-container">
-                <div className="time-axis">
-                    {timeAxisLabels.map(label => <span key={label} className="time-label">{label}</span>)}
+                <div className="time-axis-date-spacer" aria-hidden="true" />
+                <div className="time-axis-track">
+                    <div className="time-axis-check-spacer" aria-hidden="true" />
+                    <div className="time-axis">
+                        {timeAxisLabels.map(label => <span key={label} className="time-label">{label}</span>)}
+                    </div>
+                    <div className="time-axis-check-spacer" aria-hidden="true" />
                 </div>
+                <div className="time-axis-hours-spacer" aria-hidden="true" />
             </div>
             
             {/* Summary Section */}

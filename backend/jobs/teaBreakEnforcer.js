@@ -1,38 +1,16 @@
-const AttendanceLog = require('../models/AttendanceLog');
-const AttendanceSession = require('../models/AttendanceSession');
 const AnnouncementMessage = require('../models/AnnouncementMessage');
-const { getISTDateString, getISTNow } = require('../utils/istTime');
-const { applyTeaBreakOverrun } = require('../services/teaBreakService');
+const { getISTNow } = require('../utils/istTime');
+const {
+  applyTeaBreakOverrun,
+  getClockedInEmployeeIds,
+  TEA_BREAK_DURATION_MS,
+  TEA_BREAK_SAFETY_CUTOFF_MS,
+} = require('../services/teaBreakService');
 const { hasTeaBreakEnded, clearTeaBreakState } = require('../services/teaBreakState');
 
-const TEA_BREAK_DURATION_MS = 10 * 60 * 1000;
-const SAFETY_CUTOFF_MS = 30 * 60 * 1000;
 const RECURRING_INTERVAL_MS = 60 * 1000;
 
 const activeJobs = new Map();
-
-async function getClockedInEmployeeIds() {
-  const today = getISTDateString();
-  const logs = await AttendanceLog.find({
-    attendanceDate: today,
-    clockInTime: { $ne: null },
-    clockOutTime: null,
-  })
-    .select('user')
-    .lean();
-
-  const ids = [];
-  for (const log of logs) {
-    const activeSession = await AttendanceSession.findOne({
-      attendanceLog: log._id,
-      endTime: null,
-    }).lean();
-    if (activeSession) {
-      ids.push(String(log.user));
-    }
-  }
-  return ids;
-}
 
 async function runEnforcementPass(announcementId, teaBreakStartedAt) {
   const employeeIds = await getClockedInEmployeeIds();
@@ -73,7 +51,7 @@ function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
 
   const started = new Date(teaBreakStartedAt);
   const firstRunAt = new Date(started.getTime() + TEA_BREAK_DURATION_MS + 1000);
-  const cutoffAt = new Date(started.getTime() + SAFETY_CUTOFF_MS);
+  const cutoffAt = new Date(started.getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
   const now = getISTNow();
 
   const runPass = async () => {
@@ -109,7 +87,7 @@ function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
  */
 async function restoreActiveTeaBreakJobs() {
   try {
-    const cutoff = new Date(getISTNow().getTime() - SAFETY_CUTOFF_MS);
+    const cutoff = new Date(getISTNow().getTime() - TEA_BREAK_SAFETY_CUTOFF_MS);
     const active = await AnnouncementMessage.find({
       isTEABreak: true,
       teaBreakStartedAt: { $gte: cutoff },
@@ -121,7 +99,7 @@ async function restoreActiveTeaBreakJobs() {
 
     for (const ann of active) {
       if (!ann.teaBreakStartedAt) continue;
-      const endsAt = new Date(new Date(ann.teaBreakStartedAt).getTime() + SAFETY_CUTOFF_MS);
+      const endsAt = new Date(new Date(ann.teaBreakStartedAt).getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
       if (getISTNow() < endsAt) {
         scheduleTeaBreakEnforcement(ann._id, ann.teaBreakStartedAt);
       }

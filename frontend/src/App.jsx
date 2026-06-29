@@ -20,6 +20,7 @@ import SSOLoginPage from './pages/SSOLoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionProtectedRoute from './components/PermissionProtectedRoute';
 import IdleDetectionProvider from './components/IdleDetectionProvider';
+import WebPushBootstrap from './components/WebPushBootstrap';
 
 // Lazy load all pages
 const EmployeeDashboardPage = lazy(() => import('./pages/EmployeeDashboardPage'));
@@ -40,6 +41,7 @@ const EmployeeMusterRollPage = lazy(() => import('./pages/EmployeeMusterRollPage
 const LeavesTrackerPage = lazy(() => import('./pages/LeavesTrackerPage'));
 const PayrollManagementPage = lazy(() => import('./pages/PayrollManagementPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const LiveAttendancePage = lazy(() => import('./pages/LiveAttendancePage'));
 const EmployeeDetailedAnalyticsPage = lazy(() => import('./pages/EmployeeDetailedAnalyticsPage'));
 // FIX: Static import to prevent skeleton flash during auth resolution
 import ProfilePage from './pages/ProfilePage';
@@ -225,6 +227,7 @@ function App() {
                             <BreakUIProvider>
                                 <TeaBreakProvider>
                                 <NewNotificationProvider> {/* <-- CORRECT NESTING */}
+                                    <WebPushBootstrap />
                                     <IdleDetectionProvider>
                                         <Routes>
                                     {/* Public routes - accessible without authentication */}
@@ -291,6 +294,13 @@ function App() {
                                             </Suspense>
                                         } />
                                         <Route path="/admin/requests" element={<Navigate to="/activity-log?tab=requests" replace />} />
+                                        <Route path="/resource-requests/manage" element={
+                                            <Suspense fallback={<DelayedFallback><PageLoader type="table" /></DelayedFallback>}>
+                                                <PermissionProtectedRoute requiredPermission="manageResourceRequests">
+                                                    <AdminRequestsPage />
+                                                </PermissionProtectedRoute>
+                                            </Suspense>
+                                        } />
                                         <Route path="/reports" element={
                                             <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <PermissionProtectedRoute requiredPermission="viewReports">
@@ -358,6 +368,13 @@ function App() {
                                         <Route path="/analytics/attendance" element={
                                             <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
                                                 <AnalyticsPage />
+                                            </Suspense>
+                                        } />
+                                        <Route path="/live-attendance" element={
+                                            <Suspense fallback={<DelayedFallback><PageLoader /></DelayedFallback>}>
+                                                <PermissionProtectedRoute requiredPermission="viewLiveAttendance" adminBypass={false}>
+                                                    <LiveAttendancePage />
+                                                </PermissionProtectedRoute>
                                             </Suspense>
                                         } />
                                         <Route path="/analytics/employee/:employeeId" element={

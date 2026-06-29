@@ -76,20 +76,26 @@
     gap: 24px;
 }
 
-/* Summary Cards Container */
+/* Summary Cards Container — single row of 5 equal cards */
 .summary-cards-container {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
     margin-bottom: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
 .summary-stat-card {
-    padding: 16px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 10px;
     background: #ffffff;
     border-radius: 12px;
     border: 1px solid #e0e0e0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     transition: all 0.3s ease-in-out;
-    height: 100%;
-    min-height: 90px;
+    min-height: 84px;
 }
 
 .summary-stat-card:hover {
@@ -101,12 +107,12 @@
 .summary-stat-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     height: 100%;
 }
 
 .summary-stat-icon {
-    font-size: 32px !important;
+    font-size: 26px !important;
     flex-shrink: 0;
 }
 
@@ -136,19 +142,25 @@
 }
 
 .summary-stat-label {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 500;
     color: #666;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     display: block;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .summary-stat-value {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #333;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Timeline Events Container */
@@ -408,11 +420,15 @@
 
     .summary-cards-container {
         margin-bottom: 16px;
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .summary-stat-card {
-        min-height: 80px;
-        padding: 12px;
+        min-height: 76px;
+        padding: 10px 8px;
+        flex: 1 0 120px;
     }
 
     .summary-stat-icon {

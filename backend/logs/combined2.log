@@ -12781,7 +12781,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/api/announcements?_t=1771833001338',
+  url: '/api/announcements?_t=1771833011338',
   ip: '127.0.0.1',
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0',
   timestamp: '2026-02-23 13:20:01',
@@ -12791,7 +12791,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/?_t=1771833001338',
+  url: '/?_t=1771833011338',
   statusCode: 200,
   duration: '25ms',
   contentLength: '2',
@@ -74697,7 +74697,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/api/admin/employees?all=true&slim=true&_t=1771852300135',
+  url: '/api/admin/employees?all=true&slim=true&_t=1771852301135',
   ip: '127.0.0.1',
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0',
   timestamp: '2026-02-23 18:41:40',
@@ -74707,7 +74707,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/?all=true&slim=true&_t=1771852300135',
+  url: '/?all=true&slim=true&_t=1771852301135',
   statusCode: 200,
   duration: '15ms',
   contentLength: '10512',
@@ -74718,7 +74718,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/api/admin/employees?all=true&slim=true&_t=1771852300135',
+  url: '/api/admin/employees?all=true&slim=true&_t=1771852301135',
   ip: '127.0.0.1',
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0',
   timestamp: '2026-02-23 18:41:40',
@@ -74728,7 +74728,7 @@
 {
   service: 'attendance-system',
   method: 'GET',
-  url: '/?all=true&slim=true&_t=1771852300135',
+  url: '/?all=true&slim=true&_t=1771852301135',
   statusCode: 304,
   duration: '18ms',
   contentLength: 0,
@@ -188025,4 +188025,598 @@
   timestamp: '2026-02-27 16:20:13',
   level: 'info',
   message: 'Request'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '2ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 16:49:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '2ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 16:49:54'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/monthly-context-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/monthly-context-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/monthly-context-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/monthly-context-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:00:33'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:01:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:01:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '3ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:02:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:02:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:04:55'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:04:55'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:06:55'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:06:55'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:10:47'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:10:47'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:15:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:15:53'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:18:26'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:18:26'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '2ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:26:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:26:37'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:26:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:26:57'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:52:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:52:08'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 401,
+  duration: '15ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:52:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:58:30'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 17:58:30'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:01:45'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:01:45'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:11'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:10:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:14:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:14:01'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:14:36'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:14:36'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 401,
+  duration: '12ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:14:51'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:25'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/analytics/late-grace-settings',
+  statusCode: 404,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:25'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:41'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:41'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:50'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:15:50'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:45:46'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-27 18:45:46'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-29 13:02:12'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-06-29 13:02:12'
 }

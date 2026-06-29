@@ -100,6 +100,54 @@ class NewNotificationService {
         }
     }
 
+    /** Notify Admin users and employees granted canManageResourceRequests. */
+    static async broadcastToResourceRequestManagers(commonData, originatingUserId = null) {
+        try {
+            if (process.env.NODE_ENV !== 'production') {
+                console.log('[SVC] Broadcasting resource request notification:', commonData);
+            }
+
+            const managers = await User.find({
+                isActive: true,
+                $or: [
+                    { role: 'Admin' },
+                    { 'featurePermissions.canManageResourceRequests': true },
+                ],
+            }).select('_id fullName').lean();
+
+            const filteredManagers = managers.filter((manager) =>
+                !originatingUserId || manager._id.toString() !== originatingUserId.toString()
+            );
+
+            const notificationData = {
+                ...commonData,
+                userId: null,
+                userName: 'System',
+                recipientType: 'admin',
+                isSystemNotification: true,
+                targetRoles: ['Admin'],
+                metadata: {
+                    ...(commonData.metadata || {}),
+                    requiresResourceRequestAccess: true,
+                },
+            };
+
+            const notification = await this.createNotification(notificationData);
+
+            const io = getIO();
+            if (io) {
+                for (const manager of filteredManagers) {
+                    io.to(`user_${manager._id}`).emit('new_notification', {
+                        ...notification.toObject(),
+                        userName: 'System',
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[SVC] CRITICAL ERROR in broadcastToResourceRequestManagers:', error);
+        }
+    }
+
     // --- Specific Notification Event Handlers ---
     // Pass originatingUserId to broadcastToAdmins to prevent self-notifications
     static async notifyCheckIn(userId, userName) {
@@ -184,6 +232,55 @@ class NewNotificationService {
             message, type: 'break_end', category: 'break', priority: 'low',
             navigationData: { page: 'attendance', params: { userId } }
         }, userId);
+    }
+
+    static async notifyTeaBreakStarted(employeeId, teaBreakType, announcementId, initiatedByUserId = null) {
+        const label = teaBreakType === 'evening' ? 'Evening' : 'Morning';
+        const message = `${label} tea break — 10 minutes starting now.`;
+        await this.createAndEmitNotification({
+            userId: employeeId,
+            userName: 'System',
+            message,
+            type: 'info',
+            category: 'break',
+            priority: 'high',
+            read: false,
+            recipientType: 'user',
+            metadata: {
+                type: 'TEA_BREAK_STARTED',
+                announcementId: String(announcementId),
+                teaBreakType,
+                initiatedByUserId: initiatedByUserId ? String(initiatedByUserId) : null,
+            },
+            navigationData: { page: 'dashboard' },
+        });
+    }
+
+    static async notifyTeaBreakEnded(employeeId, employeeName, announcementId, overrunMinutes = 0) {
+        const overrunText = overrunMinutes > 0
+            ? ` (${overrunMinutes} min over allowance)`
+            : ' (on time)';
+        const message = `${employeeName} returned from tea break${overrunText}`;
+        await this.broadcastToAdmins({
+            message,
+            type: 'info',
+            category: 'break',
+            priority: 'medium',
+            navigationData: {
+                page: 'announcements',
+                params: {
+                    tab: 'insights',
+                    announcementId: String(announcementId),
+                },
+            },
+            metadata: {
+                type: 'TEA_BREAK_ENDED',
+                announcementId: String(announcementId),
+                employeeId: String(employeeId),
+                employeeName,
+                overrunMinutes,
+            },
+        }, employeeId);
     }
 
     static async notifyLeaveRequest(userId, userName, leaveType, startDate, endDate, requestId = null, leaveDates = null) {

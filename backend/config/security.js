@@ -9,21 +9,25 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
+    const frontendUrl = process.env.FRONTEND_URL?.trim();
+    const normalizedFrontendUrl = frontendUrl
+      ? (frontendUrl.startsWith('http') ? frontendUrl : `https://${frontendUrl}`)
+      : null;
+
     const allowedOrigins = [
-      'https://attendance.bylinelms.com', // Production AMS frontend domain
-      'https://https://attendance.bylinelms.com', // Production AMS frontend (legato)
+      'https://attendance-test.bylinelms.com', // Production AMS frontend domain
       'https://sso.legatolxp.online', // Production SSO domain (for SSO integration)
       'https://sso.bylinelms.com', // Production SSO portal (for SSO integration)
-      process.env.FRONTEND_URL?.startsWith('http') ? process.env.FRONTEND_URL : `https://${process.env.FRONTEND_URL}`,
+      normalizedFrontendUrl,
       // Development origins (only allow in development mode)
       ...(process.env.NODE_ENV === 'development' ? [
       'http://localhost:3000',
-      'http://localhost:3001',
+      'http://localhost:3011',
       'http://localhost:5173', // SSO frontend portal
       'http://localhost:5174', // AMS frontend
       'http://localhost:5175', // Other internal apps
       'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
+      'http://127.0.0.1:3011',
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
       'http://127.0.0.1:5175'

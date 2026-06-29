@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
@@ -10,6 +11,7 @@ export default defineConfig({
       // This doesn't require explicit React imports in every file
       jsxRuntime: 'automatic',
     }),
+    tailwindcss(),
     // Vite plugin to set iframe embedding headers
     {
       name: 'configure-response-headers',
@@ -22,7 +24,7 @@ export default defineConfig({
           if (req.url === '/' || req.url.endsWith('.html') || (!req.url.includes('.') && !req.url.startsWith('/api'))) {
             const allowedOrigins = process.env.NODE_ENV === 'development' 
               ? "http://localhost:5173"
-              : "https://attendance.bylinelms.com";
+              : "https://attendance-test.bylinelms.com";
             
             const existingCSP = res.getHeader('Content-Security-Policy') || '';
             if (existingCSP && !existingCSP.includes('frame-ancestors')) {
@@ -59,14 +61,14 @@ export default defineConfig({
     proxy: {
       // --- WebSocket proxy MUST come before /api to avoid being intercepted ---
       '/api/socket.io': {
-        target: 'http://127.0.0.1:3001',
+        target: 'http://127.0.0.1:3011',
         ws: true,
         changeOrigin: true,
         secure: false,
       },
       // --- Development proxy configuration ---
       '/api': {
-        target: 'http://127.0.0.1:3001',
+        target: 'http://127.0.0.1:3011',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
@@ -80,7 +82,7 @@ export default defineConfig({
             if (!res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ 
-                error: 'Backend server is not available. Please ensure the backend server is running on port 3001.' 
+                error: 'Backend server is not available. Please ensure the backend server is running on port 3011.' 
               }));
             }
           });
@@ -97,7 +99,7 @@ export default defineConfig({
       },
       // --- Avatar images proxy for development ---
       '/avatars': {
-        target: 'http://127.0.0.1:3001',
+        target: 'http://127.0.0.1:3011',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
@@ -119,7 +121,7 @@ export default defineConfig({
       },
       // --- Policy PDFs proxy for development ---
       '/policies': {
-        target: 'http://127.0.0.1:3001',
+        target: 'http://127.0.0.1:3011',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
@@ -211,6 +213,22 @@ export default defineConfig({
       '@mui/icons-material/Assessment',
       '@mui/icons-material/EventNote',
       '@mui/icons-material/History',
+      // Leave side panels (LeaveRequestForm)
+      '@mui/icons-material/BeachAccess',
+      '@mui/icons-material/WorkspacePremium',
+      '@mui/icons-material/LocalHospital',
+      '@mui/icons-material/Update',
+      '@mui/icons-material/WarningAmber',
+      '@mui/icons-material/Category',
+      '@mui/icons-material/KeyboardArrowDown',
+      '@mui/icons-material/Close',
+      '@mui/icons-material/CalendarToday',
+      '@mui/icons-material/EventAvailable',
+      '@mui/icons-material/WbSunnyOutlined',
+      '@mui/icons-material/WbTwilight',
+      '@mui/icons-material/Schedule',
+      '@mui/icons-material/CheckCircle',
+      '@mui/x-date-pickers/StaticDatePicker',
       'react-is',
       'prop-types',
       // PDF.js dependencies

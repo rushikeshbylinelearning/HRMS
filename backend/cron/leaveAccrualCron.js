@@ -165,7 +165,7 @@ async function sendAccrualNotification(result) {
                     ` : ''}
 
                     <div style="text-align: center; margin-top: 30px;">
-                        <a href="${process.env.FRONTEND_URL || 'https://attendance.bylinelms.com'}/admin/leave-management" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Leave Management</a>
+                        <a href="${process.env.FRONTEND_URL || 'https://attendance-test.bylinelms.com'}/admin/leave-management" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Leave Management</a>
                     </div>
                 </div>
                 <div style="background-color: #f2f2f2; padding: 10px; text-align: center; font-size: 12px; color: #777;">
@@ -239,7 +239,7 @@ async function sendAccrualErrorNotification(error, month, year) {
                     </ul>
 
                     <div style="text-align: center; margin-top: 30px;">
-                        <a href="${process.env.FRONTEND_URL || 'https://attendance.bylinelms.com'}/admin/system-logs" style="background-color: #D32F2F; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View System Logs</a>
+                        <a href="${process.env.FRONTEND_URL || 'https://attendance-test.bylinelms.com'}/admin/system-logs" style="background-color: #D32F2F; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View System Logs</a>
                     </div>
                 </div>
                 <div style="background-color: #f2f2f2; padding: 10px; text-align: center; font-size: 12px; color: #777;">

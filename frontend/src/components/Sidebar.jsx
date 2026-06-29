@@ -16,6 +16,7 @@ import useNewNotifications from '../hooks/useNewNotifications';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PolicyIcon from '@mui/icons-material/Policy';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import GroupsIcon from '@mui/icons-material/Groups';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +61,14 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             path: '/requests',
             roles: ['Employee', 'Intern'],
         },
+        {
+            text: 'Resources',
+            tooltip: 'Resource Requests',
+            icon: <Inventory2Icon />,
+            path: '/resource-requests/manage',
+            roles: ['Employee', 'Intern', 'HR', 'Manager'],
+            permissionCheck: () => canAccess.manageResourceRequests(),
+        },
         { 
             text: 'Reports', 
             icon: <AdminPanelSettingsIcon />, 
@@ -72,6 +81,14 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             icon: <BarChartIcon />, 
             path: '/analytics/attendance', 
             roles: ['Admin', 'HR']
+        },
+        {
+            text: 'Live Board',
+            tooltip: 'Live Attendance',
+            icon: <GroupsIcon />,
+            path: '/live-attendance',
+            roles: ['Employee', 'Intern'],
+            permissionCheck: () => canAccess.viewLiveAttendance(),
         },
         { text: 'Activity Log', icon: <AssessmentIcon />, path: '/activity-log', roles: ['Admin', 'HR', 'Manager'] },
     ];
@@ -107,7 +124,7 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
                         key={item.text}
                         to={typeof item.path === 'function' ? item.path(user) : item.path}
                         className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-                        data-tooltip={item.text}
+                        data-tooltip={item.tooltip || item.text}
                         onClick={(e) => {
                             e.preventDefault();
                             const targetPath = typeof item.path === 'function' ? item.path(user) : item.path;

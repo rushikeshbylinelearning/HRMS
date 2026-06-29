@@ -15,6 +15,8 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Group as GroupIcon,
+  Groups as GroupsIcon,
+  Inventory2 as Inventory2Icon,
   Search as SearchIcon,
   RestartAlt as RestartAltIcon,
   PeopleAlt as PeopleAltIcon,
@@ -95,6 +97,9 @@ const ManageSectionPage = () => {
       canCheckOut: true,
       canTakeBreak: true,
       canViewAnalytics: false, // New field for analytics access
+      canViewLiveAttendance: false,
+      canManageResourceRequests: false,
+      canManageBulkAttendanceActions: false,
       privilegeLevel: 'normal',
       restrictedFeatures: {
         canViewReports: false,
@@ -267,6 +272,21 @@ const privilegeOptions = useMemo(() => {
 
   const analyticsEnabledCount = useMemo(
     () => users.filter((user) => user.featurePermissions?.canViewAnalytics).length,
+    [users]
+  );
+
+  const liveAttendanceEnabledCount = useMemo(
+    () => users.filter((user) => user.featurePermissions?.canViewLiveAttendance).length,
+    [users]
+  );
+
+  const resourceRequestsEnabledCount = useMemo(
+    () => users.filter((user) => user.featurePermissions?.canManageResourceRequests).length,
+    [users]
+  );
+
+  const bulkAttendanceActionsEnabledCount = useMemo(
+    () => users.filter((user) => user.featurePermissions?.canManageBulkAttendanceActions).length,
     [users]
   );
 
@@ -461,6 +481,9 @@ const privilegeOptions = useMemo(() => {
       canCheckOut: true,
       canTakeBreak: true,
       canViewAnalytics: false, // New field for analytics access
+      canViewLiveAttendance: false,
+      canManageResourceRequests: false,
+      canManageBulkAttendanceActions: false,
       privilegeLevel: 'normal',
       // Merge existing values from featurePermissions while adding defaults
       ...featurePermissions,
@@ -1141,6 +1164,93 @@ const privilegeOptions = useMemo(() => {
                   <Switch
                     checked={safeFeaturePermissions.canViewAnalytics}
                     onChange={(e) => handlePermissionChange(currentUser._id, 'canViewAnalytics', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Can View Live Attendance
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      Real-time present / absent / leave / break board
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.canViewLiveAttendance}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canViewLiveAttendance', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Can Manage Resource Requests
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      Review and update employee stationery, IT, and workplace resource requests
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.canManageResourceRequests}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canManageResourceRequests', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Can Manage Bulk Attendance Actions
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      Refresh live attendance and end tea, lunch, or other breaks from admin summary
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.canManageBulkAttendanceActions}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canManageBulkAttendanceActions', e.target.checked)}
                     sx={{
                       '& .MuiSwitch-switchBase.Mui-checked': {
                         color: '#4F46E5',
@@ -1911,6 +2021,24 @@ const privilegeOptions = useMemo(() => {
             value: analyticsEnabledCount,
             helper: 'Can view dashboards',
             icon: <InsightsIcon />,
+          },
+          {
+            label: 'Live Attendance',
+            value: liveAttendanceEnabledCount,
+            helper: 'Real-time board access',
+            icon: <GroupsIcon />,
+          },
+          {
+            label: 'Resource Requests',
+            value: resourceRequestsEnabledCount,
+            helper: 'Delegated request managers',
+            icon: <Inventory2Icon />,
+          },
+          {
+            label: 'Bulk Attendance',
+            value: bulkAttendanceActionsEnabledCount,
+            helper: 'Admin summary assistant',
+            icon: <SettingsIcon />,
           },
           {
             label: 'Unsaved Changes',
@@ -3013,6 +3141,153 @@ const privilegeOptions = useMemo(() => {
                     onChange={(e) => setBulkSettings(prev => ({
                       ...prev,
                       featurePermissions: { ...prev.featurePermissions, canViewAnalytics: e.target.checked }
+                    }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.875rem' }}>
+                      Can View Live Attendance
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem', mt: 0.3, display: 'block' }}>
+                      Real-time present / absent / leave / break board
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={bulkSettings.featurePermissions.canViewLiveAttendance}
+                    onChange={(e) => setBulkSettings(prev => ({
+                      ...prev,
+                      featurePermissions: { ...prev.featurePermissions, canViewLiveAttendance: e.target.checked }
+                    }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.875rem' }}>
+                      Can Manage Resource Requests
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem', mt: 0.3, display: 'block' }}>
+                      Review and update employee resource requests (no delete access)
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={bulkSettings.featurePermissions.canManageResourceRequests}
+                    onChange={(e) => setBulkSettings(prev => ({
+                      ...prev,
+                      featurePermissions: { ...prev.featurePermissions, canManageResourceRequests: e.target.checked }
+                    }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.875rem' }}>
+                      Can Manage Bulk Attendance Actions
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem', mt: 0.3, display: 'block' }}>
+                      Admin summary assistant: live refresh and bulk break controls
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={bulkSettings.featurePermissions.canManageBulkAttendanceActions}
+                    onChange={(e) => setBulkSettings(prev => ({
+                      ...prev,
+                      featurePermissions: { ...prev.featurePermissions, canManageBulkAttendanceActions: e.target.checked }
                     }))}
                     sx={{
                       width: 52,

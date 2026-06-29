@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, Typography, Alert, Link } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { SkeletonBox } from '../components/SkeletonLoaders';
+import { getApiBaseUrl } from '../utils/apiBaseUrl';
 
 const SSOLoginPage = () => {
   const [searchParams] = useSearchParams();
@@ -21,11 +22,7 @@ const SSOLoginPage = () => {
         console.log('🔐 SSO Login Page - Processing token:', token ? token.substring(0, 20) + '...' : 'null');
         console.log('🔗 Redirect path:', redirectPath);
 
-        const apiUrl = import.meta.env.DEV
-          ? 'http://localhost:3001/api'
-          : (import.meta.env.VITE_API_BASE_URL?.endsWith('/api')
-              ? import.meta.env.VITE_API_BASE_URL
-              : `${import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com'}/api`);
+        const apiUrl = getApiBaseUrl();
 
         if (!token) {
           // No token means direct redirect from SSO - check if session exists

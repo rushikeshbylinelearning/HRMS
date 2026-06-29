@@ -1,4 +1,5 @@
 // frontend/src/utils/ssoConsumer.js
+import { getApiBaseUrl } from './apiBaseUrl';
 
 /**
  * SSO Token Consumer Utility
@@ -17,13 +18,7 @@ export async function consumeSsoTokenIfPresent() {
 
     console.log('[SSO-Consumer] SSO token found, processing...');
 
-    // Get API base URL from environment or use full HTTPS URL in production
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-    const apiBase = import.meta.env.DEV 
-        ? '/api'  // Use Vite proxy in development
-        : (apiBaseUrl 
-            ? (apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`)
-            : 'https://attendance.bylinelms.com/api'); // Use full HTTPS URL in production
+    const apiBase = getApiBaseUrl();
     
     // Call backend API to validate the token and create session
     const response = await fetch(`${apiBase}/auth/validate-sso`, {

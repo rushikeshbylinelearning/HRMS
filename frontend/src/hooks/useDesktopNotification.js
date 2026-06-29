@@ -44,7 +44,14 @@ const useDesktopNotification = () => {
   }, []);
 
   const showNotification = useCallback((title, options = {}) => {
-    if (!notificationSupported || Notification.permission !== 'granted') {
+    if (!notificationSupported) {
+      return null;
+    }
+
+    if (Notification.permission !== 'granted') {
+      if (import.meta.env.DEV) {
+        console.warn('[Notification] Skipped — permission is', Notification.permission);
+      }
       return null;
     }
 

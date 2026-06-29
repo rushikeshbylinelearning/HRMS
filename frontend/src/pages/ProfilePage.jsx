@@ -7,6 +7,7 @@ import ProfileMain from '../components/Profile/ProfileMain';
 import ProfilePolicies from '../components/Profile/ProfilePolicies';
 import ProfileSidebar from '../components/Profile/ProfileSidebar';
 import CustomPdfViewer from '../components/CustomPdfViewer';
+import { getApiUrl } from '../utils/apiBaseUrl';
 import '../styles/ProfilePage.css';
 
 /**
@@ -269,11 +270,9 @@ const ProfilePage = () => {
         // This endpoint requires JWT authentication via Authorization header
         if (import.meta.env.DEV) {
             return `/api/policies-gridfs/${policy._id}/file`;
-        } else {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com';
-            const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
-            return `${baseUrl}/api/policies-gridfs/${policy._id}/file`;
         }
+
+        return getApiUrl(`/api/policies-gridfs/${policy._id}/file`);
     };
 
     // ROOT CAUSE FIX: Memoize sidebar to prevent re-renders

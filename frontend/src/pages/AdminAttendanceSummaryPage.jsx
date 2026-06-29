@@ -654,6 +654,7 @@ const AdminAttendanceSummaryPage = () => {
                     if (selectedEmployeeId) fetchLogsForWeek(currentDate, selectedEmployeeId);
                 }}
             />
+
         </>
     );
 };

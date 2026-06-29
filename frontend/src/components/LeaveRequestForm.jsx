@@ -2,47 +2,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-    Stack, Typography, Alert, FormControl, InputLabel, Select, MenuItem, Divider,
-    Box, IconButton, Avatar, LinearProgress, Tooltip
+    Stack, Typography, Alert, Box, IconButton, LinearProgress
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import CloseIcon from '@mui/icons-material/Close';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CategoryIcon from '@mui/icons-material/Category';
-import BeachAccessIcon from '@mui/icons-material/BeachAccess';
-import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
-import UpdateIcon from '@mui/icons-material/Update';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import HistoryIcon from '@mui/icons-material/History';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import ListSubheader from '@mui/material/ListSubheader';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { getAllowedLeaveTypes, normalizeEmploymentType } from '../utils/leaveTypePolicy';
+import LeaveCategorySidePanel from './leave/LeaveCategorySidePanel';
+import LeaveDateSidePicker from './leave/LeaveDateSidePicker';
+import LeaveDayTypeSidePanel from './leave/LeaveDayTypeSidePanel';
+import '../styles/LeaveSidePanel.css';
 
 // isPlannedLeaveDisabled removed - Validation is now server-side only
 
 // Modern white theme with red accents
 const STORAGE_KEY = 'leave_form_draft';
-
-// Leave Category: UI config (labels, icons, descriptions); backend values unchanged
-const LEAVE_CATEGORY_CONFIG = {
-    'Casual': { label: 'Casual Leave', description: 'Short personal time off', Icon: BeachAccessIcon },
-    'Planned': { label: 'Earned Leave', description: 'Accrued paid leave', Icon: WorkspacePremiumIcon },
-    'Sick': { label: 'Sick Leave', description: 'Health-related absence', Icon: LocalHospitalIcon },
-    'Compensatory': { label: 'Compensatory Off', description: 'Against worked weekend/holiday', Icon: UpdateIcon },
-    'Loss of Pay': { label: 'Loss of Pay (LOP)', description: 'Unpaid leave', Icon: WarningAmberIcon },
-    'Backdated Leave': { label: 'Backdated Leave', description: 'Applied for past dates', Icon: HistoryIcon },
-};
-const STANDARD_LEAVES = ['Casual', 'Planned', 'Sick', 'Compensatory'];
-const SPECIAL_CASES = ['Loss of Pay', 'Backdated Leave'];
-const LEAVE_CATEGORY_PLACEHOLDER = 'Select leave type';
 
 // --- Date helpers for Comp-Off (and reuse elsewhere) ---
 const toDateKey = (d) => {
@@ -169,21 +145,6 @@ const shouldDisableRegularLeaveDate = (date, holidays, requestType, saturdayPoli
     return false;
 };
 
-const datePickerTextFieldSx = {
-    '& .MuiInputLabel-root': { color: '#374151', fontSize: '13px', fontWeight: 500, '&.Mui-focused': { color: '#EF4444' }, '& .MuiFormLabel-asterisk': { color: '#EF4444' } },
-    '& .MuiOutlinedInput-root': {
-        height: '44px',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '8px',
-        transition: 'all 200ms ease',
-        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#E5E7EB', borderWidth: '1.5px' },
-        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#D1D5DB' },
-        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#EF4444', borderWidth: '1.5px', boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.1)' },
-        '& .MuiOutlinedInput-input': { fontSize: '14px', padding: '12px 16px' },
-        '& .MuiInputAdornment-root .MuiSvgIcon-root': { color: '#EF4444', fontSize: '20px' },
-    },
-};
-
 const getInitialFormData = () => {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -246,6 +207,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [], c
     const [showDraftBanner, setShowDraftBanner] = useState(false);
     const [monthlyLimitWarning, setMonthlyLimitWarning] = useState(null);
     const [checkingEligibility, setCheckingEligibility] = useState(false);
+    const [openSidePanel, setOpenSidePanel] = useState(null);
 
     const employeeType = normalizeEmploymentType(user?.employmentStatus);
     const allowedLeaveTypes = useMemo(() => getAllowedLeaveTypes(employeeType), [employeeType]);
@@ -421,8 +383,26 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [], c
             setError('');
             setShowCategoryError(false);
             setUploadingCertificate(false);
+            setOpenSidePanel(null);
         }
     }, [open, user, allowedLeaveTypes]);
+
+    const setSidePanelOpen = (panel) => (isOpen) => {
+        setOpenSidePanel(isOpen ? panel : null);
+    };
+
+    const handleCategoryChange = (requestType) => {
+        setShowCategoryError(false);
+        setFormData((prev) => {
+            const next = { ...prev, requestType };
+            if (requestType === 'Compensatory') next.endDate = null;
+            return next;
+        });
+    };
+
+    const handleDayTypeChange = (leaveType) => {
+        setFormData((prev) => ({ ...prev, leaveType }));
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -621,6 +601,7 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [], c
             open={open}
             onClose={onClose}
             PaperProps={{
+                className: 'leave-request-modal-card',
                 sx: {
                     borderRadius: '16px',
                     width: '560px',
@@ -839,242 +820,65 @@ const LeaveRequestForm = ({ open, onClose, onSubmissionSuccess, holidays = [], c
                         </Alert>
                     )}
 
-                    <FormControl
-                        fullWidth
-                        error={showCategoryError}
-                        sx={{
-                            '& .MuiInputLabel-root': {
-                                color: showCategoryError ? '#d32f2f' : '#374151',
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                '&.Mui-focused': {
-                                    color: showCategoryError ? '#d32f2f' : '#2563eb',
-                                },
-                                '&.Mui-error': { color: '#d32f2f' },
-                                '& .MuiFormLabel-asterisk': { color: showCategoryError ? '#d32f2f' : '#6B7280' },
-                            },
-                            '& .MuiOutlinedInput-root': {
-                                height: '48px',
-                                backgroundColor: '#FFFFFF',
-                                borderRadius: '8px',
-                                transition: 'all 200ms ease',
-                                borderLeft: '3px solid transparent',
-                                '&.Mui-focused': {
-                                    borderLeftColor: showCategoryError ? '#d32f2f' : '#2563eb',
-                                },
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: showCategoryError ? '#d32f2f' : '#E5E7EB',
-                                    borderWidth: '1.5px',
-                                },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: showCategoryError ? '#d32f2f' : '#D1D5DB',
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: showCategoryError ? '#d32f2f' : '#2563eb',
-                                    borderWidth: '1.5px',
-                                    boxShadow: showCategoryError ? '0 0 0 3px rgba(211, 47, 47, 0.1)' : '0 0 0 3px rgba(37, 99, 235, 0.1)',
-                                },
-                                '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: '#d32f2f' },
-                                '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1, fontWeight: 500 },
-                                '& .MuiOutlinedInput-input': { padding: '12px 14px 12px 8px' },
-                                '& .MuiSelect-icon': { color: showCategoryError ? '#d32f2f' : '#6B7280', right: '12px' },
-                            },
-                        }}
-                    >
-                        <InputLabel id="leave-category-label">
-                            Leave Category <span style={{ color: '#6B7280' }} aria-label="required">*</span>
-                        </InputLabel>
-                        <Select
-                            name="requestType"
-                            value={formData.requestType || ''}
-                            label="Leave Category"
-                            onChange={handleChange}
-                            displayEmpty
-                            renderValue={(value) => {
-                                if (!value) {
-                                    return (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#9CA3AF' }}>
-                                            <CategoryIcon sx={{ fontSize: 20, color: 'inherit' }} />
-                                            <span>{LEAVE_CATEGORY_PLACEHOLDER}</span>
-                                        </Box>
-                                    );
-                                }
-                                const config = LEAVE_CATEGORY_CONFIG[value];
-                                if (!config) return value;
-                                const Icon = config.Icon;
-                                return (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                                        <Icon sx={{ fontSize: 20, color: '#6B7280' }} aria-hidden />
-                                        <span style={{ fontWeight: 500 }}>{config.label}</span>
-                                    </Box>
-                                );
-                            }}
-                            MenuProps={{
-                                PaperProps: {
-                                    sx: {
-                                        mt: 1.5,
-                                        borderRadius: 2,
-                                        boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-                                        '& .MuiMenuItem-root': {
-                                            py: 1.25,
-                                            '&:hover': { backgroundColor: 'rgba(37, 99, 235, 0.06)' },
-                                            '&.Mui-selected': { backgroundColor: 'rgba(37, 99, 235, 0.08)' },
-                                            '&.Mui-selected:hover': { backgroundColor: 'rgba(37, 99, 235, 0.12)' },
-                                        },
-                                        '& .MuiListItemIcon-root': { minWidth: 40, color: '#6B7280' },
-                                        '& .MuiMenuItem-root:hover .MuiListItemIcon-root': { color: '#374151' },
-                                    },
-                                },
-                            }}
-                            aria-labelledby="leave-category-label"
-                            aria-required="true"
-                            aria-describedby="leave-category-help"
-                            aria-invalid={showCategoryError}
-                        >
-                            <ListSubheader sx={{ lineHeight: 2, color: '#6B7280', fontWeight: 600, letterSpacing: '0.05em', fontSize: '0.7rem' }}>
-                                STANDARD LEAVES
-                            </ListSubheader>
-                            {STANDARD_LEAVES.filter((v) => allowedLeaveTypes.includes(v)).map((value) => {
-                                const { label, description, Icon } = LEAVE_CATEGORY_CONFIG[value];
-                                return (
-                                    <MenuItem key={value} value={value}>
-                                        <ListItemIcon><Icon sx={{ fontSize: 22 }} /></ListItemIcon>
-                                        <ListItemText
-                                            primary={label}
-                                            secondary={description}
-                                            primaryTypographyProps={{ fontWeight: 500 }}
-                                            secondaryTypographyProps={{ variant: 'caption', sx: { color: '#6B7280', fontSize: '0.75rem', mt: 0.25 } }}
-                                        />
-                                    </MenuItem>
-                                );
-                            })}
-                            <Divider sx={{ my: 0.5 }} />
-                            <ListSubheader sx={{ lineHeight: 2, color: '#6B7280', fontWeight: 600, letterSpacing: '0.05em', fontSize: '0.7rem' }}>
-                                SPECIAL CASES
-                            </ListSubheader>
-                            {SPECIAL_CASES.filter((v) => allowedLeaveTypes.includes(v)).map((value) => {
-                                const { label, description, Icon } = LEAVE_CATEGORY_CONFIG[value];
-                                return (
-                                    <MenuItem key={value} value={value}>
-                                        <ListItemIcon><Icon sx={{ fontSize: 22 }} /></ListItemIcon>
-                                        <ListItemText
-                                            primary={label}
-                                            secondary={description}
-                                            primaryTypographyProps={{ fontWeight: 500 }}
-                                            secondaryTypographyProps={{ variant: 'caption', sx: { color: '#6B7280', fontSize: '0.75rem', mt: 0.25 } }}
-                                        />
-                                    </MenuItem>
-                                );
-                            })}
-                        </Select>
-                    </FormControl>
+                    <LeaveCategorySidePanel
+                        value={formData.requestType || ''}
+                        onChange={handleCategoryChange}
+                        allowedLeaveTypes={allowedLeaveTypes}
+                        showError={showCategoryError}
+                        open={openSidePanel === 'category'}
+                        onOpenChange={setSidePanelOpen('category')}
+                    />
 
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                        {formData.requestType === 'Compensatory' ? (
-                            <>
-                                <DatePicker
-                                    label="Leave Date"
-                                    value={formData.startDate}
-                                    onChange={handleStartDateChange}
-                                    shouldDisableDate={(date) => shouldDisableLeaveDateCompOff(date, holidays)}
-                                    slotProps={{
-                                        textField: {
-                                            fullWidth: true,
-                                            required: true,
-                                            sx: datePickerTextFieldSx,
-                                        },
-                                    }}
-                                />
-                                <DatePicker
-                                    label="Worked Date (Saturday / Sunday)"
-                                    value={formData.alternateDate}
-                                    onChange={handleAlternateDateChange}
-                                    shouldDisableDate={(date) => shouldDisableWorkedDateCompOff(date, holidays)}
-                                    slotProps={{
-                                        textField: {
-                                            fullWidth: true,
-                                            required: true,
-                                            sx: datePickerTextFieldSx,
-                                        },
-                                    }}
-                                />
-                            </>
-                        ) : (
-                            <>
-                                <DatePicker
-                                    label="Leave date"
-                                    value={formData.startDate}
-                                    onChange={handleStartDateChange}
-                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
-                                    slotProps={{
-                                        textField: { fullWidth: true, sx: datePickerTextFieldSx },
-                                    }}
-                                />
-                                <DatePicker
-                                    label="End Date (optional)"
-                                    value={formData.endDate}
-                                    onChange={handleEndDateChange}
-                                    minDate={formData.startDate}
-                                    disabled={!formData.startDate}
-                                    shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
-                                    slotProps={{
-                                        textField: { fullWidth: true, sx: datePickerTextFieldSx },
-                                    }}
-                                />
-                            </>
-                        )}
-                    </LocalizationProvider>
+                    {formData.requestType === 'Compensatory' ? (
+                        <>
+                            <LeaveDateSidePicker
+                                label="Leave Date"
+                                value={formData.startDate}
+                                onChange={handleStartDateChange}
+                                shouldDisableDate={(date) => shouldDisableLeaveDateCompOff(date, holidays)}
+                                open={openSidePanel === 'startDate'}
+                                onOpenChange={setSidePanelOpen('startDate')}
+                            />
+                            <LeaveDateSidePicker
+                                label="Worked Date (Saturday / Sunday)"
+                                value={formData.alternateDate}
+                                onChange={handleAlternateDateChange}
+                                shouldDisableDate={(date) => shouldDisableWorkedDateCompOff(date, holidays)}
+                                open={openSidePanel === 'alternateDate'}
+                                onOpenChange={setSidePanelOpen('alternateDate')}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <LeaveDateSidePicker
+                                label="Leave date"
+                                value={formData.startDate}
+                                onChange={handleStartDateChange}
+                                shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
+                                open={openSidePanel === 'startDate'}
+                                onOpenChange={setSidePanelOpen('startDate')}
+                            />
+                            <LeaveDateSidePicker
+                                label="End Date (optional)"
+                                value={formData.endDate}
+                                onChange={handleEndDateChange}
+                                minDate={formData.startDate}
+                                disabled={!formData.startDate}
+                                allowClear
+                                shouldDisableDate={(date) => shouldDisableRegularLeaveDate(date, holidays, formData.requestType, user?.alternateSaturdayPolicy)}
+                                open={openSidePanel === 'endDate'}
+                                onOpenChange={setSidePanelOpen('endDate')}
+                            />
+                        </>
+                    )}
 
                     {formData.requestType !== 'Compensatory' && (
-                        <FormControl fullWidth sx={{
-                            // Modern form field styling with red accents
-                            '& .MuiInputLabel-root': {
-                                color: '#374151',
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                '&.Mui-focused': {
-                                    color: '#EF4444',
-                                },
-                            },
-                            '& .MuiOutlinedInput-root': {
-                                height: '44px',
-                                backgroundColor: '#FFFFFF',
-                                borderRadius: '8px',
-                                transition: 'all 200ms ease',
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#E5E7EB',
-                                    borderWidth: '1.5px',
-                                },
-                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#D1D5DB',
-                                },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#EF4444',
-                                    borderWidth: '1.5px',
-                                    boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.1)',
-                                },
-                                '& .MuiOutlinedInput-input': {
-                                    fontSize: '14px',
-                                    padding: '12px 16px',
-                                },
-                                '& .MuiSelect-icon': {
-                                    color: '#EF4444',
-                                    right: '12px',
-                                },
-                            },
-                        }}>
-                            <InputLabel>Day Type</InputLabel>
-                            <Select
-                                name="leaveType"
-                                value={formData.leaveType}
-                                label="Day Type"
-                                onChange={handleChange}
-                            >
-                                <MenuItem value="Full Day">Full Day</MenuItem>
-                                <MenuItem value="Half Day - First Half">Half Day - First Half</MenuItem>
-                                <MenuItem value="Half Day - Second Half">Half Day - Second Half</MenuItem>
-                            </Select>
-                        </FormControl>
+                        <LeaveDayTypeSidePanel
+                            value={formData.leaveType}
+                            onChange={handleDayTypeChange}
+                            open={openSidePanel === 'dayType'}
+                            onOpenChange={setSidePanelOpen('dayType')}
+                        />
                     )}
 
 

@@ -1,5 +1,5 @@
 const LOCAL_DEV_FALLBACK = 'http://localhost:5173';
-const PRODUCTION_FALLBACK = 'https://attendance.bylinelms.com';
+const PRODUCTION_FALLBACK = 'https://attendance-test.bylinelms.com';
 
 function stripTrailingSlash(url) {
   return url.replace(/\/$/, '');

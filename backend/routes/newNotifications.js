@@ -14,6 +14,71 @@ const isAdminOrHr = (req, res, next) => {
     next();
 };
 
+const buildUserNotificationQuery = async (userId, role) => {
+    const base = { archived: false };
+
+    if (['Admin', 'HR'].includes(role)) {
+        return {
+            ...base,
+            $or: [
+                { recipientType: { $in: ['admin', 'both'] } },
+                { isSystemNotification: true, targetRoles: { $in: [role] } },
+            ],
+        };
+    }
+
+    const dbUser = await User.findById(userId).select('featurePermissions').lean();
+    const canManageResourceRequests = dbUser?.featurePermissions?.canManageResourceRequests === true;
+
+    if (canManageResourceRequests) {
+        return {
+            ...base,
+            $or: [
+                { userId, recipientType: { $in: ['user', 'both'] } },
+                {
+                    type: 'resource_request',
+                    recipientType: 'admin',
+                    isSystemNotification: true,
+                },
+            ],
+        };
+    }
+
+    return {
+        ...base,
+        userId,
+        recipientType: { $in: ['user', 'both'] },
+    };
+};
+
+const userCanAccessNotification = async (notification, reqUser) => {
+    const { userId, role } = reqUser;
+
+    if (notification.userId && notification.userId.toString() === userId) {
+        return true;
+    }
+
+    if (['Admin', 'HR'].includes(role) && ['admin', 'both'].includes(notification.recipientType)) {
+        return true;
+    }
+
+    if (notification.isSystemNotification && notification.targetRoles?.includes(role)) {
+        return true;
+    }
+
+    if (
+        notification.type === 'resource_request'
+        && notification.recipientType === 'admin'
+        && notification.isSystemNotification
+    ) {
+        const dbUser = await User.findById(userId).select('featurePermissions role').lean();
+        if (dbUser?.role === 'Admin') return true;
+        return dbUser?.featurePermissions?.canManageResourceRequests === true;
+    }
+
+    return false;
+};
+
 // Admin Activity Log Route
 router.get('/activity-log', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
@@ -67,18 +132,7 @@ router.get('/activity-log', [authenticateToken, isAdminOrHr], async (req, res) =
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const { userId, role } = req.user;
-        const query = { archived: false };
-        
-        if (['Admin', 'HR'].includes(role)) {
-            // Admins can see admin notifications and system notifications
-            query.$or = [
-                { recipientType: { $in: ['admin', 'both'] } },
-                { isSystemNotification: true, targetRoles: { $in: [role] } }
-            ];
-        } else {
-            query.userId = userId;
-            query.recipientType = { $in: ['user', 'both'] };
-        }
+        const query = await buildUserNotificationQuery(userId, role);
 
         const notifications = await NewNotification.find(query).sort({ createdAt: -1 }).limit(50).lean();
         const unreadCountQuery = { ...query, read: false };
@@ -100,11 +154,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
         // 1. User owns the notification, OR
         // 2. User is Admin/HR and notification is for admins, OR  
         // 3. Notification is a system notification and user has the target role
-        const hasAccess = (
-            notification.userId && notification.userId.toString() === req.user.userId ||
-            ['Admin', 'HR'].includes(req.user.role) && ['admin', 'both'].includes(notification.recipientType) ||
-            notification.isSystemNotification && notification.targetRoles && notification.targetRoles.includes(req.user.role)
-        );
+        const hasAccess = await userCanAccessNotification(notification, req.user);
         
         if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden' });
@@ -120,17 +170,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
 // Mark all of a user's notifications as read
 router.post('/mark-all-read', authenticateToken, async (req, res) => {
     try {
-        const query = { read: false };
-        if (['Admin', 'HR'].includes(req.user.role)) {
-            // Admins can mark admin notifications and system notifications as read
-            query.$or = [
-                { recipientType: { $in: ['admin', 'both'] } },
-                { isSystemNotification: true, targetRoles: { $in: [req.user.role] } }
-            ];
-        } else {
-            query.userId = req.user.userId;
-            query.recipientType = { $in: ['user', 'both'] };
-        }
+        const query = { read: false, ...(await buildUserNotificationQuery(req.user.userId, req.user.role)) };
         await NewNotification.updateMany(query, { $set: { read: true, readAt: new Date() } });
         res.status(200).json({ message: 'All notifications marked as read.' });
     } catch (error) {
@@ -141,22 +181,15 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
 // A user deleting a SINGLE one of their own notifications from the drawer
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const { userId, role } = req.user;
-        const query = { id: req.params.id };
+        const notification = await NewNotification.findOne({ id: req.params.id });
+        if (!notification) return res.status(404).json({ error: 'Notification not found or you do not have permission.' });
 
-        // A user can only delete their own notifications. An admin can delete any admin/system notifications.
-        if (!['Admin', 'HR'].includes(role)) {
-            query.userId = userId;
-        } else {
-            // For admins, allow deletion of admin notifications and system notifications
-            query.$or = [
-                { recipientType: { $in: ['admin', 'both'] } },
-                { isSystemNotification: true, targetRoles: { $in: [role] } }
-            ];
+        const hasAccess = await userCanAccessNotification(notification, req.user);
+        if (!hasAccess) {
+            return res.status(404).json({ error: 'Notification not found or you do not have permission.' });
         }
 
-        const result = await NewNotification.findOneAndDelete(query);
-        if (!result) return res.status(404).json({ error: 'Notification not found or you do not have permission.' });
+        await NewNotification.findOneAndDelete({ id: req.params.id });
         res.status(200).json({ message: 'Notification deleted successfully.' });
     } catch (error) {
         console.error('Error deleting user notification:', error);

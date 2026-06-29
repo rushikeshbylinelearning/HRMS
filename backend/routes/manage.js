@@ -71,6 +71,9 @@ const DEFAULT_FEATURE_PERMISSIONS = {
     canCheckOut: true,
     canTakeBreak: true,
     canViewAnalytics: false,
+    canViewLiveAttendance: false,
+    canManageResourceRequests: false,
+    canManageBulkAttendanceActions: false,
     privilegeLevel: 'normal',
     restrictedFeatures: {
         canViewReports: false,
@@ -120,7 +123,10 @@ router.get('/', [authenticateToken, isAdmin], async (req, res) => {
                 canCheckIn: true,
                 canCheckOut: true,
                 canTakeBreak: true,
-                canViewAnalytics: false, // New field for analytics access
+                canViewAnalytics: false,
+                canViewLiveAttendance: false,
+                canManageResourceRequests: false,
+                canManageBulkAttendanceActions: false,
                 privilegeLevel: 'normal',
                 restrictedFeatures: {
                     canViewReports: false,
@@ -172,7 +178,10 @@ router.get('/:userId', [authenticateToken, isAdmin], async (req, res) => {
                 canCheckIn: true,
                 canCheckOut: true,
                 canTakeBreak: true,
-                canViewAnalytics: false, // New field for analytics access
+                canViewAnalytics: false,
+                canViewLiveAttendance: false,
+                canManageResourceRequests: false,
+                canManageBulkAttendanceActions: false,
                 privilegeLevel: 'normal',
                 restrictedFeatures: {
                     canViewReports: false,
@@ -209,7 +218,10 @@ router.get('/bulk/template', [authenticateToken, isAdmin], async (req, res) => {
                 canCheckIn: true,
                 canCheckOut: true,
                 canTakeBreak: true,
-                canViewAnalytics: false, // New field for analytics access
+                canViewAnalytics: false,
+                canViewLiveAttendance: false,
+                canManageResourceRequests: false,
+                canManageBulkAttendanceActions: false,
                 privilegeLevel: 'normal',
                 restrictedFeatures: {
                     canViewReports: false,
@@ -244,7 +256,7 @@ router.put('/bulk', [authenticateToken, isAdmin], async (req, res) => {
         // Validate the feature permissions structure (same as single user update)
         const validPermissionKeys = [
             'leaves', 'breaks', 'extraFeatures', 'maxBreaks', 'breakAfterHours',
-            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'privilegeLevel',
+            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'canViewLiveAttendance', 'canManageResourceRequests', 'canManageBulkAttendanceActions', 'privilegeLevel',
             'restrictedFeatures', 'advancedFeatures', 'breakWindows',
             'autoBreakOnInactivity', 'inactivityThresholdMinutes', 'lateArrivalMarksHalfDay'
         ];
@@ -382,7 +394,7 @@ router.put('/:userId', [authenticateToken, isAdmin], async (req, res) => {
         // Validate the feature permissions structure
         const validPermissionKeys = [
             'leaves', 'breaks', 'extraFeatures', 'maxBreaks', 'breakAfterHours',
-            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'privilegeLevel',
+            'canCheckIn', 'canCheckOut', 'canTakeBreak', 'canViewAnalytics', 'canViewLiveAttendance', 'canManageResourceRequests', 'canManageBulkAttendanceActions', 'privilegeLevel',
             'restrictedFeatures', 'advancedFeatures', 'breakWindows',
             'autoBreakOnInactivity', 'inactivityThresholdMinutes', 'lateArrivalMarksHalfDay'
         ];

@@ -1,5 +1,6 @@
 // frontend/src/hooks/useDesktopNotifications.jsx
 import { useCallback, useEffect, useState } from 'react';
+import { openAnnouncementHub, resolveAnnouncementHubNavigation } from '../utils/announcementHubEvents';
 
 // Check support synchronously so it's available on first render
 const notificationSupported = typeof window !== 'undefined' && 'Notification' in window;
@@ -37,17 +38,32 @@ const useDesktopNotifications = () => {
         }
 
         try {
-            const notification = new Notification('Byline People', {
-                body: `${title}: ${message}`,
-                icon: '/favicon.ico',
+            const notificationTitle = options.useTitleDirectly ? title : 'Byline People';
+            const body = options.useTitleDirectly ? message : `${title}: ${message}`;
+
+            const notification = new Notification(notificationTitle, {
+                body,
+                icon: options.icon || '/favicon.ico',
                 badge: '/favicon.ico',
-                tag: `ams-notification-${Date.now()}`,
+                tag: options.tag || `ams-notification-${Date.now()}`,
                 renotify: false,
             });
 
             notification.onclick = () => {
                 window.focus();
                 notification.close();
+
+                if (typeof options.onClick === 'function') {
+                    options.onClick(options.data);
+                    return;
+                }
+
+                const hubNav = resolveAnnouncementHubNavigation(options.data?.navigationData);
+                if (hubNav) {
+                    openAnnouncementHub(hubNav);
+                    return;
+                }
+
                 if (options.data?.navigationData?.page) {
                     const path = options.data.navigationData.page;
                     window.location.href = path.startsWith('/') ? path : `/${path}`;

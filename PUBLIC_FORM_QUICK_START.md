@@ -45,7 +45,7 @@ npm run dev
 
 1. **Via API:**
 ```bash
-curl -X POST http://localhost:3001/api/admin/public-form/generate-link \
+curl -X POST http://localhost:3011/api/admin/public-form/generate-link \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -69,7 +69,7 @@ import PublicFormLinkGenerator from './components/PublicFormLinkGenerator';
 
 #### Generate Links for Multiple Employees
 ```bash
-curl -X POST http://localhost:3001/api/admin/public-form/bulk-generate \
+curl -X POST http://localhost:3011/api/admin/public-form/bulk-generate \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -80,13 +80,13 @@ curl -X POST http://localhost:3001/api/admin/public-form/bulk-generate \
 
 #### Check Submission Status
 ```bash
-curl http://localhost:3001/api/admin/public-form/status/BYL202508-E80 \
+curl http://localhost:3011/api/admin/public-form/status/BYL202508-E80 \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 #### View Pending Submissions
 ```bash
-curl http://localhost:3001/api/admin/public-form/pending \
+curl http://localhost:3011/api/admin/public-form/pending \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -215,7 +215,7 @@ Public endpoints are rate-limited to 5 requests per 15 minutes per IP.
 ### Test Token Generation
 ```bash
 # Generate a test token
-curl -X POST http://localhost:3001/api/admin/public-form/generate-link \
+curl -X POST http://localhost:3011/api/admin/public-form/generate-link \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"employeeId": "TEST001", "expiryHours": 1}'

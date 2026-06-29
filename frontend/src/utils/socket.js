@@ -1,8 +1,13 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const getSocketUrl = () => {
+  if (import.meta.env.DEV) return "http://localhost:5173";
+  if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+};
 
-export const socket = io(SOCKET_URL, {
+export const socket = io(getSocketUrl(), {
   path: "/api/socket.io/",
   autoConnect: false,
   transports: ["websocket"],

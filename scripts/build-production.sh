@@ -144,11 +144,11 @@ module.exports = {
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
-      PORT: 3001
+      PORT: 3011
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3001
+      PORT: 3011
     },
     error_file: './logs/err.log',
     out_file: './logs/out.log',
@@ -224,7 +224,7 @@ server {
     
     # API routes
     location /api {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:3011;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -239,7 +239,7 @@ server {
     
     # WebSocket support
     location /socket.io {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:3011;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -251,7 +251,7 @@ server {
     
     # Health check
     location /health {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:3011;
         access_log off;
     }
 }
@@ -300,11 +300,11 @@ RUN npm ci --only=production
 RUN mkdir -p logs
 
 # Expose port
-EXPOSE 3001
+EXPOSE 3011
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3011/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Start application
 CMD ["pm2-runtime", "start", "ecosystem.config.js"]
@@ -318,7 +318,7 @@ services:
   app:
     build: .
     ports:
-      - "3001:3001"
+      - "3011:3011"
     environment:
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongo:27017/attendance_system

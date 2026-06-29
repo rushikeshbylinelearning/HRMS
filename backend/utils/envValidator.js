@@ -74,11 +74,14 @@ function validateEnv() {
   
   // Check PORT
   if (!process.env.PORT) {
-    warnings.push('PORT not set, defaulting to 3001');
+    warnings.push('PORT not set, defaulting to 3011');
   }
   
   // Production-specific checks
   if (process.env.NODE_ENV === 'production') {
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      warnings.push('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set — Web Push (background tea break alerts) will be disabled');
+    }
     if (!process.env.FRONTEND_URL) {
       warnings.push('FRONTEND_URL not set in production. CORS may not work correctly.');
     }
@@ -138,7 +141,7 @@ function getEnvironmentInfo() {
     nodeVersion: process.version,
     platform: process.platform,
     environment: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3001,
+    port: process.env.PORT || 3011,
     mongoConfigured: !!process.env.MONGODB_URI,
     jwtConfigured: !!(process.env.JWT_PRIVATE_KEY_PATH && process.env.JWT_PUBLIC_KEY_PATH),
     mailConfigured: !!(process.env.MAIL_HOST && process.env.MAIL_USER),

@@ -83,7 +83,7 @@ POST   /api/admin/holidays/:id/lock               - Toggle lock
 
 ### 1. Test Dataset Upload
 ```bash
-curl -X POST http://localhost:3001/api/admin/holiday-dataset/upload \
+curl -X POST http://localhost:3011/api/admin/holiday-dataset/upload \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -106,7 +106,7 @@ curl -X POST http://localhost:3001/api/admin/holiday-dataset/upload \
 
 ### 2. Test Clone Preview
 ```bash
-curl -X POST http://localhost:3001/api/admin/leave-years/{targetYearId}/clone/preview \
+curl -X POST http://localhost:3011/api/admin/leave-years/{targetYearId}/clone/preview \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -116,7 +116,7 @@ curl -X POST http://localhost:3001/api/admin/leave-years/{targetYearId}/clone/pr
 
 ### 3. Test Confirm Clone
 ```bash
-curl -X POST http://localhost:3001/api/admin/leave-years/clone/confirm \
+curl -X POST http://localhost:3011/api/admin/leave-years/clone/confirm \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -127,7 +127,7 @@ curl -X POST http://localhost:3001/api/admin/leave-years/clone/confirm \
 
 ### 4. Test Manual Override
 ```bash
-curl -X PUT http://localhost:3001/api/admin/holidays/{holidayId}/override \
+curl -X PUT http://localhost:3011/api/admin/holidays/{holidayId}/override \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

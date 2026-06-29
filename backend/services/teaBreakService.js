@@ -1,9 +1,12 @@
 const AttendanceLog = require('../models/AttendanceLog');
+const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const { getISTDateString, getISTNow } = require('../utils/istTime');
 const { hasTeaBreakEnded } = require('./teaBreakState');
 
 const TEA_BREAK_REASON_PREFIX = 'tea_break:';
+const TEA_BREAK_DURATION_MS = 10 * 60 * 1000;
+const TEA_BREAK_SAFETY_CUTOFF_MS = 30 * 60 * 1000;
 
 function invalidateEmployeeCaches(employeeId, today) {
   try {
@@ -19,6 +22,184 @@ function invalidateEmployeeCaches(employeeId, today) {
 
 function teaBreakReason(announcementId) {
   return `${TEA_BREAK_REASON_PREFIX}${announcementId}`;
+}
+
+/**
+ * Employees with an open attendance session today (checked in, not clocked out).
+ */
+async function getClockedInEmployeeIds() {
+  const today = getISTDateString();
+  const logs = await AttendanceLog.find({
+    attendanceDate: today,
+    clockInTime: { $ne: null },
+    clockOutTime: null,
+  })
+    .select('user')
+    .lean();
+
+  const ids = [];
+  for (const log of logs) {
+    const activeSession = await AttendanceSession.findOne({
+      attendanceLog: log._id,
+      endTime: null,
+    }).lean();
+    if (activeSession) {
+      ids.push(String(log.user));
+    }
+  }
+  return ids;
+}
+
+async function isEmployeeClockedIn(employeeId) {
+  const ids = await getClockedInEmployeeIds();
+  return ids.includes(String(employeeId));
+}
+
+/**
+ * Shared attendance snapshot for tea-break classification (load once per batch).
+ */
+async function buildTeaBreakAttendanceContext(userIds) {
+  const today = getISTDateString();
+
+  const logs = await AttendanceLog.find({
+    attendanceDate: today,
+    user: { $in: userIds },
+  })
+    .select('user clockInTime clockOutTime')
+    .lean();
+
+  const logMap = new Map(logs.map((l) => [String(l.user), l]));
+  const clockedInNow = new Set(await getClockedInEmployeeIds());
+
+  return { logMap, clockedInNow };
+}
+
+function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow) {
+  const id = String(userId);
+  const log = logMap.get(id);
+
+  if (clockedInNow.has(id)) {
+    return 'on_break';
+  }
+  if (!log?.clockInTime) {
+    return 'not_checked_in';
+  }
+  if (log.clockOutTime) {
+    return 'clocked_out_open';
+  }
+  return 'not_checked_in';
+}
+
+/**
+ * Count-only variant for insights summaries (no user list payloads).
+ */
+function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, attendanceContext) {
+  const { logMap, clockedInNow } = attendanceContext;
+  let onBreakCount = 0;
+  let notApplicableCount = 0;
+  let pendingCount = 0;
+
+  for (const userId of eligibleUserIds) {
+    const id = String(userId);
+    if (returnedIds.has(id)) continue;
+
+    pendingCount += 1;
+    const status = resolveTeaBreakOpenStatus(userId, logMap, clockedInNow);
+
+    if (status === 'on_break' || status === 'clocked_out_open') {
+      onBreakCount += 1;
+    }
+    if (status === 'not_checked_in') {
+      notApplicableCount += 1;
+    }
+  }
+
+  return { pendingCount, onBreakCount, notApplicableCount };
+}
+
+/**
+ * Classify employees who have not formally closed the tea break.
+ */
+async function classifyTeaBreakOpenUsers(eligibleUsers, returnedIds, attendanceContext = null) {
+  const userIds = eligibleUsers.map((u) => u._id);
+  const context = attendanceContext || (await buildTeaBreakAttendanceContext(userIds));
+  const { logMap, clockedInNow } = context;
+
+  const pending = [];
+  const onBreak = [];
+  const notApplicable = [];
+
+  for (const u of eligibleUsers) {
+    const id = u._id.toString();
+    if (returnedIds.has(id)) continue;
+
+    const base = {
+      userId: u._id,
+      fullName: u.fullName,
+      role: u.role,
+      profileImageUrl: u.profileImageUrl,
+      department: u.department,
+    };
+
+    const status = resolveTeaBreakOpenStatus(u._id, logMap, clockedInNow);
+
+    if (status === 'on_break') {
+      const entry = {
+        ...base,
+        teaBreakStatus: 'on_break',
+        teaBreakStatusLabel: 'On break — not closed yet',
+      };
+      onBreak.push(entry);
+      pending.push(entry);
+    } else if (status === 'not_checked_in') {
+      const entry = {
+        ...base,
+        teaBreakStatus: 'not_checked_in',
+        teaBreakStatusLabel: 'Not checked in — break does not apply',
+      };
+      notApplicable.push(entry);
+      pending.push(entry);
+    } else if (status === 'clocked_out_open') {
+      const entry = {
+        ...base,
+        teaBreakStatus: 'clocked_out_open',
+        teaBreakStatusLabel: 'Clocked out without closing break',
+      };
+      onBreak.push(entry);
+      pending.push(entry);
+    }
+  }
+
+  return { pending, onBreak, notApplicable };
+}
+
+function computeTeaBreakTiming(teaBreakStartedAt, now = getISTNow()) {
+  const started = new Date(teaBreakStartedAt);
+  const allowanceEndsAt = new Date(started.getTime() + TEA_BREAK_DURATION_MS);
+  const safetyEndsAt = new Date(started.getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
+  const remainingSeconds = Math.max(0, Math.floor((allowanceEndsAt - now) / 1000));
+  return {
+    teaBreakStartedAt: started,
+    allowanceEndsAt,
+    safetyEndsAt,
+    remainingSeconds,
+    durationMinutes: 10,
+    serverNow: now,
+  };
+}
+
+function buildTeaBreakActivePayload(announcement, timing, initiatedByUserId = null) {
+  return {
+    active: true,
+    announcementId: announcement._id,
+    teaBreakStartedAt: timing.teaBreakStartedAt,
+    teaBreakType: announcement.teaBreakType,
+    durationMinutes: timing.durationMinutes,
+    endsAt: timing.allowanceEndsAt,
+    remainingSeconds: timing.remainingSeconds,
+    serverNow: timing.serverNow,
+    initiatedByUserId: initiatedByUserId ?? announcement.sender?._id ?? announcement.sender ?? null,
+  };
 }
 
 function computeOverrunMinutes(teaBreakStartedAt, now = getISTNow()) {
@@ -179,4 +360,13 @@ module.exports = {
   finalizeTeaBreakOnEnd,
   computeOverrunMinutes,
   teaBreakReason,
+  getClockedInEmployeeIds,
+  isEmployeeClockedIn,
+  buildTeaBreakAttendanceContext,
+  countTeaBreakOpenUsers,
+  classifyTeaBreakOpenUsers,
+  computeTeaBreakTiming,
+  buildTeaBreakActivePayload,
+  TEA_BREAK_DURATION_MS,
+  TEA_BREAK_SAFETY_CUTOFF_MS,
 };

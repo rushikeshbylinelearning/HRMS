@@ -722,19 +722,25 @@
     gap: 24px;
 }
 
-/* Summary Cards Container */
+/* Summary Cards Container — single row, full width */
 .summary-cards-container {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
     margin-bottom: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
 .summary-stat-card {
-    padding: 16px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 14px 12px;
     background: #ffffff;
     border-radius: 12px;
     border: 1px solid #e0e0e0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     transition: all 0.3s ease-in-out;
-    height: 100%;
     min-height: 90px;
 }
 
@@ -747,12 +753,12 @@
 .summary-stat-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     height: 100%;
 }
 
 .summary-stat-icon {
-    font-size: 32px !important;
+    font-size: 28px !important;
     flex-shrink: 0;
 }
 
@@ -782,19 +788,25 @@
 }
 
 .summary-stat-label {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 500;
     color: #666;
     margin-bottom: 4px;
     display: block;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .summary-stat-value {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: #333;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .log-detail-dialog .header-content {
@@ -1089,11 +1101,15 @@
 
     .summary-cards-container {
         margin-bottom: 16px;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .summary-stat-card {
         min-height: 80px;
-        padding: 12px;
+        padding: 12px 10px;
+        flex: 1 0 130px;
     }
 
     .summary-stat-icon {

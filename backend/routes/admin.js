@@ -28,6 +28,7 @@ const { syncAttendanceOnLeaveApproval, syncAttendanceOnLeaveRejection } = requir
 const { getGracePeriodMinutes } = require('../utils/gracePeriod');
 const { getTodayISTKey, getISTDateString, parseISTDate, startOfISTDay, endOfISTDay, getShiftDateTimeIST, normalizeLeaveDatesForApi } = require('../utils/istTime');
 const { perfLog, verboseLog } = require('../utils/logLevel');
+const { fetchAbsentTodayEmployees } = require('../services/dashboardEmployeeLists');
 
 // ── HELPER: count only Monday–Friday dates in a leaveDates array ─────────────
 // Saturday-clubbing may have added weekend dates to the array. When deducting
@@ -2524,103 +2525,6 @@ router.get('/attendance/employee/:employeeId', [authenticateToken, isAdminOrHr],
 
 
 // --- DASHBOARD & LOGS ROUTES ---
-
-const TEAMS_STATUS_OVERRIDES_KEY = 'teamsStatusOverrides';
-
-/** Active employees absent today (no clock-in, not on leave, working day per policy). */
-async function fetchAbsentTodayEmployees(today) {
-    const holidays = await Holiday.find({ isTentative: { $ne: true } }).select('date').lean();
-    const isCompanyHoliday = (holidays || []).some((h) => getISTDateString(h.date) === today);
-    if (isCompanyHoliday) return [];
-
-    const todayDate = parseISTDate(today);
-    const [year, month, day] = today.split('-').map(Number);
-    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    if (dayOfWeek === 0) return [];
-
-    const todayStart = startOfISTDay(todayDate);
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-    const isSaturday = dayOfWeek === 6;
-
-    const employees = await User.find({ isActive: true, role: { $ne: 'Admin' } })
-        .select('fullName employeeCode designation department profileImageUrl alternateSaturdayPolicy')
-        .lean();
-
-    let filtered = employees;
-    if (isSaturday) {
-        filtered = employees.filter((emp) => {
-            const policy = emp.alternateSaturdayPolicy || 'All Saturdays Working';
-            return !LeavePolicyService.isSaturdayOff(todayDate, policy);
-        });
-    }
-
-    const employeeIds = filtered.map((e) => e._id);
-    if (employeeIds.length === 0) return [];
-
-    const todayLogs = await AttendanceLog.find({
-        user: { $in: employeeIds },
-        attendanceDate: today,
-        clockInTime: { $exists: true, $ne: null },
-    })
-        .select('user')
-        .lean();
-
-    const clockedInSet = new Set((todayLogs || []).map((l) => l.user.toString()));
-
-    const approvedLeaves = await LeaveRequest.find({
-        employee: { $in: employeeIds },
-        status: 'Approved',
-        leaveDates: { $elemMatch: { $gte: todayStart, $lt: todayEnd } },
-    })
-        .select('employee')
-        .lean();
-
-    const onLeaveSet = new Set((approvedLeaves || []).map((l) => l.employee.toString()));
-
-    const overrideSetting = await Setting.findOne({ key: TEAMS_STATUS_OVERRIDES_KEY }).lean();
-    const overrideMap = new Map();
-    for (const o of Array.isArray(overrideSetting?.value) ? overrideSetting.value : []) {
-        if (o.date === today && o.employeeId) {
-            overrideMap.set(o.employeeId.toString(), { status: o.status });
-        }
-    }
-
-    const absent = [];
-    for (const emp of filtered) {
-        const id = emp._id.toString();
-        const override = overrideMap.get(id);
-
-        if (override) {
-            if (override.status === 'absent') {
-                absent.push({
-                    _id: emp._id,
-                    fullName: emp.fullName,
-                    employeeCode: emp.employeeCode,
-                    designation: emp.designation,
-                    department: emp.department,
-                    profileImageUrl: emp.profileImageUrl,
-                    status: 'Absent',
-                });
-            }
-            continue;
-        }
-
-        if (onLeaveSet.has(id) || clockedInSet.has(id)) continue;
-
-        absent.push({
-            _id: emp._id,
-            fullName: emp.fullName,
-            employeeCode: emp.employeeCode,
-            designation: emp.designation,
-            department: emp.department,
-            profileImageUrl: emp.profileImageUrl,
-            status: 'Absent',
-        });
-    }
-
-    absent.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
-    return absent;
-}
 
 // Lightweight endpoint for delta updates: pending leaves only (used by socket-driven refresh).
 // Optional cache: TTL 45s; invalidated on leave create/approve/reject/delete.
@@ -5661,6 +5565,54 @@ router.get('/leaves/auto-conversion-log', [authenticateToken, isAdminOrHr], asyn
         res.status(500).json({
             error: 'Failed to fetch auto-conversion log.',
             details: error.message
+        });
+    }
+});
+
+// --- Bulk attendance actions (admin summary assistant) ---
+const requireBulkAttendanceActionsAccess = require('../middleware/requireBulkAttendanceActionsAccess');
+const {
+    getBulkActionPreview,
+    executeBulkAction,
+    VALID_ACTIONS,
+} = require('../services/bulkAttendanceActionsService');
+
+router.get('/bulk-attendance-actions/preview', [authenticateToken, requireBulkAttendanceActionsAccess], async (req, res) => {
+    try {
+        const preview = await getBulkActionPreview();
+        res.json({ success: true, actions: preview });
+    } catch (error) {
+        console.error('[bulk-attendance-actions] preview error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load bulk action preview.' });
+    }
+});
+
+router.post('/bulk-attendance-actions/execute', [authenticateToken, requireBulkAttendanceActionsAccess], async (req, res) => {
+    try {
+        const { action, confirm } = req.body;
+
+        if (confirm !== true) {
+            return res.status(400).json({
+                success: false,
+                error: 'Confirmation required. Set confirm: true to execute this action.',
+            });
+        }
+
+        if (!action || !VALID_ACTIONS.has(action)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid action. Must be one of: ${Array.from(VALID_ACTIONS).join(', ')}`,
+            });
+        }
+
+        const result = await executeBulkAction(action, req.user.userId);
+        res.json(result);
+    } catch (error) {
+        console.error('[bulk-attendance-actions] execute error:', error);
+        const status = error.statusCode || 500;
+        res.status(status).json({
+            success: false,
+            error: error.message || 'Failed to execute bulk action.',
         });
     }
 });

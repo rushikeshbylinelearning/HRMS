@@ -216,7 +216,7 @@ Add the route in the public routes section:
 
 Ensure your `frontend/src/api/axios.js` is configured correctly:
 ```javascript
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3011';
 ```
 
 ---

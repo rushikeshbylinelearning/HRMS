@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Box, Typography, Stack } from '@mui/material';
 import SecurePdfViewer from './SecurePdfViewer';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../utils/apiBaseUrl';
 
 const PolicyViewer = ({ policy, onClose }) => {
     const { user } = useAuth();
@@ -18,12 +19,9 @@ const PolicyViewer = ({ policy, onClose }) => {
         if (import.meta.env.DEV) {
             // Development: Vite proxy will forward to backend
             return `/api/policies-gridfs/${policy._id}/file`;
-        } else {
-            // Production: Use full backend URL
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://attendance.bylinelms.com';
-            const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
-            return `${baseUrl}/api/policies-gridfs/${policy._id}/file`;
         }
+
+        return getApiUrl(`/api/policies-gridfs/${policy._id}/file`);
     };
 
     const pdfUrl = getPdfUrl();
