@@ -1,0 +1,10 @@
+---
+description: Place all standalone reports and readme-style docs in readme/
+alwaysApply: true
+---
+
+# Documentation location
+
+- Save **technical reports**, **feature analysis write-ups**, and **standalone README-style documentation** only under `readme/` at the repository root.
+- Do **not** create new report or readme files at the repo root, or under `backend/docs/` / `frontend/`, unless they are tightly coupled to a specific module’s code (e.g. inline API comments).
+- When adding a document in `readme/`, update the index table in `readme/README.md`.

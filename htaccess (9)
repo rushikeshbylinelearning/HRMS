@@ -1,0 +1,70 @@
+# Attendance AMS — Apache config for PM2 backend (NOT Passenger)
+# Backend: pm2 start server.js --name attendance-system  (default PORT=3011)
+# Verify:   pm2 status && curl http://127.0.0.1:3011/health
+
+# ─── Disable Phusion Passenger (use PM2 + reverse proxy instead) ─────────────
+<IfModule mod_passenger.c>
+  PassengerEnabled off
+</IfModule>
+
+# ─── Reverse proxy to PM2 Node backend ──────────────────────────────────────
+<IfModule mod_proxy.c>
+  ProxyPreserveHost On
+  ProxyRequests Off
+
+  # REST API
+  ProxyPass        /api http://127.0.0.1:3011/api retry=0 timeout=300
+  ProxyPassReverse /api http://127.0.0.1:3011/api
+
+  # Socket.IO (WebSocket + polling fallback)
+  ProxyPass        /api/socket.io/ ws://127.0.0.1:3011/api/socket.io/ retry=0
+  ProxyPassReverse /api/socket.io/ ws://127.0.0.1:3011/api/socket.io/
+  ProxyPass        /api/socket.io/ http://127.0.0.1:3011/api/socket.io/ retry=0
+  ProxyPassReverse /api/socket.io/ http://127.0.0.1:3011/api/socket.io/
+
+  # Backend-served static assets (not in frontend/dist)
+  ProxyPass        /avatars http://127.0.0.1:3011/avatars retry=0
+  ProxyPassReverse /avatars http://127.0.0.1:3011/avatars
+  ProxyPass        /medical-certificates http://127.0.0.1:3011/medical-certificates retry=0
+  ProxyPassReverse /medical-certificates http://127.0.0.1:3011/medical-certificates
+  ProxyPass        /public http://127.0.0.1:3011/public retry=0
+  ProxyPassReverse /public http://127.0.0.1:3011/public
+
+  # Health check (optional — useful for monitoring)
+  ProxyPass        /health http://127.0.0.1:3011/health retry=0
+  ProxyPassReverse /health http://127.0.0.1:3011/health
+</IfModule>
+
+# Fallback proxy via mod_rewrite when ProxyPass is not allowed in .htaccess
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # WebSocket upgrade for Socket.IO
+  RewriteCond %{HTTP:Upgrade} =websocket [NC]
+  RewriteCond %{REQUEST_URI} ^/api/socket.io [NC]
+  RewriteRule ^(.*)$ ws://127.0.0.1:3011/$1 [P,L]
+
+  # API + backend paths → PM2
+  RewriteCond %{REQUEST_URI} ^/api [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/avatars [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/medical-certificates [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/public/ [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/health$ [NC]
+  RewriteRule ^(.*)$ http://127.0.0.1:3011/$1 [P,L]
+
+  # Serve existing frontend static files as-is
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Don't SPA-rewrite API/backend paths (already proxied above)
+  RewriteCond %{REQUEST_URI} !^/api
+  RewriteCond %{REQUEST_URI} !^/avatars
+  RewriteCond %{REQUEST_URI} !^/medical-certificates
+  RewriteCond %{REQUEST_URI} !^/public/
+  RewriteCond %{REQUEST_URI} !^/health$
+
+  # React SPA fallback
+  RewriteRule ^ index.html [L]
+</IfModule>

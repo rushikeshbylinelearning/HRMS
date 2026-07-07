@@ -1,0 +1,412 @@
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:42:33'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:42:54'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:43:23'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:44:04'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:50:42'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:50:43'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:50:43'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:50:44'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:51:05'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:51:33'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:51:40'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:52:27'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:52:28'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:52:28'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error HTTPS required in production',
+  stack: 'Error: HTTPS required in production\n' +
+    '    at origin (D:\\Zip 4\\attendance-system\\backend\\config\\security.js:36:23)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:219:13\n' +
+    '    at optionsCallback (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:199:9)\n' +
+    '    at corsMiddleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\cors\\lib\\index.js:204:7)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at trimPrefix (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:342:13)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:297:9\n' +
+    '    at processParams (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:582:12)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\index.js:291:5)\n' +
+    '    at compression (D:\\Zip 4\\attendance-system\\backend\\node_modules\\compression\\index.js:243:5)',
+  url: '/api/auth/login',
+  method: 'POST',
+  body: undefined,
+  params: {},
+  query: [Object: null prototype] {},
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36 Edg/145.0.0.0',
+  level: 'error',
+  timestamp: '2026-02-19 19:52:28'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error User validation failed: role: `Full Stack Developer` is not a valid enum value for path `role`.',
+  stack: 'ValidationError: User validation failed: role: `Full Stack Developer` is not a valid enum value for path `role`.\n' +
+    '    at Document.invalidate (D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3358:32)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3119:17\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\schemaType.js:1416:9\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)',
+  operation: 'update_user_permissions',
+  userId: '693d3a77da051f96635ac9dc',
+  body: {
+    featurePermissions: {
+      leaves: false,
+      breaks: false,
+      extraFeatures: false,
+      maxBreaks: 999,
+      breakAfterHours: 0,
+      breakWindows: [
+        {
+          type: 'Paid',
+          name: 'Lunch Break',
+          startTime: '13:00',
+          endTime: '14:40',
+          isActive: true,
+          _id: '69aac73811e4f800208e9c32'
+        }
+      ],
+      canCheckIn: true,
+      canCheckOut: true,
+      canTakeBreak: true,
+      canViewAnalytics: false,
+      privilegeLevel: 'normal',
+      restrictedFeatures: {
+        canViewReports: false,
+        canViewOtherLogs: false,
+        canEditProfile: true,
+        canRequestExtraBreak: true,
+        _id: '693d3a77da051f96635ac9da'
+      },
+      advancedFeatures: {
+        canBulkActions: false,
+        canExportData: false,
+        _id: '693d3a77da051f96635ac9db'
+      },
+      autoBreakOnInactivity: false,
+      inactivityThresholdMinutes: 5,
+      lateArrivalMarksHalfDay: false
+    }
+  },
+  level: 'error',
+  timestamp: '2026-05-18 15:10:17'
+}
