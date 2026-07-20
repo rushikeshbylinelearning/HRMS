@@ -183011,3 +183011,586 @@
   message: 'Request',
   timestamp: '2026-07-07 13:12:03'
 }
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784540177440',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784540177440',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:17'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784540178431',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784540178431',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:18'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:06:19'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 200,
+  duration: '1095ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:15:28'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 200,
+  duration: '1011ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:15:30'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 200,
+  duration: '1009ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:15:30'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true',
+  statusCode: 200,
+  duration: '5308ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:15:34'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 200,
+  duration: '1062ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:45'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 200,
+  duration: '1273ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:47'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard-summary?includePendingLeaves=true',
+  statusCode: 200,
+  duration: '5260ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:51'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784541415070',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:55'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:55'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784541415070',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:55'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:26:55'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 200,
+  duration: '1387ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:27:07'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1784541428616',
+  statusCode: 200,
+  duration: '1011ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:27:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 200,
+  duration: '1333ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:27:09'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-07-20',
+  statusCode: 200,
+  duration: '1715ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/avatar/69959ee1b64b4c515fc0b2b2',
+  statusCode: 200,
+  duration: '2009ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:27:10'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-07-20',
+  statusCode: 200,
+  duration: '1663ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:30:05'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:30:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784541608217',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:30:08'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784541608217',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:30:08'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:30:08'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 200,
+  duration: '1405ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:37:13'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/current-status?_t=1784542034432',
+  statusCode: 200,
+  duration: '1030ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:37:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1358ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:37:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1028ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:37:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-07-20',
+  statusCode: 200,
+  duration: '1668ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:37:16'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 200,
+  duration: '1342ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:50:14'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1328ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:50:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1003ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:50:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/dashboard/employee?date=2026-07-20',
+  statusCode: 200,
+  duration: '1663ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 15:54:38'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 200,
+  duration: '1340ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:03:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 200,
+  duration: '1334ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:03:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784543595766',
+  statusCode: 200,
+  duration: '1332ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:03:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784543596143',
+  statusCode: 200,
+  duration: '1328ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:03:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784543595766',
+  statusCode: 200,
+  duration: '1331ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:03:18'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 200,
+  duration: '1341ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784544376741',
+  statusCode: 200,
+  duration: '1328ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1331ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1002ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784544377088',
+  statusCode: 200,
+  duration: '1320ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784544376741',
+  statusCode: 200,
+  duration: '1331ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:16:19'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 200,
+  duration: '1380ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:29:17'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1340ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:29:19'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/refresh',
+  statusCode: 200,
+  duration: '1442ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:42:18'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1397ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:42:20'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 304,
+  duration: '1057ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-20 16:42:20'
+}

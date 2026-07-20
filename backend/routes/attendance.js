@@ -376,6 +376,14 @@ router.post('/clock-in', authenticateToken, geofencingMiddleware, async (req, re
         }
 
         cache.delete(`employee_dashboard:${userId}:${todayStr}`);
+
+        try {
+            const { autoDismissTeaBreakIfIneligible } = require('../services/teaBreakService');
+            await autoDismissTeaBreakIfIneligible(userId);
+        } catch (teaBreakErr) {
+            console.error('[Clock-In] Tea break eligibility check failed:', teaBreakErr.message);
+        }
+
         res.status(201).json(responsePayload);
     } catch (error) {
         // Safe logging: no stack in production; always return JSON
