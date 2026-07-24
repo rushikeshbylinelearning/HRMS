@@ -92,25 +92,27 @@ class ProbationTrackingService {
             
             // Update employment status to Permanent
             employee.employmentStatus = 'Permanent';
-            
-            // Allocate standard leave balances for permanent employees
-            employee.leaveBalances = {
-                sick: 12,      // 12 sick leave days
-                casual: 12,    // 12 casual leave days  
-                paid: 0        // No planned leave initially
-            };
-            
-            employee.leaveEntitlements = {
-                sick: 12,
-                casual: 12,
-                paid: 0
-            };
-            
+            employee.confirmationDate = new Date();
+
             await employee.save();
+
+            // Grant the prorated remaining-year leave allotment (Option C).
+            // This credits leaveBalances directly via its own transaction and sets the
+            // self-expiring probationConfirmation cap — do NOT set leaveBalances or
+            // leaveEntitlements manually here, LeaveAccrualService owns that now.
+            const LeaveAccrualService = require('./LeaveAccrualService');
+            const allotmentResult = await LeaveAccrualService.applyConfirmationAllotment(
+                employeeId,
+                employee.confirmationDate,
+                adminUserId
+            );
+
+            // Refresh employee doc so the notification/response below reflects the new balances
+            const updatedEmployee = await User.findById(employeeId);
             
             // Create success notification for admin
             await NewNotificationService.createAndEmitNotification({
-                message: `${employee.fullName} has been successfully promoted to permanent employee with leave allocations.`,
+                message: `${updatedEmployee.fullName} has been successfully promoted to permanent employee with leave allocations.`,
                 type: 'success',
                 userId: adminUserId,
                 userName: 'System',
@@ -124,24 +126,25 @@ class ProbationTrackingService {
                 message: `Congratulations! You have been promoted to permanent employee status. Your leave balances have been allocated.`,
                 type: 'success',
                 userId: employeeId,
-                userName: employee.fullName,
+                userName: updatedEmployee.fullName,
                 recipientType: 'user',
                 category: 'probation',
                 priority: 'high'
             });
             
-            console.log(`[ProbationTracking] Successfully promoted ${employee.fullName} to permanent`);
+            console.log(`[ProbationTracking] Successfully promoted ${updatedEmployee.fullName} to permanent`);
             
             return {
                 success: true,
                 message: 'Employee promoted to permanent status successfully',
                 employee: {
-                    id: employee._id,
-                    name: employee.fullName,
-                    employeeCode: employee.employeeCode,
-                    employmentStatus: employee.employmentStatus,
-                    leaveBalances: employee.leaveBalances
-                }
+                    id: updatedEmployee._id,
+                    name: updatedEmployee.fullName,
+                    employeeCode: updatedEmployee.employeeCode,
+                    employmentStatus: updatedEmployee.employmentStatus,
+                    leaveBalances: updatedEmployee.leaveBalances
+                },
+                confirmationAllotment: allotmentResult.allotments
             };
         } catch (error) {
             console.error('[ProbationTracking] Error promoting employee:', error);

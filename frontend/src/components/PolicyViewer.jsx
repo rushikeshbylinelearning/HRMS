@@ -3,25 +3,17 @@ import PropTypes from 'prop-types';
 import { Box, Typography, Stack } from '@mui/material';
 import SecurePdfViewer from './SecurePdfViewer';
 import { useAuth } from '../context/AuthContext';
-import { getApiUrl } from '../utils/apiBaseUrl';
 
 const PolicyViewer = ({ policy, onClose }) => {
     const { user } = useAuth();
     
     if (!policy) return null;
 
-    // Construct full URL for PDF
+    // Construct URL for PDF — relative to the api axios baseURL (/api).
+    // Do NOT include /api prefix here; the axios instance already has it as baseURL.
     const getPdfUrl = () => {
         if (!policy._id) return '';
-        
-        // NEW: Use GridFS endpoint with policy ID
-        // This endpoint requires JWT authentication via Authorization header
-        if (import.meta.env.DEV) {
-            // Development: Vite proxy will forward to backend
-            return `/api/policies-gridfs/${policy._id}/file`;
-        }
-
-        return getApiUrl(`/api/policies-gridfs/${policy._id}/file`);
+        return `/policies-gridfs/${policy._id}/file`;
     };
 
     const pdfUrl = getPdfUrl();

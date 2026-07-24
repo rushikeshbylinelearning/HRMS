@@ -44,6 +44,7 @@ const userSchema = new mongoose.Schema({
   probationStartDate: { type: Date, default: null },
   probationEndDate: { type: Date, default: null },
   probationDurationMonths: { type: Number, default: null },
+  confirmationDate: { type: Date, default: null }, // Set when moved to Permanent
   conversionDate: { type: Date, default: null }, // Date when intern was converted to on-role
   // Leave balances for permanent employees: 6 sick, 6 casual, 10 planned (paid)
   // Note: These defaults apply to new users. For permanent employees, balances should be:
@@ -60,6 +61,21 @@ const userSchema = new mongoose.Schema({
     casual: { type: Number, default: 6 },
     paid: { type: Number, default: 10 }
   },
+  // Tracks the one-time prorated leave allotment applied at Probation->Permanent confirmation.
+  // "year" scopes this to the confirmation calendar year ONLY. LeaveAccrualService checks
+  // `probationConfirmation.year === <accrual year>` before using proratedEntitlements as a cap.
+  // In any other year this field is simply ignored — no reset job needed, no mutation of
+  // leaveEntitlements, self-expiring by design.
+  probationConfirmation: {
+    year: { type: Number, default: null },
+    month: { type: Number, default: null }, // 1-12, confirmation month
+    proratedEntitlements: {
+      sick: { type: Number, default: null },
+      casual: { type: Number, default: null },
+      paid: { type: Number, default: null }
+    },
+    appliedAt: { type: Date, default: null }
+  },
   internshipDurationMonths: { 
     type: Number, 
     default: null 
@@ -70,6 +86,34 @@ const userSchema = new mongoose.Schema({
     default: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   },
   
+  // --- ONBOARDING & COMPLIANCE FIELDS ---
+  // These fields are permanent for audit purposes and must never be deleted.
+  // Existing employees remain unaffected (all fields default to their current state).
+  onboarding: {
+    // True once the entire onboarding sequence is fully completed
+    completed: { type: Boolean, default: false },
+    // True once the employee has completed first login (policy popup has been shown)
+    firstLoginCompleted: { type: Boolean, default: false },
+    // Policy acceptance details
+    policyAccepted: { type: Boolean, default: false },
+    policyAcceptedAt: { type: Date, default: null },
+    policyVersionAccepted: { type: String, default: null },
+    // Reference to the PolicyAcceptanceLog record for this onboarding
+    policyAcceptanceLogId: { type: mongoose.Schema.Types.ObjectId, ref: 'PolicyAcceptanceLog', default: null },
+    // Application walkthrough
+    tourCompleted: { type: Boolean, default: false },
+    tourCompletedAt: { type: Date, default: null },
+    // Profile completion deadline (7 days from joining date)
+    profileCompletionDeadline: { type: Date, default: null },
+    profileCompleted: { type: Boolean, default: false },
+    profileCompletedAt: { type: Date, default: null },
+    // Induction policy visibility (hide after 7 days — audit data kept forever)
+    inductionExpiryDate: { type: Date, default: null },
+    // Admin can manually force an existing employee through onboarding
+    forcedOnboardingBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    forcedOnboardingAt: { type: Date, default: null },
+  },
+
   // --- PERSONAL & IDENTITY DETAILS ---
   personalDetails: {
     type: Object,

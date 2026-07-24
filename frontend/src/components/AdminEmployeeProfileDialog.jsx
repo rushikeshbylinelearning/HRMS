@@ -1,72 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid, Stack, Avatar, Chip, TextField, Button, Snackbar, Alert, IconButton, MenuItem, Autocomplete } from '@mui/material';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid, Stack,
+    Avatar, Chip, TextField, Button, Snackbar, Alert, IconButton, MenuItem, Autocomplete,
+    Tabs, Tab,
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import PersonIcon from '@mui/icons-material/Person';
-import EmailIcon from '@mui/icons-material/Email';
-import BusinessIcon from '@mui/icons-material/Business';
-import CakeIcon from '@mui/icons-material/Cake';
-import WcIcon from '@mui/icons-material/Wc';
-import BloodtypeIcon from '@mui/icons-material/Bloodtype';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import PhoneIcon from '@mui/icons-material/Phone';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import ContactPageOutlinedIcon from '@mui/icons-material/ContactPageOutlined';
+import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CountryCodeSelector from './CountryCodeSelector';
 import CIFSummaryCard from './CIF/CIFSummaryCard';
+import AdminEmployeeCompliancePanel from './adminEmployee/AdminEmployeeCompliancePanel';
+import AdminEmployeeDocumentsPanel from './adminEmployee/AdminEmployeeDocumentsPanel';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
 import { SkeletonBox } from '../components/SkeletonLoaders';
 const roles = ['Admin', 'HR', 'Employee', 'Intern'];
 const statusOptions = ['Active', 'Inactive'];
+const employmentStatusOptions = ['Intern', 'Probation', 'Permanent'];
 
-// ── Design tokens ──────────────────────────────────────────────
-const RED = '#E53935';
-const RED_DARK = '#C62828';
-const RED_BG = '#FDECEC';
-const BLACK = '#1A1A1A';
-const GREY = '#6B7280';
-const BORDER = '#E5E7EB';
-
-const cardSx = {
-    background: '#fff',
-    borderRadius: '16px',
-    padding: '24px',
-    border: `1px solid ${BORDER}`,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-    transition: 'box-shadow 0.2s ease, transform 0.2s ease',
-    '&:hover': {
-        boxShadow: '0 6px 20px rgba(0,0,0,0.10)',
-        transform: 'translateY(-1px)'
-    }
-};
-
-const sectionTitleSx = {
-    fontWeight: 700,
-    color: BLACK,
-    fontSize: '15px',
-    mb: 0.5,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 1
-};
-
-const redAccentLineSx = {
-    width: 36,
-    height: 3,
-    borderRadius: 2,
-    background: RED,
-    mb: 2.5,
-    mt: 0.5
-};
+import {
+    RED, RED_DARK, RED_BG, RED_LIGHT, TEXT, MUTED, BORDER, SURFACE,
+    cardSx, sectionTitleSx, primaryBtnSx, tabSx,
+} from './adminEmployee/adminEmployeeTheme';
 
 const textFieldSx = {
     '& .MuiOutlinedInput-root': {
-        borderRadius: '12px',
-        backgroundColor: '#fff'
+        borderRadius: '8px',
+        backgroundColor: '#fff',
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: RED },
     },
-    '& .MuiInputLabel-root': {
-        color: '#666'
-    }
+    '& .MuiInputLabel-root.Mui-focused': { color: RED },
 };
 
 const defaultFormState = {
@@ -91,6 +57,9 @@ const defaultFormState = {
     addressCity: '',
     addressState: '',
     addressPincode: '',
+    marriageDate: '',
+    interests: '',
+    hobbies: '',
     emergencyContactName: '',
     emergencyContactNumber: '',
     emergencyContactCountryCode: '+91',
@@ -105,6 +74,7 @@ const defaultFormState = {
     uanNumber: '',
     pfAccountNumber: '',
     reportingPersonId: '',
+    employmentStatus: 'Probation',
 };
 
 const AdminEmployeeProfileDialog = ({
@@ -123,6 +93,7 @@ const AdminEmployeeProfileDialog = ({
     const [reportingOptions, setReportingOptions] = useState([]);
     const [reportingOptionsLoading, setReportingOptionsLoading] = useState(false);
     const [selectedReportingOption, setSelectedReportingOption] = useState(null);
+    const [activeTab, setActiveTab] = useState(0);
 
     const buildFormState = useMemo(() => (data) => ({
         fullName: data?.fullName || '',
@@ -149,6 +120,11 @@ const AdminEmployeeProfileDialog = ({
         addressCity:    data?.personalDetails?.address?.city    || '',
         addressState:   data?.personalDetails?.address?.state   || '',
         addressPincode: data?.personalDetails?.address?.pincode || '',
+        marriageDate: data?.personalDetails?.marriageDate
+            ? new Date(data.personalDetails.marriageDate).toISOString().slice(0, 10)
+            : '',
+        interests: data?.personalDetails?.interests || '',
+        hobbies:   data?.personalDetails?.hobbies   || '',
         // Emergency contact
         emergencyContactName:         data?.personalDetails?.emergencyContactName         || '',
         emergencyContactNumber:       data?.personalDetails?.emergencyContactNumber       || '',
@@ -165,6 +141,7 @@ const AdminEmployeeProfileDialog = ({
         uanNumber:       data?.identityDetails?.uanNumber       || '',
         pfAccountNumber: data?.identityDetails?.pfAccountNumber || '',
         reportingPersonId: data?.reportingPerson?._id || '',
+        employmentStatus: data?.employmentStatus || 'Probation',
     }), []);
 
     useEffect(() => {
@@ -174,6 +151,7 @@ const AdminEmployeeProfileDialog = ({
             setFormData(defaultFormState);
         }
         setIsEditing(mode === 'edit');
+        if (open) setActiveTab(0);
     }, [employee, mode, buildFormState, open]);
 
     useEffect(() => {
@@ -294,6 +272,9 @@ const AdminEmployeeProfileDialog = ({
                 emergencyContactCountryCode:  formData.emergencyContactCountryCode,
                 emergencyContactRelationship: formData.emergencyContactRelationship,
                 emergencyContactEmail:        formData.emergencyContactEmail,
+                marriageDate: formData.marriageDate,
+                interests:    formData.interests,
+                hobbies:      formData.hobbies,
             },
             identityDetails: {
                 aadhaarNumber:   formData.aadhaarNumber,
@@ -305,7 +286,8 @@ const AdminEmployeeProfileDialog = ({
                 uanNumber:       formData.uanNumber,
                 pfAccountNumber: formData.pfAccountNumber,
             },
-            reportingPerson: formData.reportingPersonId || null
+            reportingPerson: formData.reportingPersonId || null,
+            employmentStatus: formData.employmentStatus,
         };
 
         if (!payload.joiningDate) {
@@ -336,31 +318,27 @@ const AdminEmployeeProfileDialog = ({
 
     const renderValue = (label, value, icon = null) => (
         <Box>
-            <Typography 
-                variant="caption" 
-                sx={{ 
-                    color: GREY, 
-                    fontWeight: 600, 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    fontSize: '10px',
+            <Typography
+                variant="caption"
+                sx={{
+                    color: MUTED,
+                    fontWeight: 500,
+                    fontSize: '0.7rem',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 0.5,
-                    marginBottom: '8px'
+                    mb: 0.5,
                 }}
             >
-                {icon && <Box sx={{ fontSize: '14px', color: GREY }}>{icon}</Box>}
+                {icon}
                 {label}
             </Typography>
-            <Typography 
-                variant="body1" 
-                sx={{ 
-                    color: value ? BLACK : '#CBD5E0', 
-                    fontWeight: 500,
-                    fontSize: '14px',
-                    lineHeight: 1.6,
-                    fontStyle: value ? 'normal' : 'italic'
+            <Typography
+                variant="body2"
+                sx={{
+                    color: value ? TEXT : '#cbd5e1',
+                    fontWeight: value ? 500 : 400,
+                    fontSize: '0.875rem',
                 }}
             >
                 {value || '—'}
@@ -424,288 +402,185 @@ const AdminEmployeeProfileDialog = ({
                 open={open}
                 onClose={handleClose}
                 fullWidth
-                maxWidth="md"
+                maxWidth="lg"
                 PaperProps={{
                     sx: {
-                        borderRadius: '20px',
+                        borderRadius: '16px',
                         overflow: 'hidden',
-                        boxShadow: '0 24px 64px rgba(0,0,0,0.14)'
-                    }
+                        boxShadow: '0 16px 48px rgba(15, 23, 42, 0.12)',
+                    },
                 }}
             >
-                {/* ── Sticky Header ── */}
                 <DialogTitle
                     sx={{
-                        px: 4,
-                        pt: 3,
-                        pb: 2,
+                        px: 3,
+                        py: 2,
                         background: '#fff',
                         borderBottom: `1px solid ${BORDER}`,
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 10
+                        borderTop: `3px solid ${RED}`,
                     }}
                 >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                        <Box>
-                            <Typography
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                        <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0 }}>
+                            <Avatar
                                 sx={{
-                                    color: RED,
-                                    fontSize: '10px',
+                                    width: 48,
+                                    height: 48,
+                                    background: `linear-gradient(135deg, ${RED} 0%, ${RED_DARK} 100%)`,
+                                    color: '#fff',
                                     fontWeight: 700,
-                                    letterSpacing: '0.12em',
-                                    textTransform: 'uppercase',
-                                    mb: 0.5
+                                    fontSize: '1.1rem',
                                 }}
                             >
-                                Employee Profile
-                            </Typography>
-                            <Typography variant="h6" fontWeight={800} color={BLACK} lineHeight={1.2}>
-                                {isEditing ? 'Edit Details' : 'View Details'}
-                            </Typography>
-                        </Box>
-                        <IconButton
-                            onClick={handleClose}
-                            size="medium"
-                            sx={{
-                                color: GREY,
-                                transition: 'color 0.2s ease, background 0.2s ease',
-                                '&:hover': { color: RED, background: RED_BG }
-                            }}
-                        >
+                                {(employee?.fullName || 'U').charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="h6" fontWeight={700} color={TEXT} lineHeight={1.3} noWrap>
+                                    {employee?.fullName || 'Employee Details'}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: MUTED }} noWrap>
+                                    {[employee?.department, employee?.email].filter(Boolean).join(' · ') || employee?.employeeCode || '—'}
+                                </Typography>
+                                <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }} flexWrap="wrap" useFlexGap>
+                                    <Chip label={employee?.employeeCode || 'N/A'} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600, borderColor: BORDER }} />
+                                    <Chip label={employee?.role || 'Employee'} size="small" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600, bgcolor: RED_BG, color: RED, border: '1px solid #FBBCBC' }} />
+                                    <Chip
+                                        label={employee?.isActive === false ? 'Inactive' : 'Active'}
+                                        size="small"
+                                        sx={{
+                                            height: 22,
+                                            fontSize: '0.7rem',
+                                            fontWeight: 600,
+                                            bgcolor: employee?.isActive === false ? '#fef2f2' : '#f0fdf4',
+                                            color: employee?.isActive === false ? '#991b1b' : '#166534',
+                                        }}
+                                    />
+                                </Stack>
+                            </Box>
+                        </Stack>
+                        <IconButton onClick={handleClose} size="small" sx={{ color: MUTED, '&:hover': { color: RED, bgcolor: RED_BG } }}>
                             <CloseIcon />
                         </IconButton>
                     </Stack>
                 </DialogTitle>
 
-                <DialogContent sx={{ backgroundColor: '#F8F9FB', px: 4, py: 4 }}>
-                    <Stack spacing={3}>
+                <Box sx={{ px: 3, background: '#fff', borderBottom: `1px solid ${BORDER}` }}>
+                    <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={tabSx}>
+                        <Tab label="Overview" />
+                        <Tab label="Personal" />
+                        <Tab label="Compliance" />
+                        <Tab label="Documents" />
+                    </Tabs>
+                </Box>
 
-                        {/* ── Profile Hero Card ── */}
-                        <Box
-                            sx={{
-                                ...cardSx,
-                                background: 'linear-gradient(135deg, #fff 70%, #FFF5F5 100%)',
-                                padding: '28px 32px',
-                                borderLeft: `4px solid ${RED}`
-                            }}
-                        >
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ xs: 'center', sm: 'flex-start' }}>
-                                {/* Avatar */}
-                                <Avatar
-                                    sx={{
-                                        width: 88,
-                                        height: 88,
-                                        background: `linear-gradient(135deg, ${RED} 0%, ${RED_DARK} 100%)`,
-                                        fontSize: '2rem',
-                                        fontWeight: 800,
-                                        boxShadow: `0 8px 24px rgba(229,57,53,0.35)`,
-                                        flexShrink: 0,
-                                        border: '3px solid #fff'
-                                    }}
-                                >
-                                    {(employee?.fullName || 'U').charAt(0).toUpperCase()}
-                                </Avatar>
-
-                                {/* Info */}
-                                <Box flex={1}>
-                                    <Typography variant="h5" fontWeight={800} color={BLACK} lineHeight={1.2} mb={0.5}>
-                                        {employee?.fullName || '—'}
-                                    </Typography>
-                                    {employee?.designation && (
-                                        <Typography variant="body2" color={GREY} mb={1.5}>
-                                            {employee.designation}
-                                        </Typography>
-                                    )}
-                                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                        {/* Employee ID badge */}
-                                        <Chip
-                                            label={employee?.employeeCode || 'N/A'}
-                                            size="small"
-                                            sx={{
-                                                background: '#F1F5F9',
-                                                color: '#475569',
-                                                fontWeight: 600,
-                                                fontSize: '12px',
-                                                border: `1px solid ${BORDER}`,
-                                                borderRadius: '8px'
-                                            }}
-                                        />
-                                        {/* Role badge */}
-                                        <Chip
-                                            label={employee?.role || 'Employee'}
-                                            size="small"
-                                            sx={{
-                                                background: RED_BG,
-                                                color: RED,
-                                                fontWeight: 700,
-                                                fontSize: '12px',
-                                                border: `1px solid #FBBCBC`,
-                                                borderRadius: '8px',
-                                                transition: 'transform 0.15s ease',
-                                                '&:hover': { transform: 'scale(1.04)' }
-                                            }}
-                                        />
-                                        {/* Status badge */}
-                                        <Chip
-                                            label={employee?.isActive === false ? 'Inactive' : 'Active'}
-                                            size="small"
-                                            sx={{
-                                                background: employee?.isActive === false ? '#FEF2F2' : '#F0FDF4',
-                                                color: employee?.isActive === false ? '#DC2626' : '#16A34A',
-                                                fontWeight: 700,
-                                                fontSize: '12px',
-                                                border: `1px solid ${employee?.isActive === false ? '#FECACA' : '#BBF7D0'}`,
-                                                borderRadius: '8px',
-                                                transition: 'transform 0.15s ease',
-                                                '&:hover': { transform: 'scale(1.04)' }
-                                            }}
-                                        />
-                                    </Stack>
-                                </Box>
-                            </Stack>
-                        </Box>
-
-                        {/* ── CIF Summary Card - Admin/HR Only ── */}
+                <DialogContent sx={{ backgroundColor: SURFACE, px: 3, py: 2.5 }}>
+                    {activeTab === 0 && (
+                    <Stack spacing={2}>
                         {(user?.role === 'Admin' || user?.role === 'HR') && employee?._id && (
                             <CIFSummaryCard employeeId={employee._id} />
                         )}
 
-                        {/* ── Reporting Person ── */}
-                        <Box sx={cardSx}>
+                        <Box sx={{ ...cardSx, borderLeft: `3px solid ${RED}` }}>
                             <Typography sx={sectionTitleSx}>
-                                <PersonIcon sx={{ fontSize: 18, color: RED }} />
-                                Reporting Person
+                                <BadgeOutlinedIcon sx={{ fontSize: 18, color: RED }} />
+                                Employment Details
                             </Typography>
-                            <Box sx={redAccentLineSx} />
-
-                            {isEditing && (
-                                <Box mb={2.5}>
-                                    <Autocomplete
-                                        options={reportingOptions}
-                                        loading={reportingOptionsLoading}
-                                        value={selectedReportingOption}
-                                        onChange={handleReportingSelection}
-                                        getOptionLabel={(option) => option?.fullName ? `${option.fullName}${option.employeeCode ? ` (${option.employeeCode})` : ''}` : ''}
-                                        isOptionEqualToValue={(option, value) => option?._id === value?._id}
-                                        renderInput={(params) => (
-                                            <TextField
-                                                {...params}
-                                                label="Select Existing Employee"
-                                                placeholder="Search by name"
-                                                sx={textFieldSx}
-                                                InputProps={{
-                                                    ...params.InputProps,
-                                                    endAdornment: (
-                                                        <>
-                                                            {reportingOptionsLoading ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : null}
-                                                            {params.InputProps.endAdornment}
-                                                        </>
-                                                    )
-                                                }}
-                                            />
-                                        )}
-                                    />
-                                </Box>
-                            )}
-
-                            {!isEditing && !employee?.reportingPerson?.fullName ? (
-                                <Box
-                                    sx={{
-                                        textAlign: 'center',
-                                        py: 3,
-                                        color: GREY,
-                                        fontStyle: 'italic',
-                                        fontSize: '14px'
-                                    }}
-                                >
-                                    No Reporting Manager Assigned
-                                </Box>
-                            ) : (
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12} md={4}>
-                                        {isEditing
-                                            ? renderField({ label: 'Reporting Person Name', name: 'reportingPersonName' })
-                                            : renderValue('Name', employee?.reportingPerson?.fullName, <PersonIcon sx={{ fontSize: 13 }} />)
-                                        }
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        {isEditing
-                                            ? renderField({ label: 'Reporting Person Email', name: 'reportingPersonEmail', type: 'email' })
-                                            : renderValue('Email', employee?.reportingPerson?.email, <EmailIcon sx={{ fontSize: 13 }} />)
-                                        }
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        {isEditing
-                                            ? renderField({ label: 'Reporting Person Department', name: 'reportingPersonDepartment' })
-                                            : renderValue('Department', employee?.reportingPerson?.department, <BusinessIcon sx={{ fontSize: 13 }} />)
-                                        }
-                                    </Grid>
-                                </Grid>
-                            )}
-                        </Box>
-
-                        {/* ── Section 1: Basic Info ── */}
-                        <Box sx={cardSx}>
-                            <Typography sx={sectionTitleSx}>
-                                <PersonIcon sx={{ fontSize: 18, color: RED }} />
-                                Basic Info
-                            </Typography>
-                            <Box sx={redAccentLineSx} />
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Full Name', name: 'fullName' })}</Grid>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Employee ID', name: 'employeeCode' })}</Grid>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Designation', name: 'designation' })}</Grid>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Department', name: 'department' })}</Grid>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Email', name: 'email', type: 'email' })}</Grid>
-                                <Grid item xs={12} md={6}>
+                            <Grid container spacing={2.5}>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Full Name', name: 'fullName' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Employee ID', name: 'employeeCode' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Designation', name: 'designation' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Department', name: 'department' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Email', name: 'email', type: 'email' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>{renderField({ label: 'Joining Date', name: 'joiningDate', type: 'date' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>
                                     {isEditing
                                         ? renderField({ label: 'Role', name: 'role', select: true, options: roles })
-                                        : (
-                                            <Box>
-                                                <Typography sx={{ color: GREY, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '10px', mb: 1 }}>Role</Typography>
-                                                <Chip
-                                                    label={formData.role || '—'}
-                                                    size="small"
-                                                    sx={{ background: RED_BG, color: RED, fontWeight: 700, border: `1px solid #FBBCBC`, borderRadius: '8px' }}
-                                                />
-                                            </Box>
-                                        )
+                                        : renderValue('Role', formData.role)
                                     }
                                 </Grid>
-                                <Grid item xs={12} md={6}>
+                                <Grid item xs={12} sm={6} md={4}>
                                     {isEditing
                                         ? renderField({ label: 'Status', name: 'status', select: true, options: statusOptions })
-                                        : (
-                                            <Box>
-                                                <Typography sx={{ color: GREY, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '10px', mb: 1 }}>Status</Typography>
-                                                <Chip
-                                                    label={formData.status || '—'}
-                                                    size="small"
-                                                    sx={{
-                                                        background: formData.status === 'Active' ? '#F0FDF4' : '#FEF2F2',
-                                                        color: formData.status === 'Active' ? '#16A34A' : '#DC2626',
-                                                        fontWeight: 700,
-                                                        border: `1px solid ${formData.status === 'Active' ? '#BBF7D0' : '#FECACA'}`,
-                                                        borderRadius: '8px'
-                                                    }}
-                                                />
-                                            </Box>
-                                        )
+                                        : renderValue('Status', formData.status)
                                     }
                                 </Grid>
-                                <Grid item xs={12} md={6}>{renderField({ label: 'Joining Date', name: 'joiningDate', type: 'date' })}</Grid>
+                                <Grid item xs={12} sm={6} md={4}>
+                                    {isEditing
+                                        ? renderField({ label: 'Employment Status', name: 'employmentStatus', select: true, options: employmentStatusOptions })
+                                        : renderValue('Employment Status', formData.employmentStatus)
+                                    }
+                                </Grid>
                             </Grid>
+
+                            <Box sx={{ borderTop: `1px solid ${BORDER}`, mt: 2.5, pt: 2.5 }}>
+                                <Typography sx={{ ...sectionTitleSx, mb: 1.5 }}>
+                                    <PersonOutlineIcon sx={{ fontSize: 18, color: RED }} />
+                                    Reporting Manager
+                                </Typography>
+
+                                {isEditing && (
+                                    <Box mb={2}>
+                                        <Autocomplete
+                                            options={reportingOptions}
+                                            loading={reportingOptionsLoading}
+                                            value={selectedReportingOption}
+                                            onChange={handleReportingSelection}
+                                            getOptionLabel={(option) => option?.fullName ? `${option.fullName}${option.employeeCode ? ` (${option.employeeCode})` : ''}` : ''}
+                                            isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Select manager"
+                                                    placeholder="Search by name"
+                                                    size="small"
+                                                    sx={textFieldSx}
+                                                    InputProps={{
+                                                        ...params.InputProps,
+                                                        endAdornment: (
+                                                            <>
+                                                                {reportingOptionsLoading ? <SkeletonBox width="20px" height="20px" borderRadius="50%" /> : null}
+                                                                {params.InputProps.endAdornment}
+                                                            </>
+                                                        ),
+                                                    }}
+                                                />
+                                            )}
+                                        />
+                                    </Box>
+                                )}
+
+                                {!isEditing && !employee?.reportingPerson?.fullName ? (
+                                    <Typography variant="body2" sx={{ color: MUTED }}>
+                                        No reporting manager assigned
+                                    </Typography>
+                                ) : (
+                                    <Grid container spacing={2.5}>
+                                        <Grid item xs={12} sm={4}>
+                                            {renderValue('Name', employee?.reportingPerson?.fullName)}
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            {renderValue('Email', employee?.reportingPerson?.email)}
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            {renderValue('Department', employee?.reportingPerson?.department)}
+                                        </Grid>
+                                    </Grid>
+                                )}
+                            </Box>
                         </Box>
 
-                        {/* ── Section 2: Personal Details ── */}
+                    </Stack>
+                    )}
+
+                    {/* ── Tab 1: Personal ── */}
+                    {activeTab === 1 && (
+                    <Stack spacing={2}>
                         <Box sx={cardSx}>
                             <Typography sx={sectionTitleSx}>
-                                <WcIcon sx={{ fontSize: 18, color: RED }} />
+                                <ContactPageOutlinedIcon sx={{ fontSize: 18, color: RED }} />
                                 Personal Details
                             </Typography>
-                            <Box sx={redAccentLineSx} />
-                            <Grid container spacing={3}>
+                            <Grid container spacing={2.5}>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Date of Birth', name: 'dateOfBirth', type: 'date' })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Gender', name: 'gender', select: true, options: ['Male', 'Female', 'Other'] })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Blood Group', name: 'bloodGroup' })}</Grid>
@@ -722,17 +597,18 @@ const AdminEmployeeProfileDialog = ({
                                 <Grid item xs={12} md={6}>{renderField({ label: 'City', name: 'addressCity' })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'State', name: 'addressState' })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Pincode', name: 'addressPincode' })}</Grid>
+                                <Grid item xs={12} md={6}>{renderField({ label: 'Marriage Date', name: 'marriageDate', type: 'date' })}</Grid>
+                                <Grid item xs={12} md={6}>{renderField({ label: 'Interests', name: 'interests' })}</Grid>
+                                <Grid item xs={12} md={6}>{renderField({ label: 'Hobbies', name: 'hobbies' })}</Grid>
                             </Grid>
                         </Box>
 
-                        {/* ── Section 3: Identity & Bank Details ── */}
                         <Box sx={cardSx}>
                             <Typography sx={sectionTitleSx}>
-                                <BusinessIcon sx={{ fontSize: 18, color: RED }} />
+                                <AccountBalanceOutlinedIcon sx={{ fontSize: 18, color: RED }} />
                                 Identity &amp; Bank Details
                             </Typography>
-                            <Box sx={redAccentLineSx} />
-                            <Grid container spacing={3}>
+                            <Grid container spacing={2.5}>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Aadhaar Number', name: 'aadhaarNumber' })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'PAN Card Number', name: 'panCardNumber' })}</Grid>
                                 <Grid item xs={12} md={6}>{renderField({ label: 'Bank Name', name: 'bankName' })}</Grid>
@@ -743,18 +619,28 @@ const AdminEmployeeProfileDialog = ({
                                 <Grid item xs={12} md={6}>{renderField({ label: 'PF Account Number', name: 'pfAccountNumber' })}</Grid>
                             </Grid>
                         </Box>
-
                     </Stack>
+                    )}
+
+                    {/* ── Tab 2: Compliance ── */}
+                    {activeTab === 2 && employee?._id && (
+                        <AdminEmployeeCompliancePanel employeeId={employee._id} />
+                    )}
+
+                    {/* ── Tab 3: Documents ── */}
+                    {activeTab === 3 && employee?._id && (
+                        <AdminEmployeeDocumentsPanel employeeId={employee._id} />
+                    )}
                 </DialogContent>
 
                 {/* ── Footer Actions ── */}
                 <DialogActions
                     sx={{
-                        px: 4,
-                        py: 2.5,
+                        px: 3,
+                        py: 2,
                         background: '#fff',
                         borderTop: `1px solid ${BORDER}`,
-                        gap: 1.5
+                        gap: 1,
                     }}
                 >
                     {onOpenAdvancedEditor && (
@@ -762,15 +648,7 @@ const AdminEmployeeProfileDialog = ({
                             variant="text"
                             onClick={onOpenAdvancedEditor}
                             disabled={saving}
-                            sx={{
-                                mr: 'auto',
-                                color: GREY,
-                                fontWeight: 600,
-                                fontSize: '14px',
-                                textTransform: 'none',
-                                transition: 'color 0.2s ease',
-                                '&:hover': { color: RED, background: 'transparent' }
-                            }}
+                            sx={{ mr: 'auto', color: MUTED, fontWeight: 500, textTransform: 'none', '&:hover': { color: RED, bgcolor: 'transparent' } }}
                         >
                             Advanced Editor
                         </Button>
@@ -781,15 +659,7 @@ const AdminEmployeeProfileDialog = ({
                                 variant="outlined"
                                 onClick={handleReset}
                                 disabled={saving}
-                                sx={{
-                                    borderRadius: '50px',
-                                    borderColor: BORDER,
-                                    color: GREY,
-                                    fontWeight: 600,
-                                    textTransform: 'none',
-                                    px: 3,
-                                    '&:hover': { borderColor: RED, color: RED, background: RED_BG }
-                                }}
+                                sx={{ textTransform: 'none', borderColor: BORDER, color: MUTED, fontWeight: 600, '&:hover': { borderColor: RED, color: RED, bgcolor: RED_BG } }}
                             >
                                 Reset
                             </Button>
@@ -797,21 +667,7 @@ const AdminEmployeeProfileDialog = ({
                                 variant="contained"
                                 onClick={handleSave}
                                 disabled={saving}
-                                sx={{
-                                    background: `linear-gradient(135deg, ${RED} 0%, ${RED_DARK} 100%)`,
-                                    borderRadius: '50px',
-                                    fontWeight: 700,
-                                    textTransform: 'none',
-                                    px: 4,
-                                    minWidth: 130,
-                                    boxShadow: `0 4px 14px rgba(229,57,53,0.4)`,
-                                    transition: 'all 0.2s ease',
-                                    '&:hover': {
-                                        background: `linear-gradient(135deg, ${RED_DARK} 0%, #B71C1C 100%)`,
-                                        boxShadow: `0 6px 20px rgba(229,57,53,0.5)`,
-                                        transform: 'translateY(-1px)'
-                                    }
-                                }}
+                                sx={primaryBtnSx}
                             >
                                 {saving ? <SkeletonBox width="22px" height="22px" borderRadius="50%" /> : 'Save Changes'}
                             </Button>
@@ -820,21 +676,7 @@ const AdminEmployeeProfileDialog = ({
                         <Button
                             variant="contained"
                             onClick={() => setIsEditing(true)}
-                            sx={{
-                                background: `linear-gradient(135deg, ${RED} 0%, ${RED_DARK} 100%)`,
-                                borderRadius: '50px',
-                                fontWeight: 700,
-                                textTransform: 'none',
-                                px: 4,
-                                minWidth: 130,
-                                boxShadow: `0 4px 14px rgba(229,57,53,0.4)`,
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                    background: `linear-gradient(135deg, ${RED_DARK} 0%, #B71C1C 100%)`,
-                                    boxShadow: `0 6px 20px rgba(229,57,53,0.5)`,
-                                    transform: 'translateY(-1px)'
-                                }
-                            }}
+                            sx={primaryBtnSx}
                         >
                             Edit Details
                         </Button>

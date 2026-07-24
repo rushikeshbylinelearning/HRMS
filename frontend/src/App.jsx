@@ -1,6 +1,7 @@
 // frontend/src/App.jsx
 
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef } from 'react';
+import { lazyWithRetry as lazy } from './utils/lazyWithRetry';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BreakUIProvider } from './context/BreakUIContext';
@@ -20,6 +21,8 @@ import SSOLoginPage from './pages/SSOLoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionProtectedRoute from './components/PermissionProtectedRoute';
 import IdleDetectionProvider from './components/IdleDetectionProvider';
+import { OnboardingProvider } from './context/OnboardingContext';
+import './styles/OnboardingStyles.css';
 
 // Lazy load all pages
 const EmployeeDashboardPage = lazy(() => import('./pages/EmployeeDashboardPage'));
@@ -91,15 +94,14 @@ const PageLoader = ({ type = 'default' }) => (
 // Use optimized theme
 
 // DashboardRouter - routes to appropriate dashboard based on user role
-// NON-BLOCKING: Shows skeleton if authStatus is 'unknown' (auth still resolving)
+// ProtectedRoute already gates on authStatus === 'unknown', so user is set here.
 const DashboardRouter = () => {
-    const { user, authStatus } = useAuth();
-    
-    // NON-BLOCKING: Show skeleton if auth still resolving
-    if (authStatus === 'unknown' || !user) {
-        return <PageLoader type="dashboard" />;
+    const { user } = useAuth();
+
+    if (!user) {
+        return null;
     }
-    
+
     // Route to appropriate dashboard based on role
     if (user.role === 'Admin' || user.role === 'HR') {
         return <AdminDashboardPage />;
@@ -228,6 +230,7 @@ function App() {
                                 <TeaBreakProvider>
                                 <NewNotificationProvider> {/* <-- CORRECT NESTING */}
                                     <IdleDetectionProvider>
+                                        <OnboardingProvider>
                                         <Routes>
                                     {/* Public routes - accessible without authentication */}
                                     <Route path="/login" element={<LoginPage />} />
@@ -391,6 +394,7 @@ function App() {
                                     {/* Catch-all route - redirect to login for unknown routes */}
                                     <Route path="*" element={<Navigate to="/login" replace />} />
                                 </Routes>
+                                        </OnboardingProvider>
                             </IdleDetectionProvider>
                         </NewNotificationProvider>
                                 </TeaBreakProvider>

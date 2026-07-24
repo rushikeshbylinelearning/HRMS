@@ -114,6 +114,7 @@ export const routePrefetchMap = {
     '/attendance-summary': () => import('../pages/AttendanceSummaryPage'),
     '/admin/attendance-summary': () => import('../pages/AdminAttendanceSummaryPage'),
     '/activity-log': () => import('../pages/NewActivityLogPage'),
-    '/shifts': () => import('../pages/ShiftsPage'),
+    '/shifts': () => import('../pages/SchedulingManagementPage'),
+    '/scheduling-management': () => import('../pages/SchedulingManagementPage'),
     '/probation': () => import('../pages/ProbationPage'),
 };

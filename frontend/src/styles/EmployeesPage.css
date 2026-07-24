@@ -107,6 +107,7 @@
     padding-bottom: 10px;
     transition: background-color 0.2s ease;
     min-height: 60px;
+    overflow: visible;
 }
 .employee-grid-row:hover {
     background-color: #f8f9fa;
@@ -120,7 +121,17 @@
 }
 .grid-cell.actions {
     justify-content: center;
-    gap: 4px; /* Spacing between action buttons */
+    gap: 4px;
+    overflow: visible;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.grid-cell.actions .MuiIconButton-root:focus-visible,
+.grid-cell.actions .MuiIconButton-root.Mui-focusVisible {
+    outline: 2px solid #E53935;
+    outline-offset: 1px;
+    background-color: rgba(229, 57, 53, 0.08);
 }
 .grid-cell.isActive {
     justify-content: center;

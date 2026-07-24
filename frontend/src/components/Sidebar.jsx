@@ -41,7 +41,8 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             text: 'Summary', 
             icon: <AssessmentIcon />, 
             path: (user && ['Admin', 'HR'].includes(user.role)) ? '/admin/attendance-summary' : '/attendance-summary',
-            roles: ['Employee', 'Intern', 'HR', 'Admin'] 
+            roles: ['Employee', 'Intern', 'HR', 'Admin'],
+            tourId: 'sidebar-attendance',
         },
         { text: 'Employees', icon: <PeopleIcon />, path: '/employees', roles: ['HR', 'Admin'] },
         { text: 'Scheduling', icon: <TimelapseIcon />, path: '/scheduling-management', roles: ['Admin'] },
@@ -53,7 +54,8 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             icon: <EventNoteIcon />, 
             path: (user && ['Admin', 'HR'].includes(user.role)) ? '/admin/leaves' : '/leaves', 
             roles: ['Employee', 'Intern', 'HR', 'Admin'],
-            permissionCheck: () => canAccess.leaves()
+            permissionCheck: () => canAccess.leaves(),
+            tourId: 'sidebar-leaves',
         },
         {
             text: 'Requests',
@@ -74,7 +76,8 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
             icon: <AdminPanelSettingsIcon />, 
             path: '/reports', 
             roles: ['Admin', 'HR'],
-            permissionCheck: () => canAccess.viewReports()
+            permissionCheck: () => canAccess.viewReports(),
+            tourId: 'sidebar-reports',
         },
         { 
             text: 'Analytics', 
@@ -125,6 +128,7 @@ const Sidebar = ({ onNotificationClick, isMobileOpen = false, onClose = () => {}
                         to={typeof item.path === 'function' ? item.path(user) : item.path}
                         className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
                         data-tooltip={item.tooltip || item.text}
+                        data-tour={item.tourId || undefined}
                         onClick={(e) => {
                             e.preventDefault();
                             const targetPath = typeof item.path === 'function' ? item.path(user) : item.path;

@@ -205,7 +205,11 @@ export default defineConfig({
       '@emotion/styled',
       '@emotion/cache',
       '@mui/material',
+      '@mui/utils',
       '@mui/icons-material',
+      '@mui/icons-material/Add',
+      '@mui/icons-material/EditOutlined',
+      '@mui/icons-material/DeleteOutline',
       // Pre-bundle deps used by lazy-loaded pages (prevents "Outdated Optimize Dep" 504s)
       'date-fns',
       'jspdf',
@@ -251,8 +255,8 @@ export default defineConfig({
       // Ensure proper initialization order
       target: 'es2015',
     },
-    // Force re-optimization to fix stale cache issues
-    force: true, // Will force re-optimization on next dev server start
+    // Do not force re-optimization on every dev start — it invalidates browser
+    // module hashes and causes "Failed to fetch dynamically imported module".
   },
   // Resolve configuration to prevent React duplication
   resolve: {

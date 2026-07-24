@@ -263,6 +263,36 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                             maxLength={6}
                         />
                     </div>
+
+                    <div className="pm-field pm-field--sm">
+                        <label className="pm-label">Marriage Date</label>
+                        <input
+                            className="pm-input"
+                            type="date"
+                            value={formData.marriageDate}
+                            onChange={(e) => onFieldChange('marriageDate', e.target.value)}
+                        />
+                    </div>
+                    <div className="pm-field pm-field--md">
+                        <label className="pm-label">Interests</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.interests}
+                            onChange={(e) => onFieldChange('interests', e.target.value)}
+                            placeholder="e.g. Reading, Music, Sports"
+                        />
+                    </div>
+                    <div className="pm-field pm-field--lg">
+                        <label className="pm-label">Hobbies</label>
+                        <input
+                            className="pm-input"
+                            type="text"
+                            value={formData.hobbies}
+                            onChange={(e) => onFieldChange('hobbies', e.target.value)}
+                            placeholder="e.g. Photography, Cooking, Travel"
+                        />
+                    </div>
                 </div>
             </div>
 

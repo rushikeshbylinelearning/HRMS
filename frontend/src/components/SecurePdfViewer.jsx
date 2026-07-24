@@ -9,6 +9,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloseIcon from '@mui/icons-material/Close';
 import '../styles/SecurePdfViewer.css';
+import api from '../api/axios';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -29,19 +30,11 @@ const SecurePdfViewer = ({ pdfUrl, policyName, role = 'employee', onClose }) => 
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(pdfUrl, {
-                    credentials: 'include',
-                    headers: {
-                        'Authorization': `Bearer ${sessionStorage.getItem('ams_token') || sessionStorage.getItem('token')}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load PDF');
-                }
-
-                const blob = await response.blob();
-                setPdfBlob(blob);
+                // Use the configured api axios instance — it always carries the
+                // in-memory Authorization header set by AuthContext (Phase 1 model).
+                // No sessionStorage reads needed.
+                const response = await api.get(pdfUrl, { responseType: 'blob' });
+                setPdfBlob(response.data);
             } catch (err) {
                 console.error('Error loading PDF:', err);
                 setError('Failed to load PDF. Please try again.');

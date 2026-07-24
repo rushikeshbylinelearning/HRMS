@@ -7,7 +7,7 @@ const newNotificationSchema = new mongoose.Schema({
     message: { type: String, required: true },
     type: { 
         type: String, 
-        enum: ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'leave_returned', 'leave_resubmitted', 'leave_revoked', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview', 'resource_request', 'resource_request_status'], 
+        enum: ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'leave_returned', 'leave_resubmitted', 'leave_revoked', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview', 'resource_request', 'resource_request_status', 'onboarding_welcome', 'onboarding_policy_pending', 'onboarding_tour_pending', 'onboarding_profile_pending', 'onboarding_deadline_reminder', 'onboarding_completed', 'onboarding_overdue', 'employee_document_assigned', 'employee_document_pending_hr', 'employment_status_changed'], 
         required: true 
     },
     
@@ -70,7 +70,7 @@ newNotificationSchema.index({ recipientType: 1, read: 1, createdAt: -1 });
 // This provides clear error messages and prevents server crashes
 newNotificationSchema.pre('save', function(next) {
     // Validate type enum
-    const validTypes = ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'leave_returned', 'leave_resubmitted', 'leave_revoked', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview', 'resource_request', 'resource_request_status'];
+    const validTypes = ['checkin', 'checkout', 'normal_checkout', 'break_start', 'break_end', 'leave_request', 'leave_approval', 'leave_rejection', 'leave_returned', 'leave_resubmitted', 'leave_revoked', 'extra_break_request', 'extra_break_approval', 'extra_break_rejection', 'auto_break', 'auto_break_end', 'system', 'info', 'success', 'warning', 'error', 'half_day_marked', 'early_checkout_request', 'early_checkout_approved', 'early_checkout_rejected', 'policy_added', 'policy_updated', 'anonymous_feedback', 'cif_attachment_added', 'teams_report_preview', 'resource_request', 'resource_request_status', 'onboarding_welcome', 'onboarding_policy_pending', 'onboarding_tour_pending', 'onboarding_profile_pending', 'onboarding_deadline_reminder', 'onboarding_completed', 'onboarding_overdue', 'employee_document_assigned', 'employee_document_pending_hr', 'employment_status_changed'];
     if (this.type && !validTypes.includes(this.type)) {
         const error = new mongoose.Error.ValidationError(this);
         error.errors.type = new mongoose.Error.ValidatorError({

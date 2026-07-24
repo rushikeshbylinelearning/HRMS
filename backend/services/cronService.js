@@ -10,6 +10,8 @@ const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
 const { executeLeaveAccrual } = require('../cron/leaveAccrualCron');
+const { runOnboardingReminders } = require('../cron/onboardingReminderCron');
+const { runEmployeeDocumentProbationChecks } = require('../cron/employeeDocumentCron');
 const { sendMorningAttendanceReport, sendAfternoonAttendanceReport } = require('./teamsAttendanceNotificationService');
 
 // --- CONFIGURATION (from .env) ---
@@ -327,6 +329,14 @@ const startScheduledJobs = () => {
     
     // Auto-logout job (runs every 5 minutes)
     startAutoLogoutJob();
+    
+    // Onboarding reminder job (runs daily)
+    runOnboardingReminders();
+    setInterval(runOnboardingReminders, 24 * 60 * 60 * 1000);
+
+    // Employee document probation-end automation (runs daily)
+    runEmployeeDocumentProbationChecks();
+    setInterval(runEmployeeDocumentProbationChecks, 24 * 60 * 60 * 1000);
     
     // Half-day leave auto-conversion job (runs daily at 12:30 AM IST)
     startHalfDayConversionJob();

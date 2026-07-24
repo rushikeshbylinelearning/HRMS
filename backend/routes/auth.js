@@ -256,7 +256,10 @@ router.post('/login', loginGeofencingMiddleware, async (req, res) => {
                     endTime: user.shiftGroup.endTime,
                     duration: user.shiftGroup.durationHours,
                     paidBreak: user.shiftGroup.paidBreakMinutes,
-                } : null
+                } : null,
+                // Include onboarding status so the frontend can decide the flow
+                // without an extra API call on first login.
+                onboarding: user.onboarding || {}
             }
         });
 
@@ -510,7 +513,8 @@ router.get('/me', async (req, res) => {
                 endTime: user.shiftGroup.endTime,
                 duration: user.shiftGroup.durationHours,
                 paidBreak: user.shiftGroup.paidBreakMinutes,
-            } : null
+            } : null,
+            onboarding: user.onboarding || {}
         };
 
         // Cache the user data

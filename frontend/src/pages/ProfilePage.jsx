@@ -7,7 +7,8 @@ import ProfileMain from '../components/Profile/ProfileMain';
 import ProfilePolicies from '../components/Profile/ProfilePolicies';
 import ProfileSidebar from '../components/Profile/ProfileSidebar';
 import CustomPdfViewer from '../components/CustomPdfViewer';
-import { getApiUrl } from '../utils/apiBaseUrl';
+import ProfileCompletionBanner from '../components/onboarding/ProfileCompletionBanner';
+import { useOnboarding } from '../context/OnboardingContext';
 import '../styles/ProfilePage.css';
 
 /**
@@ -19,6 +20,7 @@ import '../styles/ProfilePage.css';
 
 const ProfilePage = () => {
     const { user, refreshUserData } = useAuth();
+    const { showProfilePrompt, completeProfile, STEP, step } = useOnboarding();
     const [searchParams, setSearchParams] = useSearchParams();
     const [formData, setFormData] = useState({
         // Personal
@@ -28,6 +30,7 @@ const ProfilePage = () => {
         alternatePhone: '', personalEmail: '',
         // Address
         addressFlat: '', addressArea: '', addressCity: '', addressState: '', addressPincode: '',
+        marriageDate: '', interests: '', hobbies: '',
         // Emergency contact
         emergencyContactName: '', emergencyContactNumber: '', emergencyContactCountryCode: '+91',
         emergencyContactRelationship: '', emergencyContactEmail: '',
@@ -39,8 +42,11 @@ const ProfilePage = () => {
     const [saving, setSaving] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [policies, setPolicies] = useState([]);
+    const [documents, setDocuments] = useState([]);
     const [selectedPolicy, setSelectedPolicy] = useState(null);
     const [policyModalOpen, setPolicyModalOpen] = useState(false);
+    const [documentCenterOpen, setDocumentCenterOpen] = useState(false);
+    const [initialDocumentId, setInitialDocumentId] = useState(null);
     
     // ROOT CAUSE FIX: Track if initial layout has been rendered
     const layoutLocked = useRef(false);
@@ -71,6 +77,9 @@ const ProfilePage = () => {
                 addressCity:    user.personalDetails?.address?.city    || '',
                 addressState:   user.personalDetails?.address?.state   || '',
                 addressPincode: user.personalDetails?.address?.pincode || '',
+                marriageDate:   user.personalDetails?.marriageDate   || '',
+                interests:      user.personalDetails?.interests      || '',
+                hobbies:        user.personalDetails?.hobbies        || '',
                 // Emergency contact
                 emergencyContactName:         user.personalDetails?.emergencyContactName         || '',
                 emergencyContactNumber:       user.personalDetails?.emergencyContactNumber       || '',
@@ -90,21 +99,33 @@ const ProfilePage = () => {
 
             // Load policies asynchronously WITHOUT affecting layout
             try {
-                const { data } = await api.get('/policies-gridfs');
-                setPolicies(data.policies || []);
+                const [policiesRes, docsRes] = await Promise.all([
+                    api.get('/policies-gridfs'),
+                    api.get('/employee-documents/mine').catch(() => ({ data: { documents: [] } })),
+                ]);
+                setPolicies(policiesRes.data.policies || []);
+                setDocuments(docsRes.data.documents || []);
                 
                 // Check if we need to open a specific policy from URL params
                 const section = searchParams.get('section');
                 const policyId = searchParams.get('policyId');
+                const documentId = searchParams.get('documentId');
                 
-                if (section === 'policies' && policyId && data.policies) {
-                    const policy = data.policies.find(p => p._id === policyId);
+                if (section === 'policies' && policyId && policiesRes.data.policies) {
+                    const policy = policiesRes.data.policies.find(p => p._id === policyId);
                     if (policy) {
                         setSelectedPolicy(policy);
                         setPolicyModalOpen(true);
-                        // Clear the URL params after opening
                         setSearchParams({});
                     }
+                } else if (section === 'documents' && documentId) {
+                    setInitialDocumentId(documentId);
+                    setDocumentCenterOpen(true);
+                    setSearchParams({});
+                } else if (section === 'documents') {
+                    setInitialDocumentId(null);
+                    setDocumentCenterOpen(true);
+                    setSearchParams({});
                 } else if (section === 'policies') {
                     // Just scroll to policies section if no specific policy
                     setTimeout(() => {
@@ -183,6 +204,9 @@ const ProfilePage = () => {
             addressCity:    user.personalDetails?.address?.city    || '',
             addressState:   user.personalDetails?.address?.state   || '',
             addressPincode: user.personalDetails?.address?.pincode || '',
+            marriageDate:   user.personalDetails?.marriageDate   || '',
+            interests:      user.personalDetails?.interests      || '',
+            hobbies:        user.personalDetails?.hobbies        || '',
             emergencyContactName:         user.personalDetails?.emergencyContactName         || '',
             emergencyContactNumber:       user.personalDetails?.emergencyContactNumber       || '',
             emergencyContactCountryCode:  user.personalDetails?.emergencyContactCountryCode  || '+91',
@@ -224,6 +248,9 @@ const ProfilePage = () => {
                     emergencyContactCountryCode:  formData.emergencyContactCountryCode,
                     emergencyContactRelationship: formData.emergencyContactRelationship,
                     emergencyContactEmail:        formData.emergencyContactEmail,
+                    marriageDate: formData.marriageDate,
+                    interests:    formData.interests,
+                    hobbies:      formData.hobbies,
                 },
                 identityDetails: {
                     aadhaarNumber:   formData.aadhaarNumber,
@@ -240,11 +267,26 @@ const ProfilePage = () => {
             await api.put('/user/update-profile', payload);
             await refreshUserData();
             setSnackbar({ open: true, severity: 'success', message: 'Profile updated successfully!' });
+
+            // Onboarding completes only after all required profile fields are saved
+            if (step === STEP?.PROFILE) {
+                const { data: onboardingStatus } = await api.get('/onboarding/status');
+                if (onboardingStatus.profileCompleted) {
+                    const result = await completeProfile();
+                    if (result?.success === false) {
+                        setSnackbar({
+                            open: true,
+                            severity: 'error',
+                            message: result.error || 'Complete all required profile fields to finish onboarding.',
+                        });
+                    }
+                }
+            }
         } catch (e) {
             setSnackbar({ open: true, severity: 'error', message: 'Failed to save profile.' });
         }
         setSaving(false);
-    }, [formData, refreshUserData]);
+    }, [formData, refreshUserData, step, STEP, completeProfile]);
 
     const handleFieldChange = useCallback((field, value) => {
         // ROOT CAUSE FIX: Prevent layout mutations during form updates
@@ -263,16 +305,27 @@ const ProfilePage = () => {
         setSelectedPolicy(null);
     }, []);
 
+    const loadDocuments = useCallback(async () => {
+        try {
+            const { data } = await api.get('/employee-documents/mine');
+            setDocuments(data.documents || []);
+            return data.documents || [];
+        } catch (e) {
+            console.error('Failed to load documents:', e);
+            return [];
+        }
+    }, []);
+
+    const handleCloseDocumentCenter = useCallback(() => {
+        setDocumentCenterOpen(false);
+        setInitialDocumentId(null);
+    }, []);
     const getPdfUrl = (policy) => {
         if (!policy?._id) return '';
         
-        // NEW: Use GridFS endpoint with policy ID
-        // This endpoint requires JWT authentication via Authorization header
-        if (import.meta.env.DEV) {
-            return `/api/policies-gridfs/${policy._id}/file`;
-        }
-
-        return getApiUrl(`/api/policies-gridfs/${policy._id}/file`);
+        // Relative to the api axios baseURL (/api).
+        // Do NOT include /api prefix here; the axios instance already has it as baseURL.
+        return `/policies-gridfs/${policy._id}/file`;
     };
 
     // ROOT CAUSE FIX: Memoize sidebar to prevent re-renders
@@ -282,11 +335,25 @@ const ProfilePage = () => {
 
     // ROOT CAUSE FIX: Memoize policies to prevent re-renders
     const memoizedPolicies = useMemo(() => (
-        <ProfilePolicies policies={policies} onPolicyClick={handlePolicyClick} />
-    ), [policies, handlePolicyClick]);
+        <ProfilePolicies
+            policies={policies}
+            onPolicyClick={handlePolicyClick}
+            documents={documents}
+            documentCenterOpen={documentCenterOpen}
+            initialDocumentId={initialDocumentId}
+            onDocumentCenterClose={handleCloseDocumentCenter}
+            onDocumentsUpdated={loadDocuments}
+        />
+    ), [policies, documents, documentCenterOpen, initialDocumentId, handlePolicyClick, handleCloseDocumentCenter, loadDocuments]);
 
     return (
         <div className="profile-page">
+            {/* Onboarding: show profile completion banner when in onboarding PROFILE step */}
+            {showProfilePrompt && (
+                <div style={{ padding: '0 0 8px 0' }}>
+                    <ProfileCompletionBanner />
+                </div>
+            )}
             <div className="profile-container">
                 {memoizedSidebar}
                 <ProfileMain 
@@ -310,9 +377,9 @@ const ProfilePage = () => {
             {policyModalOpen && selectedPolicy && (
                 <CustomPdfViewer
                     pdfUrl={getPdfUrl(selectedPolicy)}
-                    title={selectedPolicy.title || 'Leave Policies'}
-                    version={selectedPolicy.version || '1.3'}
-                    effectiveDate={selectedPolicy.effectiveDate}
+                    title={selectedPolicy.name || 'Company Policy'}
+                    version={selectedPolicy.version || '1.0'}
+                    effectiveDate={selectedPolicy.effectiveFrom}
                     onClose={handleClosePolicyModal}
                 />
             )}
