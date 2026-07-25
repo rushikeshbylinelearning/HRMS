@@ -191321,3 +191321,36 @@
   message: 'Request',
   timestamp: '2026-07-25 14:12:55'
 }
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784971744895',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-25 14:59:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784972566702',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-25 15:12:46'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/active?_t=1784972590386',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-07-25 15:13:10'
+}
