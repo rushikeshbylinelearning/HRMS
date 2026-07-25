@@ -64,6 +64,12 @@ const employeeDocumentSchema = new mongoose.Schema({
 
     note: { type: String, default: '' },
 
+    // Template provenance — set when the document was generated from a DocumentTemplate.
+    // These fields are immutable after creation so re-opening old records always shows
+    // which template version was used, even if the template has since been updated.
+    templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'DocumentTemplate', default: null },
+    templateVersion: { type: Number, default: null },
+
     status: {
         type: String,
         enum: ['pending', 'viewed', 'acknowledged', 'hr_pending'],

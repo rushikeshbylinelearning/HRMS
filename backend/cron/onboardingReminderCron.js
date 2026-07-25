@@ -7,6 +7,10 @@ const User = require('../models/User');
 const PolicyAcceptanceLog = require('../models/PolicyAcceptanceLog');
 const NewNotificationService = require('../services/NewNotificationService');
 
+const ONBOARDING_FEATURE_START_DATE = new Date(
+    process.env.ONBOARDING_FEATURE_START_DATE || '2026-07-24T00:00:00+05:30'
+);
+
 /**
  * Run this cron daily (e.g., every day at 09:00 IST from cronService.js)
  */
@@ -15,13 +19,18 @@ async function runOnboardingReminders() {
     const now = new Date();
 
     try {
-        // Find all users who are in onboarding but haven't completed profile
+        // Only remind employees created after the onboarding feature (or admin-forced).
+        // Pre-feature users who were wrongly enrolled must not keep getting nagged.
         const users = await User.find({
             'onboarding.firstLoginCompleted': true,
             'onboarding.completed': false,
             'onboarding.profileCompleted': false,
-            'onboarding.profileCompletionDeadline': { $exists: true, $ne: null }
-        }).select('_id fullName onboarding').lean();
+            'onboarding.profileCompletionDeadline': { $exists: true, $ne: null },
+            $or: [
+                { createdAt: { $gte: ONBOARDING_FEATURE_START_DATE } },
+                { 'onboarding.forcedOnboardingBy': { $ne: null } },
+            ],
+        }).select('_id fullName onboarding createdAt').lean();
 
         console.log(`[OnboardingCron] Found ${users.length} users with pending profile completion.`);
 

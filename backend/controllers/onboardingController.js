@@ -11,6 +11,38 @@ const mongoose = require('mongoose');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Cutoff for mandatory onboarding / policy acknowledgement.
+ * Only employees created on or after this date are auto-enrolled.
+ * Pre-existing employees are grandfathered out (unless an admin forces onboarding).
+ * Override with ONBOARDING_FEATURE_START_DATE (ISO string) if needed.
+ */
+const ONBOARDING_FEATURE_START_DATE = new Date(
+    process.env.ONBOARDING_FEATURE_START_DATE || '2026-07-24T00:00:00+05:30'
+);
+
+/**
+ * True when this user should go through onboarding acknowledgement.
+ * - Admin-forced users always qualify
+ * - Otherwise only accounts created on/after the feature start date
+ */
+function isEligibleForOnboarding(user) {
+    if (user?.onboarding?.forcedOnboardingBy) return true;
+
+    const createdAt = user?.createdAt ? new Date(user.createdAt) : null;
+    if (createdAt && !Number.isNaN(createdAt.getTime())) {
+        return createdAt >= ONBOARDING_FEATURE_START_DATE;
+    }
+
+    // Fallback when createdAt is missing (should be rare with timestamps: true)
+    const joiningDate = user?.joiningDate ? new Date(user.joiningDate) : null;
+    if (joiningDate && !Number.isNaN(joiningDate.getTime())) {
+        return joiningDate >= ONBOARDING_FEATURE_START_DATE;
+    }
+
+    return false;
+}
+
 /** Parse UA string into a human-readable device / browser summary. */
 function parseUA(ua = '') {
     let device = 'Desktop';
@@ -95,7 +127,7 @@ exports.getOnboardingStatus = async (req, res) => {
         const userId = req.user.userId;
 
         const user = await User.findById(userId)
-            .select('onboarding fullName employeeCode department joiningDate personalDetails identityDetails')
+            .select('onboarding fullName employeeCode department joiningDate createdAt personalDetails identityDetails')
             .lean();
 
         if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -113,17 +145,10 @@ exports.getOnboardingStatus = async (req, res) => {
 
         const profileEval = evaluateProfileCompletion(user);
 
-        // Determine if this user has been enrolled in the onboarding flow.
-        // Existing employees have the onboarding sub-document but with all defaults
-        // (Mongoose materialises embedded schema defaults for every record).
-        // profileCompletionDeadline is only set when recordFirstLogin() runs — it
-        // stays null for all pre-existing employees who were never enrolled.
-        const ob = user.onboarding || {};
-        const isNewOnboardingEmployee = !!(
-            ob.profileCompletionDeadline ||
-            ob.firstLoginCompleted ||
-            ob.forcedOnboardingBy
-        );
+        // Only employees created after the onboarding feature (or admin-forced)
+        // should see the acknowledgement — enrollment flags alone are not enough,
+        // because pre-feature users may have been wrongly enrolled earlier.
+        const isNewOnboardingEmployee = isEligibleForOnboarding(user);
 
         return res.json({
             onboarding: user.onboarding || {},
@@ -153,6 +178,15 @@ exports.recordFirstLogin = async (req, res) => {
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        // Pre-feature employees must never be enrolled (unless admin-forced).
+        if (!isEligibleForOnboarding(user)) {
+            return res.json({
+                message: 'Onboarding not required for this employee.',
+                onboarding: user.onboarding || {},
+                isNewOnboardingEmployee: false,
+            });
+        }
 
         // Idempotent — if already done, just return current state
         if (user.onboarding?.firstLoginCompleted) {

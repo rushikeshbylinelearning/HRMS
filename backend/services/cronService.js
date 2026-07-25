@@ -11,7 +11,8 @@ const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
 const { executeLeaveAccrual } = require('../cron/leaveAccrualCron');
 const { runOnboardingReminders } = require('../cron/onboardingReminderCron');
-const { runEmployeeDocumentProbationChecks } = require('../cron/employeeDocumentCron');
+// NOTE: Employee document probation-end auto-assignment has been removed.
+// Documents are only created by explicit admin action via the Assign Document flow.
 const { sendMorningAttendanceReport, sendAfternoonAttendanceReport } = require('./teamsAttendanceNotificationService');
 
 // --- CONFIGURATION (from .env) ---
@@ -334,9 +335,8 @@ const startScheduledJobs = () => {
     runOnboardingReminders();
     setInterval(runOnboardingReminders, 24 * 60 * 60 * 1000);
 
-    // Employee document probation-end automation (runs daily)
-    runEmployeeDocumentProbationChecks();
-    setInterval(runEmployeeDocumentProbationChecks, 24 * 60 * 60 * 1000);
+    // Employee document probation-end automation has been removed.
+    // All document assignment is now explicit admin action only.
     
     // Half-day leave auto-conversion job (runs daily at 12:30 AM IST)
     startHalfDayConversionJob();

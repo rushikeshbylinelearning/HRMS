@@ -13,12 +13,17 @@ import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlin
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
-import AutoModeOutlinedIcon from '@mui/icons-material/AutoModeOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import api from '../../api/axios';
+import DocumentTemplateEditorDialog from './DocumentTemplateEditorDialog';
+import TemplateAssignDialog from './TemplateAssignDialog';
+
+// The 4 built-in types that use templates
+const BUILT_IN_KEYS = ['joining_letter', 'kra', 'probation_confirmation', 'probation_extension'];
 
 const sectionCardSx = {
     background: '#fff',
@@ -199,7 +204,6 @@ const ChangeStatusDialog = ({ open, onClose, employee, onSuccess }) => {
 
 const EmployeeDocumentsDashboard = () => {
     const [types, setTypes] = useState([]);
-    const [autoRule, setAutoRule] = useState({ enabled: true, outcome: 'pending_hr_decision' });
     const [records, setRecords] = useState([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -207,6 +211,13 @@ const EmployeeDocumentsDashboard = () => {
     const [filters, setFilters] = useState({ status: '', department: '', documentType: '' });
     const [snack, setSnack] = useState('');
 
+    // Template editor / assign dialogs for built-in types
+    const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+    const [templateEditorType, setTemplateEditorType] = useState('');
+    const [templateAssignOpen, setTemplateAssignOpen] = useState(false);
+    const [templateAssignType, setTemplateAssignType] = useState('');
+
+    // Custom (non-built-in) direct-upload assign
     const [employees, setEmployees] = useState([]);
     const [selectedEmployees, setSelectedEmployees] = useState([]);
     const [assignType, setAssignType] = useState('');
@@ -218,7 +229,6 @@ const EmployeeDocumentsDashboard = () => {
 
     const [newTypeLabel, setNewTypeLabel] = useState('');
     const [savingTypes, setSavingTypes] = useState(false);
-    const [savingRule, setSavingRule] = useState(false);
 
     const [statusDialog, setStatusDialog] = useState({ open: false, employee: null });
 
@@ -226,15 +236,6 @@ const EmployeeDocumentsDashboard = () => {
         try {
             const { data } = await api.get('/employee-documents/types');
             setTypes(data.types || []);
-        } catch (e) {
-            console.error(e);
-        }
-    }, []);
-
-    const loadAutoRule = useCallback(async () => {
-        try {
-            const { data } = await api.get('/employee-documents/auto-rule');
-            setAutoRule(data.rule || { enabled: true, outcome: 'pending_hr_decision' });
         } catch (e) {
             console.error(e);
         }
@@ -268,9 +269,8 @@ const EmployeeDocumentsDashboard = () => {
 
     useEffect(() => {
         loadTypes();
-        loadAutoRule();
         loadEmployees();
-    }, [loadTypes, loadAutoRule, loadEmployees]);
+    }, [loadTypes, loadEmployees]);
 
     useEffect(() => { loadRecords(); }, [loadRecords]);
 
@@ -291,20 +291,8 @@ const EmployeeDocumentsDashboard = () => {
         }
     };
 
-    const handleSaveAutoRule = async () => {
-        setSavingRule(true);
-        try {
-            const { data } = await api.put('/employee-documents/auto-rule', autoRule);
-            setAutoRule(data.rule);
-            setSnack('Automated rule saved.');
-        } catch (e) {
-            setSnack(e.response?.data?.error || 'Failed to save rule.');
-        } finally {
-            setSavingRule(false);
-        }
-    };
-
-    const handleAssign = async () => {
+    // Direct PDF upload — only for custom (non-built-in) types
+    const handleAssignCustom = async () => {
         if (!selectedEmployees.length || !assignType || !assignFile) {
             setSnack('Select employee(s), document type, and upload a PDF.');
             return;
@@ -338,6 +326,9 @@ const EmployeeDocumentsDashboard = () => {
         }
     };
 
+    // Whether the currently selected assign type is a built-in (templated) type
+    const isBuiltInAssignType = BUILT_IN_KEYS.includes(assignType);
+
     const totalPages = Math.ceil(total / 25);
 
     return (
@@ -347,7 +338,7 @@ const EmployeeDocumentsDashboard = () => {
                     Employee Documents
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 640 }}>
-                    Manage document types, configure probation automation, assign letters, and track employee compliance.
+                    Manage document types, assign letters from templates, and track employee compliance.
                 </Typography>
             </Box>
 
@@ -357,28 +348,21 @@ const EmployeeDocumentsDashboard = () => {
                 </Alert>
             )}
 
-            {/* Configuration row */}
-            <Box sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-                gap: 2.5,
-                alignItems: 'stretch',
-            }}>
-                {/* Document Types */}
-                <Box sx={sectionCardSx}>
-                    <SectionHeader
-                        icon={<CategoryOutlinedIcon sx={{ fontSize: 20, color: '#6366f1' }} />}
-                        title="Document Types"
-                        description="Built-in and custom categories used when assigning employee documents."
-                    />
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, minHeight: 32 }}>
-                        {types.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                No document types configured.
-                            </Typography>
-                        ) : types.map((t) => (
+            {/* ── Document Types card ─────────────────────────────────── */}
+            <Box sx={sectionCardSx}>
+                <SectionHeader
+                    icon={<CategoryOutlinedIcon sx={{ fontSize: 20, color: '#6366f1' }} />}
+                    title="Document Types"
+                    description="Built-in types use templates. Click the settings icon to configure a template. Custom types use direct PDF upload."
+                />
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, minHeight: 32 }}>
+                    {types.length === 0 ? (
+                        <Typography variant="body2" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                            No document types configured.
+                        </Typography>
+                    ) : types.map((t) => (
+                        <Box key={t.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
                             <Chip
-                                key={t.key}
                                 label={t.label}
                                 size="small"
                                 variant="outlined"
@@ -390,107 +374,75 @@ const EmployeeDocumentsDashboard = () => {
                                     fontSize: '0.78rem',
                                 }}
                             />
-                        ))}
-                    </Box>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                        <TextField
-                            size="small"
-                            placeholder="New type name"
-                            value={newTypeLabel}
-                            onChange={(e) => setNewTypeLabel(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddCustomType()}
-                            sx={{ flex: 1 }}
-                        />
-                        <Button
-                            variant="outlined"
-                            startIcon={savingTypes ? <CircularProgress size={16} /> : <AddIcon />}
-                            onClick={handleAddCustomType}
-                            disabled={savingTypes || !newTypeLabel.trim()}
-                            sx={{ textTransform: 'none', whiteSpace: 'nowrap', borderColor: '#cbd5e1', color: '#475569' }}
-                        >
-                            Add Type
-                        </Button>
-                    </Stack>
+                            {t.isBuiltIn && BUILT_IN_KEYS.includes(t.key) && (
+                                <Tooltip title={`Manage template for ${t.label}`}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => { setTemplateEditorType(t.key); setTemplateEditorOpen(true); }}
+                                        sx={{ p: 0.25, color: '#6366f1', '&:hover': { background: '#eef2ff' } }}
+                                        aria-label={`Manage template for ${t.label}`}
+                                    >
+                                        <TuneOutlinedIcon sx={{ fontSize: 15 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Box>
+                    ))}
                 </Box>
-
-                {/* Automated Rule */}
-                <Box sx={sectionCardSx}>
-                    <SectionHeader
-                        icon={<AutoModeOutlinedIcon sx={{ fontSize: 20, color: '#6366f1' }} />}
-                        title="Automated Assignment"
-                        description="Trigger document workflows automatically when an employee's probation end date is reached."
-                    />
-                    <FormControlLabel
-                        sx={{ mb: 1.5, ml: 0, alignItems: 'flex-start' }}
-                        control={
-                            <Switch
-                                checked={!!autoRule.enabled}
-                                onChange={(e) => setAutoRule((r) => ({ ...r, enabled: e.target.checked }))}
-                                sx={{ mt: -0.25 }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 500 }}>
-                                Enable auto-trigger on probation end date
-                            </Typography>
-                        }
-                    />
-                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                        <InputLabel>Rule Outcome</InputLabel>
-                        <Select
-                            value={autoRule.outcome || 'pending_hr_decision'}
-                            label="Rule Outcome"
-                            onChange={(e) => setAutoRule((r) => ({ ...r, outcome: e.target.value }))}
-                            disabled={!autoRule.enabled}
-                        >
-                            <MenuItem value="pending_hr_decision">Pending HR decision (notify HR, no status change)</MenuItem>
-                            <MenuItem value="probation_confirmation">Auto-assign Probation Confirmation</MenuItem>
-                            <MenuItem value="probation_extension">Auto-assign Probation Extension</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <Button
-                        variant="contained"
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <TextField
                         size="small"
-                        onClick={handleSaveAutoRule}
-                        disabled={savingRule}
-                        sx={primaryBtnSx}
+                        placeholder="New custom type name"
+                        value={newTypeLabel}
+                        onChange={(e) => setNewTypeLabel(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddCustomType()}
+                        sx={{ flex: 1 }}
+                    />
+                    <Button
+                        variant="outlined"
+                        startIcon={savingTypes ? <CircularProgress size={16} /> : <AddIcon />}
+                        onClick={handleAddCustomType}
+                        disabled={savingTypes || !newTypeLabel.trim()}
+                        sx={{ textTransform: 'none', whiteSpace: 'nowrap', borderColor: '#cbd5e1', color: '#475569' }}
                     >
-                        {savingRule ? 'Saving…' : 'Save Rule'}
+                        Add Custom Type
                     </Button>
-                </Box>
+                </Stack>
             </Box>
 
-            {/* Manual Assign */}
+            {/* ── Assign Document card ─────────────────────────────────── */}
             <Box sx={sectionCardSx}>
                 <SectionHeader
                     icon={<AssignmentOutlinedIcon sx={{ fontSize: 20, color: '#6366f1' }} />}
                     title="Assign Document"
-                    description="Select employees, choose a document type, and upload a PDF to distribute."
+                    description="Select a document type. Built-in types generate from a template; custom types require a PDF upload."
                 />
-                <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    gap: 2,
-                }}>
-                    <Autocomplete
-                        multiple
-                        options={employees}
-                        getOptionLabel={(o) => `${o.fullName} (${o.employeeCode})`}
-                        value={selectedEmployees}
-                        onChange={(_, v) => setSelectedEmployees(v)}
-                        renderInput={(params) => <TextField {...params} label="Employees" size="small" placeholder="Search by name or code" />}
-                    />
+
+                {/* Step 1: pick type */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
                     <FormControl size="small">
                         <InputLabel>Document Type</InputLabel>
                         <Select
                             value={assignType}
                             label="Document Type"
-                            onChange={(e) => setAssignType(e.target.value)}
+                            onChange={(e) => {
+                                setAssignType(e.target.value);
+                                setSelectedEmployees([]);
+                                setAssignFile(null);
+                                setCustomTypeLabel('');
+                            }}
                         >
                             {types.map((t) => (
-                                <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
+                                <MenuItem key={t.key} value={t.key}>
+                                    {t.label}
+                                    {t.isBuiltIn && (
+                                        <Typography component="span" variant="caption" sx={{ ml: 1, color: '#6366f1' }}>
+                                            (template)
+                                        </Typography>
+                                    )}
+                                </MenuItem>
                             ))}
-                            <MenuItem value="custom">Custom</MenuItem>
+                            <MenuItem value="custom">Custom (manual label)</MenuItem>
                         </Select>
                     </FormControl>
                     {assignType === 'custom' && (
@@ -501,14 +453,46 @@ const EmployeeDocumentsDashboard = () => {
                             onChange={(e) => setCustomTypeLabel(e.target.value)}
                         />
                     )}
-                    <TextField
-                        size="small"
-                        label="Note"
-                        placeholder="Optional internal note"
-                        value={assignNote}
-                        onChange={(e) => setAssignNote(e.target.value)}
-                    />
-                    <Box sx={{ gridColumn: { md: '1 / -1' } }}>
+                </Box>
+
+                {/* Built-in type → open template assign dialog */}
+                {isBuiltInAssignType && (
+                    <Box>
+                        <Alert severity="info" sx={{ mb: 2, borderRadius: 2, fontSize: '0.8rem' }}>
+                            This is a <strong>templated document type</strong>. Fields will be auto-filled from the
+                            employee profile. You can override any field and optionally add notes before the PDF is generated.
+                        </Alert>
+                        <Button
+                            variant="contained"
+                            startIcon={<AssignmentOutlinedIcon />}
+                            onClick={() => { setTemplateAssignType(assignType); setTemplateAssignOpen(true); }}
+                            sx={primaryBtnSx}
+                        >
+                            Open Assign Form
+                        </Button>
+                    </Box>
+                )}
+
+                {/* Custom / non-built-in → direct PDF upload (unchanged) */}
+                {assignType && !isBuiltInAssignType && (
+                    <Stack spacing={2}>
+                        <Autocomplete
+                            multiple
+                            options={employees}
+                            getOptionLabel={(o) => `${o.fullName} (${o.employeeCode})`}
+                            value={selectedEmployees}
+                            onChange={(_, v) => setSelectedEmployees(v)}
+                            renderInput={(params) => (
+                                <TextField {...params} label="Employees" size="small" placeholder="Search by name or code" />
+                            )}
+                        />
+                        <TextField
+                            size="small"
+                            label="Note"
+                            placeholder="Optional internal note"
+                            value={assignNote}
+                            onChange={(e) => setAssignNote(e.target.value)}
+                        />
                         <Button
                             variant="outlined"
                             component="label"
@@ -521,11 +505,7 @@ const EmployeeDocumentsDashboard = () => {
                                 borderColor: assignFile ? '#6366f1' : '#cbd5e1',
                                 color: assignFile ? '#4338ca' : '#64748b',
                                 background: assignFile ? '#f5f3ff' : '#fafafa',
-                                '&:hover': {
-                                    borderStyle: 'dashed',
-                                    borderColor: '#6366f1',
-                                    background: '#f5f3ff',
-                                },
+                                '&:hover': { borderStyle: 'dashed', borderColor: '#6366f1', background: '#f5f3ff' },
                             }}
                         >
                             {assignFile ? assignFile.name : 'Choose PDF file to upload'}
@@ -536,36 +516,36 @@ const EmployeeDocumentsDashboard = () => {
                                 onChange={(e) => setAssignFile(e.target.files?.[0] || null)}
                             />
                         </Button>
-                    </Box>
-                    <FormControlLabel
-                        sx={{ ml: 0 }}
-                        control={
-                            <Switch
-                                checked={requiresAck}
-                                onChange={(e) => setRequiresAck(e.target.checked)}
-                                size="small"
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" sx={{ color: '#475569' }}>
-                                Require employee acknowledgment
-                            </Typography>
-                        }
-                    />
-                </Box>
-                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                        variant="contained"
-                        onClick={handleAssign}
-                        disabled={assigning || !selectedEmployees.length || !assignType || !assignFile}
-                        sx={primaryBtnSx}
-                    >
-                        {assigning ? 'Assigning…' : 'Assign Document'}
-                    </Button>
-                </Box>
+                        <FormControlLabel
+                            sx={{ ml: 0 }}
+                            control={
+                                <Switch
+                                    checked={requiresAck}
+                                    onChange={(e) => setRequiresAck(e.target.checked)}
+                                    size="small"
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" sx={{ color: '#475569' }}>
+                                    Require employee acknowledgment
+                                </Typography>
+                            }
+                        />
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="contained"
+                                onClick={handleAssignCustom}
+                                disabled={assigning || !selectedEmployees.length || !assignType || !assignFile}
+                                sx={primaryBtnSx}
+                            >
+                                {assigning ? 'Assigning…' : 'Assign Document'}
+                            </Button>
+                        </Box>
+                    </Stack>
+                )}
             </Box>
 
-            {/* Compliance Table */}
+            {/* ── Compliance Table ─────────────────────────────────────── */}
             <Box sx={sectionCardSx}>
                 <Box sx={{
                     display: 'flex',
@@ -680,6 +660,11 @@ const EmployeeDocumentsDashboard = () => {
                                     </TableCell>
                                     <TableCell sx={{ fontSize: '0.8125rem', color: '#334155' }}>
                                         {r.documentTypeLabel}
+                                        {r.templateVersion != null && (
+                                            <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
+                                                template v{r.templateVersion}
+                                            </Typography>
+                                        )}
                                     </TableCell>
                                     <TableCell sx={{ color: '#64748b', fontSize: '0.8125rem' }}>
                                         {r.assignedAt ? new Date(r.assignedAt).toLocaleDateString('en-IN') : '—'}
@@ -755,6 +740,23 @@ const EmployeeDocumentsDashboard = () => {
                     </Box>
                 )}
             </Box>
+
+            {/* ── Template editor ──────────────────────────────────── */}
+            <DocumentTemplateEditorDialog
+                open={templateEditorOpen}
+                onClose={() => setTemplateEditorOpen(false)}
+                documentType={templateEditorType}
+                onSaved={() => setSnack('Template saved successfully.')}
+            />
+
+            {/* ── Template-based assign ────────────────────────────── */}
+            <TemplateAssignDialog
+                open={templateAssignOpen}
+                onClose={() => setTemplateAssignOpen(false)}
+                documentType={templateAssignType}
+                employees={employees}
+                onAssigned={() => { setSnack('Document(s) assigned successfully.'); loadRecords(); }}
+            />
 
             <ChangeStatusDialog
                 open={statusDialog.open}

@@ -35,22 +35,10 @@ export const OnboardingProvider = ({ children }) => {
 
     // Determine which step the user is at based on their onboarding object.
     // This is purely derived — never stores its own copy of user data.
+    // Caller must only invoke this for employees eligible for onboarding
+    // (created after the feature start date, or admin-forced).
     const computeStep = useCallback((onboarding, policy) => {
-        if (!onboarding) return STEP.DONE; // Existing employees with no onboarding object — skip
-
-        // Existing employees have the onboarding sub-document with all defaults
-        // (completed: false, firstLoginCompleted: false, etc.) because Mongoose
-        // materialises embedded schema defaults for every document, even those
-        // created before the onboarding feature existed.
-        //
-        // The ONLY reliable signal that this user has actually been enrolled in the
-        // onboarding flow is profileCompletionDeadline — it stays null until
-        // recordFirstLogin() runs (or an admin forces the flow).
-        // If it's null AND firstLoginCompleted is still false, this is a pre-existing
-        // employee who should never see the onboarding UI.
-        if (!onboarding.profileCompletionDeadline && !onboarding.firstLoginCompleted) {
-            return STEP.DONE; // Pre-existing employee — skip onboarding entirely
-        }
+        if (!onboarding) return STEP.DONE;
 
         if (onboarding.completed) return STEP.DONE;
 
@@ -77,17 +65,33 @@ export const OnboardingProvider = ({ children }) => {
         try {
             const { data } = await api.get('/onboarding/status');
             setMandatoryPolicy(data.mandatoryPolicy || null);
-            
-            // If the backend says this user was never enrolled in onboarding
-            // (pre-existing employee), skip the flow entirely.
+
+            // Pre-feature / non-eligible employees never see acknowledgement,
+            // even if they were wrongly enrolled earlier.
             if (!data.isNewOnboardingEmployee) {
                 setStep(STEP.DONE);
                 return;
             }
 
-            const ob = data.onboarding || user.onboarding || {};
-            const computed = computeStep(ob, data.mandatoryPolicy);
-            setStep(computed);
+            let ob = data.onboarding || user.onboarding || {};
+
+            // Eligible new employee — enroll on first login if not yet recorded
+            if (!ob.firstLoginCompleted && !firstLoginApiCalled.current) {
+                firstLoginApiCalled.current = true;
+                try {
+                    const { data: fl } = await api.post('/onboarding/first-login');
+                    if (fl.isNewOnboardingEmployee === false) {
+                        setStep(STEP.DONE);
+                        return;
+                    }
+                    ob = fl.onboarding || ob;
+                    updateUserContext({ onboarding: ob });
+                } catch (e) {
+                    console.error('[Onboarding] recordFirstLogin failed:', e.message);
+                }
+            }
+
+            setStep(computeStep(ob, data.mandatoryPolicy));
         } catch (e) {
             console.error('[Onboarding] Failed to load status:', e.message);
             // On error, don't block the user — let them proceed normally
@@ -95,7 +99,7 @@ export const OnboardingProvider = ({ children }) => {
         } finally {
             setStatusLoaded(true);
         }
-    }, [user, authStatus, computeStep]);
+    }, [user, authStatus, computeStep, updateUserContext]);
 
     // When auth becomes authenticated, load status once
     useEffect(() => {
@@ -109,17 +113,23 @@ export const OnboardingProvider = ({ children }) => {
         }
     }, [authStatus, user, statusLoaded, loadStatus]);
 
-    // Record first login (idempotent — backend handles duplicates)
+    // Record first login (idempotent — backend handles duplicates).
+    // Prefer enrollment via loadStatus; this remains for orchestrator fallback.
     const recordFirstLogin = useCallback(async () => {
         if (firstLoginApiCalled.current) return;
         firstLoginApiCalled.current = true;
         try {
             const { data } = await api.post('/onboarding/first-login');
+            if (data.isNewOnboardingEmployee === false) {
+                setStep(STEP.DONE);
+                return;
+            }
             updateUserContext({ onboarding: data.onboarding });
+            setStep(computeStep(data.onboarding, mandatoryPolicy));
         } catch (e) {
             console.error('[Onboarding] recordFirstLogin failed:', e.message);
         }
-    }, [updateUserContext]);
+    }, [updateUserContext, computeStep, mandatoryPolicy]);
 
     // Called when employee starts reading the policy
     const recordReadingStart = useCallback(async () => {

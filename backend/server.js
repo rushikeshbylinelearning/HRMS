@@ -49,6 +49,7 @@ require('./models/EmployeeResourceRequest');
 require('./models/RefreshToken');
 require('./models/PolicyAcceptanceLog');
 require('./models/EmployeeDocument');
+require('./models/DocumentTemplate');
 
 // Route Imports
 const authRoutes = require('./routes/auth');

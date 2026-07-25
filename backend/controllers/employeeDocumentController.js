@@ -341,7 +341,8 @@ exports.getAdminCompliance = async (req, res) => {
 
 exports.getMyDocuments = async (req, res) => {
     try {
-        await exports.runProbationEndChecksForUser(req.user.userId);
+        // Auto-trigger removed: documents are only created by explicit admin action.
+        // Previously called runProbationEndChecksForUser here — that path is now disabled.
 
         const docs = await EmployeeDocument.find({ employeeId: req.user.userId })
             .sort({ assignedAt: -1 })

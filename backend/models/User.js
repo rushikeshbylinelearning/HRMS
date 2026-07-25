@@ -88,7 +88,8 @@ const userSchema = new mongoose.Schema({
   
   // --- ONBOARDING & COMPLIANCE FIELDS ---
   // These fields are permanent for audit purposes and must never be deleted.
-  // Existing employees remain unaffected (all fields default to their current state).
+  // Auto-enrollment applies only to users created on/after ONBOARDING_FEATURE_START_DATE
+  // (see onboardingController). Pre-feature employees are skipped unless admin-forced.
   onboarding: {
     // True once the entire onboarding sequence is fully completed
     completed: { type: Boolean, default: false },
