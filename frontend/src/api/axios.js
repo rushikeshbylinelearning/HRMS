@@ -17,6 +17,7 @@
 
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/apiBaseUrl';
+import { refreshAccessToken, isAuthBootstrapInProgress } from './authRefresh';
 
 const authErrorEvent = new Event('auth-error');
 
@@ -90,20 +91,7 @@ const processQueue = (error, token = null) => {
   refreshSubscribers = [];
 };
 
-/**
- * Attempt a silent token refresh.
- * The server reads the httpOnly refreshToken cookie automatically (withCredentials).
- * Returns the new accessToken string on success, throws on failure.
- */
-const silentRefresh = async () => {
-  // Use a plain axios instance so the response interceptor doesn't intercept
-  // the refresh call itself (no recursive 401 handling).
-  const refreshAxios = axios.create({ baseURL, withCredentials: true });
-  const response = await refreshAxios.post('/auth/refresh');
-  const newAccessToken = response.data.accessToken || response.data.token;
-  if (!newAccessToken) throw new Error('No access token in refresh response');
-  return newAccessToken;
-};
+const isAuthEndpoint = (url = '') => url.includes('/auth/refresh') || url.includes('/auth/me');
 
 /**
  * Trigger a clean logout: clear the in-memory header, clear legacy storage
@@ -150,9 +138,14 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // During initial auth restoration, let /api/auth/me 401 propagate naturally
-    // so AuthContext can set status = 'unauthenticated' cleanly.
-    if (window.__AUTH_RESTORING__ === true && originalRequest.url?.includes('/auth/me')) {
+    // Never intercept auth bootstrap endpoints — AuthContext owns session restore.
+    if (isAuthEndpoint(originalRequest.url)) {
+      return Promise.reject(error);
+    }
+
+    // During initial auth restoration, let 401s propagate so AuthContext can
+    // resolve to authenticated/unauthenticated without forcing a logout redirect.
+    if (isAuthBootstrapInProgress()) {
       return Promise.reject(error);
     }
 
@@ -188,7 +181,7 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const newAccessToken = await silentRefresh();
+      const newAccessToken = await refreshAccessToken();
 
       // Update the default header for all subsequent requests
       api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;

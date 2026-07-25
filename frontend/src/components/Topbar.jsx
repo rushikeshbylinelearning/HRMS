@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Menu, MenuItem, Tooltip, IconButton, Badge, useMediaQuery, useTheme } from '@mui/material';
-import { NotificationsNone as NotificationsNoneIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { NotificationsNone as NotificationsNoneIcon, Menu as MenuIcon, HelpOutline as HelpOutlineIcon } from '@mui/icons-material';
 import useNewNotifications from '../hooks/useNewNotifications';
 import UserAvatar from './common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
 import AnnouncementDropdown from './AnnouncementDropdown';
@@ -60,13 +60,23 @@ const Topbar = ({ onNotificationClick, onHamburgerClick }) => {
             </div>
             <div className="topbar-right">
                 <AnnouncementDropdown />
-                <IconButton className="topbar-icon-btn" onClick={onNotificationClick}>
+                <Tooltip title="Help & Support">
+                    <IconButton
+                        className="topbar-icon-btn"
+                        aria-label="Help and support"
+                        data-tour="topbar-help"
+                        sx={{ color: '#6b7280' }}
+                    >
+                        <HelpOutlineIcon />
+                    </IconButton>
+                </Tooltip>
+                <IconButton className="topbar-icon-btn" onClick={onNotificationClick} data-tour="notification-bell">
                     <Badge badgeContent={Number(unreadCount) || 0} color="error" max={99}>
                         <NotificationsNoneIcon />
                     </Badge>
                 </IconButton>
                 <Tooltip title="Account">
-                    <IconButton onClick={handleMenu} sx={{ p: 0 }}>
+                    <IconButton onClick={handleMenu} sx={{ p: 0 }} data-tour="sidebar-profile">
                         <UserAvatar 
                             user={user}
                             size="sm"

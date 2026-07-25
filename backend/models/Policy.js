@@ -47,6 +47,20 @@ const policySchema = new mongoose.Schema({
     replacedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Policy'
+    },
+    // Onboarding / compliance flags
+    isMandatoryOnboarding: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    onboardingExpiryDays: {
+        type: Number,
+        default: 7  // induction popup hidden after this many days
+    },
+    wordCount: {
+        type: Number,
+        default: null // set by admin or auto-computed on upload
     }
 }, {
     timestamps: true

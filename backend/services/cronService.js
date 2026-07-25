@@ -10,6 +10,9 @@ const { checkAndSendWeeklyLateWarnings } = require('./analyticsEmailService');
 const { checkAndAutoLogout } = require('./autoLogoutService');
 const { getISTNow, startOfISTDay, parseISTDate, getISTDateString, getISTDateParts } = require('../utils/istTime');
 const { executeLeaveAccrual } = require('../cron/leaveAccrualCron');
+const { runOnboardingReminders } = require('../cron/onboardingReminderCron');
+// NOTE: Employee document probation-end auto-assignment has been removed.
+// Documents are only created by explicit admin action via the Assign Document flow.
 const { sendMorningAttendanceReport, sendAfternoonAttendanceReport } = require('./teamsAttendanceNotificationService');
 
 // --- CONFIGURATION (from .env) ---
@@ -327,6 +330,13 @@ const startScheduledJobs = () => {
     
     // Auto-logout job (runs every 5 minutes)
     startAutoLogoutJob();
+    
+    // Onboarding reminder job (runs daily)
+    runOnboardingReminders();
+    setInterval(runOnboardingReminders, 24 * 60 * 60 * 1000);
+
+    // Employee document probation-end automation has been removed.
+    // All document assignment is now explicit admin action only.
     
     // Half-day leave auto-conversion job (runs daily at 12:30 AM IST)
     startHalfDayConversionJob();

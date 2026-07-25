@@ -8,6 +8,7 @@ const { markTeaBreakEnded } = require('../services/teaBreakState');
 const {
   finalizeTeaBreakOnEnd,
   isEmployeeClockedIn,
+  isEmployeeEligibleForTeaBreak,
   computeTeaBreakTiming,
   buildTeaBreakActivePayload,
   TEA_BREAK_SAFETY_CUTOFF_MS,
@@ -46,6 +47,15 @@ router.get('/active', authenticateToken, async (req, res) => {
       const clockedIn = await isEmployeeClockedIn(req.user.userId);
       if (!clockedIn) {
         return res.json({ active: false, reason: 'not_clocked_in' });
+      }
+
+      const eligible = await isEmployeeEligibleForTeaBreak(
+        req.user.userId,
+        announcement.teaBreakStartedAt
+      );
+      if (!eligible) {
+        markTeaBreakEnded(announcement._id, req.user.userId);
+        return res.json({ active: false, reason: 'joined_after_allowance' });
       }
     }
 

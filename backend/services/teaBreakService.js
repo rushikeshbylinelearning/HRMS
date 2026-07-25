@@ -2,7 +2,7 @@ const AttendanceLog = require('../models/AttendanceLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const BreakLog = require('../models/BreakLog');
 const { getISTDateString, getISTNow } = require('../utils/istTime');
-const { hasTeaBreakEnded } = require('./teaBreakState');
+const { hasTeaBreakEnded, markTeaBreakEnded } = require('./teaBreakState');
 
 const TEA_BREAK_REASON_PREFIX = 'tea_break:';
 const TEA_BREAK_DURATION_MS = 10 * 60 * 1000;
@@ -22,6 +22,71 @@ function invalidateEmployeeCaches(employeeId, today) {
 
 function teaBreakReason(announcementId) {
   return `${TEA_BREAK_REASON_PREFIX}${announcementId}`;
+}
+
+function getTeaBreakAllowanceEnd(teaBreakStartedAt) {
+  return new Date(new Date(teaBreakStartedAt).getTime() + TEA_BREAK_DURATION_MS);
+}
+
+/**
+ * Tea break applies only if the employee's first check-in of the day was before the allowance end.
+ */
+function isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckInTime, teaBreakStartedAt) {
+  if (!firstCheckInTime || !teaBreakStartedAt) return false;
+  const allowanceEnd = getTeaBreakAllowanceEnd(teaBreakStartedAt);
+  return new Date(firstCheckInTime) < allowanceEnd;
+}
+
+async function getEmployeeFirstCheckInTime(employeeId, today = getISTDateString()) {
+  const log = await AttendanceLog.findOne({ user: employeeId, attendanceDate: today })
+    .select('_id clockInTime')
+    .lean();
+  if (!log) return null;
+
+  const firstSession = await AttendanceSession.findOne({ attendanceLog: log._id })
+    .sort({ startTime: 1 })
+    .select('startTime')
+    .lean();
+
+  if (firstSession?.startTime) return new Date(firstSession.startTime);
+  if (log.clockInTime) return new Date(log.clockInTime);
+  return null;
+}
+
+async function isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt) {
+  const firstCheckIn = await getEmployeeFirstCheckInTime(employeeId);
+  return isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt);
+}
+
+/**
+ * If the employee checked in after the tea break allowance ended, dismiss tea break for them
+ * so enforcement and UI do not treat them as participants.
+ */
+async function autoDismissTeaBreakIfIneligible(employeeId) {
+  const now = getISTNow();
+  const cutoff = new Date(now.getTime() - TEA_BREAK_SAFETY_CUTOFF_MS);
+  const AnnouncementMessage = require('../models/AnnouncementMessage');
+
+  const announcement = await AnnouncementMessage.findOne({
+    isTEABreak: true,
+    teaBreakStartedAt: { $gte: cutoff, $lte: now },
+    teaBreakStoppedAt: null,
+  })
+    .sort({ teaBreakStartedAt: -1 })
+    .select('_id teaBreakStartedAt')
+    .lean();
+
+  if (!announcement?.teaBreakStartedAt) return { dismissed: false };
+
+  if (hasTeaBreakEnded(announcement._id, employeeId)) {
+    return { dismissed: false, reason: 'already_ended' };
+  }
+
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, announcement.teaBreakStartedAt);
+  if (eligible) return { dismissed: false };
+
+  markTeaBreakEnded(announcement._id, employeeId);
+  return { dismissed: true, announcementId: announcement._id, reason: 'joined_after_allowance' };
 }
 
 /**
@@ -74,26 +139,66 @@ async function buildTeaBreakAttendanceContext(userIds) {
     attendanceDate: today,
     user: { $in: userIds },
   })
-    .select('user clockInTime clockOutTime')
+    .select('user clockInTime clockOutTime _id')
     .lean();
 
   const logMap = new Map(logs.map((l) => [String(l.user), l]));
   const clockedInNow = new Set(await getClockedInEmployeeIds());
 
-  return { logMap, clockedInNow };
+  const logIds = logs.map((l) => l._id);
+  const firstCheckInMap = new Map();
+
+  if (logIds.length > 0) {
+    const firstSessions = await AttendanceSession.aggregate([
+      { $match: { attendanceLog: { $in: logIds } } },
+      { $sort: { startTime: 1 } },
+      { $group: { _id: '$attendanceLog', startTime: { $first: '$startTime' } } },
+    ]);
+
+    const logIdToFirstSession = new Map(
+      firstSessions.map((s) => [String(s._id), s.startTime])
+    );
+
+    for (const log of logs) {
+      const userId = String(log.user);
+      const sessionStart = logIdToFirstSession.get(String(log._id));
+      const firstCheckIn = sessionStart || log.clockInTime || null;
+      if (firstCheckIn) {
+        firstCheckInMap.set(userId, new Date(firstCheckIn));
+      }
+    }
+  }
+
+  return { logMap, clockedInNow, firstCheckInMap };
 }
 
-function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow) {
+function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStartedAt, firstCheckInMap) {
   const id = String(userId);
   const log = logMap.get(id);
+  const firstCheckIn = firstCheckInMap?.get(id) ?? null;
 
   if (clockedInNow.has(id)) {
+    if (teaBreakStartedAt) {
+      if (!firstCheckIn) {
+        return 'not_checked_in';
+      }
+      if (!isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt)) {
+        return 'joined_after_allowance';
+      }
+    }
     return 'on_break';
   }
   if (!log?.clockInTime) {
     return 'not_checked_in';
   }
   if (log.clockOutTime) {
+    if (
+      teaBreakStartedAt &&
+      firstCheckIn &&
+      !isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt)
+    ) {
+      return 'joined_after_allowance';
+    }
     return 'clocked_out_open';
   }
   return 'not_checked_in';
@@ -102,8 +207,8 @@ function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow) {
 /**
  * Count-only variant for insights summaries (no user list payloads).
  */
-function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, attendanceContext) {
-  const { logMap, clockedInNow } = attendanceContext;
+function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, teaBreakStartedAt, attendanceContext) {
+  const { logMap, clockedInNow, firstCheckInMap } = attendanceContext;
   let onBreakCount = 0;
   let notApplicableCount = 0;
   let pendingCount = 0;
@@ -113,12 +218,18 @@ function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, attendanceContext)
     if (returnedIds.has(id)) continue;
 
     pendingCount += 1;
-    const status = resolveTeaBreakOpenStatus(userId, logMap, clockedInNow);
+    const status = resolveTeaBreakOpenStatus(
+      userId,
+      logMap,
+      clockedInNow,
+      teaBreakStartedAt,
+      firstCheckInMap
+    );
 
     if (status === 'on_break' || status === 'clocked_out_open') {
       onBreakCount += 1;
     }
-    if (status === 'not_checked_in') {
+    if (status === 'not_checked_in' || status === 'joined_after_allowance') {
       notApplicableCount += 1;
     }
   }
@@ -129,10 +240,15 @@ function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, attendanceContext)
 /**
  * Classify employees who have not formally closed the tea break.
  */
-async function classifyTeaBreakOpenUsers(eligibleUsers, returnedIds, attendanceContext = null) {
+async function classifyTeaBreakOpenUsers(
+  eligibleUsers,
+  returnedIds,
+  teaBreakStartedAt,
+  attendanceContext = null
+) {
   const userIds = eligibleUsers.map((u) => u._id);
   const context = attendanceContext || (await buildTeaBreakAttendanceContext(userIds));
-  const { logMap, clockedInNow } = context;
+  const { logMap, clockedInNow, firstCheckInMap } = context;
 
   const pending = [];
   const onBreak = [];
@@ -150,7 +266,13 @@ async function classifyTeaBreakOpenUsers(eligibleUsers, returnedIds, attendanceC
       department: u.department,
     };
 
-    const status = resolveTeaBreakOpenStatus(u._id, logMap, clockedInNow);
+    const status = resolveTeaBreakOpenStatus(
+      u._id,
+      logMap,
+      clockedInNow,
+      teaBreakStartedAt,
+      firstCheckInMap
+    );
 
     if (status === 'on_break') {
       const entry = {
@@ -165,6 +287,14 @@ async function classifyTeaBreakOpenUsers(eligibleUsers, returnedIds, attendanceC
         ...base,
         teaBreakStatus: 'not_checked_in',
         teaBreakStatusLabel: 'Not checked in — break does not apply',
+      };
+      notApplicable.push(entry);
+      pending.push(entry);
+    } else if (status === 'joined_after_allowance') {
+      const entry = {
+        ...base,
+        teaBreakStatus: 'joined_after_allowance',
+        teaBreakStatusLabel: 'Checked in after break window — not applicable',
       };
       notApplicable.push(entry);
       pending.push(entry);
@@ -234,6 +364,12 @@ async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementI
 
   if (hasTeaBreakEnded(announcementId, employeeId)) {
     return { applied: false, overrunMinutes: 0, skippedReason: 'already_ended' };
+  }
+
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt);
+  if (!eligible) {
+    markTeaBreakEnded(announcementId, employeeId);
+    return { applied: false, overrunMinutes: 0, skippedReason: 'joined_after_allowance' };
   }
 
   const overrunMinutes = computeOverrunMinutes(teaBreakStartedAt, now);
@@ -313,6 +449,11 @@ async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStarted
     return { overrunMinutes: 0 };
   }
 
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt);
+  if (!eligible) {
+    return { overrunMinutes: 0, skippedReason: 'joined_after_allowance' };
+  }
+
   const reason = teaBreakReason(announcementId);
   const existing = await BreakLog.findOne({
     attendanceLog: log._id,
@@ -367,7 +508,12 @@ async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStarted
 module.exports = {
   applyTeaBreakOverrun,
   finalizeTeaBreakOnEnd,
+  autoDismissTeaBreakIfIneligible,
   computeOverrunMinutes,
+  getTeaBreakAllowanceEnd,
+  isEmployeeEligibleForTeaBreak,
+  isEmployeeEligibleForTeaBreakByFirstCheckIn,
+  getEmployeeFirstCheckInTime,
   teaBreakReason,
   getClockedInEmployeeIds,
   isEmployeeClockedIn,

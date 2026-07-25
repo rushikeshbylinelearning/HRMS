@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
+import { useAuth } from './AuthContext';
 
 const ActiveYearContext = createContext();
 
 export const ActiveYearProvider = ({ children }) => {
+    const { authStatus } = useAuth();
     const [activeYear, setActiveYear] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const fetchActiveYear = useCallback(async () => {
@@ -30,8 +32,15 @@ export const ActiveYearProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
+        if (authStatus !== 'authenticated') {
+            setActiveYear(null);
+            setError(null);
+            setLoading(false);
+            return;
+        }
+
         fetchActiveYear();
-    }, [fetchActiveYear]);
+    }, [authStatus, fetchActiveYear]);
 
     const refreshActiveYear = useCallback(() => {
         return fetchActiveYear();

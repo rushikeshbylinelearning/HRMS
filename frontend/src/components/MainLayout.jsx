@@ -9,7 +9,8 @@ import NewNotificationDrawer from './NewNotificationDrawer';
 import EarlyCheckoutApprovalModal from './EarlyCheckoutApprovalModal';
 import NotificationPermissionPrompt from './NotificationPermissionPrompt';
 import PageTransition from './PageTransition';
-import useNewNotifications from '../hooks/useNewNotifications'; // Central notification hook
+import useNewNotifications from '../hooks/useNewNotifications';
+import OnboardingOrchestrator from './onboarding/OnboardingOrchestrator';
 import '../styles/MainLayout.css';
 
 const MainLayout = () => {
@@ -82,6 +83,8 @@ const MainLayout = () => {
 
     return (
         <div className="app-container">
+            {/* Onboarding flow — manages policy modal, tour, and profile prompt */}
+            <OnboardingOrchestrator />
             <Topbar 
                 onNotificationClick={handleNotificationIconClick}
                 onHamburgerClick={handleHamburgerClick}

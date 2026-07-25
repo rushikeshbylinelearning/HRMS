@@ -110,7 +110,7 @@ class LeaveAccrualService {
             }
 
             const employees = await User.find(query)
-                .select('_id fullName employeeCode leaveBalances leaveEntitlements joiningDate')
+                .select('_id fullName employeeCode leaveBalances leaveEntitlements joiningDate probationConfirmation')
                 .lean();
 
             results.totalEmployees = employees.length;
@@ -245,7 +245,17 @@ class LeaveAccrualService {
             }
 
             const currentBalance = employee.leaveBalances[leaveType] || 0;
-            const entitlement = employee.leaveEntitlements[leaveType] || config.annualQuota;
+            let entitlement = employee.leaveEntitlements[leaveType] || config.annualQuota;
+
+            // If this employee was confirmed this same calendar year, the monthly cron
+            // must respect the prorated remaining-year cap instead of the full annual
+            // entitlement — otherwise it would double-credit on top of the confirmation
+            // lump sum. This override is year-scoped and self-expiring: it is ignored
+            // entirely once `year` no longer matches, with no reset job required.
+            const confirmationCap = employee.probationConfirmation;
+            if (confirmationCap && confirmationCap.year === year && confirmationCap.proratedEntitlements?.[leaveType] != null) {
+                entitlement = confirmationCap.proratedEntitlements[leaveType];
+            }
             
             // Check if already at or above entitlement
             if (currentBalance >= entitlement) {
@@ -321,6 +331,124 @@ class LeaveAccrualService {
         const monthsInHalf = 6;
         
         return halfYearQuota / monthsInHalf;
+    }
+
+    /**
+     * Compute the prorated remaining-year leave quota for an employee being confirmed
+     * mid-year. Sums calculateAccrualAmount() for each leave type from the confirmation
+     * month through December, using the SAME per-month formulas the monthly cron uses,
+     * so this never drifts from the cron's math.
+     * @param {Date} confirmationDate
+     * @returns {{ year: number, month: number, entitlements: {sick:number, casual:number, paid:number} }}
+     */
+    static computeProratedRemainingYearEntitlement(confirmationDate) {
+        const year = confirmationDate.getFullYear();
+        const confirmationMonth = confirmationDate.getMonth() + 1; // 1-12
+
+        const entitlements = {};
+        for (const [leaveType, config] of Object.entries(this.ACCRUAL_CONFIG)) {
+            let total = 0;
+            for (let m = confirmationMonth; m <= 12; m++) {
+                total += this.calculateAccrualAmount(leaveType, m, config);
+            }
+            entitlements[leaveType] = Math.round(total * 10) / 10; // 1 decimal, matches rest of codebase
+        }
+
+        return { year, month: confirmationMonth, entitlements };
+    }
+
+    /**
+     * Apply the one-time confirmation leave allotment. Called ONLY from
+     * probationTrackingService.promoteEmployeeToPermanent. Transactional.
+     * ADDITIVE to any pre-existing balance (does not overwrite/destroy existing balance,
+     * e.g. for Intern->Permanent conversions that may already carry a small balance).
+     * Does NOT touch leaveEntitlements.
+     * @param {ObjectId} employeeId
+     * @param {Date} confirmationDate
+     * @param {ObjectId} adminId - admin performing the confirmation (for ledger audit)
+     * @returns {Object} result summary
+     */
+    static async applyConfirmationAllotment(employeeId, confirmationDate, adminId) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            const employee = await User.findById(employeeId).session(session);
+            if (!employee) {
+                throw new Error('Employee not found');
+            }
+
+            const { year, month, entitlements } = this.computeProratedRemainingYearEntitlement(confirmationDate);
+            const monthName = this.getMonthName(month);
+            const remainingMonths = 12 - month + 1;
+
+            const result = { employeeId, year, month, allotments: {} };
+
+            for (const leaveType of Object.keys(entitlements)) {
+                const amount = entitlements[leaveType];
+                if (amount <= 0) continue;
+
+                const currentBalance = employee.leaveBalances?.[leaveType] || 0;
+                const newBalance = currentBalance + amount;
+
+                await User.updateOne(
+                    { _id: employeeId },
+                    { $inc: { [`leaveBalances.${leaveType}`]: amount } },
+                    { session }
+                );
+
+                await LeaveLedger.recordTransaction({
+                    employeeId,
+                    leaveType,
+                    transactionType: 'CONFIRMATION_ALLOTMENT',
+                    amount,
+                    balanceBefore: currentBalance,
+                    balanceAfter: newBalance,
+                    month,
+                    year,
+                    source: 'ADMIN',
+                    performedBy: adminId,
+                    description: `Pro-rated ${leaveType} leave allotment on confirmation (${monthName} ${year}): ${amount} day(s) for ${remainingMonths} remaining month(s) of the year`,
+                    metadata: { confirmationMonth: month, confirmationYear: year, remainingMonths }
+                }, session);
+
+                result.allotments[leaveType] = { amount, balanceBefore: currentBalance, balanceAfter: newBalance };
+            }
+
+            // Store the self-expiring cap override. Year-scoped — automatically ignored
+            // by accrueForEmployee once the calendar year changes. leaveEntitlements is
+            // intentionally left untouched.
+            await User.updateOne(
+                { _id: employeeId },
+                {
+                    $set: {
+                        probationConfirmation: {
+                            year,
+                            month,
+                            proratedEntitlements: entitlements,
+                            appliedAt: new Date()
+                        }
+                    }
+                },
+                { session }
+            );
+
+            await session.commitTransaction();
+
+            logger.info(`[LeaveAccrual] Confirmation allotment applied`, {
+                employeeId, year, month, allotments: result.allotments
+            });
+
+            return { success: true, ...result };
+        } catch (error) {
+            await session.abortTransaction();
+            logger.error(`[LeaveAccrual] Confirmation allotment failed`, {
+                error: error.message, employeeId
+            });
+            throw error;
+        } finally {
+            session.endSession();
+        }
     }
 
     /**

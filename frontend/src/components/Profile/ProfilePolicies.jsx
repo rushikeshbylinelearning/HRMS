@@ -1,11 +1,36 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import AnonymousFeedback from './AnonymousFeedback';
+import DocumentCenterModal from './DocumentCenterModal';
 
-const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
+const ProfilePolicies = memo(({
+    policies,
+    onPolicyClick,
+    documents = [],
+    documentCenterOpen = false,
+    initialDocumentId = null,
+    onDocumentCenterClose,
+    onDocumentsUpdated,
+}) => {
+    const [centerOpen, setCenterOpen] = useState(false);
+
+    const docCount = documents.filter((d) => d.fileRef).length;
+    const pendingCount = documents.filter(
+        (d) => d.fileRef && d.displayStatus === 'pending'
+    ).length;
+
+    useEffect(() => {
+        if (documentCenterOpen) setCenterOpen(true);
+    }, [documentCenterOpen]);
+
+    const handleCloseCenter = () => {
+        setCenterOpen(false);
+        onDocumentCenterClose?.();
+    };
+
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-IN', {
-            month: 'short', day: 'numeric', year: 'numeric'
+            month: 'short', day: 'numeric', year: 'numeric',
         });
     };
 
@@ -53,6 +78,44 @@ const ProfilePolicies = memo(({ policies, onPolicyClick }) => {
                     )}
                 </div>
             </div>
+
+            {/* My Documents — Document Center entry */}
+            <div className="policies-section">
+                <h4 className="policies-section-title">MY DOCUMENTS</h4>
+                <button
+                    type="button"
+                    className="document-center-btn"
+                    onClick={() => setCenterOpen(true)}
+                >
+                    <span className="document-center-btn-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </span>
+                    <span className="document-center-btn-text">
+                        <span className="document-center-btn-label">Document Center</span>
+                        <span className="document-center-btn-hint">
+                            {docCount === 0
+                                ? 'No documents yet'
+                                : `${docCount} document${docCount !== 1 ? 's' : ''}${pendingCount > 0 ? ` · ${pendingCount} pending` : ''}`}
+                        </span>
+                    </span>
+                    {pendingCount > 0 && (
+                        <span className="document-center-badge">{pendingCount}</span>
+                    )}
+                    <svg className="document-center-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+
+            <DocumentCenterModal
+                open={centerOpen}
+                onClose={handleCloseCenter}
+                documents={documents}
+                initialDocumentId={initialDocumentId}
+                onDocumentsUpdated={onDocumentsUpdated}
+            />
 
             {/* Anonymous Feedback */}
             <div className="policies-section">

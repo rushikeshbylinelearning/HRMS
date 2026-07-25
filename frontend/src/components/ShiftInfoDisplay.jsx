@@ -204,7 +204,7 @@ const ShiftInfoDisplay = ({ dailyData, fallbackShift, lastLogoutBaselineReceived
         const Icon = penaltyMinutes > 0 ? WarningAmberIcon : UpdateIcon;
         const className = penaltyMinutes > 0 ? 'logout-time-warning' : 'logout-time-normal';
 
-        return <div className={`info-value logout-time-display ${className}`}><Icon fontSize="small" /> {formattedLiveLogout}</div>;
+        return <div className={`info-value logout-time-display ${className}`} data-tour="required-logout"><Icon fontSize="small" /> {formattedLiveLogout}</div>;
     };
 
     return (

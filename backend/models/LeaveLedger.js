@@ -20,7 +20,7 @@ const leaveLedgerSchema = new mongoose.Schema({
     },
     transactionType: {
         type: String,
-        enum: ['ACCRUAL', 'ADJUSTMENT', 'DEDUCTION', 'CARRY_FORWARD', 'ENCASHMENT', 'YEAR_END_RESET'],
+        enum: ['ACCRUAL', 'ADJUSTMENT', 'DEDUCTION', 'CARRY_FORWARD', 'ENCASHMENT', 'YEAR_END_RESET', 'CONFIRMATION_ALLOTMENT'],
         required: true,
         index: true
     },

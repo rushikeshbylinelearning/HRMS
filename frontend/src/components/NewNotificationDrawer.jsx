@@ -353,6 +353,22 @@ const NewNotificationDrawer = ({ open, onClose, onOpenECRModal }) => {
             return;
         }
         
+        // Handle employee document notifications
+        if (notificationType === 'employee_document_assigned' || notificationType === 'employment_status_changed') {
+            const documentId = metadata?.documentId || navigationData?.params?.documentId;
+            if (documentId) {
+                navigate(`/profile?section=documents&documentId=${documentId}`);
+            } else {
+                navigate('/profile?section=documents');
+            }
+            return;
+        }
+
+        if (notificationType === 'employee_document_pending_hr') {
+            navigate('/admin/policies?tab=employee-documents');
+            return;
+        }
+
         // Handle POLICY notifications FIRST (most specific)
         if (notificationType === 'policy_added' || notificationType === 'policy_updated') {
             const policyId = metadata?.policyId || navigationData?.params?.policyId;

@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { useBreakUI } from '../context/BreakUIContext';
 import { useTeaBreak } from '../context/TeaBreakContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -81,6 +82,8 @@ const getLocalDateString = (date = new Date()) => {
 
 const EmployeeDashboardPage = () => {
     const { user: contextUser, updateUserContext, loading: authLoading } = useAuth();
+    const { showTour } = useOnboarding();
+    const tourPreview = showTour;
     const { uiBreakState, startUiBreak, endUiBreak, setUiBreakState, reconcileFromBackend } = useBreakUI();
     const { teaBreakData, clearTeaBreak } = useTeaBreak();
     const { canAccess, breakLimits, privilegeLevel } = usePermissions();
@@ -104,6 +107,8 @@ const EmployeeDashboardPage = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+    const [tourPreviewSelectedBreak, setTourPreviewSelectedBreak] = useState(null);
+    const [tourPreviewCheckoutConfirmed, setTourPreviewCheckoutConfirmed] = useState(false);
     
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [breakReason, setBreakReason] = useState('');
@@ -147,8 +152,41 @@ const EmployeeDashboardPage = () => {
         dailyData && (dailyData.status === 'Clocked In' || isOnBreakUI || isOnTeaBreak)
     );
 
+    const showTourPreviewUi = tourPreview && !isClockedInSession;
+
+    const tourPreviewDailyData = useMemo(() => {
+        if (!showTourPreviewUi) return null;
+        const now = new Date();
+        const logout = new Date(now);
+        logout.setHours(19, 0, 0, 0);
+        if (logout <= now) {
+            logout.setTime(now.getTime() + 9 * 60 * 60 * 1000);
+        }
+        return {
+            status: 'Clocked In',
+            hasLog: true,
+            attendanceLog: {
+                penaltyMinutes: 0,
+                isLate: false,
+                isHalfDay: false,
+                paidBreakMinutesTaken: 0,
+                unpaidBreakMinutesTaken: 0,
+            },
+            sessions: [{ startTime: now.toISOString() }],
+            shift: dailyData?.shift || contextUser?.shift,
+            calculatedLogoutTime: logout.toISOString(),
+            breaks: [],
+        };
+    }, [showTourPreviewUi, dailyData?.shift, contextUser?.shift]);
+
+    const uiDailyData = tourPreviewDailyData || dailyData;
+    const effectiveIsClockedInSession = isClockedInSession || showTourPreviewUi;
+    const effectiveCanCheckout = showTourPreviewUi ? false : canCheckout;
+    const effectiveRemainingTime = showTourPreviewUi ? 7200 : remainingTime;
+
     const dataReady = !!dailyData;
     const timeTrackingReady = dataReady && !loading && hasInitialLoadFinished;
+    const attendanceUiReady = timeTrackingReady || (tourPreview && !!contextUser);
 
     const fetchAllDataRef = useRef(null);
 
@@ -317,13 +355,13 @@ const EmployeeDashboardPage = () => {
 
     // Defer applying .visible by one frame so the element paints at opacity 0 first, then fades in (prevents flash).
     useEffect(() => {
-        if (!timeTrackingReady || !isClockedInSession) {
+        if (!attendanceUiReady || !effectiveIsClockedInSession) {
             setShowTimeTrackingContentVisible(false);
             return;
         }
         const raf = requestAnimationFrame(() => setShowTimeTrackingContentVisible(true));
         return () => cancelAnimationFrame(raf);
-    }, [timeTrackingReady, isClockedInSession]);
+    }, [attendanceUiReady, effectiveIsClockedInSession]);
 
     useEffect(() => {
         if (location.state?.refresh) {
@@ -402,43 +440,44 @@ const EmployeeDashboardPage = () => {
     }, [contextUser?.id, contextUser?._id, updateUserContext]);
 
     const workedMinutes = useMemo(() => {
-        if (!dailyData?.sessions?.[0]?.startTime) return 0;
+        if (!uiDailyData?.sessions?.[0]?.startTime) return 0;
         const now = new Date();
-        const grossTimeMs = dailyData.sessions.reduce((total, s) => total + ((s.endTime ? new Date(s.endTime) : now) - new Date(s.startTime)), 0);
+        const grossTimeMs = uiDailyData.sessions.reduce((total, s) => total + ((s.endTime ? new Date(s.endTime) : now) - new Date(s.startTime)), 0);
         const breakTimeMs = (breaksForUi || []).reduce((total, b) => total + ((b.endTime ? new Date(b.endTime) : now) - new Date(b.startTime)), 0);
         return Math.floor(Math.max(0, grossTimeMs - breakTimeMs) / 60000);
-    }, [dailyData?.sessions, breaksForUi]);
+    }, [uiDailyData?.sessions, breaksForUi]);
     
     const serverCalculated = useMemo(() => {
-        const paidMinutesTaken = dailyData?.attendanceLog?.paidBreakMinutesTaken || 0;
-        const unpaidBreakMinutesTaken = dailyData?.attendanceLog?.unpaidBreakMinutesTaken || 0;
-        const paidBreakAllowance = dailyData?.shift?.paidBreakMinutes || 30;
-        // Calculate paid break excess (time beyond 30 minutes)
+        const paidMinutesTaken = uiDailyData?.attendanceLog?.paidBreakMinutesTaken || 0;
+        const unpaidBreakMinutesTaken = uiDailyData?.attendanceLog?.unpaidBreakMinutesTaken || 0;
+        const paidBreakAllowance = uiDailyData?.shift?.paidBreakMinutes || 30;
         const paidBreakExcess = Math.max(0, paidMinutesTaken - paidBreakAllowance);
         
         return {
-            penaltyMinutes: dailyData?.attendanceLog?.penaltyMinutes || 0,
+            penaltyMinutes: uiDailyData?.attendanceLog?.penaltyMinutes || 0,
             paidMinutesTaken,
             unpaidBreakMinutesTaken,
             paidBreakExcess,
         };
-    }, [dailyData?.attendanceLog, dailyData?.shift]);
+    }, [uiDailyData?.attendanceLog, uiDailyData?.shift]);
     
-    const paidBreakAllowance = dailyData?.shift?.paidBreakMinutes || 30;
-    // Use shift duration only when valid (> 0); otherwise default 9h so Flexible/zero-duration shifts don't show 3-min "required logout"
-    const rawDurationHours = dailyData?.shift?.durationHours;
+    const paidBreakAllowance = uiDailyData?.shift?.paidBreakMinutes || 30;
+    const rawDurationHours = uiDailyData?.shift?.durationHours;
     const scheduledShiftMinutes = (rawDurationHours != null && Number(rawDurationHours) > 0 ? Number(rawDurationHours) * 60 : null) ?? 9 * 60;
 
     // Unified time model: single source for timer, progress bar, and required logout (updates every second when clocked in).
     const [tickNow, setTickNow] = useState(() => new Date());
     useEffect(() => {
         const isClockedInOrBreak = statusForUi === 'Clocked In' || statusForUi === 'On Break';
-        const needsTick = isClockedInOrBreak || isOnTeaBreak;
+        const needsTick = isClockedInOrBreak || isOnTeaBreak || showTourPreviewUi;
         if (!needsTick) return;
-        if (isClockedInOrBreak && !dailyData?.sessions?.length && !isOnTeaBreak) return;
+        if (isClockedInOrBreak && !uiDailyData?.sessions?.length && !isOnTeaBreak && !showTourPreviewUi) return;
         const intervalId = setInterval(() => setTickNow(new Date()), 1000);
         return () => clearInterval(intervalId);
-    }, [statusForUi, dailyData?.sessions?.length, isOnTeaBreak]);
+    }, [statusForUi, uiDailyData?.sessions?.length, isOnTeaBreak, showTourPreviewUi]);
+
+    const tourPreviewStatusForUi = showTourPreviewUi ? 'Clocked In' : statusForUi;
+    const tourPreviewDisplayStatus = showTourPreviewUi ? 'Clocked In' : displayStatus;
 
     const teaBreakRemainingSec = useMemo(
         () => computeTeaBreakRemainingSeconds(teaBreakData, tickNow.getTime()),
@@ -450,14 +489,14 @@ const EmployeeDashboardPage = () => {
     const showEndBreakButton = isOnBreakUI || canEndTeaBreak;
 
     const unifiedState = useMemo(() => {
-        const clockIn = dailyData?.sessions?.[0]?.startTime;
-        if (!clockIn || !dailyData?.sessions?.length) return null;
-        return getUnifiedShiftTimeState(clockIn, dailyData.sessions, breaksForUi, tickNow, {
+        const clockIn = uiDailyData?.sessions?.[0]?.startTime;
+        if (!clockIn || !uiDailyData?.sessions?.length) return null;
+        return getUnifiedShiftTimeState(clockIn, uiDailyData.sessions, breaksForUi, tickNow, {
             scheduledShiftMinutes,
             allowedPaidBreakMinutes: paidBreakAllowance,
-            backendRequiredLogoutTime: dailyData?.calculatedLogoutTime || null,
+            backendRequiredLogoutTime: uiDailyData?.calculatedLogoutTime || null,
         });
-    }, [dailyData?.sessions, dailyData?.calculatedLogoutTime, breaksForUi, tickNow, scheduledShiftMinutes, paidBreakAllowance]);
+    }, [uiDailyData?.sessions, uiDailyData?.calculatedLogoutTime, breaksForUi, tickNow, scheduledShiftMinutes, paidBreakAllowance]);
 
     // Real-time checkout availability: update canCheckout every second when clocked in
     useEffect(() => {
@@ -594,6 +633,10 @@ const EmployeeDashboardPage = () => {
         }
     };
     const handleClockOut = async () => {
+        if (tourPreview) {
+            setSnackbar({ open: true, message: 'Check-out preview — no attendance recorded during onboarding.' });
+            return;
+        }
         if (clockOutActionInFlightRef.current) return;
         clockOutActionInFlightRef.current = true;
         setActionLoading(true);
@@ -617,10 +660,11 @@ const EmployeeDashboardPage = () => {
     };
 
     const handleCheckOutClick = () => {
-        if (pendingEarlyCheckoutRequest) return; // Already pending; button is disabled
-        if (canCheckout) {
+        if (pendingEarlyCheckoutRequest && !tourPreview) return;
+        if (effectiveCanCheckout) {
             handleClockOut();
         } else {
+            if (tourPreview) setTourPreviewCheckoutConfirmed(false);
             setEarlyCheckoutWarningOpen(true);
         }
     };
@@ -628,11 +672,16 @@ const EmployeeDashboardPage = () => {
     const handleEarlyCheckoutClose = () => {
         setEarlyCheckoutWarningOpen(false);
         setEarlyCheckoutNote('');
+        setTourPreviewCheckoutConfirmed(false);
     };
 
     const handleEarlyCheckoutConfirm = async () => {
         const note = (earlyCheckoutNote || '').trim();
         if (!note || note.length < 25) return;
+        if (tourPreview) {
+            setTourPreviewCheckoutConfirmed(true);
+            return;
+        }
         if (clockOutActionInFlightRef.current) return;
         clockOutActionInFlightRef.current = true;
         setActionLoading(true);
@@ -678,6 +727,10 @@ const EmployeeDashboardPage = () => {
     }, []);
 
     const handleStartBreak = async (breakType) => {
+        if (tourPreview) {
+            setTourPreviewSelectedBreak(breakType);
+            return;
+        }
         if (breakActionInFlightRef.current) return;
         breakActionInFlightRef.current = true;
         setIsBreakModalOpen(false);
@@ -774,6 +827,11 @@ const EmployeeDashboardPage = () => {
     
     const handleRequestExtraBreak = async () => {
         if (!breakReason.trim()) { setError("Please provide a reason."); return; }
+        if (tourPreview) {
+            handleCloseReasonModal();
+            setSnackbar({ open: true, message: 'Extra break request preview — not submitted during onboarding.' });
+            return;
+        }
         setIsSubmittingReason(true); setError('');
         try {
             await api.post('/breaks/request-extra', { reason: breakReason });
@@ -790,8 +848,14 @@ const EmployeeDashboardPage = () => {
         }
     };
 
-    const handleOpenBreakModal = useCallback(() => setIsBreakModalOpen(true), []);
-    const handleCloseBreakModal = useCallback(() => setIsBreakModalOpen(false), []);
+    const handleOpenBreakModal = useCallback(() => {
+        setTourPreviewSelectedBreak(null);
+        setIsBreakModalOpen(true);
+    }, []);
+    const handleCloseBreakModal = useCallback(() => {
+        setIsBreakModalOpen(false);
+        setTourPreviewSelectedBreak(null);
+    }, []);
     const handleOpenReasonModal = useCallback(() => {
         setIsBreakModalOpen(false);
         setIsReasonModalOpen(true);
@@ -837,30 +901,34 @@ const EmployeeDashboardPage = () => {
                 <Grid container spacing={3} alignItems="flex-start">
                     <Grid item xs={12} lg={4}>
                         <Stack spacing={3}>
-                            <Paper className="dashboard-card-base action-card">
+                            <Paper className="dashboard-card-base action-card" data-tour="attendance-card">
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.9375rem', color: '#111827' }} className="theme-text-black">Time Tracking</Typography>
-                                    {timeTrackingReady ? (
+                                    {attendanceUiReady ? (
                                         <Typography variant="body2" sx={{ mb: 2.5, fontWeight: 400, color: '#9ca3af', fontSize: '0.8125rem', lineHeight: 1.4 }}>
-                                            {dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? 'You are currently checked out. Ready to start your day?' : `Status: ${displayStatus}`}
+                                            {showTourPreviewUi
+                                                ? 'Status: Clocked In (Tour Preview)'
+                                                : uiDailyData.status === 'Not Clocked In' || uiDailyData.status === 'Clocked Out'
+                                                    ? 'You are currently checked out. Ready to start your day?'
+                                                    : `Status: ${tourPreviewDisplayStatus}`}
                                         </Typography>
                                     ) : (
                                         <Skeleton variant="text" width="80%" height={20} sx={{ mb: 2.5 }} />
                                     )}
                                 </Box>
-                                {timeTrackingReady ? (
+                                {attendanceUiReady ? (
                                     <>
                                         <Box
-                                            className={`time-tracking-content ${showTimeTrackingContentVisible && isClockedInSession ? 'visible' : 'hidden'}`}
+                                            className={`time-tracking-content ${showTimeTrackingContentVisible && effectiveIsClockedInSession ? 'visible' : 'hidden'}`}
                                             sx={{ my: 'auto' }}
                                         >
                                             <MemoizedShiftProgressBar
                                                 workedMinutes={workedMinutes}
                                                 unpaidBreakMinutes={serverCalculated.unpaidBreakMinutesTaken}
                                                 paidBreakExcess={serverCalculated.paidBreakExcess}
-                                                status={statusForUi}
+                                                status={tourPreviewStatusForUi}
                                                 breaks={breaksForUi}
-                                                sessions={dailyData.sessions}
+                                                sessions={uiDailyData.sessions}
                                                 activeBreakOverride={activeBreakOverride}
                                                 unifiedState={unifiedState}
                                             />
@@ -884,9 +952,9 @@ const EmployeeDashboardPage = () => {
                                                     />
                                                 ) : (
                                                     <MemoizedWorkTimeTracker
-                                                        sessions={dailyData.sessions}
+                                                        sessions={uiDailyData.sessions}
                                                         breaks={breaksForUi}
-                                                        status={statusForUi}
+                                                        status={tourPreviewStatusForUi}
                                                         unifiedState={unifiedState}
                                                     />
                                                 )}
@@ -909,9 +977,23 @@ const EmployeeDashboardPage = () => {
                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', py: 1 }}>
                                                     <SkeletonBox width="100%" height="36px" borderRadius="8px" />
                                                 </Box>
-                                            ) : dailyData.status === 'Not Clocked In' || dailyData.status === 'Clocked Out' ? (
+                                            ) : showTourPreviewUi ? (
+                                                <>
+                                                    <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} data-tour="break-btn">Start Break</Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        className={`theme-button-checkout${earlyCheckoutWarningOpen ? ' tour-preview-active' : ''}`}
+                                                        onClick={handleCheckOutClick}
+                                                        startIcon={<LogoutIcon />}
+                                                        data-tour="clock-out"
+                                                        sx={{ marginLeft: 'auto' }}
+                                                    >
+                                                        Check Out
+                                                    </Button>
+                                                </>
+                                            ) : uiDailyData.status === 'Not Clocked In' || uiDailyData.status === 'Clocked Out' ? (
                                                 canAccess.checkIn() ? (
-                                                    <Button fullWidth className="theme-button-red" onClick={handleClockIn}>Check In</Button>
+                                                    <Button fullWidth className="theme-button-red" onClick={handleClockIn} data-tour="clock-in">Check In</Button>
                                                 ) : (
                                                     <Button fullWidth disabled className="theme-button-red">Check In (Disabled)</Button>
                                                 )
@@ -928,11 +1010,11 @@ const EmployeeDashboardPage = () => {
                                                 </Button>
                                             ) : isOnTeaBreak ? (
                                                 null
-                                            ) : dailyData.status === 'Clocked In' ? (
+                                            ) : uiDailyData.status === 'Clocked In' ? (
                                                 <>
                                                     <Tooltip title={!isAnyBreakPossible ? 'No breaks are currently available' : ''} placement="top">
                                                         <span>
-                                                            <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible}>Start Break</Button>
+                                                            <Button variant="contained" className="theme-button-red theme-button-break" onClick={handleOpenBreakModal} startIcon={<FreeBreakfastIcon />} disabled={!isAnyBreakPossible} data-tour="break-btn">Start Break</Button>
                                                         </span>
                                                     </Tooltip>
                                                     {canAccess.checkOut() ? (
@@ -944,9 +1026,9 @@ const EmployeeDashboardPage = () => {
                                                                 </span>
                                                             </Tooltip>
                                                         ) : (
-                                                            <Tooltip title={!canCheckout ? 'Check out early (reason required)' : ''} placement="top">
+                                                            <Tooltip title={!effectiveCanCheckout ? 'Check out early (reason required)' : ''} placement="top">
                                                                 <span style={{ marginLeft: 'auto' }}>
-                                                                    <Button variant="outlined" className="theme-button-checkout" onClick={handleCheckOutClick} startIcon={<LogoutIcon />}>Check Out</Button>
+                                                                    <Button variant="outlined" className="theme-button-checkout" onClick={handleCheckOutClick} startIcon={<LogoutIcon />} data-tour="clock-out">Check Out</Button>
                                                                 </span>
                                                             </Tooltip>
                                                         )
@@ -1000,9 +1082,9 @@ const EmployeeDashboardPage = () => {
                                 <Typography variant="subtitle2" className="theme-text-black" sx={{ fontWeight: 600, fontSize: '0.9375rem', mb: 1.25, color: '#111827' }}>Today's Shift</Typography>
                                 <Divider sx={{ mb: 1.5 }} />
                                 <Stack spacing={3} divider={<Divider flexItem />} sx={{ flexGrow: 1, minHeight: 260 }}>
-                                    {dataReady ? (
+                                    {dataReady || showTourPreviewUi ? (
                                         <MemoizedShiftInfoDisplay
-                                            dailyData={dailyData}
+                                            dailyData={uiDailyData}
                                             fallbackShift={contextUser?.shift}
                                             lastLogoutBaselineReceivedAtRef={lastLogoutBaselineReceivedAtRef}
                                             isOnBreak={isOnBreakUI}
@@ -1047,29 +1129,46 @@ const EmployeeDashboardPage = () => {
                     onClose={handleCloseBreakModal} 
                     TransitionComponent={BreakModalTransition} 
                     PaperProps={{ className: 'break-modal-paper' }}
+                    sx={tourPreview ? { zIndex: 100002 } : undefined}
                 >
                     <DialogTitle className="break-modal-title">Choose Your Break Type<IconButton aria-label="close" onClick={handleCloseBreakModal} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton></DialogTitle>
-                    <DialogContent dividers>
-                        <Stack 
-                            spacing={2}
-                        >
+                    <DialogContent dividers className="break-modal-content">
+                        <Stack spacing={1.5} sx={{ py: 0.5 }}>
+                            {(tourPreview ? (
+                                <Box>
+                                    <Paper className={`break-modal-card paid${tourPreviewSelectedBreak === 'Paid' ? ' selected' : ''}`} onClick={() => handleStartBreak('Paid')}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Paid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
+                                </Box>
+                            ) : (
                             <Tooltip title={!paidBreakCheck.allowed ? paidBreakCheck.message : (hasExhaustedPaidBreak ? 'You have used all your paid break time' : '')} arrow placement="left">
                                 <Box>
-                                    <Paper className={`break-modal-card ${hasExhaustedPaidBreak || !paidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasExhaustedPaidBreak && paidBreakCheck.allowed ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Paid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card paid ${!tourPreview && (hasExhaustedPaidBreak || !paidBreakCheck.allowed) ? 'disabled' : ''}${tourPreviewSelectedBreak === 'Paid' ? ' selected' : ''}`} onClick={tourPreview || (!hasExhaustedPaidBreak && paidBreakCheck.allowed) ? () => handleStartBreak('Paid') : undefined}><AccountBalanceWalletIcon className="break-modal-icon paid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Paid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{Math.max(0, paidBreakAllowance - serverCalculated.paidMinutesTaken)} mins remaining</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
-                            
+                            ))}
+
+                            {(tourPreview ? (
+                                <Box>
+                                    <Paper className={`break-modal-card unpaid${tourPreviewSelectedBreak === 'Unpaid' ? ' selected' : ''}`} onClick={() => handleStartBreak('Unpaid')}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Unpaid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>10 minute break</Typography></Box></Paper>
+                                </Box>
+                            ) : (
                             <Tooltip title={!unpaidBreakCheck.allowed ? unpaidBreakCheck.message : (hasTakenUnpaidBreak ? 'You have already taken an unpaid break today' : '')} arrow placement="left">
                                 <Box>
-                                    <Paper className={`break-modal-card ${hasTakenUnpaidBreak || !unpaidBreakCheck.allowed ? 'disabled' : ''}`} onClick={!hasTakenUnpaidBreak && unpaidBreakCheck.allowed ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Unpaid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>10 minute break</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card unpaid ${!tourPreview && (hasTakenUnpaidBreak || !unpaidBreakCheck.allowed) ? 'disabled' : ''}${tourPreviewSelectedBreak === 'Unpaid' ? ' selected' : ''}`} onClick={tourPreview || (!hasTakenUnpaidBreak && unpaidBreakCheck.allowed) ? () => handleStartBreak('Unpaid') : undefined}><NoMealsIcon className="break-modal-icon unpaid" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Unpaid Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>10 minute break</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
+                            ))}
 
+                            {(tourPreview ? (
+                                <Box>
+                                    <Paper className={`break-modal-card extra${tourPreviewSelectedBreak === 'Extra' ? ' selected' : ''}`} onClick={() => handleStartBreak('Extra')}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>Request Extra Break</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>Requires admin approval</Typography></Box></Paper>
+                                </Box>
+                            ) : (
                             <Tooltip title={!extraBreakCheck.allowed ? extraBreakCheck.message : (hasPendingExtraBreak ? 'Your request is pending' : hasTakenExtraBreak ? 'You have already used an extra break' : '')} arrow placement="left">
                                 <Box>
-                                    <Paper className={`break-modal-card extra ${(hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}`} onClick={hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal)}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
+                                    <Paper className={`break-modal-card extra ${!tourPreview && (hasPendingExtraBreak || (!hasApprovedExtraBreak && hasTakenExtraBreak) || !extraBreakCheck.allowed) ? 'disabled' : ''}${tourPreviewSelectedBreak === 'Extra' ? ' selected' : ''}`} onClick={tourPreview ? () => handleStartBreak('Extra') : (hasApprovedExtraBreak && !hasTakenExtraBreak && extraBreakCheck.allowed ? () => handleStartBreak('Extra') : (hasPendingExtraBreak || hasTakenExtraBreak || !extraBreakCheck.allowed ? undefined : handleOpenReasonModal))}><MoreTimeIcon className="break-modal-icon extra" /><Box><Typography variant="h6" sx={{ fontWeight: 500, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? 'Start Extra Break' : 'Request Extra Break'}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, letterSpacing: '0.025em' }}>{hasApprovedExtraBreak ? '10 minute approved break' : 'Requires admin approval'}</Typography></Box></Paper>
                                 </Box>
                             </Tooltip>
+                            ))}
                         </Stack>
                     </DialogContent>
                 </Dialog>
@@ -1102,7 +1201,14 @@ const EmployeeDashboardPage = () => {
                 </Dialog>
 
                 {/* Early checkout: single unified popup with warning, remaining time, and mandatory reason (feature-toggled) */}
-                <Dialog open={earlyCheckoutWarningOpen} onClose={handleEarlyCheckoutClose} maxWidth={false} fullWidth PaperProps={{ className: 'early-checkout-dialog-paper' }}>
+                <Dialog
+                    open={earlyCheckoutWarningOpen}
+                    onClose={handleEarlyCheckoutClose}
+                    maxWidth={false}
+                    fullWidth
+                    PaperProps={{ className: 'early-checkout-dialog-paper' }}
+                    sx={tourPreview ? { zIndex: 100002 } : undefined}
+                >
                     <DialogTitle className="early-checkout-dialog-title">Early Checkout</DialogTitle>
                     <Divider className="early-checkout-dialog-divider" />
                     <DialogContent className="early-checkout-dialog-content">
@@ -1110,9 +1216,9 @@ const EmployeeDashboardPage = () => {
                             You have not completed the required working time.
                             Are you sure you want to check out early?
                         </Typography>
-                        {remainingTime != null && (
+                        {effectiveRemainingTime != null && (
                             <Typography variant="body2" className="early-checkout-remaining">
-                                Remaining time: {formatRemainingTimeDisplay(remainingTime)}
+                                Remaining time: {formatRemainingTimeDisplay(effectiveRemainingTime)}
                                 {hasHalfDayLeave && (
                                     <Typography component="span" variant="caption" display="block" sx={{ mt: 0.5, color: 'text.secondary' }}>
                                         Required: 5 hrs (half-day leave)
@@ -1136,7 +1242,12 @@ const EmployeeDashboardPage = () => {
                     </DialogContent>
                     <DialogActions className="early-checkout-actions">
                         <Button variant="outlined" onClick={handleEarlyCheckoutClose}>Cancel</Button>
-                        <Button variant="contained" onClick={handleEarlyCheckoutConfirm} className="theme-button-red" disabled={!earlyCheckoutNote.trim() || earlyCheckoutNote.trim().length < 25}>
+                        <Button
+                            variant="contained"
+                            onClick={handleEarlyCheckoutConfirm}
+                            className={`theme-button-red${tourPreview && tourPreviewCheckoutConfirmed ? ' selected' : ''}`}
+                            disabled={!earlyCheckoutNote.trim() || earlyCheckoutNote.trim().length < 25}
+                        >
                             Confirm Check Out
                         </Button>
                     </DialogActions>

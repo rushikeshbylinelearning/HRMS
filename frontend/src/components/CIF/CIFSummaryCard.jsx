@@ -8,14 +8,15 @@ import {
   Alert
 } from '@mui/material';
 import {
-  WarningAmber as WarningIcon
+  InfoOutlined as InfoIcon
 } from '@mui/icons-material';
 import api from '../../api/axios';
 
 const RED = '#E53935';
+const RED_DARK = '#C62828';
 const RED_BG = '#FDECEC';
-const BLACK = '#1A1A1A';
-const GREY = '#6B7280';
+const TEXT = '#1A1A1A';
+const MUTED = '#6B7280';
 
 const CIFSummaryCard = ({ employeeId }) => {
   const [summary, setSummary] = useState(null);
@@ -63,22 +64,16 @@ const CIFSummaryCard = ({ employeeId }) => {
 
   const cardBase = {
     background: '#fff',
-    borderRadius: '16px',
-    padding: '20px 24px',
-    border: '1px solid #E5E7EB',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-    transition: 'box-shadow 0.2s ease, transform 0.2s ease',
-    '&:hover': {
-      boxShadow: '0 6px 20px rgba(0,0,0,0.10)',
-      transform: 'translateY(-1px)'
-    }
+    borderRadius: '12px',
+    padding: '16px 20px',
+    border: '1px solid #e2e8f0',
   };
 
   if (loading) {
     return (
       <Box sx={cardBase}>
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress size={28} sx={{ color: RED }} />
+          <CircularProgress size={24} sx={{ color: RED }} />
         </Box>
       </Box>
     );
@@ -96,63 +91,24 @@ const CIFSummaryCard = ({ employeeId }) => {
 
   if (!summary || summary.total === 0) {
     return (
-      <Box sx={{ ...cardBase, background: RED_BG, border: `1px solid #FBBCBC` }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              background: '#FBBCBC',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <WarningIcon sx={{ fontSize: 20, color: RED }} />
-          </Box>
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: BLACK }}>CIF Summary</Typography>
-            <Typography sx={{ fontSize: '13px', color: GREY, mt: 0.25 }}>
-              No CIF records found for this employee.
-            </Typography>
-          </Box>
+      <Box sx={{ ...cardBase, display: 'flex', alignItems: 'center', gap: 1.5, borderLeft: `3px solid ${RED}` }}>
+        <InfoIcon sx={{ fontSize: 20, color: RED }} />
+        <Box>
+          <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: TEXT }}>CIF Records</Typography>
+          <Typography sx={{ fontSize: '0.8125rem', color: MUTED }}>
+            No incident records on file for this employee.
+          </Typography>
         </Box>
       </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        ...cardBase,
-        background: RED_BG,
-        border: `1px solid #FBBCBC`,
-        borderLeft: `4px solid ${RED}`
-      }}
-    >
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              background: '#FBBCBC',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <WarningIcon sx={{ fontSize: 20, color: RED }} />
-          </Box>
-          <Typography sx={{ fontWeight: 700, fontSize: '15px', color: BLACK }}>
-            CIF Summary
-          </Typography>
-        </Box>
+    <Box sx={{ ...cardBase, borderLeft: `3px solid ${RED}` }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: TEXT }}>
+          CIF Summary
+        </Typography>
         <Chip
           label={`Risk: ${summary.riskLevel.toUpperCase()}`}
           size="small"
@@ -177,10 +133,10 @@ const CIFSummaryCard = ({ employeeId }) => {
               border: '1px solid #E5E7EB'
             }}
           >
-            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Total Cases
             </Typography>
-            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: BLACK, lineHeight: 1 }}>
+            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: TEXT, lineHeight: 1 }}>
               {summary.total}
             </Typography>
           </Box>
@@ -194,7 +150,7 @@ const CIFSummaryCard = ({ employeeId }) => {
               border: '1px solid #E5E7EB'
             }}
           >
-            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Open Cases
             </Typography>
             <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#F59E0B', lineHeight: 1 }}>
@@ -211,10 +167,10 @@ const CIFSummaryCard = ({ employeeId }) => {
               border: '1px solid #E5E7EB'
             }}
           >
-            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               High Severity
             </Typography>
-            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: RED, lineHeight: 1 }}>
+            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#dc2626', lineHeight: 1 }}>
               {summary.highCount}
             </Typography>
           </Box>
@@ -228,10 +184,10 @@ const CIFSummaryCard = ({ employeeId }) => {
               border: '1px solid #E5E7EB'
             }}
           >
-            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: GREY, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Last Incident
             </Typography>
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: BLACK, lineHeight: 1.3, mt: 0.5 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: TEXT, lineHeight: 1.3, mt: 0.5 }}>
               {formatDate(summary.lastIncidentDate)}
             </Typography>
           </Box>

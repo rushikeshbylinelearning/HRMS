@@ -13,6 +13,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../api/axios';
+import { refreshAccessToken } from '../api/authRefresh';
 import { Box, Snackbar, Alert } from '@mui/material';
 import socket from '../socket';
 
@@ -94,8 +95,7 @@ export const AuthProvider = ({ children }) => {
                 console.log(`[AuthContext] Proactive refresh attempt ${attempt + 1}`);
             }
             // withCredentials is set on the api instance — httpOnly cookie sent automatically
-            const response = await api.post('/auth/refresh');
-            const newToken = response.data.accessToken || response.data.token;
+            const newToken = await refreshAccessToken();
             if (!newToken) throw new Error('No accessToken in refresh response');
 
             // Store new token in memory and update axios header
@@ -201,6 +201,7 @@ export const AuthProvider = ({ children }) => {
         authBootstrapPromise = (async () => {
         setAuthStatus('unknown');
         authInitializedRef.current = true;
+        window.__AUTH_RESTORING__ = true;
 
         // Phase 1: Access token is held in memory only.
         // On page load the in-memory token is gone; we attempt a silent refresh
@@ -217,10 +218,7 @@ export const AuthProvider = ({ children }) => {
 
         // ── Try silent refresh first (fast path for users with valid refresh cookies) ──
         try {
-            window.__AUTH_RESTORING__ = true;
-
-            const refreshResponse = await api.post('/auth/refresh');
-            const newToken = refreshResponse.data.accessToken || refreshResponse.data.token;
+            const newToken = await refreshAccessToken();
 
             if (newToken) {
                 setAccessToken(newToken);
@@ -244,14 +242,11 @@ export const AuthProvider = ({ children }) => {
             if (process.env.NODE_ENV !== 'production') {
                 console.log('[AuthContext] Silent refresh failed:', refreshErr?.response?.data?.code || refreshErr.message);
             }
-        } finally {
-            window.__AUTH_RESTORING__ = false;
         }
 
         // ── Legacy token path (transition period only) ────────────────────────
         if (legacyToken) {
             try {
-                window.__AUTH_RESTORING__ = true;
                 api.defaults.headers.common['Authorization'] = `Bearer ${legacyToken}`;
 
                 console.log('[AuthContext] Attempting auth restore from legacy storage token...');
@@ -286,8 +281,6 @@ export const AuthProvider = ({ children }) => {
                     setIsAuthenticated(false);
                     setAuthStatus('unknown');
                 }
-            } finally {
-                window.__AUTH_RESTORING__ = false;
             }
             return;
         }
@@ -297,7 +290,9 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAuthenticated(false);
         setAuthStatus('unauthenticated');
-        })();
+        })().finally(() => {
+            window.__AUTH_RESTORING__ = false;
+        });
 
         return authBootstrapPromise;
     }, [logout, scheduleProactiveRefresh]);
@@ -341,6 +336,7 @@ export const AuthProvider = ({ children }) => {
 
         // Listen for auth errors dispatched by the axios interceptor
         const handleAuthError = () => {
+            if (window.__AUTH_RESTORING__ === true) return;
             logout();
         };
         window.addEventListener('auth-error', handleAuthError);

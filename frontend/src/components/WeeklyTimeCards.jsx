@@ -17,11 +17,13 @@ const LEAVE_STATUS = { text: 'Leave', Icon: BeachAccessIcon, color: '#3b82f6' };
 const toLeaveDateKey = (leaveDate) => {
     if (leaveDate == null || leaveDate === '') return null;
 
-    if (typeof leaveDate === 'string') {
-        const dateOnly = leaveDate.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (dateOnly) return dateOnly[1];
+    // Plain YYYY-MM-DD with no time component — safe to use as-is
+    if (typeof leaveDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(leaveDate)) {
+        return leaveDate;
     }
 
+    // Everything else (ISO datetime strings, Date objects) must go through
+    // IST conversion so UTC midnight vs IST midnight doesn't shift the day.
     const date = leaveDate instanceof Date ? leaveDate : new Date(leaveDate);
     if (Number.isNaN(date.getTime())) return null;
 

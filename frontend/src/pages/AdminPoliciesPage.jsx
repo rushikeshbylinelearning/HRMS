@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Box,
     Typography,
     Snackbar,
     Alert,
-    IconButton,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     Button,
-    Divider
+    Divider,
+    Tabs,
+    Tab,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
+import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
+import FolderCopyOutlinedIcon from '@mui/icons-material/FolderCopyOutlined';
 import PageHeroHeader from '../components/PageHeroHeader';
 import PolicyUploadForm from '../components/PolicyUploadForm';
 import PolicyViewer from '../components/PolicyViewer';
 import AnonymousMessagesList from '../components/AnonymousMessagesList';
 import PolicyListCompact from '../components/PolicyListCompact';
+import ComplianceDashboard from '../components/onboarding/ComplianceDashboard';
+import EmployeeDocumentsDashboard from '../components/employeeDocuments/EmployeeDocumentsDashboard';
 import api from '../api/axios';
 import '../styles/AdminPoliciesPage.css';
 
@@ -30,7 +35,19 @@ const cardBaseSx = {
     boxShadow: '0 4px 14px rgba(0,0,0,0.08)'
 };
 
+const scrollBoxSx = {
+    overflowY: 'auto',
+    pr: 1,
+    '&::-webkit-scrollbar': { width: '6px' },
+    '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+    '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px' },
+    '&::-webkit-scrollbar-thumb:hover': { background: '#555' },
+};
+
 const AdminPoliciesPage = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = searchParams.get('tab') === 'employee-documents' ? 3 : 0;
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [policies, setPolicies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -46,6 +63,13 @@ const AdminPoliciesPage = () => {
         loadPolicies();
         loadAnonymousMessages();
     }, []);
+
+    useEffect(() => {
+        if (searchParams.get('tab') === 'employee-documents') {
+            setActiveTab(3);
+            setSearchParams({}, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     const loadPolicies = async () => {
         setLoading(true);
@@ -74,7 +98,6 @@ const AdminPoliciesPage = () => {
     };
 
     const handleDeleteMessage = (messageId) => {
-        // Optimistically remove from UI
         setAnonymousMessages(prev => prev.filter(msg => msg._id !== messageId));
         setSnackbar({ open: true, message: 'Message deleted successfully', severity: 'success' });
     };
@@ -89,10 +112,10 @@ const AdminPoliciesPage = () => {
             loadPolicies();
         } catch (error) {
             console.error('Failed to upload policy:', error);
-            setSnackbar({ 
-                open: true, 
-                message: error.response?.data?.error || 'Failed to upload policy', 
-                severity: 'error' 
+            setSnackbar({
+                open: true,
+                message: error.response?.data?.error || 'Failed to upload policy',
+                severity: 'error'
             });
         } finally {
             setSubmitting(false);
@@ -111,10 +134,10 @@ const AdminPoliciesPage = () => {
             loadPolicies();
         } catch (error) {
             console.error('Failed to replace policy:', error);
-            setSnackbar({ 
-                open: true, 
-                message: error.response?.data?.error || 'Failed to replace policy', 
-                severity: 'error' 
+            setSnackbar({
+                open: true,
+                message: error.response?.data?.error || 'Failed to replace policy',
+                severity: 'error'
             });
         } finally {
             setSubmitting(false);
@@ -123,17 +146,16 @@ const AdminPoliciesPage = () => {
 
     const handleDelete = async (policyId) => {
         if (!window.confirm('Are you sure you want to delete this policy?')) return;
-
         try {
             await api.delete(`/policies-gridfs/${policyId}`);
             setSnackbar({ open: true, message: 'Policy deleted successfully', severity: 'success' });
             loadPolicies();
         } catch (error) {
             console.error('Failed to delete policy:', error);
-            setSnackbar({ 
-                open: true, 
-                message: error.response?.data?.error || 'Failed to delete policy', 
-                severity: 'error' 
+            setSnackbar({
+                open: true,
+                message: error.response?.data?.error || 'Failed to delete policy',
+                severity: 'error'
             });
         }
     };
@@ -151,9 +173,7 @@ const AdminPoliciesPage = () => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
+            year: 'numeric', month: 'short', day: 'numeric'
         });
     };
 
@@ -162,121 +182,154 @@ const AdminPoliciesPage = () => {
             <PageHeroHeader
                 eyebrow="Operations Control"
                 title="Policies Management"
-                description="Upload and manage company policies."
+                description="Upload, manage, and monitor company policy compliance."
             />
-            
+
+            {/* Tab navigation */}
+            <Box sx={{ borderBottom: '1px solid #e2e8f0', mb: 3, background: '#fff', px: 3 }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, v) => setActiveTab(v)}
+                    sx={{
+                        '& .MuiTab-root': {
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            minHeight: 48,
+                            gap: 0.75,
+                            color: '#64748b',
+                        },
+                        '& .Mui-selected': { color: '#6366f1' },
+                        '& .MuiTab-iconWrapper': { marginRight: 0 },
+                        '& .MuiTabs-indicator': { backgroundColor: '#6366f1', height: 2 },
+                    }}
+                >
+                    <Tab icon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Policies" />
+                    <Tab icon={<ForumOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Anonymous Messages" />
+                    <Tab icon={<VerifiedUserOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Onboarding Compliance" />
+                    <Tab icon={<FolderCopyOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Employee Documents" />
+                </Tabs>
+            </Box>
+
             <Box sx={{ py: 0, px: 0, maxWidth: '100%' }}>
-                {/* Two Column Grid Layout */}
-                <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    gap: 3,
-                    width: '100%'
-                }}>
-                    {/* Upload Form & Existing Policies */}
-                    <Box sx={cardBaseSx}>
-                        <Typography variant="h6" fontWeight={700} color="#222" mb={3}>
-                            Upload New Policy
-                        </Typography>
-                        <PolicyUploadForm onSubmit={handleUpload} submitting={submitting} />
-                        
-                        <Divider sx={{ my: 3 }} />
-                        
-                        <Typography variant="h6" fontWeight={700} color="#222" mb={2}>
-                            Existing Policies
-                        </Typography>
-                        <Box sx={{ 
-                            maxHeight: '400px', 
-                            overflowY: 'auto',
-                            pr: 1,
-                            '&::-webkit-scrollbar': {
-                                width: '6px'
-                            },
-                            '&::-webkit-scrollbar-track': {
-                                background: '#f1f1f1',
-                                borderRadius: '4px'
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                                background: '#888',
-                                borderRadius: '4px'
-                            },
-                            '&::-webkit-scrollbar-thumb:hover': {
-                                background: '#555'
-                            }
-                        }}>
-                            <PolicyListCompact
-                                policies={policies}
-                                loading={loading}
-                                onView={handleView}
-                                onReplace={openReplaceDialog}
-                                onDelete={handleDelete}
-                                formatDate={formatDate}
-                            />
+
+                {/* ── Tab 0: Policies ──────────────────────────────────────── */}
+                {activeTab === 0 && (
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                        gap: 3,
+                        width: '100%'
+                    }}>
+                        <Box sx={cardBaseSx}>
+                            <Typography variant="h6" fontWeight={700} color="#222" mb={3}>
+                                Upload New Policy
+                            </Typography>
+                            <PolicyUploadForm onSubmit={handleUpload} submitting={submitting} />
+
+                            <Divider sx={{ my: 3 }} />
+
+                            <Typography variant="h6" fontWeight={700} color="#222" mb={2}>
+                                Existing Policies
+                            </Typography>
+                            <Box sx={{ maxHeight: '400px', ...scrollBoxSx }}>
+                                <PolicyListCompact
+                                    policies={policies}
+                                    loading={loading}
+                                    onView={handleView}
+                                    onReplace={openReplaceDialog}
+                                    onDelete={handleDelete}
+                                    formatDate={formatDate}
+                                />
+                            </Box>
+                        </Box>
+
+                        {/* Right column: quick stats */}
+                        <Box sx={cardBaseSx}>
+                            <Typography variant="h6" fontWeight={700} color="#222" mb={3}>
+                                Policy Overview
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, background: '#f8fafc', borderRadius: 2 }}>
+                                    <Typography variant="body2" sx={{ color: '#475569' }}>Total Policies</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{policies.length}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, background: '#f0fdf4', borderRadius: 2 }}>
+                                    <Typography variant="body2" sx={{ color: '#166534' }}>Active</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a' }}>
+                                        {policies.filter(p => p.status === 'Active').length}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, background: '#f8fafc', borderRadius: 2 }}>
+                                    <Typography variant="body2" sx={{ color: '#475569' }}>Archived</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                        {policies.filter(p => p.status === 'Archived').length}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, background: '#eef2ff', borderRadius: 2 }}>
+                                    <Typography variant="body2" sx={{ color: '#3730a3' }}>Mandatory Onboarding</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#4f46e5' }}>
+                                        {policies.filter(p => p.isMandatoryOnboarding).length}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            <Box sx={{ mt: 3 }}>
+                                <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                                    To configure the mandatory onboarding policy, go to the
+                                    <strong style={{ color: '#6366f1', cursor: 'pointer' }} onClick={() => setActiveTab(2)}>
+                                        {' '}Onboarding Compliance
+                                    </strong>{' '}tab.
+                                </Typography>
+                            </Box>
                         </Box>
                     </Box>
+                )}
 
-                    {/* Anonymous Messages */}
+                {/* ── Tab 1: Anonymous Messages ────────────────────────────── */}
+                {activeTab === 1 && (
                     <Box sx={cardBaseSx}>
                         <Typography variant="h6" fontWeight={700} color="#222" mb={3}>
                             Anonymous Messages
                         </Typography>
-                        <Box sx={{ 
-                            maxHeight: '700px', 
-                            overflowY: 'auto',
-                            pr: 1,
-                            '&::-webkit-scrollbar': {
-                                width: '6px'
-                            },
-                            '&::-webkit-scrollbar-track': {
-                                background: '#f1f1f1',
-                                borderRadius: '4px'
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                                background: '#888',
-                                borderRadius: '4px'
-                            },
-                            '&::-webkit-scrollbar-thumb:hover': {
-                                background: '#555'
-                            }
-                        }}>
-                            <AnonymousMessagesList 
-                                messages={anonymousMessages} 
+                        <Box sx={{ maxHeight: '700px', ...scrollBoxSx }}>
+                            <AnonymousMessagesList
+                                messages={anonymousMessages}
                                 loading={messagesLoading}
                                 onDelete={handleDeleteMessage}
                             />
                         </Box>
                     </Box>
-                </Box>
+                )}
+
+                {/* ── Tab 2: Onboarding Compliance ─────────────────────────── */}
+                {activeTab === 2 && (
+                    <Box sx={cardBaseSx}>
+                        <ComplianceDashboard
+                            policies={policies}
+                            onRefreshPolicies={loadPolicies}
+                        />
+                    </Box>
+                )}
+
+                {/* ── Tab 3: Employee Documents ─────────────────────────────── */}
+                {activeTab === 3 && (
+                    <Box sx={{ px: { xs: 0, sm: 0.5 } }}>
+                        <EmployeeDocumentsDashboard />
+                    </Box>
+                )}
             </Box>
 
             {/* Policy Viewer Dialog */}
-            <Dialog
-                open={viewerOpen}
-                onClose={() => setViewerOpen(false)}
-                maxWidth="lg"
-                fullWidth
-                PaperProps={{
-                    sx: { height: '80vh' }
-                }}
-            >
+            <Dialog open={viewerOpen} onClose={() => setViewerOpen(false)} maxWidth="lg" fullWidth
+                PaperProps={{ sx: { height: '80vh' } }}>
                 <DialogContent sx={{ p: 3 }}>
-                    <PolicyViewer
-                        policy={selectedPolicy}
-                        onClose={() => setViewerOpen(false)}
-                    />
+                    <PolicyViewer policy={selectedPolicy} onClose={() => setViewerOpen(false)} />
                 </DialogContent>
             </Dialog>
 
             {/* Replace Policy Dialog */}
-            <Dialog
-                open={replaceDialogOpen}
-                onClose={() => setReplaceDialogOpen(false)}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogTitle>
-                    Replace Policy: {policyToReplace?.name}
-                </DialogTitle>
+            <Dialog open={replaceDialogOpen} onClose={() => setReplaceDialogOpen(false)} maxWidth="md" fullWidth>
+                <DialogTitle>Replace Policy: {policyToReplace?.name}</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" mb={3}>
                         Upload a new version. The current version will be automatically archived.

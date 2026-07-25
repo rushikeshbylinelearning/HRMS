@@ -385,7 +385,8 @@ async function getReadReceipts(announcementId) {
 
     const { pending, onBreak, notApplicable } = await classifyTeaBreakOpenUsers(
       eligibleUsers,
-      returnedIds
+      returnedIds,
+      announcement.teaBreakStartedAt
     );
 
     result.breakClosedCount = breakClosed.length;
@@ -484,7 +485,7 @@ async function getReadReceiptsSummaries(announcementIds) {
   if (!objectIds.length) return {};
 
   const announcements = await AnnouncementMessage.find({ _id: { $in: objectIds } })
-    .select("_id contentType isTEABreak teaBreakType createdAt")
+    .select("_id contentType isTEABreak teaBreakType teaBreakStartedAt createdAt")
     .lean();
 
   if (!announcements.length) return {};
@@ -559,7 +560,7 @@ async function getReadReceiptsSummaries(announcementIds) {
       summary.notSubmittedCount = Math.max(0, totalEligible - submittedCount);
     }
 
-    if (ann.isTEABreak && attendanceContext && eligibleUserIds) {
+    if (ann.isTEABreak && attendanceContext && eligibleUserIds && ann.teaBreakStartedAt) {
       const returns = returnMap.get(id);
       const breakClosedCount = returns?.breakClosedCount || 0;
       const returnedIds = new Set(
@@ -568,6 +569,7 @@ async function getReadReceiptsSummaries(announcementIds) {
       const { pendingCount, onBreakCount, notApplicableCount } = countTeaBreakOpenUsers(
         eligibleUserIds,
         returnedIds,
+        ann.teaBreakStartedAt,
         attendanceContext
       );
 
