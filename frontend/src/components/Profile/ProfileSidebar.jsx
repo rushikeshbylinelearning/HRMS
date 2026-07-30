@@ -142,36 +142,6 @@ const ProfileSidebar = memo(({ user }) => {
                     <span className="psb-chip psb-chip--code">{user?.employeeCode || '—'}</span>
                     <span className="psb-chip psb-chip--status">{getStatusLabel()}</span>
                 </div>
-                {user?.employmentStatus && (
-                    <div className="psb-chips" style={{ marginTop: '6px' }}>
-                        <span
-                            className="psb-chip"
-                            style={{
-                                backgroundColor: user.employmentStatus === 'Permanent'
-                                    ? '#f0fdf4'
-                                    : user.employmentStatus === 'Probation'
-                                        ? '#fff7ed'
-                                        : '#f0f9ff',
-                                color: user.employmentStatus === 'Permanent'
-                                    ? '#166534'
-                                    : user.employmentStatus === 'Probation'
-                                        ? '#9a3412'
-                                        : '#0369a1',
-                                border: `1px solid ${user.employmentStatus === 'Permanent'
-                                    ? '#bbf7d0'
-                                    : user.employmentStatus === 'Probation'
-                                        ? '#fed7aa'
-                                        : '#bae6fd'}`,
-                                fontWeight: 600,
-                                fontSize: '0.72rem',
-                                padding: '2px 10px',
-                                borderRadius: '20px',
-                            }}
-                        >
-                            {user.employmentStatus}
-                        </span>
-                    </div>
-                )}
             </div>
 
             {/* ── Divider ─────────────────────────────── */}
@@ -217,7 +187,7 @@ const ProfileSidebar = memo(({ user }) => {
                     </div>
                     <div className="psb-detail-body">
                         <span className="psb-detail-label">Work Email</span>
-                        <span className="psb-detail-value psb-detail-value--email">{user?.email || '—'}</span>
+                        <span className="psb-detail-value psb-detail-value--email" title={user?.email || ''}>{user?.email || '—'}</span>
                     </div>
                 </div>
 

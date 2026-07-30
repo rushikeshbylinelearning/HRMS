@@ -214,14 +214,55 @@ const sanitizeProfileData = (req, res, next) => {
 };
 
 /**
- * Rate limiting for public form
+ * Rate limiting for public form token validation (relaxed — 20 per 15 min).
+ * Users may re-validate several times while navigating the multi-step form.
+ */
+const validateRateLimitConfig = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 requests per window
+  message: 'Too many validation attempts. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+};
+
+/**
+ * Rate limiting for public form submissions (strict — 10 per 15 min).
+ * Kept tight to prevent abuse but generous enough to survive a few retries
+ * on the final submit step.
  */
 const rateLimitConfig = {
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
+  max: 10, // 10 requests per window (up from 5)
   message: 'Too many submission attempts. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false
+};
+
+/**
+ * Rate limiting for KYC document uploads (relaxed — 100 per 15 min).
+ * An employee may upload several documents in one sitting, each requiring
+ * a request-upload + confirm-upload pair, so the strict form-submission
+ * limit would incorrectly block legitimate uploads.
+ * 
+ * Increased from 50 to 100 to account for:
+ * - 8 required docs × 2 requests each = 16 requests minimum
+ * - Retry attempts on network failures = potential 3× multiplier = 48 more
+ * - Multiple employees on shared mobile carrier-grade NAT IPs
+ * - GET /my-documents calls consuming additional requests
+ */
+const kycUploadLimiterConfig = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window (up from 50)
+  message: 'Too many upload attempts. Please wait a few minutes and try again.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Return error in consistent format matching frontend expectations
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Too many upload attempts. Please wait a few minutes and try again.',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
+    });
+  },
 };
 
 module.exports = {
@@ -229,5 +270,7 @@ module.exports = {
   validate,
   sanitizeProfileData,
   rateLimitConfig,
+  validateRateLimitConfig,
+  kycUploadLimiterConfig,
   PATTERNS
 };

@@ -2,7 +2,7 @@
 
 /* Route host: fit exactly below topbar, no outer scroll / clip */
 .main-content.live-attendance-layout {
-    padding: 56px 16px 12px !important;
+    padding: 72px 20px 12px !important;
     height: 100vh !important;
     max-height: 100vh !important;
     overflow: hidden !important;

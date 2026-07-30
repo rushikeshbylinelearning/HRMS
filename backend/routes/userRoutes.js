@@ -71,6 +71,9 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
                 ...user.personalDetails,
                 ...personalDetails
             };
+            // personalDetails is a Mixed/Object type — Mongoose won't detect the
+            // mutation from the spread unless we explicitly mark it modified.
+            user.markModified('personalDetails');
         }
 
         // Update identity details
@@ -79,9 +82,16 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
                 ...user.identityDetails,
                 ...identityDetails
             };
+            // Same reason as above.
+            user.markModified('identityDetails');
         }
 
         await user.save();
+
+        // Bust the /auth/me cache so the next request returns fresh data.
+        // Without this the 5-min NodeCache TTL serves the old personalDetails
+        // even though MongoDB has the new values.
+        cacheService.invalidateUser(req.user.userId);
 
         // Return updated user
         const updatedUser = await User.findById(req.user.userId)

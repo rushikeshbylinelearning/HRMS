@@ -50,6 +50,7 @@ require('./models/RefreshToken');
 require('./models/PolicyAcceptanceLog');
 require('./models/EmployeeDocument');
 require('./models/DocumentTemplate');
+require('./models/EmployeeKycDocument');
 
 // Route Imports
 const authRoutes = require('./routes/auth');
@@ -292,8 +293,10 @@ app.use('/api/policies-gridfs', policiesGridFSRoutes);
 
 const onboardingRoutes = require('./routes/onboarding');
 const employeeDocumentRoutes = require('./routes/employeeDocuments');
+const kycRoutes = require('./routes/kyc');
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/employee-documents', employeeDocumentRoutes);
+app.use('/api/kyc', kycRoutes);
 
 const absentToLeaveRoutes = require('./routes/absent_to_leave_route');
 app.use('/api/admin', absentToLeaveRoutes);

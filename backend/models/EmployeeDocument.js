@@ -14,6 +14,7 @@ const timelineEventSchema = new mongoose.Schema({
             'status_changed',
             'auto_triggered',
             'hr_pending',
+            'forwarded_to_personal_email',
         ],
         required: true,
     },
@@ -63,6 +64,11 @@ const employeeDocumentSchema = new mongoose.Schema({
     readingDurationSeconds: { type: Number, default: 0 },
 
     note: { type: String, default: '' },
+
+    // Personal email forwarding audit
+    forwardedToPersonalEmailAt: { type: Date, default: null },
+    forwardedCount: { type: Number, default: 0 },
+    lastForwardStatus: { type: String, enum: ['success', 'failure', null], default: null },
 
     // Template provenance — set when the document was generated from a DocumentTemplate.
     // These fields are immutable after creation so re-opening old records always shows

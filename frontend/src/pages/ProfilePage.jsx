@@ -343,8 +343,9 @@ const ProfilePage = () => {
             initialDocumentId={initialDocumentId}
             onDocumentCenterClose={handleCloseDocumentCenter}
             onDocumentsUpdated={loadDocuments}
+            hasPersonalEmail={!!(user?.personalDetails?.personalEmail)}
         />
-    ), [policies, documents, documentCenterOpen, initialDocumentId, handlePolicyClick, handleCloseDocumentCenter, loadDocuments]);
+    ), [policies, documents, documentCenterOpen, initialDocumentId, handlePolicyClick, handleCloseDocumentCenter, loadDocuments, user?.personalDetails?.personalEmail]);
 
     return (
         <div className="profile-page">

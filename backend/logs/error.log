@@ -410,3 +410,11 @@
   level: 'error',
   timestamp: '2026-05-18 15:10:17'
 }
+{
+  service: 'attendance-system',
+  error: 'DELIBERATE TEST FAILURE: simulating mid-transaction crash after first $inc',
+  employeeId: new ObjectId('6a64b048322749d076772c05'),
+  level: 'error',
+  message: '[LeaveAccrual] Confirmation allotment failed',
+  timestamp: '2026-07-25 18:17:04'
+}

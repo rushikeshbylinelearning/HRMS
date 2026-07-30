@@ -17,17 +17,13 @@ import api from '../api/axios';
 import socket from '../socket';
 import { formatISTTime, formatISTDate, parseISTDate } from '../utils/istTime';
 import '../styles/LiveAttendancePage.css';
-import BulkAttendanceAssistant from '../components/BulkAttendanceAssistant';
-import usePermissions from '../hooks/usePermissions';
 
 const REFRESH_INTERVAL_MS = 60000;
 const SOCKET_THROTTLE_MS = 500;
 
 const LEAVE_RANGE_OPTIONS = [
     { value: 'today', label: 'Today' },
-    { value: 'this_week', label: 'This Week' },
-    { value: '1_week', label: '1 Week' },
-    { value: '2_weeks', label: '2 Weeks' },
+    { value: 'upcoming', label: 'Upcoming' },
 ];
 
 const BADGE_MAP = {
@@ -121,8 +117,6 @@ const formatLeaveDayTypeLabel = (dayType) => {
 };
 
 const LiveAttendancePage = () => {
-    const { canAccess } = usePermissions();
-    const canUseBulkAssistant = canAccess.manageBulkAttendanceActions();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -201,9 +195,7 @@ const LiveAttendancePage = () => {
 
     const leaveEmptyText = {
         today: 'No one on leave today',
-        this_week: 'No leaves this week',
-        '1_week': 'No leaves in the next 7 days',
-        '2_weeks': 'No leaves in the next 2 weeks',
+        upcoming: 'No upcoming leaves',
     };
 
     const counts = data?.counts || {};
@@ -226,7 +218,6 @@ const LiveAttendancePage = () => {
     const absentList = data?.absent || [];
 
     return (
-        <>
         <div className="live-attendance-dashboard">
             <header className="la-header">
                 <div className="la-header__left">
@@ -360,11 +351,6 @@ const LiveAttendancePage = () => {
                 </Panel>
             </div>
         </div>
-
-        {canUseBulkAssistant && (
-            <BulkAttendanceAssistant onActionComplete={() => fetchOverview(false, leaveRange)} />
-        )}
-        </>
     );
 };
 

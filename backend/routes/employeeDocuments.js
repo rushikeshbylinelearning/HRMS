@@ -37,6 +37,7 @@ router.post('/admin/change-status/:userId', authenticateToken, isAdminOrHr, ctrl
 router.post('/:id/view', authenticateToken, ctrl.recordView);
 router.post('/:id/start-reading', authenticateToken, ctrl.startReading);
 router.post('/:id/acknowledge', authenticateToken, ctrl.acknowledgeDocument);
+router.post('/:id/forward-email', authenticateToken, ctrl.forwardToPersonalEmail);
 router.get('/:id/file', authenticateToken, ctrl.getDocumentFile);
 
 module.exports = router;

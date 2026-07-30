@@ -5,7 +5,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const { getTodayISTKey, getISTDateString, parseISTDate, startOfISTDay } = require('../utils/istTime');
 const { fetchAbsentTodayEmployees } = require('./dashboardEmployeeLists');
 
-const VALID_LEAVE_RANGES = new Set(['today', 'this_week', '1_week', '2_weeks']);
+const VALID_LEAVE_RANGES = new Set(['today', 'upcoming']);
 
 function mapEmployeeBase(user, extra = {}) {
     return {
@@ -109,8 +109,6 @@ function mergeLeaveRowsByEmployee(rows) {
 }
 
 function filterLeaveRows(rows, leaveRange, todayKey) {
-    const { weekStart, weekEnd } = getWeekBoundsIST(todayKey);
-
     return rows.filter((row) => {
         const { leaveStart, leaveEnd } = row;
 
@@ -118,18 +116,10 @@ function filterLeaveRows(rows, leaveRange, todayKey) {
             return row.isOnLeaveToday;
         }
 
-        if (leaveRange === 'this_week') {
-            return rangesOverlap(leaveStart, leaveEnd, weekStart, weekEnd) && leaveEnd >= todayKey;
-        }
-
-        if (leaveRange === '1_week') {
-            const windowEnd = addDaysIST(todayKey, 6);
-            return rangesOverlap(leaveStart, leaveEnd, todayKey, windowEnd);
-        }
-
-        if (leaveRange === '2_weeks') {
-            const windowEnd = addDaysIST(todayKey, 13);
-            return rangesOverlap(leaveStart, leaveEnd, todayKey, windowEnd);
+        if (leaveRange === 'upcoming') {
+            // All future leaves: any leave that ends on or after tomorrow
+            const tomorrow = addDaysIST(todayKey, 1);
+            return leaveEnd >= tomorrow;
         }
 
         return row.isOnLeaveToday;
@@ -137,9 +127,9 @@ function filterLeaveRows(rows, leaveRange, todayKey) {
 }
 
 async function fetchApprovedLeavesForCatalog(todayKey) {
-    const { weekStart } = getWeekBoundsIST(todayKey);
-    const catalogEnd = addDaysIST(todayKey, 13);
-    const queryStart = startOfISTDay(weekStart < todayKey ? weekStart : todayKey);
+    const queryStart = startOfISTDay(todayKey);
+    // Fetch up to 1 year ahead to cover all upcoming leaves
+    const catalogEnd = addDaysIST(todayKey, 365);
     const queryEnd = startOfISTDay(addDaysIST(catalogEnd, 1));
 
     return LeaveRequest.find({
@@ -249,13 +239,9 @@ async function getLiveAttendanceOverview(options = {}) {
     present.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
     onBreak.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
 
-    const { weekStart, weekEnd } = getWeekBoundsIST(today);
-
     return {
         date: today,
         leaveRange,
-        weekStart,
-        weekEnd,
         lastUpdated: new Date().toISOString(),
         counts: {
             present: present.length,

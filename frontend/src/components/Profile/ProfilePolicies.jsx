@@ -10,6 +10,7 @@ const ProfilePolicies = memo(({
     initialDocumentId = null,
     onDocumentCenterClose,
     onDocumentsUpdated,
+    hasPersonalEmail = false,
 }) => {
     const [centerOpen, setCenterOpen] = useState(false);
 
@@ -115,6 +116,7 @@ const ProfilePolicies = memo(({
                 documents={documents}
                 initialDocumentId={initialDocumentId}
                 onDocumentsUpdated={onDocumentsUpdated}
+                hasPersonalEmail={hasPersonalEmail}
             />
 
             {/* Anonymous Feedback */}

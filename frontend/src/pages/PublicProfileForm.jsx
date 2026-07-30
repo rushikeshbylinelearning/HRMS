@@ -80,9 +80,194 @@ const PATTERNS = {
   email:   /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 };
 
-const STEPS = ['Personal', 'Address', 'Emergency', 'Identity'];
+const STEPS = ['Personal', 'Address', 'Emergency', 'Identity', 'Documents'];
 
-// ── Sub-components defined OUTSIDE the main component to prevent remounting ──
+// ── KYC document types (mirrors backend catalogue) ────────────────────────────
+const KYC_TYPES = [
+  { key: 'aadhaar',                 label: 'Aadhaar Card',                    isOptional: false },
+  { key: 'pan',                     label: 'PAN Card',                        isOptional: false },
+  { key: 'utility_bill',            label: 'Utility Bill',                    isOptional: false },
+  { key: 'rent_agreement',          label: 'Rent Agreement',                  isOptional: false },
+  { key: 'educational_certificate', label: 'Educational Certificates',        isOptional: false },
+  { key: 'salary_slip',             label: 'Salary Slips',                    isOptional: false },
+  { key: 'bank_statement',          label: 'Bank Statement',                  isOptional: false },
+  { key: 'bank_details',            label: 'Bank Details / Cancelled Cheque', isOptional: false },
+  { key: 'passport',                label: 'Passport',                        isOptional: true },
+  { key: 'driving_license',         label: "Driver's License",                isOptional: true },
+  { key: 'relieving_letter',        label: 'Relieving Letter',                isOptional: true },
+  { key: 'experience_letter',       label: 'Experience Letter',               isOptional: true },
+];
+
+const KYC_REQUIRED_KEYS = KYC_TYPES.filter(t => !t.isOptional).map(t => t.key);
+const KYC_ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png'];
+const KYC_MAX_SIZE = 5 * 1024 * 1024;
+
+function kycGetExt(filename = '') {
+  const idx = filename.lastIndexOf('.');
+  return idx === -1 ? '' : filename.slice(idx).toLowerCase();
+}
+function kycGetMime(ext) {
+  const map = { '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+  return map[ext] || 'application/octet-stream';
+}
+function kycGetStatusMeta(status) {
+  switch (status) {
+    case 'verified':       return { label: 'Verified',       className: 'kyc-status--verified' };
+    case 'rejected':       return { label: 'Rejected',       className: 'kyc-status--rejected' };
+    case 'pending_review': return { label: 'Pending Review', className: 'kyc-status--pending'  };
+    default:               return { label: 'Not Uploaded',   className: 'kyc-status--none'     };
+  }
+}
+
+// ── KycRow — single document upload row for the public form ─────────────────
+// Uses the public-token API endpoints instead of the JWT-authenticated ones.
+const KycRow = ({ typeMeta, document: doc, token, onUploaded }) => {
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError]         = React.useState('');
+  const [progress, setProgress]   = React.useState(0);
+  const fileInputRef               = React.useRef(null);
+  const statusMeta                 = kycGetStatusMeta(doc?.status);
+
+  const handleFileSelect = React.useCallback(async (file) => {
+    setError('');
+    setProgress(0);
+    if (!file) return;
+
+    const ext = kycGetExt(file.name);
+    if (!KYC_ALLOWED_EXTENSIONS.includes(ext)) {
+      setError(`Not allowed. Use: ${KYC_ALLOWED_EXTENSIONS.join(', ')}`);
+      return;
+    }
+    if (file.size > KYC_MAX_SIZE) {
+      setError('File exceeds 5 MB limit.');
+      return;
+    }
+    if (file.size === 0) {
+      setError('File is empty.');
+      return;
+    }
+
+    const mimeType = kycGetMime(ext);
+    setUploading(true);
+
+    try {
+      // Single-request proxy upload — file goes to our own backend as
+      // multipart/form-data; the backend uploads it to B2 server-side.
+      // No presigned URL, no direct-to-B2 PUT, no B2 CORS involved at all.
+      const form = new FormData();
+      form.append('file', file, file.name);
+      form.append('documentType', typeMeta.key);
+
+      setProgress(10);
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) setProgress(10 + Math.round((e.loaded / e.total) * 80));
+      });
+
+      const confirmed = await new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+              reject(new Error('Upload succeeded but the server response could not be read.'));
+            }
+          } else {
+            let detail = `HTTP ${xhr.status}`;
+            try {
+              const parsed = JSON.parse(xhr.responseText);
+              if (parsed?.error) detail = parsed.error;
+            } catch (_) {}
+            reject(new Error(detail));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload. Check your connection and try again.'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out. Please try again on a faster connection.'));
+        xhr.timeout = 2 * 60 * 1000; // 2 minutes — well above what a 5MB upload to our own server needs
+        xhr.open('POST', `/api/public/kyc/upload?token=${encodeURIComponent(token)}`);
+        // No manual Content-Type header — the browser sets the correct
+        // multipart/form-data boundary automatically for FormData bodies.
+        xhr.send(form);
+      });
+
+      setProgress(100);
+      onUploaded(typeMeta.key, confirmed.document);
+    } catch (err) {
+      const data = err.response?.data;
+      const msg = data?.error || data?.message || err.message || 'Upload failed.';
+      const retryAfter = data?.retryAfter;
+      setError(retryAfter
+        ? `${msg} (retry in ${Math.ceil(retryAfter / 60)} min)`
+        : msg
+      );
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [typeMeta.key, token, onUploaded]);
+
+  return (
+    <div className={`kyc-row${uploading ? ' kyc-row--uploading' : ''}`}>
+      <div className="kyc-row-info">
+        <span className="kyc-row-label">
+          {typeMeta.label}
+          {typeMeta.isOptional && (
+            <span className="pf-label-optional" style={{ marginLeft: 6 }}>Optional</span>
+          )}
+        </span>
+        <span className={`kyc-status ${statusMeta.className}`}>{statusMeta.label}</span>
+        {doc?.status === 'rejected' && doc?.rejectionReason && (
+          <span className="kyc-rejection-reason">Reason: {doc.rejectionReason}</span>
+        )}
+        {doc?.originalFileName && (
+          <span className="kyc-file-name">{doc.originalFileName}</span>
+        )}
+      </div>
+
+      <div className="kyc-row-actions">
+        <label
+          className={`kyc-btn kyc-btn--upload${uploading ? ' kyc-btn--disabled' : ''}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFileSelect(f); }}
+          role="button"
+          tabIndex={uploading ? -1 : 0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+          aria-label={doc ? `Re-upload ${typeMeta.label}` : `Upload ${typeMeta.label}`}
+        >
+          {uploading ? (
+            <span className="kyc-spinner" aria-hidden="true" />
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+          {uploading ? (progress > 0 ? `${progress}%` : 'Uploading…') : (doc ? 'Replace' : 'Upload')}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            className="kyc-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+            disabled={uploading}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+        </label>
+      </div>
+
+      {uploading && progress > 0 && (
+        <div className="kyc-progress-bar-wrap" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+          <div className="kyc-progress-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+
+      {error && <span className="kyc-row-error" role="alert">⚠ {error}</span>}
+    </div>
+  );
+};
 
 const Field = ({ label, children, error: fieldErr, optional }) => (
   <div className="pf-field">
@@ -128,6 +313,12 @@ const PublicProfileForm = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [formData, setFormData]     = useState(DEFAULT_FORM);
 
+  // ── Step 5: KYC document state ──
+  const [kycDocMap, setKycDocMap]         = useState({}); // key → doc | null
+  const [kycLoading, setKycLoading]       = useState(false);
+  const [kycLoadError, setKycLoadError]   = useState('');
+  const [kycStepErrors, setKycStepErrors] = useState({}); // key → error msg for required docs
+
   useEffect(() => {
     if (!token) { setError('Invalid or missing link.'); setLoading(false); return; }
     publicApi.get('/api/public/validate', { params: { token } })
@@ -165,6 +356,24 @@ const PublicProfileForm = () => {
       }
     } catch (_) {}
   }, [token, employee]);
+
+  // Load existing KYC documents when step 5 is first reached
+  useEffect(() => {
+    if (currentStep !== 5 || !token || !employee) return;
+    if (Object.keys(kycDocMap).length > 0) return; // already loaded
+    setKycLoading(true);
+    setKycLoadError('');
+    publicApi.get('/api/public/kyc/my-documents', { params: { token } })
+      .then(({ data }) => {
+        const map = {};
+        for (const entry of data.documents) {
+          map[entry.key] = entry.document;
+        }
+        setKycDocMap(map);
+      })
+      .catch(() => setKycLoadError('Failed to load existing documents. You can still upload below.'))
+      .finally(() => setKycLoading(false));
+  }, [currentStep, token, employee]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPD = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, personalDetails: { ...prev.personalDetails, [field]: value } }));
@@ -209,12 +418,26 @@ const PublicProfileForm = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = () => { if (validateStep(currentStep)) setCurrentStep(s => Math.min(s + 1, 4)); };
+  const handleNext = () => { if (validateStep(currentStep)) setCurrentStep(s => Math.min(s + 1, 5)); };
   const handlePrev = () => setCurrentStep(s => Math.max(s - 1, 1));
+
+  const validateKycStep = () => {
+    const errs = {};
+    for (const key of KYC_REQUIRED_KEYS) {
+      if (!kycDocMap[key]) {
+        errs[key] = 'This document is required before submitting.';
+      }
+    }
+    setKycStepErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateStep(4)) return;
+    if (!validateKycStep()) {
+      setError('Please upload all required documents before submitting.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -280,7 +503,7 @@ const PublicProfileForm = () => {
     </div>
   );
 
-  const progress = (currentStep / 4) * 100;
+  const progress = (currentStep / 5) * 100;
   const pd = formData.personalDetails;
   const id = formData.identityDetails;
 
@@ -453,6 +676,86 @@ const PublicProfileForm = () => {
                     <Input value={id.pfAccountNumber} onChange={v => setID('pfAccountNumber', v)} placeholder="PF account number" />
                   </Field>
                 </div>
+
+                {/* ── KYC documents notice removed — uploading happens on Step 5 ── */}
+              </div>
+            )}
+
+            {/* ── Step 5: Documents ── */}
+            {currentStep === 5 && (
+              <div className="pf-step-content">
+                <h3 className="pf-section-title">KYC &amp; Compliance Documents</h3>
+                <p className="pf-section-desc">Upload your identity and compliance documents. Files are stored securely and reviewed by HR.</p>
+
+                <div className="pf-security-banner" style={{ marginBottom: 20 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>Documents are encrypted and stored securely. Visible only to HR admins.</span>
+                </div>
+
+                {kycLoading && (
+                  <div className="kyc-loading" aria-busy="true">
+                    <span className="kyc-spinner" />
+                    <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--text-muted)' }}>Loading existing documents…</span>
+                  </div>
+                )}
+
+                {kycLoadError && (
+                  <div className="pf-alert pf-alert--error" style={{ marginBottom: 16 }}>{kycLoadError}</div>
+                )}
+
+                {!kycLoading && (
+                  <>
+                    {/* Required documents */}
+                    <div className="kyc-section-header" style={{ marginBottom: 8 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Required &amp; Optional Documents
+                      <span className="kyc-badge-info">PDF, JPG, PNG · Max 5 MB</span>
+                    </div>
+
+                    <div className="kyc-group-label">Required Documents</div>
+                    <div className="kyc-list" role="list">
+                      {KYC_TYPES.filter(t => !t.isOptional).map((typeMeta) => (
+                        <div key={typeMeta.key}>
+                          <KycRow
+                            typeMeta={typeMeta}
+                            document={kycDocMap[typeMeta.key] || null}
+                            token={token}
+                            onUploaded={(key, doc) => {
+                              setKycDocMap(prev => ({ ...prev, [key]: doc }));
+                              setKycStepErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
+                            }}
+                          />
+                          {kycStepErrors[typeMeta.key] && (
+                            <span className="pf-error-text" role="alert" style={{ paddingLeft: 4 }}>
+                              ⚠ {kycStepErrors[typeMeta.key]}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="kyc-group-label kyc-group-label--optional" style={{ marginTop: 24 }}>
+                      Optional Documents
+                      <span className="kyc-optional-note">Not required to complete your profile</span>
+                    </div>
+                    <div className="kyc-list" role="list">
+                      {KYC_TYPES.filter(t => t.isOptional).map((typeMeta) => (
+                        <KycRow
+                          key={typeMeta.key}
+                          typeMeta={typeMeta}
+                          document={kycDocMap[typeMeta.key] || null}
+                          token={token}
+                          onUploaded={(key, doc) => setKycDocMap(prev => ({ ...prev, [key]: doc }))}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -479,7 +782,7 @@ const PublicProfileForm = () => {
                   Previous
                 </button>
               )}
-              {currentStep < 4 ? (
+              {currentStep < 5 ? (
                 <button type="button" onClick={handleNext} className="pf-btn pf-btn--primary">
                   Next
                 </button>

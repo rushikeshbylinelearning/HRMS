@@ -1073,9 +1073,13 @@ const EmployeeDashboardPage = () => {
                                     />
                                 </Box>
                                 <Typography variant="subtitle1" className="theme-text-black" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1rem', color: '#111827' }}>{contextUser.fullName || contextUser.name}</Typography>
-                                <Typography variant="body2" sx={{ color: '#9ca3af', mb: 1, fontWeight: 400, fontSize: '0.8125rem' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
+                                <Typography variant="body2" sx={{ color: '#1f2937', mb: 1, fontWeight: 500, fontSize: '0.8125rem' }}>Employee Code: {contextUser.employeeCode || 'N/A'}</Typography>
                                 <Divider sx={{ my: 1, borderColor: 'var(--theme-red)', borderWidth: '1px', width: '50px', marginX: 'auto' }} />
-                                <Chip label={contextUser.designation || contextUser.role || 'Employee'} size="small" sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, fontSize: '0.75rem' }} />
+                                <Chip
+                                    label={`${contextUser.designation || contextUser.role || 'Employee'}${contextUser.employmentStatus ? ` (${contextUser.employmentStatus})` : ''}`}
+                                    size="small"
+                                    sx={{ mt: 1, mb: 2, bgcolor: 'var(--theme-red-light)', color: 'var(--theme-red)', fontWeight: 500, fontSize: '0.75rem' }}
+                                />
                                 <Typography variant="body2" sx={{ fontWeight: 400, color: '#9ca3af', fontSize: '0.8125rem' }}>{formatISTDate(getISTNow(), { month: 'long', day: 'numeric', year: 'numeric' })}</Typography>
                             </Paper>
                             <Paper className="dashboard-card-base shift-info-card">

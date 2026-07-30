@@ -13,6 +13,7 @@ import CountryCodeSelector from './CountryCodeSelector';
 import CIFSummaryCard from './CIF/CIFSummaryCard';
 import AdminEmployeeCompliancePanel from './adminEmployee/AdminEmployeeCompliancePanel';
 import AdminEmployeeDocumentsPanel from './adminEmployee/AdminEmployeeDocumentsPanel';
+import AdminEmployeeKycPanel from './adminEmployee/AdminEmployeeKycPanel';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -470,6 +471,7 @@ const AdminEmployeeProfileDialog = ({
                         <Tab label="Personal" />
                         <Tab label="Compliance" />
                         <Tab label="Documents" />
+                        <Tab label="KYC Documents" />
                     </Tabs>
                 </Box>
 
@@ -630,6 +632,11 @@ const AdminEmployeeProfileDialog = ({
                     {/* ── Tab 3: Documents ── */}
                     {activeTab === 3 && employee?._id && (
                         <AdminEmployeeDocumentsPanel employeeId={employee._id} />
+                    )}
+
+                    {/* ── Tab 4: KYC Documents ── */}
+                    {activeTab === 4 && employee?._id && (
+                        <AdminEmployeeKycPanel employeeId={employee._id} />
                     )}
                 </DialogContent>
 

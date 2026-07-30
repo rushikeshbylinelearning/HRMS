@@ -10,6 +10,8 @@
 //     and issues a new one (rolling rotation).
 //   - Reuse of an already-rotated (revoked) token raises RefreshTokenReuseError
 //     and is logged clearly for security review.
+//   - Rotation is ATOMIC: uses findOneAndUpdate with a conditional filter so
+//     two concurrent callers presenting the same token can never both succeed.
 
 const crypto = require('crypto');
 const RefreshToken = require('../models/RefreshToken');
@@ -76,8 +78,14 @@ async function issueRefreshToken(userId, authMethod = 'local', userAgent = null)
 }
 
 /**
- * Validates an incoming refresh token, revokes it, and issues a new one
- * (rolling rotation).
+ * Validates an incoming refresh token, revokes it atomically, and issues a
+ * new one (rolling rotation).
+ *
+ * ATOMICITY: The "mark as revoked" step uses a single findOneAndUpdate with a
+ * conditional filter `{ tokenHash: oldHash, revoked: false }`. Only one
+ * concurrent caller can win this write — MongoDB document-level locking ensures
+ * the second caller gets null back, preventing the race condition that caused
+ * intermittent logouts under multi-tab / retry scenarios.
  *
  * @param {string} oldRawToken - The raw token from the client cookie.
  * @returns {Promise<{ newRawToken: string, userId: string, authMethod: string }>}
@@ -86,67 +94,103 @@ async function issueRefreshToken(userId, authMethod = 'local', userAgent = null)
  */
 async function rotateRefreshToken(oldRawToken) {
     const oldHash = hashRefreshToken(oldRawToken);
-    const record = await RefreshToken.findOne({ tokenHash: oldHash });
+    const hashPrefix = oldHash.slice(0, 12);
 
-    if (!record) {
-        // Token simply doesn't exist — either fabricated or already deleted by TTL.
-        throw new Error('Refresh token not found');
-    }
-
-    // Check for token reuse (already rotated → possible theft)
-    if (record.revoked && record.replacedByTokenHash) {
-        // This is the classic "reuse of rotated token" signal.
-        // SECURITY NOTE (flagged back per spec): We deliberately do NOT auto-revoke
-        // all sessions here. The decision to revoke all of a user's sessions on
-        // reuse detection is a security-vs-convenience trade-off that the operator
-        // should make explicitly. See RefreshTokenReuseError handling in the route.
-        console.error(
-            `[RefreshToken] ⚠️  REUSE DETECTED — userId: ${record.userId} | ` +
-            `oldHash: ${oldHash.slice(0, 12)}... | ` +
-            `replacedBy: ${record.replacedByTokenHash.slice(0, 12)}... | ` +
-            `issuedAt: ${record.issuedAt.toISOString()} | ` +
-            `This may indicate token theft. Manual review recommended.`
-        );
-        throw new RefreshTokenReuseError(
-            'Refresh token has already been rotated — possible token reuse / theft'
-        );
-    }
-
-    // Generic revocation (expired, or revoked by logout)
-    if (record.revoked) {
-        throw new Error('Refresh token has been revoked');
-    }
-
-    // Check expiry (belt-and-suspenders — MongoDB TTL handles cleanup but may lag)
-    if (record.expiresAt < new Date()) {
-        throw new Error('Refresh token has expired');
-    }
-
-    // Issue replacement token
+    // Prepare the replacement hash upfront so we can set it in the atomic write.
     const newRawToken = generateRefreshToken();
     const newHash = hashRefreshToken(newRawToken);
 
-    // Mark old record as rotated
-    record.revoked = true;
-    record.replacedByTokenHash = newHash;
-    await record.save();
+    // ─── ATOMIC READ-AND-REVOKE ────────────────────────────────────────────────
+    // findOneAndUpdate with { revoked: false } as part of the query filter means
+    // this write can only succeed once, even if two requests race with the same
+    // token. { new: false } returns the pre-update document so we can read
+    // userId / authMethod / expiresAt without a second round-trip.
+    const preUpdateRecord = await RefreshToken.findOneAndUpdate(
+        { tokenHash: oldHash, revoked: false },
+        { $set: { revoked: true, replacedByTokenHash: newHash } },
+        { new: false }
+    );
 
-    // Persist new token
+    if (!preUpdateRecord) {
+        // The atomic write found nothing with revoked:false. Distinguish between:
+        //   a) Token never existed / already cleaned up by TTL → generic error
+        //   b) Token exists but is already revoked → reuse / possible theft
+        const existingRecord = await RefreshToken.findOne({ tokenHash: oldHash }).lean();
+
+        if (!existingRecord) {
+            // (a) Token simply doesn't exist — fabricated or TTL-expired.
+            console.info(
+                `[RefreshToken] INFO not-found | hash: ${hashPrefix}... | ` +
+                `branch: token-not-found`
+            );
+            throw new Error('Refresh token not found');
+        }
+
+        // (b) Record exists but was already revoked.
+        if (existingRecord.replacedByTokenHash) {
+            // Already rotated before — classic reuse / token theft signal.
+            console.error(
+                `[RefreshToken] ⚠️  REUSE DETECTED | hash: ${hashPrefix}... | ` +
+                `userId: ${existingRecord.userId} | ` +
+                `replacedBy: ${existingRecord.replacedByTokenHash.slice(0, 12)}... | ` +
+                `issuedAt: ${existingRecord.issuedAt ? existingRecord.issuedAt.toISOString() : 'unknown'} | ` +
+                `branch: reuse-detected | ` +
+                `This may indicate token theft. Manual review recommended.`
+            );
+            throw new RefreshTokenReuseError(
+                'Refresh token has already been rotated — possible token reuse / theft'
+            );
+        }
+
+        // Revoked without a replacement — e.g. revoked by logout or admin action.
+        console.info(
+            `[RefreshToken] INFO already-revoked | hash: ${hashPrefix}... | ` +
+            `userId: ${existingRecord.userId} | ` +
+            `branch: already-revoked-no-replacement`
+        );
+        throw new Error('Refresh token has been revoked');
+    }
+
+    // ─── POST-ATOMIC-WRITE CHECKS ─────────────────────────────────────────────
+    // Check expiry on the pre-update doc (belt-and-suspenders — MongoDB TTL
+    // handles cleanup but may lag by up to 60 seconds).
+    if (preUpdateRecord.expiresAt < new Date()) {
+        // Already marked as rotated above, but the token was expired — treat
+        // as an invalid token rather than a reuse event.
+        console.info(
+            `[RefreshToken] INFO expired | hash: ${hashPrefix}... | ` +
+            `userId: ${preUpdateRecord.userId} | ` +
+            `expiresAt: ${preUpdateRecord.expiresAt.toISOString()} | ` +
+            `branch: expired`
+        );
+        throw new Error('Refresh token has expired');
+    }
+
+    // ─── ISSUE REPLACEMENT TOKEN ──────────────────────────────────────────────
+    // The atomic update already wrote newHash into replacedByTokenHash, so now
+    // we just persist the new child document.
     await RefreshToken.create({
-        userId: record.userId,
+        userId: preUpdateRecord.userId,
         tokenHash: newHash,
         issuedAt: new Date(),
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
         revoked: false,
         replacedByTokenHash: null,
-        userAgent: record.userAgent,
-        authMethod: record.authMethod,
+        userAgent: preUpdateRecord.userAgent,
+        authMethod: preUpdateRecord.authMethod,
     });
+
+    console.info(
+        `[RefreshToken] INFO success | hash: ${hashPrefix}... | ` +
+        `userId: ${preUpdateRecord.userId} | ` +
+        `newHash: ${newHash.slice(0, 12)}... | ` +
+        `branch: rotated`
+    );
 
     return {
         newRawToken,
-        userId: record.userId.toString(),
-        authMethod: record.authMethod,
+        userId: preUpdateRecord.userId.toString(),
+        authMethod: preUpdateRecord.authMethod,
     };
 }
 

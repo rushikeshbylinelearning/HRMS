@@ -23,6 +23,7 @@ const DocumentCenterModal = memo(({
     documents,
     initialDocumentId = null,
     onDocumentsUpdated,
+    hasPersonalEmail = false,
 }) => {
     const [selectedId, setSelectedId] = useState(null);
     const [pdfBlob, setPdfBlob] = useState(null);
@@ -36,6 +37,10 @@ const DocumentCenterModal = memo(({
     const [readingSeconds, setReadingSeconds] = useState(0);
     const [ackPending, setAckPending] = useState(false);
     const [ackError, setAckError] = useState('');
+
+    // Forward-to-email state: keyed by document _id so each row is independent
+    const [forwardingId, setForwardingId] = useState(null);
+    const [forwardToast, setForwardToast] = useState({ open: false, message: '', isError: false });
 
     const contentRef = useRef(null);
     const readingStartRef = useRef(null);
@@ -163,6 +168,20 @@ const DocumentCenterModal = memo(({
         }
     };
 
+    const handleForwardEmail = async (doc, e) => {
+        e?.stopPropagation();
+        setForwardingId(doc._id);
+        try {
+            const { data } = await api.post(`/employee-documents/${doc._id}/forward-email`);
+            setForwardToast({ open: true, message: data.message || 'Document sent to your personal email.', isError: false });
+        } catch (err) {
+            const msg = err.response?.data?.error || 'Failed to send. Please try again.';
+            setForwardToast({ open: true, message: msg, isError: true });
+        } finally {
+            setForwardingId(null);
+        }
+    };
+
     const handleAcknowledge = async () => {
         if (!selectedDoc || !acknowledged || !canAcknowledge) return;
         setAckPending(true);
@@ -181,11 +200,18 @@ const DocumentCenterModal = memo(({
         }
     };
 
+    // Auto-dismiss the forward toast after 4.5 s
+    useEffect(() => {
+        if (!forwardToast.open) return undefined;
+        const id = setTimeout(() => setForwardToast((t) => ({ ...t, open: false })), 4500);
+        return () => clearTimeout(id);
+    }, [forwardToast.open]);
+
     if (!open) return null;
 
     const timerRemaining = Math.max(0, MIN_READ_SECONDS - readingSeconds);
 
-    return createPortal(
+    const modal = createPortal(
         <div className="doc-center-overlay" onClick={onClose} role="presentation">
             <div
                 className="doc-center-modal doc-center-modal-split"
@@ -255,6 +281,44 @@ const DocumentCenterModal = memo(({
                                                     >
                                                         Download
                                                     </button>
+                                                    <button
+                                                        type="button"
+                                                        className="doc-center-btn-forward"
+                                                        onClick={(e) => handleForwardEmail(doc, e)}
+                                                        disabled={forwardingId === doc._id || !hasPersonalEmail}
+                                                        title={
+                                                            !hasPersonalEmail
+                                                                ? 'Add a personal email in your profile to enable this'
+                                                                : 'Forward to your personal email'
+                                                        }
+                                                        aria-label={
+                                                            !hasPersonalEmail
+                                                                ? 'Forward unavailable — add a personal email in your profile'
+                                                                : `Forward ${doc.documentTypeLabel} to your personal email`
+                                                        }
+                                                    >
+                                                        {forwardingId === doc._id ? (
+                                                            <span className="doc-center-btn-forward-spinner" aria-hidden="true" />
+                                                        ) : (
+                                                            /* mail/send icon */
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                    {!hasPersonalEmail && (
+                                                        <span className="doc-center-btn-forward-hint" aria-live="polite">
+                                                            No personal email —{' '}
+                                                            <a
+                                                                href="#contact"
+                                                                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                                                                className="doc-center-btn-forward-hint-link"
+                                                            >
+                                                                add one in your profile
+                                                            </a>
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </li>
@@ -359,6 +423,42 @@ const DocumentCenterModal = memo(({
             </div>
         </div>,
         document.body
+    );
+
+    return (
+        <>
+            {modal}
+            {/* Forward-email toast — separate portal so it floats above the modal overlay */}
+            {forwardToast.open && createPortal(
+                <div
+                    className={`doc-forward-toast${forwardToast.isError ? ' is-error' : ''}`}
+                    role="status"
+                    aria-live="polite"
+                >
+                    {forwardToast.isError ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                            <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                    ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    )}
+                    <span>{forwardToast.message}</span>
+                    <button
+                        type="button"
+                        className="doc-forward-toast-close"
+                        onClick={() => setForwardToast((t) => ({ ...t, open: false }))}
+                        aria-label="Dismiss"
+                    >
+                        ×
+                    </button>
+                </div>,
+                document.body
+            )}
+        </>
     );
 });
 

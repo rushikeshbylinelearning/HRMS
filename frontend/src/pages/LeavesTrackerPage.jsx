@@ -235,379 +235,273 @@ const SaturdayScheduleManager = ({ employees, onUpdate }) => {
         return groups;
     }, [filteredEmployees]);
 
-    const EmployeeChip = ({ emp, color }) => (
-        <Chip
-            key={emp._id}
-            avatar={<Avatar sx={{ bgcolor: '#dc3545', color: 'white' }}>{emp.fullName.charAt(0)}</Avatar>}
-            label={
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', py: 0.5 }}>
-                    <Typography variant="body2" fontWeight="600" sx={{ color: '#000' }}>{emp.fullName}</Typography>
-                    <Typography variant="caption" sx={{ color: '#666' }}>{emp.employeeCode} • {emp.department || 'N/A'}</Typography>
-                </Box>
-            }
-            deleteIcon={loadingMap[emp._id] ? <SkeletonBox width="18px" height="18px" borderRadius="50%" /> : <SwapHorizIcon />}
-            onDelete={() => handleSwapPolicy(emp)}
+    // Clean row-based employee card replacing the bulky Chip
+    const EmployeeRow = ({ emp }) => (
+        <Box
             draggable
             onDragStart={(e) => handleDragStart(e, emp)}
             onDragEnd={handleDragEnd}
-            sx={{ 
-                height: 'auto', 
-                py: 1, 
+            sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
                 px: 1.5,
-                mb: 1.5,
-                mr: 1.5,
-                borderRadius: '8px',
-                bgcolor: 'white',
-                cursor: 'grab',
-                border: '2px solid #dc3545',
-                '& .MuiChip-label': { display: 'block', whiteSpace: 'normal' },
-                transition: 'all 0.3s ease',
+                py: 1,
+                borderRadius: '6px',
+                cursor: loadingMap[emp._id] ? 'wait' : 'grab',
+                bgcolor: 'transparent',
+                transition: 'background 0.15s ease',
                 '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(220, 53, 69, 0.3)',
-                    borderColor: '#dc3545',
-                    bgcolor: '#fff'
+                    bgcolor: '#f5f5f5',
+                    '& .swap-btn': { opacity: 1 },
                 },
-                '&:active': {
-                    cursor: 'grabbing'
-                }
+                '&:active': { cursor: 'grabbing' },
             }}
-        />
+        >
+            <Avatar sx={{ width: 30, height: 30, fontSize: '0.75rem', bgcolor: '#dc3545', flexShrink: 0 }}>
+                {emp.fullName.charAt(0)}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" fontWeight={500} noWrap sx={{ color: '#111', lineHeight: 1.3 }}>
+                    {emp.fullName}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#888', lineHeight: 1.2 }}>
+                    {emp.employeeCode}
+                </Typography>
+            </Box>
+            <Tooltip title="Swap to alternate week">
+                <IconButton
+                    className="swap-btn"
+                    size="small"
+                    onClick={() => handleSwapPolicy(emp)}
+                    disabled={!!loadingMap[emp._id]}
+                    sx={{ opacity: 0, transition: 'opacity 0.15s', color: '#dc3545', p: '4px' }}
+                >
+                    {loadingMap[emp._id]
+                        ? <SkeletonBox width="16px" height="16px" borderRadius="50%" />
+                        : <SwapHorizIcon sx={{ fontSize: 16 }} />
+                    }
+                </IconButton>
+            </Tooltip>
+        </Box>
     );
 
-    const EmployeeList = ({ title, employees, color, icon, category }) => {
+    // Category config — colour accent per lane
+    const CATEGORY_CONFIG = {
+        firstAndThirdOff:   { label: '1st & 3rd Saturdays Off',  accent: '#2563eb', lightBg: '#eff6ff' },
+        secondAndFourthOff: { label: '2nd & 4th Saturdays Off', accent: '#7c3aed', lightBg: '#f5f3ff' },
+        allWorking:         { label: 'All Saturdays Working',    accent: '#16a34a', lightBg: '#f0fdf4' },
+        allOff:             { label: 'All Saturdays Off',        accent: '#dc3545', lightBg: '#fff1f2' },
+    };
+
+    const EmployeeList = ({ employees, category }) => {
         const isDragOver = dragOverCategory === category;
-        
+        const { label, accent, lightBg } = CATEGORY_CONFIG[category];
+
         return (
-            <Card 
-                variant="outlined" 
+            <Box
                 onDragOver={handleDragOver}
                 onDragEnter={() => handleDragEnter(category)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, category)}
-                sx={{ 
-                    flex: 1, 
-                    borderRadius: '8px',
-                    boxShadow: 'none',
-                    transition: 'all 0.3s ease',
-                    border: isDragOver ? '3px dashed #dc3545' : '2px solid #dc3545',
-                    bgcolor: isDragOver ? '#f8f9fa' : 'white',
-                    transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
-                    '&:hover': {
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                        borderColor: '#dc3545'
-                    }
+                sx={{
+                    borderRadius: '10px',
+                    border: isDragOver ? `2px dashed ${accent}` : '1px solid #e5e7eb',
+                    bgcolor: isDragOver ? lightBg : 'white',
+                    transition: 'all 0.18s ease',
+                    transform: isDragOver ? 'scale(1.01)' : 'scale(1)',
+                    overflow: 'hidden',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
-                <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, pb: 2, borderBottom: '1px solid #e0e0e0' }}>
-                        {icon}
-                        <Typography variant="h6" fontWeight="bold" sx={{ ml: 1, color: '#000' }}>{title}</Typography>
-                        <Chip 
-                            label={employees.length} 
-                            size="small" 
-                            sx={{ 
-                                ml: 'auto', 
-                                fontWeight: 'bold', 
-                                bgcolor: '#dc3545', 
-                                color: 'white',
-                                border: '1px solid #dc3545'
-                            }}
-                        />
-                    </Box>
-                    <Box sx={{ 
-                        minHeight: 200,
-                        maxHeight: 400, 
-                        overflowY: 'auto', 
-                        display: 'flex', 
-                        flexWrap: 'wrap',
-                        p: 1
+                {/* Lane header */}
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2,
+                    py: 1.5,
+                    borderBottom: '1px solid #f0f0f0',
+                    bgcolor: '#fafafa',
+                }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: accent, flexShrink: 0 }} />
+                    <Typography variant="body2" fontWeight={600} sx={{ color: '#111', flex: 1 }}>
+                        {label}
+                    </Typography>
+                    <Box sx={{
+                        minWidth: 22, height: 22,
+                        borderRadius: '6px',
+                        bgcolor: accent,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                        {employees.length === 0 ? (
-                            <Box sx={{ 
-                                py: 4, 
-                                textAlign: 'center', 
-                                width: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: 1
-                            }}>
-                                <Typography variant="body2" sx={{ color: '#666' }}>
-                                    {isDragOver ? 'Drop employee here' : 'No employees in this category'}
-                                </Typography>
-                                {isDragOver && (
-                                    <Typography variant="caption" sx={{ color: '#dc3545', fontWeight: 'bold' }}>
-                                        Release to assign
-                                    </Typography>
-                                )}
-                            </Box>
-                        ) : (
-                            employees.map(emp => <EmployeeChip key={emp._id} emp={emp} color={color} />)
-                        )}
+                        <Typography variant="caption" fontWeight={700} sx={{ color: 'white', fontSize: '0.7rem' }}>
+                            {employees.length}
+                        </Typography>
                     </Box>
-                </CardContent>
-            </Card>
+                </Box>
+
+                {/* Employee rows */}
+                <Box sx={{ flex: 1, overflowY: 'auto', maxHeight: 300, py: 0.5 }}>
+                    {employees.length === 0 ? (
+                        <Box sx={{ py: 5, textAlign: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#bbb' }}>
+                                {isDragOver ? 'Drop here to assign' : 'No employees'}
+                            </Typography>
+                        </Box>
+                    ) : (
+                        employees.map(emp => <EmployeeRow key={emp._id} emp={emp} />)
+                    )}
+                </Box>
+            </Box>
         );
     };
 
+    const GridView = () => (
+        <Grid container spacing={2} sx={{ mt: 0 }}>
+            {Object.keys(CATEGORY_CONFIG).map(cat => (
+                <Grid key={cat} item xs={12} sm={6}>
+                    <EmployeeList employees={categorizedSchedules[cat]} category={cat} />
+                </Grid>
+            ))}
+        </Grid>
+    );
+
     const DepartmentView = () => (
-        <Box sx={{ mt: 3 }}>
+        <Box sx={{ mt: 0 }}>
             {Object.entries(departmentGroups).map(([dept, schedules]) => (
-                <Card key={dept} sx={{ 
-                    mb: 3, 
-                    borderRadius: '8px', 
-                    boxShadow: 'none',
-                    border: '2px solid #000',
-                    bgcolor: 'white'
-                }}>
-                    <CardContent>
-                        <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#000' }}>
+                <Box key={dept} sx={{ mb: 3 }}>
+                    {/* Department heading */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#111' }}>
                             {dept}
-                            <Chip 
-                                label={`${Object.values(schedules).flat().length} employees`}
-                                size="small"
-                                sx={{ 
-                                    ml: 2, 
-                                    bgcolor: '#dc3545', 
-                                    color: 'white', 
-                                    fontWeight: 'bold',
-                                    border: '1px solid #dc3545'
-                                }}
-                            />
                         </Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} md={6}>
-                                <EmployeeList 
-                                    title="1st & 3rd Saturdays Off" 
-                                    employees={schedules.firstAndThirdOff}
-                                    color="white"
-                                    icon={<CalendarMonthIcon sx={{ color: '#dc3545' }} />}
-                                    category="firstAndThirdOff"
-                                />
+                        <Box sx={{ height: 1, flex: 1, bgcolor: '#e5e7eb' }} />
+                        <Typography variant="caption" sx={{ color: '#888', whiteSpace: 'nowrap' }}>
+                            {Object.values(schedules).flat().length} employees
+                        </Typography>
+                    </Box>
+                    <Grid container spacing={2}>
+                        {Object.keys(CATEGORY_CONFIG).map(cat => (
+                            <Grid key={cat} item xs={12} sm={6} md={3}>
+                                <EmployeeList employees={schedules[cat]} category={cat} />
                             </Grid>
-                            <Grid item xs={12} md={6}>
-                                <EmployeeList 
-                                    title="2nd & 4th Saturdays Off" 
-                                    employees={schedules.secondAndFourthOff}
-                                    color="white"
-                                    icon={<CalendarMonthIcon sx={{ color: '#dc3545' }} />}
-                                    category="secondAndFourthOff"
-                                />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <EmployeeList 
-                                    title="All Saturdays Working" 
-                                    employees={schedules.allWorking}
-                                    color="white"
-                                    icon={<Assignment sx={{ color: '#dc3545' }} />}
-                                    category="allWorking"
-                                />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <EmployeeList 
-                                    title="All Saturdays Off" 
-                                    employees={schedules.allOff}
-                                    color="white"
-                                    icon={<History sx={{ color: '#dc3545' }} />}
-                                    category="allOff"
-                                />
-                            </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
+                        ))}
+                    </Grid>
+                </Box>
             ))}
         </Box>
     );
 
-    const GridView = () => (
-        <Box sx={{ mt: 3 }}>
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                    <EmployeeList 
-                        title="Off on 1st & 3rd Saturdays" 
-                        employees={categorizedSchedules.firstAndThirdOff}
-                        color="white"
-                        icon={<CalendarMonthIcon sx={{ color: '#dc3545' }} />}
-                        category="firstAndThirdOff"
-                    />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <EmployeeList 
-                        title="Off on 2nd & 4th Saturdays" 
-                        employees={categorizedSchedules.secondAndFourthOff}
-                        color="white"
-                        icon={<CalendarMonthIcon sx={{ color: '#dc3545' }} />}
-                        category="secondAndFourthOff"
-                    />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <EmployeeList 
-                        title="All Saturdays Working" 
-                        employees={categorizedSchedules.allWorking}
-                        color="white"
-                        icon={<Assignment sx={{ color: '#dc3545' }} />}
-                        category="allWorking"
-                    />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <EmployeeList 
-                        title="All Saturdays Off" 
-                        employees={categorizedSchedules.allOff}
-                        color="white"
-                        icon={<History sx={{ color: '#dc3545' }} />}
-                        category="allOff"
-                    />
-                </Grid>
-            </Grid>
-        </Box>
-    );
+    const statItems = [
+        { key: 'firstAndThirdOff',   label: '1st & 3rd Off',  value: categorizedSchedules.firstAndThirdOff.length,   accent: '#2563eb' },
+        { key: 'secondAndFourthOff', label: '2nd & 4th Off', value: categorizedSchedules.secondAndFourthOff.length,  accent: '#7c3aed' },
+        { key: 'allWorking',         label: 'All Working',    value: categorizedSchedules.allWorking.length,          accent: '#16a34a' },
+        { key: 'allOff',             label: 'All Off',        value: categorizedSchedules.allOff.length,             accent: '#dc3545' },
+    ];
 
     return (
-        <Box>
-            {/* Statistics Overview */}
-            <Card sx={{ 
-                mb: 3, 
-                borderRadius: '8px', 
-                background: 'white',
-                border: '2px solid #000',
-                boxShadow: 'none'
+        <Box sx={{ pt: 1 }}>
+            {/* ── Stats row ── */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                {statItems.map(({ key, label, value, accent }) => (
+                    <Grid key={key} item xs={6} sm={3}>
+                        <Box sx={{
+                            p: 2,
+                            borderRadius: '10px',
+                            border: '1px solid #e5e7eb',
+                            bgcolor: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            transition: 'box-shadow 0.15s',
+                            '&:hover': { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
+                        }}>
+                            <Box sx={{ width: 4, height: 36, borderRadius: '4px', bgcolor: accent, flexShrink: 0 }} />
+                            <Box>
+                                <Typography variant="h5" fontWeight={700} sx={{ color: '#111', lineHeight: 1.1 }}>
+                                    {value}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#888' }}>{label}</Typography>
+                            </Box>
+                        </Box>
+                    </Grid>
+                ))}
+            </Grid>
+
+            {/* ── Toolbar ── */}
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                mb: 2.5,
+                flexWrap: 'wrap',
             }}>
-                <CardContent>
-                    <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#000' }}>
-                        Saturday Schedule Overview
-                    </Typography>
-                    <Grid container spacing={3}>
-                        <Grid item xs={6} sm={3}>
-                            <Box sx={{ 
-                                textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
-                                background: 'white',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    background: '#f8f9fa',
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                                }
-                            }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.firstAndThirdOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>1st & 3rd Off</Typography>
-                            </Box>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <Box sx={{ 
-                                textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
-                                background: 'white',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    background: '#f8f9fa',
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                                }
-                            }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.secondAndFourthOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>2nd & 4th Off</Typography>
-                            </Box>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <Box sx={{ 
-                                textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
-                                background: 'white',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    background: '#f8f9fa',
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                                }
-                            }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.allWorking.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>All Working</Typography>
-                            </Box>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <Box sx={{ 
-                                textAlign: 'center',
-                                p: 2,
-                                borderRadius: '8px',
-                                border: '2px solid #dc3545',
-                                background: 'white',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    background: '#f8f9fa',
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                                }
-                            }}>
-                                <Typography variant="h3" fontWeight="bold" sx={{ color: '#000' }}>{categorizedSchedules.allOff.length}</Typography>
-                                <Typography variant="body2" sx={{ color: '#666' }}>All Off</Typography>
-                            </Box>
-                        </Grid>
-                    </Grid>
-                </CardContent>
-            </Card>
+                <TextField
+                    size="small"
+                    placeholder="Search employees…"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: '#aaa', fontSize: 18 }} /> }}
+                    sx={{ width: 220, '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                />
+                <FormControl size="small" sx={{ width: 180 }}>
+                    <InputLabel>Department</InputLabel>
+                    <Select
+                        value={selectedDepartmentFilter}
+                        label="Department"
+                        onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                        sx={{ borderRadius: '8px' }}
+                    >
+                        <MenuItem value="">All Departments</MenuItem>
+                        {departments.map(dept => (
+                            <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-            {/* Filters and View Toggle */}
-            <Card sx={{ mb: 3, borderRadius: '8px', boxShadow: 'none', border: '2px solid #e0e0e0', bgcolor: 'white' }}>
-                <CardContent>
-                    <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} sm={6} md={4}>
-                            <TextField
-                                fullWidth
-                                size="small"
-                                label="Search employees..."
-                                value={searchFilter}
-                                onChange={(e) => setSearchFilter(e.target.value)}
-                                InputProps={{
-                                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel>Department</InputLabel>
-                                <Select
-                                    value={selectedDepartmentFilter}
-                                    label="Department"
-                                    onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-                                >
-                                    <MenuItem value="">All Departments</MenuItem>
-                                    {departments.map(dept => (
-                                        <MenuItem key={dept} value={dept}>{dept}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={12} md={4}>
-                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                <Button
-                                    variant={viewMode === 'grid' ? 'contained' : 'outlined'}
-                                    onClick={() => setViewMode('grid')}
-                                    sx={{ flex: 1 }}
-                                >
-                                    Grid View
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'department' ? 'contained' : 'outlined'}
-                                    onClick={() => setViewMode('department')}
-                                    sx={{ flex: 1 }}
-                                >
-                                    Department View
-                                </Button>
-                            </Box>
-                        </Grid>
-                    </Grid>
-                </CardContent>
-            </Card>
+                {/* View toggle — pill buttons */}
+                <Box sx={{
+                    ml: 'auto',
+                    display: 'flex',
+                    bgcolor: '#f3f4f6',
+                    borderRadius: '8px',
+                    p: '3px',
+                    gap: '3px',
+                }}>
+                    {[{ id: 'grid', label: 'Grid' }, { id: 'department', label: 'By Department' }].map(v => (
+                        <Button
+                            key={v.id}
+                            size="small"
+                            disableElevation
+                            onClick={() => setViewMode(v.id)}
+                            sx={{
+                                borderRadius: '6px',
+                                px: 2,
+                                py: 0.5,
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                textTransform: 'none',
+                                bgcolor: viewMode === v.id ? 'white' : 'transparent',
+                                color: viewMode === v.id ? '#111' : '#888',
+                                boxShadow: viewMode === v.id ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                                '&:hover': { bgcolor: viewMode === v.id ? 'white' : '#e9eaec' },
+                                transition: 'all 0.15s',
+                            }}
+                        >
+                            {v.label}
+                        </Button>
+                    ))}
+                </Box>
+            </Box>
 
-            {/* View Content */}
+            {/* ── Drag hint ── */}
+            <Typography variant="caption" sx={{ color: '#bbb', display: 'block', mb: 1.5 }}>
+                Drag an employee card between lanes to reassign their schedule. Click the swap icon to toggle between alternating weeks.
+            </Typography>
+
+            {/* ── Content ── */}
             {viewMode === 'grid' ? <GridView /> : <DepartmentView />}
         </Box>
     );
@@ -630,6 +524,10 @@ const LeavesTrackerPage = () => {
   // UPGRADED: Pagination state for Leave Balances table
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(15);
+
+  // Pagination state for Leave Requests table
+  const [lrPage, setLrPage] = useState(0);
+  const [lrRowsPerPage, setLrRowsPerPage] = useState(10);
   
   const [activeTab, setActiveTab] = useState(0);
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -837,6 +735,17 @@ const LeavesTrackerPage = () => {
       return true;
     });
   }, [leaveRequests, selectedYear, selectedMonth, selectedWeek, selectedDepartment, selectedEmployee, searchTerm]);
+
+  // Paginated slice for Leave Requests table
+  const paginatedLeaveRequests = useMemo(() => {
+    const start = lrPage * lrRowsPerPage;
+    return filteredLeaveRequests.slice(start, start + lrRowsPerPage);
+  }, [filteredLeaveRequests, lrPage, lrRowsPerPage]);
+
+  // Reset leave requests page when filters change
+  useEffect(() => {
+    setLrPage(0);
+  }, [selectedYear, selectedMonth, selectedWeek, selectedDepartment, selectedEmployee, searchTerm]);
   
   const toYYYYMMDD = (d) => {
     const date = new Date(d);
@@ -1552,7 +1461,7 @@ const LeavesTrackerPage = () => {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredLeaveRequests.map(req => {
+                                paginatedLeaveRequests.map(req => {
                                     const emp = req.employee || {};
                                     const dates = Array.isArray(req.leaveDates) ? req.leaveDates : [];
                                     const days = dates.length * (req.leaveType && req.leaveType.startsWith('Half Day') ? 0.5 : 1);
@@ -1624,6 +1533,16 @@ const LeavesTrackerPage = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    component="div"
+                    count={filteredLeaveRequests.length}
+                    page={lrPage}
+                    onPageChange={(_, newPage) => setLrPage(newPage)}
+                    rowsPerPage={lrRowsPerPage}
+                    onRowsPerPageChange={(e) => { setLrRowsPerPage(parseInt(e.target.value, 10)); setLrPage(0); }}
+                    rowsPerPageOptions={[10, 20, 50, 100]}
+                    sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+                />
             </Box>
         )}
 

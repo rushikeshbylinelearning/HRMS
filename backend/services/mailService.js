@@ -51,7 +51,7 @@ function getTransporter() {
     return _transporter;
 }
 
-const sendEmail = async ({ to, subject, text, html, isHREmail = false }) => {
+const sendEmail = async ({ to, subject, text, html, isHREmail = false, attachments }) => {
     if (process.env.DISABLE_ALL_EMAILS === 'true') {
         return; // silently skip – no log spam needed
     }
@@ -71,13 +71,21 @@ const sendEmail = async ({ to, subject, text, html, isHREmail = false }) => {
         // adds 200-800 ms per email on every request.  Errors surface naturally
         // from sendMail() and are caught below.
 
-        const info = await transporter.sendMail({
+        const mailOptions = {
             from: `"AMS Portal" <${process.env.MAIL_USER}>`,
             to,
             subject,
             text,
             html,
-        });
+        };
+
+        // attachments is an optional array of nodemailer attachment objects
+        // e.g. [{ filename: 'doc.pdf', content: Buffer, contentType: 'application/pdf' }]
+        if (attachments && attachments.length > 0) {
+            mailOptions.attachments = attachments;
+        }
+
+        const info = await transporter.sendMail(mailOptions);
 
         if (process.env.NODE_ENV !== 'production') {
             console.log(`[Email Service] Sent: ${info.messageId}`);

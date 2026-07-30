@@ -39,12 +39,63 @@ const jwtUtils = require('../utils/jwtUtils');
 // with the uniform 15-minute access token model. Import kept as a no-op comment
 // until the module reference is confirmed safe to remove.
 // const { isNightShiftEmployee } = require('../utils/istTime');
+const rateLimit = require('express-rate-limit');
 const {
     RefreshTokenReuseError,
     issueRefreshToken,
     rotateRefreshToken,
     revokeRefreshToken,
+    hashRefreshToken,
 } = require('../utils/refreshTokenUtils');
+
+// ─── Refresh-token rotation dedup cache ───────────────────────────────────────
+// Keyed by the SHA-256 hash of the raw refresh token (never the raw value).
+// If two requests arrive with the same token within REFRESH_DEDUP_TTL_MS
+// (e.g. a network-level retry or a proactive-refresh timer racing a reactive
+// 401 retry) the second call waits for the first call's in-flight Promise
+// instead of creating a new DB race.  This is a defence-in-depth layer on top
+// of the atomic findOneAndUpdate in rotateRefreshToken().
+//
+// Map<tokenHash, { promise: Promise, settledAt: number|null }>
+const refreshDedupCache = new Map();
+const REFRESH_DEDUP_TTL_MS = 2000; // 2 seconds
+
+function cleanRefreshDedupCache() {
+    const now = Date.now();
+    for (const [key, entry] of refreshDedupCache.entries()) {
+        if (entry.settledAt !== null && now - entry.settledAt > REFRESH_DEDUP_TTL_MS) {
+            refreshDedupCache.delete(key);
+        }
+    }
+}
+
+// ─── Dedicated rate limiter for POST /api/auth/refresh ────────────────────────
+// Separate from the general 100/15 min limiter — tighter window to contain
+// rotation storms from a misbehaving client without affecting other auth routes.
+const refreshRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,   // 5 minutes
+    max: 20,                    // 20 requests per window per IP
+    standardHeaders: true,      // Return RateLimit-* headers
+    legacyHeaders: false,
+    // Key by IP + first 16 chars of cookie hash so each refresh-token identity
+    // gets its own bucket, but we never log the raw token.
+    keyGenerator: (req) => {
+        const raw = req.cookies && req.cookies.refreshToken;
+        const cookieKey = raw ? hashRefreshToken(raw).slice(0, 16) : 'no-cookie';
+        const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+        return `${ip}:${cookieKey}`;
+    },
+    handler: (req, res) => {
+        console.warn(
+            `[Auth/Refresh] Rate limit exceeded | ip: ${req.ip} | ` +
+            `ua: ${(req.headers['user-agent'] || '').slice(0, 80)}`
+        );
+        return res.status(429).json({
+            error: 'Too many refresh attempts. Please try again later.',
+            code: 'REFRESH_RATE_LIMITED',
+        });
+    },
+});
 
 // Helper to clear the refresh token cookie with the same attributes used to set it.
 // clearCookie() must match the original path and domain or the browser ignores it.
@@ -1079,8 +1130,15 @@ router.post('/sso-consume', async (req, res) => {
 // a new 15-minute access token + new refresh token cookie.
 // This route is intentionally UNAUTHENTICATED — the refresh cookie IS
 // the credential; it must not pass through authenticateToken middleware.
+//
+// Hardening layers (in order):
+//   1. refreshRateLimiter  — 20 req / 5 min per IP+cookieHash bucket
+//   2. refreshDedupCache   — in-process promise coalescing for the same
+//                            raw token within a 2-second window
+//   3. rotateRefreshToken  — atomic findOneAndUpdate in MongoDB so only
+//                            one concurrent DB write can succeed
 // =================================================================
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', refreshRateLimiter, async (req, res) => {
     // Read refresh token from httpOnly cookie (never from body or header)
     const rawRefreshToken = req.cookies && req.cookies.refreshToken;
 
@@ -1091,62 +1149,111 @@ router.post('/refresh', async (req, res) => {
         });
     }
 
+    // ── Dedup cache: coalesce concurrent requests for the same token ──────────
+    // Key by the hash (never the raw value) so the cache itself holds no secret.
+    cleanRefreshDedupCache();
+    const dedupKey = hashRefreshToken(rawRefreshToken);
+    const existingEntry = refreshDedupCache.get(dedupKey);
+
+    if (existingEntry) {
+        // A request for this exact token is already in-flight (or settled within
+        // the TTL window). Wait for / reuse its result.
+        try {
+            const { newRawToken, userId, authMethod } = await existingEntry.promise;
+            return await _buildRefreshResponse(res, newRawToken, userId, authMethod);
+        } catch (err) {
+            return _handleRefreshError(res, err);
+        }
+    }
+
+    // ── First caller: create the in-flight promise and register it ────────────
+    let resolveEntry, rejectEntry;
+    const rotationPromise = new Promise((resolve, reject) => {
+        resolveEntry = resolve;
+        rejectEntry = reject;
+    });
+
+    const cacheEntry = { promise: rotationPromise, settledAt: null };
+    refreshDedupCache.set(dedupKey, cacheEntry);
+
     try {
-        const { newRawToken, userId, authMethod } = await rotateRefreshToken(rawRefreshToken);
+        const rotationResult = await rotateRefreshToken(rawRefreshToken);
 
-        // Fetch the user to build the access token claims
-        const user = await User.findById(userId)
-            .select('email role isActive')
-            .lean();
+        // Settle the shared promise so any coalesced waiters get the same result.
+        cacheEntry.settledAt = Date.now();
+        resolveEntry(rotationResult);
 
-        if (!user || !user.isActive) {
-            // User deactivated since the refresh token was issued — treat as invalid
-            await revokeRefreshToken(newRawToken).catch(() => {});
-            clearRefreshCookie(res);
-            return res.status(401).json({
-                error: 'User account is inactive',
-                code: 'REFRESH_INVALID',
-            });
-        }
-
-        const accessToken = jwtUtils.sign({
-            userId: user._id.toString(),
-            email: user.email,
-            role: user.role,
-            authMethod,
-        }, { expiresIn: '15m' });
-
-        // Set new refresh token cookie (old one was just rotated/revoked)
-        res.cookie('refreshToken', newRawToken, getRefreshCookieOptions());
-
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`[Auth/Refresh] ✅ Token rotated for userId: ${userId}`);
-        }
-
-        return res.status(200).json({ accessToken });
+        const { newRawToken, userId, authMethod } = rotationResult;
+        return await _buildRefreshResponse(res, newRawToken, userId, authMethod);
 
     } catch (err) {
-        if (err instanceof RefreshTokenReuseError) {
-            // Possible token theft — log is already emitted by rotateRefreshToken.
-            // Clear the cookie so the attacker's copy is also neutered.
-            clearRefreshCookie(res);
-            return res.status(401).json({
-                error: 'Refresh token invalid or expired',
-                code: 'REFRESH_INVALID',
-            });
-        }
+        cacheEntry.settledAt = Date.now();
+        rejectEntry(err);
+        return _handleRefreshError(res, err);
+    }
+});
 
-        if (process.env.NODE_ENV !== 'production') {
-            console.warn('[Auth/Refresh] Refresh failed:', err.message);
-        }
+/**
+ * Build and send the 200 response after a successful rotation.
+ * Extracted so both the first-caller and coalesced-waiter paths share it.
+ */
+async function _buildRefreshResponse(res, newRawToken, userId, authMethod) {
+    // Fetch the user to build the access token claims
+    const user = await User.findById(userId)
+        .select('email role isActive')
+        .lean();
 
+    if (!user || !user.isActive) {
+        // User deactivated since the refresh token was issued — treat as invalid.
+        await revokeRefreshToken(newRawToken).catch(() => {});
+        clearRefreshCookie(res);
+        return res.status(401).json({
+            error: 'User account is inactive',
+            code: 'REFRESH_INVALID',
+        });
+    }
+
+    const accessToken = jwtUtils.sign({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        authMethod,
+    }, { expiresIn: '15m' });
+
+    // Set new refresh token cookie (old one was just rotated/revoked)
+    res.cookie('refreshToken', newRawToken, getRefreshCookieOptions());
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Auth/Refresh] ✅ Token rotated for userId: ${userId}`);
+    }
+
+    return res.status(200).json({ accessToken });
+}
+
+/**
+ * Unified error handler for /refresh — preserves the existing response contract.
+ */
+function _handleRefreshError(res, err) {
+    if (err instanceof RefreshTokenReuseError) {
+        // Possible token theft — structured log already emitted by rotateRefreshToken.
+        // Clear the cookie so the attacker's copy is also neutered.
         clearRefreshCookie(res);
         return res.status(401).json({
             error: 'Refresh token invalid or expired',
             code: 'REFRESH_INVALID',
         });
     }
-});
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Auth/Refresh] Refresh failed:', err.message);
+    }
+
+    clearRefreshCookie(res);
+    return res.status(401).json({
+        error: 'Refresh token invalid or expired',
+        code: 'REFRESH_INVALID',
+    });
+}
 
 // =================================================================
 // POST /api/auth/logout

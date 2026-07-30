@@ -11,6 +11,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import SecurePdfViewer from '../SecurePdfViewer';
+import AdminEmployeeKycPanel from './AdminEmployeeKycPanel';
 import api from '../../api/axios';
 import { RED, RED_DARK, RED_BG, TEXT, MUTED, cardSx, sectionTitleSx } from './adminEmployeeTheme';
 
@@ -205,6 +206,9 @@ const AdminEmployeeDocumentsPanel = ({ employeeId }) => {
                     </Box>
                 )}
             </Box>
+
+            {/* ── KYC Documents ── */}
+            <AdminEmployeeKycPanel employeeId={employeeId} />
 
             {/* PDF Viewer Dialog */}
             <Dialog

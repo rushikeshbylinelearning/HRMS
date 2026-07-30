@@ -523,6 +523,147 @@ exports.acknowledgeDocument = async (req, res) => {
     }
 };
 
+// ─── Forward to personal email ────────────────────────────────────────────────
+
+exports.forwardToPersonalEmail = async (req, res) => {
+    const COOLDOWN_MS = 5 * 60 * 1000; // 5-minute cooldown per document
+
+    try {
+        // 1. Load and verify ownership — never trust client-supplied email
+        const doc = await EmployeeDocument.findById(req.params.id);
+        if (!doc) return res.status(404).json({ error: 'Document not found.' });
+
+        if (doc.employeeId.toString() !== req.user.userId) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        if (!doc.fileRef) {
+            return res.status(400).json({ error: 'No file attached to this document.' });
+        }
+
+        // 2. Rate-limit: timestamp-based cooldown
+        if (doc.forwardedToPersonalEmailAt) {
+            const elapsed = Date.now() - new Date(doc.forwardedToPersonalEmailAt).getTime();
+            if (elapsed < COOLDOWN_MS) {
+                const waitSec = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
+                return res.status(429).json({
+                    error: `Please wait ${waitSec} second${waitSec !== 1 ? 's' : ''} before sending again.`,
+                });
+            }
+        }
+
+        // 3. Read personal email from the authenticated user's own profile — server-side only
+        const user = await User.findById(req.user.userId)
+            .select('personalDetails fullName')
+            .lean();
+
+        const personalEmail = user?.personalDetails?.personalEmail;
+        if (!personalEmail) {
+            return res.status(400).json({
+                error: 'No personal email address found on your profile. Please add one in Profile → Contact Information.',
+            });
+        }
+
+        // 4. Stream the PDF from GridFS into a Buffer for the email attachment
+        const policyBucket = getPolicyBucket();
+        const downloadStream = policyBucket.openDownloadStream(
+            new mongoose.Types.ObjectId(doc.fileRef)
+        );
+
+        const pdfBuffer = await new Promise((resolve, reject) => {
+            const chunks = [];
+            downloadStream.on('data', (chunk) => chunks.push(chunk));
+            downloadStream.on('end', () => resolve(Buffer.concat(chunks)));
+            downloadStream.on('error', reject);
+        });
+
+        // 5. Send via the existing mail utility — reuses the singleton SMTP transporter
+        const { sendEmail } = require('../services/mailService');
+        const companyName = process.env.COMPANY_NAME || 'Your Company';
+
+        await sendEmail({
+            to: personalEmail,
+            subject: `Your ${doc.documentTypeLabel} from ${companyName}`,
+            text: [
+                `Hi ${user.fullName},`,
+                '',
+                `Please find your "${doc.documentTypeLabel}" attached to this email.`,
+                '',
+                'This is a system-generated compliance document. Please do not reply to this message if it was sent from a no-reply address.',
+                '',
+                `Issued: ${new Date(doc.assignedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+                '',
+                `— ${companyName} HR`,
+            ].join('\n'),
+            html: `
+                <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1e293b;max-width:560px;margin:0 auto">
+                    <p>Hi ${user.fullName},</p>
+                    <p>Please find your <strong>${doc.documentTypeLabel}</strong> attached to this email.</p>
+                    <p style="color:#64748b;font-size:13px">
+                        This is a system-generated compliance document.
+                        Please do not reply to this message if it was sent from a no-reply address.
+                    </p>
+                    <p style="color:#94a3b8;font-size:12px">
+                        Issued: ${new Date(doc.assignedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                    <p style="color:#94a3b8;font-size:12px">&mdash; ${companyName} HR</p>
+                </div>
+            `,
+            attachments: [{
+                filename: doc.fileName || `${doc.documentTypeLabel}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf',
+            }],
+        });
+
+        // 6. Update audit fields on the existing record — no new collection
+        const now = new Date();
+        doc.forwardedToPersonalEmailAt = now;
+        doc.forwardedCount = (doc.forwardedCount || 0) + 1;
+        doc.lastForwardStatus = 'success';
+        doc.timeline.push({
+            event: 'forwarded_to_personal_email',
+            timestamp: now,
+            notes: `Forwarded to personal email (send #${doc.forwardedCount})`,
+            performedBy: req.user.email || 'Employee',
+        });
+        await doc.save();
+
+        // 7. Return a masked email address (e.g. j•••e@gmail.com) for the toast
+        const atIdx = personalEmail.lastIndexOf('@');
+        const localPart = personalEmail.slice(0, atIdx);
+        const domain = personalEmail.slice(atIdx + 1);
+        const maskedLocal = localPart.length <= 2
+            ? `${localPart[0]}•••`
+            : `${localPart[0]}•••${localPart.slice(-1)}`;
+        const maskedEmail = `${maskedLocal}@${domain}`;
+
+        res.json({ message: `Sent to ${maskedEmail}`, maskedEmail });
+    } catch (err) {
+        console.error('[EmployeeDoc] forwardToPersonalEmail error:', err);
+
+        // Best-effort: record the failure in the timeline
+        try {
+            const docForAudit = await EmployeeDocument.findById(req.params.id);
+            if (docForAudit && docForAudit.employeeId.toString() === req.user.userId) {
+                docForAudit.lastForwardStatus = 'failure';
+                docForAudit.timeline.push({
+                    event: 'forwarded_to_personal_email',
+                    timestamp: new Date(),
+                    notes: `Forward failed: ${err.message}`,
+                    performedBy: req.user.email || 'Employee',
+                });
+                await docForAudit.save();
+            }
+        } catch (_) { /* ignore secondary failure */ }
+
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to send email. Please try again.' });
+        }
+    }
+};
+
 // ─── Employment status change ─────────────────────────────────────────────────
 
 exports.changeEmploymentStatus = async (req, res) => {

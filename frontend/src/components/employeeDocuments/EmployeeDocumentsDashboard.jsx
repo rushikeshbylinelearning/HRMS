@@ -619,7 +619,7 @@ const EmployeeDocumentsDashboard = () => {
                     <Table size="small">
                         <TableHead>
                             <TableRow sx={{ background: '#f8fafc' }}>
-                                {['Employee', 'Department', 'Document', 'Assigned', 'Viewed', 'Acknowledged', 'Assigned By', 'Status', 'Actions'].map((col) => (
+                                {['Employee', 'Department', 'Document', 'Assigned', 'Viewed', 'Acknowledged', 'Forwarded', 'Assigned By', 'Status', 'Actions'].map((col) => (
                                     <TableCell
                                         key={col}
                                         sx={{
@@ -640,7 +640,7 @@ const EmployeeDocumentsDashboard = () => {
                         <TableBody>
                             {loading && (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
                                         <CircularProgress size={24} sx={{ color: '#6366f1' }} />
                                     </TableCell>
                                 </TableRow>
@@ -672,6 +672,17 @@ const EmployeeDocumentsDashboard = () => {
                                     <TableCell><BoolChip val={!!r.viewedAt} /></TableCell>
                                     <TableCell>
                                         {r.requiresAcknowledgment ? <BoolChip val={!!r.acknowledgedAt} /> : '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {r.forwardedToPersonalEmailAt ? (
+                                            <Tooltip title={new Date(r.forwardedToPersonalEmailAt).toLocaleString('en-IN')}>
+                                                <span>
+                                                    <BoolChip val />
+                                                </span>
+                                            </Tooltip>
+                                        ) : (
+                                            <BoolChip val={false} />
+                                        )}
                                     </TableCell>
                                     <TableCell sx={{ fontSize: '0.8125rem', color: '#64748b' }}>
                                         {r.assignedByDisplay}
@@ -707,7 +718,7 @@ const EmployeeDocumentsDashboard = () => {
                             ))}
                             {!loading && records.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ color: '#94a3b8', py: 5 }}>
+                                    <TableCell colSpan={10} align="center" sx={{ color: '#94a3b8', py: 5 }}>
                                         No compliance records found.
                                     </TableCell>
                                 </TableRow>

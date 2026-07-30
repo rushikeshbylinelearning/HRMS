@@ -1,4 +1,5 @@
 import CountryCodeSelect from './CountryCodeSelect';
+import DateSelectInput from './DateSelectInput';
 
 const SectionIcon = ({ children }) => (
     <div className="pm-section-icon">{children}</div>
@@ -59,13 +60,11 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                 <div className="pm-field-section-label">Contact Information</div>
 
                 <div className="pm-form-grid">
-                    <div className="pm-field pm-field--sm">
+                    <div className="pm-field pm-field--date">
                         <label className="pm-label">Date of Birth</label>
-                        <input
-                            className="pm-input"
-                            type="date"
+                        <DateSelectInput
                             value={formData.dateOfBirth}
-                            onChange={(e) => onFieldChange('dateOfBirth', e.target.value)}
+                            onChange={(val) => onFieldChange('dateOfBirth', val)}
                         />
                     </div>
                     <div className="pm-field pm-field--sm">
@@ -264,13 +263,11 @@ const ProfileMain = ({ user, formData, onFieldChange, onSave, saving }) => {
                         />
                     </div>
 
-                    <div className="pm-field pm-field--sm">
+                    <div className="pm-field pm-field--date">
                         <label className="pm-label">Marriage Date</label>
-                        <input
-                            className="pm-input"
-                            type="date"
+                        <DateSelectInput
                             value={formData.marriageDate}
-                            onChange={(e) => onFieldChange('marriageDate', e.target.value)}
+                            onChange={(val) => onFieldChange('marriageDate', val)}
                         />
                     </div>
                     <div className="pm-field pm-field--md">
