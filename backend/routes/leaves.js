@@ -144,7 +144,7 @@ function getAllowedLeaveTypes(employmentStatus) {
 router.get('/holidays', authenticateToken, async (req, res) => {
     try {
         // Get all holidays and sort: valid dates first (ASC), then tentative holidays at bottom (alphabetically)
-        const holidays = await Holiday.find();
+        const holidays = await Holiday.find().lean();
         // Manual sort to ensure tentative holidays are at bottom
         const sortedHolidays = holidays.sort((a, b) => {
             const aIsTentative = !a.date || a.isTentative;
@@ -435,7 +435,8 @@ router.get('/my-requests', authenticateToken, async (req, res) => {
         const requests = await LeaveRequest.find({ employee: req.user.userId })
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .lean();
             
         res.json({
             requests,

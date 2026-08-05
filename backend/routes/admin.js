@@ -1152,7 +1152,8 @@ router.get('/leaves/pending', [authenticateToken, isAdminOrHr], async (req, res)
             requestType: { $ne: 'YEAR_END' }
         })
             .populate('employee', 'fullName employeeCode')
-            .sort({ createdAt: 1 });
+            .sort({ createdAt: 1 })
+            .lean();
         res.json(pendingRequests);
     } catch (error) {
         console.error('Error fetching pending leave requests:', error);
@@ -1182,7 +1183,8 @@ router.get('/leaves/employee/:id', [authenticateToken, isAdminOrHr], async (req,
 
         const leaveRequests = await LeaveRequest.find(query)
             .populate('employee', 'fullName employeeCode')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         res.json(leaveRequests);
     } catch (error) {
@@ -1933,7 +1935,7 @@ router.post('/early-checkout-requests/:id/reject', [authenticateToken, isAdminOr
 
 router.get('/holidays', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
-        const holidays = await Holiday.find();
+        const holidays = await Holiday.find().lean();
         // Sort: valid dates first (ASC), then tentative holidays at bottom (alphabetically)
         const sortedHolidays = holidays.sort((a, b) => {
             const aIsTentative = !a.date || a.isTentative;
