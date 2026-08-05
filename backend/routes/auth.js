@@ -31,6 +31,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const authenticateToken = require('../middleware/authenticateToken');
 const { loginGeofencingMiddleware } = require('../middleware/geofencingMiddleware');
+const { validateLogin } = require('../middleware/validation');
 const { checkGeofence } = require('../services/geofencingService');
 const ssoService = require('../services/ssoService');
 const SSOVerification = require('../utils/ssoVerification');
@@ -160,7 +161,7 @@ const normalizeEmail = (email) => {
 // It is completely independent of SSO and should never be interfered with
 // SSO authentication uses /api/auth/sso-consume instead
 // =================================================================
-router.post('/login', loginGeofencingMiddleware, async (req, res) => {
+router.post('/login', validateLogin, loginGeofencingMiddleware, async (req, res) => {
     // Validate required fields before any async work (production-safe)
     const email = req.body && typeof req.body.email === 'string' ? req.body.email.trim() : '';
     const password = req.body && typeof req.body.password === 'string' ? req.body.password : '';
