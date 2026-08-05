@@ -246,8 +246,6 @@ app.use('/api/public', publicFormRoutes);
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/') ||
       req.path.startsWith('/health') ||
-      req.path.startsWith('/metrics') ||
-      req.path.startsWith('/cache-stats') ||
       req.path.startsWith('/avatars') ||
       req.path.startsWith('/medical-certificates') ||
       req.path.startsWith('/public')) {
@@ -309,48 +307,14 @@ app.use('/api/admin', absentToLeaveRoutes);
 const publicFormAdminRoutes = require('./routes/admin/publicFormAdmin');
 app.use('/api/admin/public-form', publicFormAdminRoutes);
 
-// Health check endpoint
+// Health check endpoint — minimal public response; no internals exposed (A05-MED)
 app.get('/health', async (req, res) => {
-  const healthStatus = performanceMonitor.getHealthStatus();
-  const ssoJwksUrl = process.env.SSO_JWKS_URL;
-  let jwksStatus = 'unknown';
-  if (ssoJwksUrl) {
-    try {
-      const axios = require('axios');
-      const response = await axios.get(ssoJwksUrl, { timeout: 5000 });
-      jwksStatus = response.status === 200 ? 'OK' : 'ERROR';
-    } catch {
-      jwksStatus = 'ERROR';
-    }
-  }
-
-  const fs = require('fs');
-  const privateKeyPath = path.resolve(__dirname, process.env.JWT_PRIVATE_KEY_PATH || './keys/private.pem');
-  const publicKeyPath  = path.resolve(__dirname, process.env.JWT_PUBLIC_KEY_PATH  || './keys/public.pem');
-
-  res.json({
-    ...healthStatus,
-    ssoStatus: {
-      configured: !!(ssoJwksUrl || process.env.SSO_PUBLIC_KEY_URL),
-      jwksUrl: ssoJwksUrl || null,
-      jwksStatus,
-      algorithm: 'RS256',
-    },
-    jwtKeys: {
-      privateKeyExists: fs.existsSync(privateKeyPath),
-      publicKeyExists:  fs.existsSync(publicKeyPath),
-    },
-    database: {
-      connected:  mongoose.connection.readyState === 1,
-      readyState: mongoose.connection.readyState,
-      name:       mongoose.connection.name,
-    },
-    timestamp: new Date().toISOString(),
-  });
+  const isConnected = mongoose.connection.readyState === 1;
+  res.json({ status: isConnected ? 'ok' : 'unhealthy' });
 });
 
-app.get('/metrics', (req, res) => res.json(performanceMonitor.getMetrics()));
-app.get('/cache-stats', (req, res) => res.json(cacheService.getStats()));
+app.get('/metrics', authenticateToken, isAdminOrHr, (req, res) => res.json(performanceMonitor.getMetrics()));
+app.get('/cache-stats', authenticateToken, isAdminOrHr, (req, res) => res.json(cacheService.getStats()));
 
 app.post('/sso/logout', (req, res) => {
   req.session.destroy((err) => {
