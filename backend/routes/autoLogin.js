@@ -409,7 +409,7 @@ const verifySSOToken = async (req, res, next) => {
 // In-memory cache for AMS tokens by user email (fallback if Redis not available)
 // Key: user email, Value: { token, expiresAt, userId }
 const amsTokenCache = new Map();
-const AMS_TOKEN_CACHE_TTL = 8 * 60 * 60 * 1000; // 8 hours (matches token expiry)
+const AMS_TOKEN_CACHE_TTL = 15 * 60 * 1000; // 15 minutes — matches access token expiry (PERF-007)
 
 /**
  * Get cached AMS token for user
