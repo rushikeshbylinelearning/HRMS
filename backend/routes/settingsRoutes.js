@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const Setting = require('../models/Setting');
 const authenticateToken = require('../middleware/authenticateToken');
+const isAdminOrHr = require('../middleware/requireAdminOrHr');
 const cache = require('../utils/cache');
 const User = require('../models/User');
 
@@ -25,7 +26,7 @@ const ENFORCE_REQUIRED_LOGOUT_KEY = 'enforceRequiredLogoutBeforeCheckout';
 const REQUIRE_ADMIN_APPROVAL_EARLY_CHECKOUT_KEY = 'requireAdminApprovalForEarlyCheckout';
 
 // GET /api/admin/settings/hr-emails - Get the list of HR emails
-router.get('/hr-emails', async (req, res) => {
+router.get('/hr-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
         const setting = await Setting.findOne({ key: HR_EMAIL_KEY });
         res.json(setting ? setting.value : []); // Return emails array or empty array if not found
@@ -35,7 +36,7 @@ router.get('/hr-emails', async (req, res) => {
 });
 
 // POST /api/admin/settings/hr-emails - Add a new email to the list
-router.post('/hr-emails', async (req, res) => {
+router.post('/hr-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { email } = req.body;
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -56,7 +57,7 @@ router.post('/hr-emails', async (req, res) => {
 });
 
 // DELETE /api/admin/settings/hr-emails - Remove an email from the list
-router.delete('/hr-emails', async (req, res) => {
+router.delete('/hr-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { email } = req.body;
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -75,7 +76,7 @@ router.delete('/hr-emails', async (req, res) => {
 });
 
 // GET /api/admin/settings/hiring-emails - Get the list of hiring emails
-router.get('/hiring-emails', async (req, res) => {
+router.get('/hiring-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
         const setting = await Setting.findOne({ key: HIRING_EMAIL_KEY });
         res.json(setting ? setting.value : []); // Return emails array or empty array if not found
@@ -85,7 +86,7 @@ router.get('/hiring-emails', async (req, res) => {
 });
 
 // POST /api/admin/settings/hiring-emails - Add a new email to the hiring list
-router.post('/hiring-emails', async (req, res) => {
+router.post('/hiring-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { email } = req.body;
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -106,7 +107,7 @@ router.post('/hiring-emails', async (req, res) => {
 });
 
 // DELETE /api/admin/settings/hiring-emails - Remove an email from the hiring list
-router.delete('/hiring-emails', async (req, res) => {
+router.delete('/hiring-emails', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { email } = req.body;
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -125,7 +126,7 @@ router.delete('/hiring-emails', async (req, res) => {
 });
 
 // GET /api/admin/settings/year-end-feature - Get the year-end feature enabled status
-router.get('/year-end-feature', async (req, res) => {
+router.get('/year-end-feature', [authenticateToken, isAdminOrHr], async (req, res) => {
     try {
         const setting = await Setting.findOne({ key: YEAR_END_FEATURE_KEY });
         res.json({ enabled: setting ? setting.value : false }); // Return enabled status, default to false if not found
@@ -135,7 +136,7 @@ router.get('/year-end-feature', async (req, res) => {
 });
 
 // POST /api/admin/settings/year-end-feature - Update the year-end feature enabled status
-router.post('/year-end-feature', async (req, res) => {
+router.post('/year-end-feature', [authenticateToken, isAdminOrHr], async (req, res) => {
     const { enabled } = req.body;
     
     if (typeof enabled !== 'boolean') {
