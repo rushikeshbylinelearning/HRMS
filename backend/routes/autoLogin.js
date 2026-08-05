@@ -604,7 +604,7 @@ router.post('/launch/:appId', verifySSOToken, async (req, res) => {
 
 /**
  * GET /api/auto-login/status
- * Check auto-login service status
+ * Check auto-login service status — public endpoint; no internal URLs exposed (PERF-008)
  */
 router.get('/status', (req, res) => {
   const ssoConfigured = !!(
@@ -617,10 +617,6 @@ router.get('/status', (req, res) => {
   res.json({
     success: true,
     autoLoginEnabled: ssoConfigured,
-    ssoConfigured: ssoConfigured,
-    ssoJwksUrl: process.env.SSO_JWKS_URL || null,
-    ssoPublicKey: process.env.SSO_PUBLIC_KEY ? 'configured' : null,
-    ssoValidateUrl: process.env.SSO_VALIDATE_URL || null,
     timestamp: new Date().toISOString()
   });
 });
