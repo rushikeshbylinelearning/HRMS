@@ -484,9 +484,10 @@ router.get('/me', async (req, res) => {
         if (process.env.NODE_ENV !== 'production') console.log('[/me] Fetching user from database');
         if (process.env.NODE_ENV !== 'production') console.log('[/me] userId value:', userId, 'type:', typeof userId);
         
-        // Fetch user with shiftGroup populate only (reportingPerson may have empty string issue)
+        // Fetch user with shiftGroup and reportingPerson populated in a single query (PERF-005)
         const user = await User.findById(userId)
             .populate('shiftGroup', 'shiftName startTime endTime durationHours paidBreakMinutes')
+            .populate('reportingPerson', 'fullName email department designation')
             .select('-passwordHash -__v')
             .lean();
         
@@ -495,18 +496,8 @@ router.get('/me', async (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
         
-        // Manually populate reportingPerson if it's a valid ObjectId
-        if (user.reportingPerson && user.reportingPerson !== '' && mongoose.Types.ObjectId.isValid(user.reportingPerson)) {
-            try {
-                const reportingPerson = await User.findById(user.reportingPerson)
-                    .select('fullName email department designation')
-                    .lean();
-                user.reportingPerson = reportingPerson;
-            } catch (err) {
-                console.error('[/me] Error populating reportingPerson:', err.message);
-                user.reportingPerson = null;
-            }
-        } else {
+        // Normalize reportingPerson: if not a populated object, set to null
+        if (!user.reportingPerson || typeof user.reportingPerson !== 'object') {
             user.reportingPerson = null;
         }
 
