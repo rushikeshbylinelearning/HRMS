@@ -373,13 +373,16 @@ class PublicFormService {
   encryptSensitiveData(data) {
     if (!data) return data;
     
-    // Simple encryption - in production, use proper encryption library
+    // Validate encryption key before use
+    if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+      throw new Error(
+        'ENCRYPTION_KEY must be set to a random value of at least 32 characters. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      );
+    }
+
     const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(
-      process.env.ENCRYPTION_KEY || 'default-encryption-key',
-      'salt',
-      32
-    );
+    const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 32);
     const iv = crypto.randomBytes(16);
     
     const cipher = crypto.createCipheriv(algorithm, key, iv);
@@ -395,13 +398,16 @@ class PublicFormService {
   decryptSensitiveData(encryptedData) {
     if (!encryptedData || !encryptedData.includes(':')) return encryptedData;
     
+    // Validate encryption key before use
+    if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+      throw new Error(
+        'ENCRYPTION_KEY must be set to a random value of at least 32 characters.'
+      );
+    }
+
     try {
       const algorithm = 'aes-256-cbc';
-      const key = crypto.scryptSync(
-        process.env.ENCRYPTION_KEY || 'default-encryption-key',
-        'salt',
-        32
-      );
+      const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 32);
       
       const [ivHex, encrypted] = encryptedData.split(':');
       const iv = Buffer.from(ivHex, 'hex');
