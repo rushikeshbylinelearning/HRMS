@@ -24,6 +24,8 @@ const { corsOptions } = require('./config/security');
 const { requestLogger, logError, logger } = require('./utils/logger');
 const { optimizeConnection, createIndexes } = require('./utils/database');
 const { sanitizeInput } = require('./middleware/validation');
+const authenticateToken = require('./middleware/authenticateToken');
+const isAdminOrHr = require('./middleware/requireAdminOrHr');
 const ssoService = require('./services/ssoService');
 const performanceMonitor = require('./services/performanceMonitor');
 const cacheService = require('./services/cacheService');
@@ -260,7 +262,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/new-notifications', newNotificationRoutes);
 app.use('/api/resource-requests', resourceRequestRoutes);
 app.use('/api/admin/employees', employeeRoutes);
-app.use('/api/admin/shifts', shiftRoutes);
+app.use('/api/admin/shifts', authenticateToken, isAdminOrHr, shiftRoutes); // F-HIGH-003: auth at router level
 app.use('/api/admin/settings', settingsRoutes);
 app.use('/api/admin/reports', reportsRoutes);
 app.use('/api/admin/office-locations', officeLocationRoutes);
