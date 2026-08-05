@@ -85,10 +85,13 @@ const SSO_CONFIG = {
   audience: process.env.SSO_AUDIENCE || 'sso-apps',
   sessionSecret: (() => {
     const sessionSecret = process.env.SESSION_SECRET;
-    if (process.env.NODE_ENV === 'production' && !sessionSecret) {
-      console.warn('⚠️ WARNING: SESSION_SECRET missing in production.');
+    if (!sessionSecret) {
+      throw new Error(
+        'SESSION_SECRET is not set. Refusing to start with an insecure default. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+      );
     }
-    return sessionSecret || 'fallback-secret-key-CHANGE-ME';
+    return sessionSecret;
   })(),
   sessionMaxAge: 24 * 60 * 60 * 1000,
   jwksUrl: process.env.SSO_JWKS_URL,
