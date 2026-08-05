@@ -31,7 +31,7 @@ function setCachedSSOUser(email, user) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -39,125 +39,117 @@ function authenticateToken(req, res, next) {
         return res.sendStatus(401); // Unauthorized
     }
 
-    (async () => {
-        try {
-            // Ensure MongoDB connection before proceeding
-            const mongoose = require('mongoose');
-            if (mongoose.connection.readyState !== 1) {
-                await new Promise((resolve, reject) => {
-                    if (mongoose.connection.readyState === 1) return resolve();
-                    const timeout = setTimeout(() => reject(new Error('MongoDB connection timeout')), 5000);
-                    mongoose.connection.once('connected', () => {
-                        clearTimeout(timeout);
-                        resolve();
-                    });
+    try {
+        // Ensure MongoDB connection before proceeding
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 1) {
+            await new Promise((resolve, reject) => {
+                if (mongoose.connection.readyState === 1) return resolve();
+                const timeout = setTimeout(() => reject(new Error('MongoDB connection timeout')), 5000);
+                mongoose.connection.once('connected', () => {
+                    clearTimeout(timeout);
+                    resolve();
                 });
-            }
-
-            // Decode token header to determine type
-            const decodedHeader = jwt.decode(token, { complete: true });
-            if (!decodedHeader || !decodedHeader.header) {
-                throw new Error('Invalid token format: missing header');
-            }
-
-            const kid = decodedHeader.header.kid;
-            const alg = decodedHeader.header.alg;
-
-            let user;
-
-            if (alg === 'HS256') {
-                // Legacy HS256 token
-                const decoded = jwtUtils.verify(token);
-                user = {
-                    userId: decoded.userId || decoded.id,
-                    email: decoded.email,
-                    role: decoded.role,
-                    authMethod: decoded.authMethod || 'local'
-                };
-            } else if (!kid) {
-                throw new Error('Missing kid (key ID) in token header');
-            } else if (kid.startsWith('sso-key-')) {
-                // SSO token - verify using JWKS
-                const decoded = await jwtUtils.verifySSOTokenWithJWKS(token);
-
-                const rawEmail = decoded.email;
-                const normalizedEmail = normalizeEmail(rawEmail);
-                const rawLowerEmail = String(rawEmail).toLowerCase();
-
-                // ── Check in-process cache first (avoids DB round-trip on shared hosting) ──
-                let cachedUser = getCachedSSOUser(normalizedEmail) || getCachedSSOUser(rawLowerEmail);
-
-                if (!cachedUser) {
-                    const User = require('../models/User');
-                    const dbUser = await User.findOne({
-                        isActive: true,
-                        $or: [
-                            { email: normalizedEmail },
-                            { email: rawLowerEmail }
-                        ]
-                    }).select('_id email role').lean(); // select only needed fields
-
-                    if (!dbUser) {
-                        throw new Error('User not found for SSO token email: ' + normalizedEmail);
-                    }
-
-                    cachedUser = {
-                        userId: dbUser._id.toString(),
-                        email: dbUser.email,
-                        role: dbUser.role,
-                        authMethod: 'SSO'
-                    };
-                    setCachedSSOUser(normalizedEmail, cachedUser);
-                    if (rawLowerEmail !== normalizedEmail) {
-                        setCachedSSOUser(rawLowerEmail, cachedUser);
-                    }
-                }
-
-                user = cachedUser;
-            } else {
-                if (alg !== 'RS256') {
-                    throw new Error(`Invalid algorithm: ${alg}. Only RS256 or HS256 are supported.`);
-                }
-                // AMS local RS256 token
-                const decoded = jwtUtils.verify(token);
-                user = {
-                    userId: decoded.userId || decoded.id,
-                    email: decoded.email,
-                    role: decoded.role,
-                    authMethod: decoded.authMethod || 'local'
-                };
-            }
-
-            req.user = user;
-            next();
-        } catch (err) {
-            // Only log detailed info in development to reduce I/O overhead on A2
-            if (process.env.NODE_ENV !== 'production') {
-                console.error('[AuthenticateToken] Token verification failed:', err.message);
-            }
-
-            // Distinguish expired tokens from genuinely invalid ones.
-            // The frontend axios interceptor (frontend/src/api/axios.js) only triggers
-            // its silent token-refresh flow on HTTP 401.  Returning 403 for expired
-            // tokens prevents the refresh from ever firing, leaving users stuck.
-            // Mirror the convention already used in requireAuth.js and errorHandler.js.
-            if (err.name === 'TokenExpiredError') {
-                return res.status(401).json({
-                    error: 'Token expired',
-                    message: err.message,
-                    code: 'TOKEN_EXPIRED'
-                });
-            }
-
-            // All other failures (JsonWebTokenError, invalid algorithm, missing kid,
-            // malformed token, SSO user-not-found, etc.) remain 403 Forbidden.
-            return res.status(403).json({
-                error: 'Invalid token',
-                message: err.message,
-                code: 'TOKEN_VERIFICATION_FAILED'
             });
         }
-    })();
+
+        // Decode token header to determine type
+        const decodedHeader = jwt.decode(token, { complete: true });
+        if (!decodedHeader || !decodedHeader.header) {
+            throw new Error('Invalid token format: missing header');
+        }
+
+        const kid = decodedHeader.header.kid;
+        const alg = decodedHeader.header.alg;
+
+        let user;
+
+        if (alg === 'HS256') {
+            // Legacy HS256 token
+            const decoded = jwtUtils.verify(token);
+            user = {
+                userId: decoded.userId || decoded.id,
+                email: decoded.email,
+                role: decoded.role,
+                authMethod: decoded.authMethod || 'local'
+            };
+        } else if (!kid) {
+            throw new Error('Missing kid (key ID) in token header');
+        } else if (kid.startsWith('sso-key-')) {
+            // SSO token - verify using JWKS
+            const decoded = await jwtUtils.verifySSOTokenWithJWKS(token);
+
+            const rawEmail = decoded.email;
+            const normalizedEmail = normalizeEmail(rawEmail);
+            const rawLowerEmail = String(rawEmail).toLowerCase();
+
+            // ── Check in-process cache first (avoids DB round-trip on shared hosting) ──
+            let cachedUser = getCachedSSOUser(normalizedEmail) || getCachedSSOUser(rawLowerEmail);
+
+            if (!cachedUser) {
+                const User = require('../models/User');
+                const dbUser = await User.findOne({
+                    isActive: true,
+                    $or: [
+                        { email: normalizedEmail },
+                        { email: rawLowerEmail }
+                    ]
+                }).select('_id email role').lean(); // select only needed fields
+
+                if (!dbUser) {
+                    throw new Error('User not found for SSO token email: ' + normalizedEmail);
+                }
+
+                cachedUser = {
+                    userId: dbUser._id.toString(),
+                    email: dbUser.email,
+                    role: dbUser.role,
+                    authMethod: 'SSO'
+                };
+                setCachedSSOUser(normalizedEmail, cachedUser);
+                if (rawLowerEmail !== normalizedEmail) {
+                    setCachedSSOUser(rawLowerEmail, cachedUser);
+                }
+            }
+
+            user = cachedUser;
+        } else {
+            if (alg !== 'RS256') {
+                throw new Error(`Invalid algorithm: ${alg}. Only RS256 or HS256 are supported.`);
+            }
+            // AMS local RS256 token
+            const decoded = jwtUtils.verify(token);
+            user = {
+                userId: decoded.userId || decoded.id,
+                email: decoded.email,
+                role: decoded.role,
+                authMethod: decoded.authMethod || 'local'
+            };
+        }
+
+        req.user = user;
+        next();
+    } catch (err) {
+        // Only log detailed info in development to reduce I/O overhead on A2
+        if (process.env.NODE_ENV !== 'production') {
+            console.error('[AuthenticateToken] Token verification failed:', err.message);
+        }
+
+        // Distinguish expired tokens from genuinely invalid ones.
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                error: 'Token expired',
+                message: err.message,
+                code: 'TOKEN_EXPIRED'
+            });
+        }
+
+        return res.status(403).json({
+            error: 'Invalid token',
+            message: err.message,
+            code: 'TOKEN_VERIFICATION_FAILED'
+        });
+    }
 }
 
 module.exports = authenticateToken;
