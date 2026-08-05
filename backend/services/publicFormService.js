@@ -1,6 +1,5 @@
 // backend/services/publicFormService.js
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const EmployeePublicToken = require('../models/EmployeePublicToken');
 const ProfileSubmissionAudit = require('../models/ProfileSubmissionAudit');
@@ -42,22 +41,13 @@ class PublicFormService {
       }
 
       // Generate new secure token
-      const tokenPayload = {
-        employeeId: employee.employeeCode,
-        type: 'profile_form',
-        timestamp: Date.now()
-      };
-
-      const jwtToken = jwt.sign(
-        tokenPayload,
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: options.expiryHours ? `${options.expiryHours}h` : '48h' }
-      );
+      // Generate random entropy for the token hash (F-MED-004: no JWT_SECRET fallback needed)
+      const randomEntropy = crypto.randomBytes(32).toString('hex');
 
       // Create secure hash
       const secureToken = crypto
         .createHash('sha256')
-        .update(jwtToken + employee.employeeCode + Date.now())
+        .update(randomEntropy + employee.employeeCode + Date.now())
         .digest('hex');
 
       // Calculate expiry
