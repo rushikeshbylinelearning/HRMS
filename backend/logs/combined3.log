@@ -194698,3 +194698,184 @@
   message: 'Request',
   timestamp: '2026-07-30 16:15:13'
 }
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/bulk-attendance-actions/execute',
+  statusCode: 200,
+  duration: '1097ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 11:37:32'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 12:21:43'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 12:21:56'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/hr-emails',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 12:22:47'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/year-end-feature',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 12:22:55'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/hr-emails',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 12:23:04'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/metrics',
+  statusCode: 401,
+  duration: '2ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:03:16'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/cache-stats',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:18:19'
+}
+{
+  service: 'attendance-system',
+  message: 'Application Error Validation failed',
+  stack: 'Error: Validation failed\n' +
+    '    at handleValidationErrors (D:\\Zip 4\\attendance-system\\backend\\middleware\\validation.js:15:14)\n' +
+    '    at Layer.handleRequest (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n' +
+    '    at next (D:\\Zip 4\\attendance-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n' +
+    '    at middleware (D:\\Zip 4\\attendance-system\\backend\\node_modules\\express-validator\\lib\\middlewares\\check.js:16:13)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)',
+  errors: [
+    {
+      field: 'email',
+      message: 'Please provide a valid email address',
+      value: 'not-an-email'
+    },
+    {
+      field: 'password',
+      message: 'Password must be at least 6 characters long',
+      value: '123'
+    }
+  ],
+  body: { email: '@not-an-email', password: '123' },
+  params: [Object: null prototype] {},
+  query: [Object: null prototype] {},
+  level: 'error',
+  timestamp: '2026-08-05 15:18:38'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/login',
+  statusCode: 400,
+  duration: '4ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:18:38'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:18:49'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/hr-emails',
+  statusCode: 401,
+  duration: '0ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:19:15'
+}
+{
+  service: 'attendance-system',
+  method: 'POST',
+  url: '/hr-emails',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:19:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/year-end-feature',
+  statusCode: 401,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:19:15'
+}
+{
+  service: 'attendance-system',
+  method: 'GET',
+  url: '/status',
+  statusCode: 403,
+  duration: '1ms',
+  ip: '127.0.0.1',
+  level: 'info',
+  message: 'Request',
+  timestamp: '2026-08-05 15:19:27'
+}
