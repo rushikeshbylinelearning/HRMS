@@ -7,6 +7,7 @@ on:
 
 env:
   DEPLOY_ROOT: /home/bylinelm/attendance-test.bylinelms.com
+  SALARY_DEPLOY_ROOT: /home/bylinelm/payroll-test.bylinelms.com/salary-service
 
 jobs:
   deploy:
@@ -36,12 +37,15 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy backend
+      # ── AMS backend ───────────────────────────────────────────────────────────
+      - name: Deploy AMS backend
         run: |
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }}" \
             --exclude 'node_modules' \
             --exclude '.env' \
+            --exclude 'keys/' \
+            --exclude 'logs/' \
             backend/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_ROOT }}/backend/
 
@@ -56,7 +60,7 @@ jobs:
             frontend/dist/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_ROOT }}/
 
-      - name: Install dependencies and restart PM2
+      - name: Install AMS dependencies and restart PM2
         run: |
           ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
@@ -64,5 +68,47 @@ jobs:
             cd /home/bylinelm/attendance-test.bylinelms.com/backend
             npm ci --omit=dev
             pm2 restart attendancetest-backend --update-env
+            pm2 save
+          EOF
+
+      # ── salary-service frontend ──────────────────────────────────────────────
+      - name: Install and build salary-service frontend
+        working-directory: salary-service-frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_BASE_URL: /api
+
+      # ── salary-service backend + built frontend ───────────────────────────────
+      # .env is NEVER deployed via rsync — it lives only on the server.
+      # Set it manually once via cPanel or SSH, then leave it in place.
+      - name: Deploy salary-service backend
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }}" \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude 'logs/' \
+            --exclude 'keys/' \
+            salary-service/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.SALARY_DEPLOY_ROOT }}/
+
+      - name: Deploy salary-service frontend (dist to server)
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }}" \
+            salary-service-frontend/dist/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.SALARY_DEPLOY_ROOT }}/public/
+
+      - name: Install salary-service dependencies and restart PM2
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            source ~/.bashrc
+            cd ${{ env.SALARY_DEPLOY_ROOT }}
+            npm ci --omit=dev
+            # --env production is mandatory — default block runs NODE_ENV=development
+            pm2 restart salary-service --update-env || pm2 start ecosystem.config.js --only salary-service --env production
             pm2 save
           EOF

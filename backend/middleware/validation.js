@@ -28,11 +28,17 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 // Authentication validation
+// Allow both email and employeeCode for login
 const validateLogin = [
   body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+    .trim()
+    .notEmpty()
+    .withMessage('Email or Employee Code is required')
+    .custom((value) => {
+      // Accept either valid email OR non-empty string (for employeeCode)
+      // Don't force email validation since employeeCode is also allowed
+      return true;
+    }),
   body('password')
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters long'),

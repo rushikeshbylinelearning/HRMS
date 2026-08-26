@@ -11,6 +11,9 @@ import NotificationPermissionPrompt from './NotificationPermissionPrompt';
 import PageTransition from './PageTransition';
 import useNewNotifications from '../hooks/useNewNotifications';
 import OnboardingOrchestrator from './onboarding/OnboardingOrchestrator';
+import HRQueryFloatingChat from './HRQueryFloatingChat';
+import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import '../styles/MainLayout.css';
 
 const MainLayout = () => {
@@ -23,6 +26,8 @@ const MainLayout = () => {
     const scrollPositionsRef = useRef({});
 
     const { fetchNotifications } = useNewNotifications();
+    const { user } = useAuth();
+    const { canAccess } = usePermissions();
 
     // Preserve scroll position when navigating
     useEffect(() => {
@@ -131,6 +136,11 @@ const MainLayout = () => {
             <NotificationPermissionPrompt 
                 onPermissionChange={handleNotificationPermissionChange}
             />
+            
+            {/* HR Query Floating Chat - Visible for Admin, HR, and users with canManageHRQueries permission */}
+            {(user?.role === 'Admin' || user?.role === 'HR' || canAccess?.manageHRQueries?.()) && (
+                <HRQueryFloatingChat />
+            )}
         </div>
     );
 };

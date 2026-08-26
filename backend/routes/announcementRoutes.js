@@ -118,8 +118,8 @@ router.post("/", authenticateToken, async (req, res) => {
       if (!isAdminOrHr(req.user.role)) {
         return res.status(403).json({ message: "Only Admin/HR can post tea break announcements" });
       }
-      if (!teaBreakType || !["morning", "evening"].includes(teaBreakType)) {
-        return res.status(400).json({ message: "teaBreakType must be 'morning' or 'evening'" });
+      if (!teaBreakType || !["morning", "evening", "lunch"].includes(teaBreakType)) {
+        return res.status(400).json({ message: "teaBreakType must be 'morning', 'evening', or 'lunch'" });
       }
       const { getISTNow } = require("../utils/istTime");
       createPayload.isTEABreak = true;
@@ -138,7 +138,7 @@ router.post("/", authenticateToken, async (req, res) => {
         announcementId: msgObj._id,
         teaBreakStartedAt: msgObj.teaBreakStartedAt,
         teaBreakType: msgObj.teaBreakType,
-        durationMinutes: 10,
+        durationMinutes: msgObj.teaBreakType === 'lunch' ? 30 : 10,
       };
       emitTeaBreakStarted(teaPayload, req.user.userId).catch((err) => {
         console.error("[Announcements] tea_break_started broadcast failed:", err.message);
@@ -146,7 +146,8 @@ router.post("/", authenticateToken, async (req, res) => {
 
       try {
         const { scheduleTeaBreakEnforcement } = require("../jobs/teaBreakEnforcer");
-        scheduleTeaBreakEnforcement(msgObj._id, msgObj.teaBreakStartedAt);
+        const breakType = msgObj.teaBreakType === 'lunch' ? 'lunch' : 'tea';
+        scheduleTeaBreakEnforcement(msgObj._id, msgObj.teaBreakStartedAt, breakType);
       } catch (jobErr) {
         console.error("[Announcements] tea break enforcer schedule failed:", jobErr.message);
       }

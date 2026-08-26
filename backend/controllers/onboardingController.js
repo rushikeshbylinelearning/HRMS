@@ -150,6 +150,25 @@ exports.getOnboardingStatus = async (req, res) => {
         // because pre-feature users may have been wrongly enrolled earlier.
         const isNewOnboardingEmployee = isEligibleForOnboarding(user);
 
+        // Check for pending policy acknowledgements (new dynamic policy assignment)
+        let pendingPolicyAcknowledgement = null;
+        if (mandatoryPolicy) {
+            const existingLog = await PolicyAcceptanceLog.findOne({
+                userId: userId,
+                policyId: mandatoryPolicy._id,
+                accepted: false
+            }).lean();
+
+            if (existingLog) {
+                pendingPolicyAcknowledgement = {
+                    policyId: mandatoryPolicy._id,
+                    policyName: mandatoryPolicy.name,
+                    policyVersion: mandatoryPolicy.version,
+                    logId: existingLog._id
+                };
+            }
+        }
+
         return res.json({
             onboarding: user.onboarding || {},
             mandatoryPolicy: mandatoryPolicy || null,
@@ -159,6 +178,7 @@ exports.getOnboardingStatus = async (req, res) => {
             profileFilledCount: profileEval.profileFilledCount,
             profileFieldsTotal: profileEval.profileFieldsTotal,
             missingProfileFields: profileEval.missingFields,
+            pendingPolicyAcknowledgement,
         });
     } catch (err) {
         console.error('[Onboarding] getOnboardingStatus error:', err);
@@ -812,5 +832,371 @@ exports.forceOnboarding = async (req, res) => {
     } catch (err) {
         console.error('[Onboarding Admin] forceOnboarding error:', err);
         res.status(500).json({ error: 'Failed to force onboarding.' });
+    }
+};
+
+// ─── New Dynamic Policy Assignment Endpoints ──────────────────────────────────
+
+// POST /api/onboarding/admin/assign-policy-to-users
+// Assign a mandatory policy to specific users (without forcing full onboarding)
+exports.assignPolicyToUsers = async (req, res) => {
+    try {
+        if (!['Admin', 'HR'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        const { userIds, policyId, deadline } = req.body;
+
+        if (!policyId || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(400).json({ error: 'policyId and userIds array are required.' });
+        }
+
+        const policy = await Policy.findOne({ _id: policyId, status: 'Active' }).lean();
+        if (!policy) {
+            return res.status(404).json({ error: 'Policy not found or inactive.' });
+        }
+
+        const assignmentDeadline = deadline 
+            ? new Date(deadline) 
+            : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        const results = {
+            success: [],
+            alreadyAccepted: [],
+            failed: []
+        };
+
+        for (const userId of userIds) {
+            try {
+                const user = await User.findById(userId).select('fullName employeeCode department').lean();
+                if (!user) {
+                    results.failed.push({ userId, reason: 'User not found' });
+                    continue;
+                }
+
+                // Check if user already accepted this policy version
+                const existingLog = await PolicyAcceptanceLog.findOne({
+                    userId: userId,
+                    policyId: policy._id,
+                    policyVersion: policy.version,
+                    accepted: true
+                }).lean();
+
+                if (existingLog) {
+                    results.alreadyAccepted.push({ userId, userName: user.fullName });
+                    continue;
+                }
+
+                // Check for pending log with same policy
+                const pendingLog = await PolicyAcceptanceLog.findOne({
+                    userId: userId,
+                    policyId: policy._id,
+                    accepted: false
+                });
+
+                if (pendingLog) {
+                    // Update existing pending log with new deadline
+                    pendingLog.profileDeadline = assignmentDeadline;
+                    pendingLog.policyVersion = policy.version;
+                    pendingLog.policyName = policy.name;
+                    pendingLog.timeline.push({
+                        event: 'policy_reassigned',
+                        timestamp: new Date(),
+                        notes: `Policy reassigned by ${req.user.role} (deadline updated)`
+                    });
+                    await pendingLog.save();
+                    results.success.push({ userId, userName: user.fullName, status: 'updated' });
+                } else {
+                    // Create new policy acceptance log
+                    await PolicyAcceptanceLog.create({
+                        userId: userId,
+                        userName: user.fullName,
+                        employeeCode: user.employeeCode,
+                        department: user.department || '',
+                        policyId: policy._id,
+                        policyName: policy.name,
+                        policyVersion: policy.version,
+                        minimumReadingSeconds: calcMinReadSeconds(policy.wordCount),
+                        profileDeadline: assignmentDeadline,
+                        status: 'pending',
+                        timeline: [{
+                            event: 'policy_assigned',
+                            timestamp: new Date(),
+                            notes: `Policy assigned by ${req.user.role}`
+                        }]
+                    });
+                    results.success.push({ userId, userName: user.fullName, status: 'assigned' });
+                }
+
+                // Send notification to user
+                setImmediate(async () => {
+                    try {
+                        await NewNotificationService.createAndEmitNotification({
+                            message: `New policy "${policy.name}" requires your acknowledgement. Please review and accept it.`,
+                            type: 'policy_assignment',
+                            userId: userId,
+                            userName: user.fullName,
+                            recipientType: 'user',
+                            category: 'compliance',
+                            priority: 'high',
+                            navigationData: { page: 'policy-acknowledgement' },
+                            metadata: { 
+                                type: 'POLICY_ASSIGNMENT',
+                                policyId: policy._id,
+                                policyName: policy.name
+                            }
+                        });
+                    } catch (e) {
+                        console.error('[Policy Assignment] Notification failed:', e.message);
+                    }
+                });
+
+            } catch (err) {
+                console.error(`[Policy Assignment] Failed for user ${userId}:`, err);
+                results.failed.push({ userId, reason: err.message });
+            }
+        }
+
+        return res.json({
+            message: 'Policy assignment completed.',
+            results
+        });
+    } catch (err) {
+        console.error('[Onboarding Admin] assignPolicyToUsers error:', err);
+        res.status(500).json({ error: 'Failed to assign policy to users.' });
+    }
+};
+
+// POST /api/onboarding/admin/assign-policy-to-all
+// Assign a mandatory policy to all active employees
+exports.assignPolicyToAll = async (req, res) => {
+    try {
+        if (req.user.role !== 'Admin') {
+            return res.status(403).json({ error: 'Only admins can assign policies to all employees.' });
+        }
+
+        const { policyId, deadline, excludeUserIds = [] } = req.body;
+
+        if (!policyId) {
+            return res.status(400).json({ error: 'policyId is required.' });
+        }
+
+        const policy = await Policy.findOne({ _id: policyId, status: 'Active' }).lean();
+        if (!policy) {
+            return res.status(404).json({ error: 'Policy not found or inactive.' });
+        }
+
+        // Get all active employees (excluding Admin and HR)
+        const users = await User.find({
+            isActive: true,
+            role: { $in: ['Employee', 'Intern'] },
+            _id: { $nin: excludeUserIds }
+        }).select('_id fullName employeeCode department').lean();
+
+        const userIds = users.map(u => u._id.toString());
+
+        // Reuse the assignPolicyToUsers logic
+        req.body.userIds = userIds;
+        return exports.assignPolicyToUsers(req, res);
+
+    } catch (err) {
+        console.error('[Onboarding Admin] assignPolicyToAll error:', err);
+        res.status(500).json({ error: 'Failed to assign policy to all employees.' });
+    }
+};
+
+// GET /api/onboarding/pending-policies
+// Get all pending policy acknowledgements for the current user
+exports.getPendingPolicies = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        const pendingLogs = await PolicyAcceptanceLog.find({
+            userId: userId,
+            accepted: false
+        })
+        .populate('policyId', 'name version wordCount effectiveFrom')
+        .sort({ createdAt: -1 })
+        .lean();
+
+        return res.json({
+            pendingPolicies: pendingLogs.map(log => ({
+                logId: log._id,
+                policyId: log.policyId?._id || log.policyId,
+                policyName: log.policyName,
+                policyVersion: log.policyVersion,
+                deadline: log.profileDeadline,
+                assignedAt: log.createdAt,
+                policy: log.policyId
+            }))
+        });
+    } catch (err) {
+        console.error('[Onboarding] getPendingPolicies error:', err);
+        res.status(500).json({ error: 'Failed to fetch pending policies.' });
+    }
+};
+
+// POST /api/onboarding/policy/standalone-accept
+// Accept a policy that was assigned outside of the onboarding flow
+exports.standaloneAcceptPolicy = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const {
+            logId,
+            policyId,
+            policyVersion,
+            checkboxAcknowledged,
+            readingDurationSeconds,
+            scrolledToBottom,
+        } = req.body;
+
+        if (!logId || !policyId || !policyVersion) {
+            return res.status(400).json({ error: 'logId, policyId, and policyVersion are required.' });
+        }
+
+        if (!checkboxAcknowledged) {
+            return res.status(400).json({ error: 'You must acknowledge the checkbox to accept.' });
+        }
+
+        const log = await PolicyAcceptanceLog.findOne({
+            _id: logId,
+            userId: userId,
+            policyId: policyId
+        });
+
+        if (!log) {
+            return res.status(404).json({ error: 'Policy acceptance record not found.' });
+        }
+
+        if (log.accepted) {
+            return res.json({ message: 'Policy already accepted.', log });
+        }
+
+        // Verify the policy is still active
+        const policy = await Policy.findOne({
+            _id: policyId,
+            status: 'Active'
+        }).lean();
+
+        if (!policy) {
+            return res.status(400).json({ error: 'Policy not found or inactive.' });
+        }
+
+        if (policy.version !== policyVersion) {
+            return res.status(400).json({ error: 'Policy version mismatch. Please reload and try again.' });
+        }
+
+        if (!scrolledToBottom) {
+            return res.status(400).json({ error: 'You must scroll to the bottom of the policy before accepting.' });
+        }
+
+        const minSeconds = 60;
+        if (!readingDurationSeconds || readingDurationSeconds < minSeconds) {
+            return res.status(400).json({
+                error: `Minimum reading time not met. Required: ${minSeconds}s, Recorded: ${readingDurationSeconds || 0}s.`
+            });
+        }
+
+        const now = new Date();
+        const ip = req.ip || req.connection?.remoteAddress || '';
+        const ua = req.headers['user-agent'] || '';
+        const { device, browser } = parseUA(ua);
+
+        log.readingCompletedAt = now;
+        log.readingDurationSeconds = readingDurationSeconds;
+        log.scrolledToBottom = scrolledToBottom;
+        log.accepted = true;
+        log.acceptedAt = now;
+        log.checkboxAcknowledged = checkboxAcknowledged;
+        log.ipAddress = ip;
+        log.userAgent = ua;
+        log.deviceType = device;
+        log.browser = browser;
+        log.status = 'completed';
+
+        log.timeline.push(
+            {
+                event: 'reading_completed',
+                timestamp: now,
+                notes: `Reading time: ${readingDurationSeconds}s`
+            },
+            {
+                event: 'policy_accepted',
+                timestamp: now,
+                notes: `Accepted from ${ip} via ${browser}`
+            }
+        );
+
+        await log.save();
+
+        // Send confirmation notification
+        setImmediate(async () => {
+            try {
+                const user = await User.findById(userId).select('fullName').lean();
+                await NewNotificationService.createAndEmitNotification({
+                    message: `You have successfully acknowledged the policy "${policy.name}".`,
+                    type: 'policy_accepted',
+                    userId: userId,
+                    userName: user?.fullName || '',
+                    recipientType: 'user',
+                    category: 'compliance',
+                    priority: 'medium',
+                    navigationData: { page: 'dashboard' },
+                    metadata: { 
+                        type: 'POLICY_ACCEPTED',
+                        policyId: policy._id,
+                        policyName: policy.name
+                    }
+                });
+            } catch (e) {
+                console.error('[Policy Acceptance] Notification failed:', e.message);
+            }
+        });
+
+        return res.json({ 
+            message: 'Policy accepted successfully.', 
+            log 
+        });
+    } catch (err) {
+        console.error('[Onboarding] standaloneAcceptPolicy error:', err);
+        res.status(500).json({ error: 'Failed to accept policy.' });
+    }
+};
+
+// POST /api/onboarding/policy/standalone-start-reading
+// Record reading start for standalone policy acknowledgement
+exports.standaloneStartReading = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { logId } = req.body;
+
+        if (!logId) {
+            return res.status(400).json({ error: 'logId is required.' });
+        }
+
+        const log = await PolicyAcceptanceLog.findOne({
+            _id: logId,
+            userId: userId
+        });
+
+        if (!log) {
+            return res.status(404).json({ error: 'Policy acceptance record not found.' });
+        }
+
+        if (!log.readingStartedAt) {
+            log.readingStartedAt = new Date();
+            log.status = 'in_progress';
+            log.timeline.push({
+                event: 'reading_started',
+                timestamp: new Date(),
+                notes: 'Employee opened policy document (standalone)'
+            });
+            await log.save();
+        }
+
+        return res.json({ message: 'Reading started.' });
+    } catch (err) {
+        console.error('[Onboarding] standaloneStartReading error:', err);
+        res.status(500).json({ error: 'Failed to record reading start.' });
     }
 };

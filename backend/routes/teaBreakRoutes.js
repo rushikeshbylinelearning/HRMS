@@ -21,7 +21,8 @@ const router = express.Router();
 router.get('/active', authenticateToken, async (req, res) => {
   try {
     const now = getISTNow();
-    const cutoff = new Date(now.getTime() - TEA_BREAK_SAFETY_CUTOFF_MS);
+    const { LUNCH_BREAK_SAFETY_CUTOFF_MS } = require('../services/teaBreakService');
+    const cutoff = new Date(now.getTime() - LUNCH_BREAK_SAFETY_CUTOFF_MS); // Use longer cutoff to catch lunch breaks
 
     const announcement = await AnnouncementMessage.findOne({
       isTEABreak: true,
@@ -37,7 +38,8 @@ router.get('/active', authenticateToken, async (req, res) => {
       return res.json({ active: false });
     }
 
-    const timing = computeTeaBreakTiming(announcement.teaBreakStartedAt, now);
+    const breakType = announcement.teaBreakType === 'lunch' ? 'lunch' : 'tea';
+    const timing = computeTeaBreakTiming(announcement.teaBreakStartedAt, now, breakType);
     if (now >= timing.safetyEndsAt) {
       return res.json({ active: false });
     }
@@ -51,7 +53,8 @@ router.get('/active', authenticateToken, async (req, res) => {
 
       const eligible = await isEmployeeEligibleForTeaBreak(
         req.user.userId,
-        announcement.teaBreakStartedAt
+        announcement.teaBreakStartedAt,
+        breakType
       );
       if (!eligible) {
         markTeaBreakEnded(announcement._id, req.user.userId);
@@ -82,11 +85,13 @@ router.post('/end', authenticateToken, async (req, res) => {
     }
 
     const employeeId = req.user.userId;
+    const breakType = announcement.teaBreakType === 'lunch' ? 'lunch' : 'tea';
 
     const { overrunMinutes } = await finalizeTeaBreakOnEnd(
       employeeId,
       announcementId,
-      announcement.teaBreakStartedAt
+      announcement.teaBreakStartedAt,
+      breakType
     );
 
     markTeaBreakEnded(announcementId, employeeId);

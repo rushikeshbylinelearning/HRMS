@@ -445,3 +445,37 @@
   level: 'error',
   timestamp: '2026-08-05 15:18:38'
 }
+{
+  service: 'attendance-system',
+  errors: {
+    'messages.0.senderName': ValidatorError: Path `senderName` is required.
+        at validate (D:\Zip 4\attendance-system\backend\node_modules\mongoose\lib\schemaType.js:1413:13)
+        at SchemaType.doValidate (D:\Zip 4\attendance-system\backend\node_modules\mongoose\lib\schemaType.js:1397:7)
+        at D:\Zip 4\attendance-system\backend\node_modules\mongoose\lib\document.js:3111:18
+        at process.processTicksAndRejections (node:internal/process/task_queues:85:11) {
+      properties: {
+        validator: [Function (anonymous)],
+        message: 'Path `senderName` is required.',
+        type: 'required',
+        path: 'senderName',
+        fullPath: undefined,
+        value: undefined
+      },
+      kind: 'required',
+      path: 'senderName',
+      value: undefined,
+      reason: undefined,
+      Symbol(mongoose#validatorError): true
+    }
+  },
+  _message: 'HRQuery validation failed',
+  level: 'error',
+  message: 'Failed to create HR query: HRQuery validation failed: messages.0.senderName: Path `senderName` is required.',
+  stack: 'ValidationError: HRQuery validation failed: messages.0.senderName: Path `senderName` is required.\n' +
+    '    at Document.invalidate (D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3358:32)\n' +
+    '    at Subdocument.invalidate (D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\types\\subdocument.js:229:12)\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\document.js:3119:17\n' +
+    '    at D:\\Zip 4\\attendance-system\\backend\\node_modules\\mongoose\\lib\\schemaType.js:1416:9\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)',
+  timestamp: '2026-08-13 14:17:02'
+}

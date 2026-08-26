@@ -1,0 +1,364 @@
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+/* Explicitly set html background to match body/surface so no stray dark band
+   appears between the browser chrome and the first pixel of content.
+   MUI CssBaseline sets body background from theme, but html itself must also
+   be covered to avoid a sliver of browser-default colour at the top edge. */
+html {
+  background-color: #f4f7fb; /* --surface */
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+               'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f7fb;
+}
+
+/* ─── Design tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* Brand — identical to AMS */
+  --ink:            #1a202c;
+  --ink-secondary:  #6b7280;
+  --ink-muted:      #9aa3b2;
+  --paper:          #ffffff;
+  --surface:        #f4f7fb;
+  --border:         #e5e7eb;
+
+  --brand-red:        #d32f2f;
+  --brand-red-hover:  #b71c1c;
+  --brand-red-tint:   #fdecea;
+
+  /* Sidebar — navy-deep for payroll (one shade deeper than AMS #192a56) */
+  --sidebar-navy:      #192a56;   /* AMS original */
+  --sidebar-navy-deep: #10193f;   /* payroll — deliberate subtle differentiator */
+
+  /* Status semantics */
+  --status-draft:      #6b7280;
+  --status-finalized:  #b45309;
+  --status-paid:       #15803d;
+  --status-paid-tint:  #dcfce7;
+
+  /* Ledger seal — reserved ONLY for net-pay banner + paid badge */
+  --ledger-seal:       #a01f1f;
+
+  /* Shared horizontal rhythm — topbar title and page content use the SAME token
+     so they can never drift apart. Both .payroll-topbar and .payroll-content__inner
+     reference --content-padding-x; do not hardcode 24px/32px in two places. */
+  --content-padding-x: 28px;
+
+  /* Spacing & shape */
+  --radius-card:    16px;
+  --radius-control: 8px;
+  --radius-pill:    16px;
+
+  --shadow-card:       0 2px 8px rgba(0, 0, 0, 0.10);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+  /* Sidebar sizing — icon-only, matching AMS */
+  --sidebar-width: 72px;
+  --topbar-height: 56px;
+}
+
+/* ─── Typography utility ─────────────────────────────────────────────────────── */
+/* Every rupee figure — tabular-nums so columns align like a real statement */
+.currency {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Monospace for IPs and token-hash prefixes in Audit Logs */
+.monospace {
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+/* ─── Tables and cards fill available content width ─────────────────────────── */
+/* Prevents tables/cards from shrink-wrapping to content and leaving the
+   right side of the content wrapper empty. */
+.payroll-content__inner table,
+.payroll-content__inner .MuiTableContainer-root,
+.payroll-content__inner .MuiPaper-root {
+  width: 100%;
+}
+
+/* ─── Card lift (reuse AMS .card:hover pattern) ──────────────────────────────── */
+.card {
+  background: var(--paper);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+/* ─── Ledger Seal ────────────────────────────────────────────────────────────── */
+/* Used in EXACTLY two places: net-pay banner & paid status badge */
+.ledger-seal {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ledger-seal);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ─── Net-pay banner ─────────────────────────────────────────────────────────── */
+.net-pay-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-card);
+}
+
+.net-pay-banner__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 2px;
+}
+
+.net-pay-banner__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* Stamp landing animation — only on the seal inside the net-pay banner */
+@keyframes seal-stamp {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.net-pay-banner .ledger-seal {
+  animation: seal-stamp 250ms ease-out forwards;
+}
+
+/* ─── Sensitive field masking (Financial Profiles) ───────────────────────────── */
+.sensitive-field {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  letter-spacing: 0.05em;
+  color: var(--ink-secondary);
+}
+
+/* ─── Frosted topbar (mirrors AMS Topbar.css exactly) ───────────────────────── */
+.payroll-topbar {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  height: var(--topbar-height);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  display: flex;
+  align-items: center;
+  z-index: 1100;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0 var(--content-padding-x);
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.05);
+  transition: background 0.3s ease;
+}
+.payroll-topbar.scrolled {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ─── Icon-only sidebar (matches AMS Sidebar.css sizing) ────────────────────── */
+.payroll-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--sidebar-navy-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1200;
+  overflow: hidden;
+}
+
+.payroll-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  padding: 12px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* 56×56 link, 32×32 icon container, 12px radius — exact AMS values */
+.payroll-nav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  text-decoration: none;
+  position: relative;
+  transition: background-color 0.18s ease;
+  cursor: pointer;
+}
+
+.payroll-nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.payroll-nav-link.active {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.payroll-nav-link__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: background-color 0.18s ease;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.payroll-nav-link.active .payroll-nav-link__icon,
+.payroll-nav-link:hover .payroll-nav-link__icon {
+  background-color: var(--brand-red);
+  color: #fff;
+}
+
+.payroll-nav-link__label {
+  font-size: 8.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  margin-top: 5px;
+  max-width: 62px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payroll-nav-link.active .payroll-nav-link__label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Tooltip on hover — same as AMS */
+.payroll-nav-link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.95);
+  background: var(--sidebar-navy);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.payroll-nav-link:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) scale(1);
+  transition-delay: 0.25s;
+}
+
+/* ─── Page content shell ─────────────────────────────────────────────────────── */
+.payroll-content {
+  margin-left: var(--sidebar-width);
+  padding-top: var(--topbar-height);
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.payroll-content__inner {
+  /* Fill the available width after the sidebar — no centering with margin: auto
+     because that would center within the full viewport (including sidebar width)
+     and drift the content away from the topbar's left edge.
+     max-width keeps long table rows readable on ultra-wide monitors. */
+  max-width: 1600px;
+  width: 100%;
+  margin: 0;                          /* pin to left — never drift from topbar */
+  padding: 28px var(--content-padding-x);
+  box-sizing: border-box;
+}
+
+/* ─── Status chip colours (semantic, not decorative) ─────────────────────────── */
+.status-chip-draft     { background: #f3f4f6 !important; color: var(--status-draft)     !important; }
+.status-chip-finalized { background: #fffbeb !important; color: var(--status-finalized) !important; }
+.status-chip-paid      { background: var(--status-paid-tint) !important; color: var(--status-paid) !important; }
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+/* Stat card stagger-in — used by DashboardPage (index × 60ms animation-delay) */
+@keyframes statCardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* Fallback for non-JS environments (gsap was removed — CSS-only now) */
+@media (prefers-reduced-motion: reduce) {
+  .card, .payroll-nav-link, .net-pay-banner .ledger-seal {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  body { overflow-x: hidden; }
+
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 56px;
+  }
+
+  .payroll-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    width: 240px;
+  }
+  .payroll-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .payroll-topbar {
+    left: 0;
+  }
+  .payroll-content {
+    margin-left: 0;
+  }
+  .payroll-content__inner {
+    padding: 16px;
+  }
+  .payroll-nav-link::after { display: none; }
+}

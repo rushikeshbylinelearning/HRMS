@@ -6,7 +6,9 @@ const { hasTeaBreakEnded, markTeaBreakEnded } = require('./teaBreakState');
 
 const TEA_BREAK_REASON_PREFIX = 'tea_break:';
 const TEA_BREAK_DURATION_MS = 10 * 60 * 1000;
+const LUNCH_BREAK_DURATION_MS = 30 * 60 * 1000;
 const TEA_BREAK_SAFETY_CUTOFF_MS = 30 * 60 * 1000;
+const LUNCH_BREAK_SAFETY_CUTOFF_MS = 60 * 60 * 1000;
 
 function invalidateEmployeeCaches(employeeId, today) {
   try {
@@ -24,16 +26,17 @@ function teaBreakReason(announcementId) {
   return `${TEA_BREAK_REASON_PREFIX}${announcementId}`;
 }
 
-function getTeaBreakAllowanceEnd(teaBreakStartedAt) {
-  return new Date(new Date(teaBreakStartedAt).getTime() + TEA_BREAK_DURATION_MS);
+function getTeaBreakAllowanceEnd(teaBreakStartedAt, breakType = 'tea') {
+  const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+  return new Date(new Date(teaBreakStartedAt).getTime() + durationMs);
 }
 
 /**
  * Tea break applies only if the employee's first check-in of the day was before the allowance end.
  */
-function isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckInTime, teaBreakStartedAt) {
+function isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckInTime, teaBreakStartedAt, breakType = 'tea') {
   if (!firstCheckInTime || !teaBreakStartedAt) return false;
-  const allowanceEnd = getTeaBreakAllowanceEnd(teaBreakStartedAt);
+  const allowanceEnd = getTeaBreakAllowanceEnd(teaBreakStartedAt, breakType);
   return new Date(firstCheckInTime) < allowanceEnd;
 }
 
@@ -53,9 +56,9 @@ async function getEmployeeFirstCheckInTime(employeeId, today = getISTDateString(
   return null;
 }
 
-async function isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt) {
+async function isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt, breakType = 'tea') {
   const firstCheckIn = await getEmployeeFirstCheckInTime(employeeId);
-  return isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt);
+  return isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt, breakType);
 }
 
 /**
@@ -64,7 +67,7 @@ async function isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt) {
  */
 async function autoDismissTeaBreakIfIneligible(employeeId) {
   const now = getISTNow();
-  const cutoff = new Date(now.getTime() - TEA_BREAK_SAFETY_CUTOFF_MS);
+  const cutoff = new Date(now.getTime() - LUNCH_BREAK_SAFETY_CUTOFF_MS); // Use longer cutoff to catch lunch breaks
   const AnnouncementMessage = require('../models/AnnouncementMessage');
 
   const announcement = await AnnouncementMessage.findOne({
@@ -73,7 +76,7 @@ async function autoDismissTeaBreakIfIneligible(employeeId) {
     teaBreakStoppedAt: null,
   })
     .sort({ teaBreakStartedAt: -1 })
-    .select('_id teaBreakStartedAt')
+    .select('_id teaBreakStartedAt teaBreakType')
     .lean();
 
   if (!announcement?.teaBreakStartedAt) return { dismissed: false };
@@ -82,7 +85,8 @@ async function autoDismissTeaBreakIfIneligible(employeeId) {
     return { dismissed: false, reason: 'already_ended' };
   }
 
-  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, announcement.teaBreakStartedAt);
+  const breakType = announcement.teaBreakType === 'lunch' ? 'lunch' : 'tea';
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, announcement.teaBreakStartedAt, breakType);
   if (eligible) return { dismissed: false };
 
   markTeaBreakEnded(announcement._id, employeeId);
@@ -172,7 +176,7 @@ async function buildTeaBreakAttendanceContext(userIds) {
   return { logMap, clockedInNow, firstCheckInMap };
 }
 
-function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStartedAt, firstCheckInMap) {
+function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStartedAt, firstCheckInMap, breakType = 'tea') {
   const id = String(userId);
   const log = logMap.get(id);
   const firstCheckIn = firstCheckInMap?.get(id) ?? null;
@@ -182,7 +186,7 @@ function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStarted
       if (!firstCheckIn) {
         return 'not_checked_in';
       }
-      if (!isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt)) {
+      if (!isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt, breakType)) {
         return 'joined_after_allowance';
       }
     }
@@ -195,7 +199,7 @@ function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStarted
     if (
       teaBreakStartedAt &&
       firstCheckIn &&
-      !isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt)
+      !isEmployeeEligibleForTeaBreakByFirstCheckIn(firstCheckIn, teaBreakStartedAt, breakType)
     ) {
       return 'joined_after_allowance';
     }
@@ -207,7 +211,7 @@ function resolveTeaBreakOpenStatus(userId, logMap, clockedInNow, teaBreakStarted
 /**
  * Count-only variant for insights summaries (no user list payloads).
  */
-function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, teaBreakStartedAt, attendanceContext) {
+function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, teaBreakStartedAt, attendanceContext, breakType = 'tea') {
   const { logMap, clockedInNow, firstCheckInMap } = attendanceContext;
   let onBreakCount = 0;
   let notApplicableCount = 0;
@@ -223,7 +227,8 @@ function countTeaBreakOpenUsers(eligibleUserIds, returnedIds, teaBreakStartedAt,
       logMap,
       clockedInNow,
       teaBreakStartedAt,
-      firstCheckInMap
+      firstCheckInMap,
+      breakType
     );
 
     if (status === 'on_break' || status === 'clocked_out_open') {
@@ -244,7 +249,8 @@ async function classifyTeaBreakOpenUsers(
   eligibleUsers,
   returnedIds,
   teaBreakStartedAt,
-  attendanceContext = null
+  attendanceContext = null,
+  breakType = 'tea'
 ) {
   const userIds = eligibleUsers.map((u) => u._id);
   const context = attendanceContext || (await buildTeaBreakAttendanceContext(userIds));
@@ -271,7 +277,8 @@ async function classifyTeaBreakOpenUsers(
       logMap,
       clockedInNow,
       teaBreakStartedAt,
-      firstCheckInMap
+      firstCheckInMap,
+      breakType
     );
 
     if (status === 'on_break') {
@@ -312,17 +319,22 @@ async function classifyTeaBreakOpenUsers(
   return { pending, onBreak, notApplicable };
 }
 
-function computeTeaBreakTiming(teaBreakStartedAt, now = getISTNow()) {
+function computeTeaBreakTiming(teaBreakStartedAt, now = getISTNow(), breakType = 'tea') {
   const started = new Date(teaBreakStartedAt);
-  const allowanceEndsAt = new Date(started.getTime() + TEA_BREAK_DURATION_MS);
-  const safetyEndsAt = new Date(started.getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
+  const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+  const safetyCutoffMs = breakType === 'lunch' ? LUNCH_BREAK_SAFETY_CUTOFF_MS : TEA_BREAK_SAFETY_CUTOFF_MS;
+  const durationMinutes = breakType === 'lunch' ? 30 : 10;
+  
+  const allowanceEndsAt = new Date(started.getTime() + durationMs);
+  const safetyEndsAt = new Date(started.getTime() + safetyCutoffMs);
   const remainingSeconds = Math.max(0, Math.floor((allowanceEndsAt - now) / 1000));
+  
   return {
     teaBreakStartedAt: started,
     allowanceEndsAt,
     safetyEndsAt,
     remainingSeconds,
-    durationMinutes: 10,
+    durationMinutes,
     serverNow: now,
   };
 }
@@ -341,9 +353,10 @@ function buildTeaBreakActivePayload(announcement, timing, initiatedByUserId = nu
   };
 }
 
-function computeOverrunMinutes(teaBreakStartedAt, now = getISTNow()) {
+function computeOverrunMinutes(teaBreakStartedAt, now = getISTNow(), breakType = 'tea') {
   const started = new Date(teaBreakStartedAt);
-  const allowanceEnd = new Date(started.getTime() + 10 * 60 * 1000);
+  const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+  const allowanceEnd = new Date(started.getTime() + durationMs);
   if (now <= allowanceEnd) return 0;
   return Math.max(0, Math.floor((now - allowanceEnd) / 60000));
 }
@@ -352,7 +365,7 @@ function computeOverrunMinutes(teaBreakStartedAt, now = getISTNow()) {
  * Apply or extend auto unpaid break for tea break overrun.
  * @returns {{ applied: boolean, overrunMinutes: number, skippedReason?: string }}
  */
-async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementId) {
+async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementId, breakType = 'tea') {
   const today = getISTDateString();
   const now = getISTNow();
 
@@ -366,13 +379,13 @@ async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementI
     return { applied: false, overrunMinutes: 0, skippedReason: 'already_ended' };
   }
 
-  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt);
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt, breakType);
   if (!eligible) {
     markTeaBreakEnded(announcementId, employeeId);
     return { applied: false, overrunMinutes: 0, skippedReason: 'joined_after_allowance' };
   }
 
-  const overrunMinutes = computeOverrunMinutes(teaBreakStartedAt, now);
+  const overrunMinutes = computeOverrunMinutes(teaBreakStartedAt, now, breakType);
   if (overrunMinutes <= 0) {
     return { applied: false, overrunMinutes: 0, skippedReason: 'within_allowance' };
   }
@@ -390,7 +403,8 @@ async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementI
   }
 
   const reason = teaBreakReason(announcementId);
-  const allowanceEnd = new Date(new Date(teaBreakStartedAt).getTime() + 10 * 60 * 1000);
+  const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+  const allowanceEnd = new Date(new Date(teaBreakStartedAt).getTime() + durationMs);
 
   let existing = await BreakLog.findOne({
     attendanceLog: log._id,
@@ -441,7 +455,7 @@ async function applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementI
  * Finalize auto tea break log when employee ends voluntarily.
  * Only increments unpaid minutes by the delta since the last enforcement tick.
  */
-async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStartedAt) {
+async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStartedAt, breakType = 'tea') {
   const today = getISTDateString();
   const now = getISTNow();
   const log = await AttendanceLog.findOne({ user: employeeId, attendanceDate: today });
@@ -449,7 +463,7 @@ async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStarted
     return { overrunMinutes: 0 };
   }
 
-  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt);
+  const eligible = await isEmployeeEligibleForTeaBreak(employeeId, teaBreakStartedAt, breakType);
   if (!eligible) {
     return { overrunMinutes: 0, skippedReason: 'joined_after_allowance' };
   }
@@ -462,10 +476,11 @@ async function finalizeTeaBreakOnEnd(employeeId, announcementId, teaBreakStarted
     reason,
   });
 
-  const overrunMinutes = computeOverrunMinutes(teaBreakStartedAt, now);
+  const overrunMinutes = computeOverrunMinutes(teaBreakStartedAt, now, breakType);
   if (!existing) {
     if (overrunMinutes > 0) {
-      const allowanceEnd = new Date(new Date(teaBreakStartedAt).getTime() + 10 * 60 * 1000);
+      const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+      const allowanceEnd = new Date(new Date(teaBreakStartedAt).getTime() + durationMs);
       await BreakLog.create({
         attendanceLog: log._id,
         userId: employeeId,
@@ -524,4 +539,6 @@ module.exports = {
   buildTeaBreakActivePayload,
   TEA_BREAK_DURATION_MS,
   TEA_BREAK_SAFETY_CUTOFF_MS,
+  LUNCH_BREAK_DURATION_MS,
+  LUNCH_BREAK_SAFETY_CUTOFF_MS,
 };

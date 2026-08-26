@@ -53,6 +53,7 @@ require('./models/PolicyAcceptanceLog');
 require('./models/EmployeeDocument');
 require('./models/DocumentTemplate');
 require('./models/EmployeeKycDocument');
+require('./models/HRQuery');
 
 // Route Imports
 const authRoutes = require('./routes/auth');
@@ -307,6 +308,21 @@ app.use('/api/admin', absentToLeaveRoutes);
 const publicFormAdminRoutes = require('./routes/admin/publicFormAdmin');
 app.use('/api/admin/public-form', publicFormAdminRoutes);
 
+const hrQueryRoutes = require('./routes/hrQueries');
+app.use('/api/hr-queries', hrQueryRoutes);
+
+// ─── INTERNAL SERVICE ROUTES ──────────────────────────────────────────────────
+// Read-only payroll feed consumed exclusively by salary-service.
+// Protected by X-Service-Token (separate from user JWT).
+// Bind this prefix at the reverse-proxy level to salary-service's server IP only
+// for belt-and-suspenders on top of the token check.
+const payrollFeedRoutes = require('./routes/internal/payrollFeed');
+app.use('/internal/payroll-feed', payrollFeedRoutes);
+
+// Read-only employee feed for salary-service to fetch employee list
+const employeeFeedRoutes = require('./routes/internal/employeeFeed');
+app.use('/internal/employees', employeeFeedRoutes);
+
 // Health check endpoint — minimal public response; no internals exposed (A05-MED)
 app.get('/health', async (req, res) => {
   const isConnected = mongoose.connection.readyState === 1;
@@ -383,6 +399,7 @@ app.use(express.static(FRONTEND_DIR, frontendStaticOptions));
 // SPA fallback
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') ||
+      req.path.startsWith('/internal') ||
       req.path.startsWith('/avatars') ||
       req.path.startsWith('/medical-certificates') ||
       req.path.startsWith('/public') ||

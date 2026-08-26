@@ -5,7 +5,7 @@ const { getISTDateString, getISTNow } = require('../utils/istTime');
 const { markTeaBreakEnded } = require('./teaBreakState');
 const { stopEnforcement } = require('../jobs/teaBreakEnforcer');
 
-const SAFETY_CUTOFF_MS = 30 * 60 * 1000;
+const SAFETY_CUTOFF_MS = 60 * 60 * 1000; // Use longer cutoff to handle lunch breaks
 
 // Uses exactly 2 queries regardless of employee count (batched, no N+1).
 async function getClockedInEmployeeIds() {

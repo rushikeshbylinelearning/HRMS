@@ -36,7 +36,7 @@ const announcementMessageSchema = new mongoose.Schema(
     },
     teaBreakType: {
       type: String,
-      enum: ["morning", "evening"],
+      enum: ["morning", "evening", "lunch"],
       default: null,
     },
     teaBreakStoppedAt: {

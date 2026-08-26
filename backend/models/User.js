@@ -178,6 +178,9 @@ const userSchema = new mongoose.Schema({
     // Resource request management (delegated HR / staff access)
     canManageResourceRequests: { type: Boolean, default: false },
 
+    // HR Query management (delegated HR / staff access)
+    canManageHRQueries: { type: Boolean, default: false },
+
     // Bulk attendance actions on admin summary (live refresh, end breaks)
     canManageBulkAttendanceActions: { type: Boolean, default: false },
     

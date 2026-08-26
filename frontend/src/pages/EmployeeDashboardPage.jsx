@@ -26,6 +26,7 @@ import SaturdaySchedule from '../components/SaturdaySchedule';
 import RecentActivityCard from '../components/RecentActivityCard';
 import ShiftProgressBar from '../components/ShiftProgressBar';
 import UserAvatar from '../components/common/UserAvatar'; // CENTRALIZED AVATAR COMPONENT
+import PendingPolicyBanner from '../components/PendingPolicyBanner';
 import { ShiftInfoSkeleton, RecentActivitySkeleton, SaturdayScheduleSkeleton, WeeklyTimeCardsSkeleton } from '../components/DashboardSkeletons';
 import { EmployeeDashboardSkeleton, SkeletonBox } from '../components/SkeletonLoaders';
 import { getISTNow, formatISTDate } from '../utils/istTime';
@@ -875,6 +876,9 @@ const EmployeeDashboardPage = () => {
     return (
         <Box className="employee-dashboard-container">
             <Box>
+                {/* Pending Policy Acknowledgement Banner */}
+                <PendingPolicyBanner />
+
                 {error && (
                     <Alert
                         severity="error"

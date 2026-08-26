@@ -33,6 +33,10 @@
   # Health check (optional — useful for monitoring)
   ProxyPass        /health http://127.0.0.1:3011/health retry=0
   ProxyPassReverse /health http://127.0.0.1:3011/health
+
+  # Internal service-to-service routes (salary-service → AMS, never browser-exposed)
+  ProxyPass        /internal http://127.0.0.1:3011/internal retry=0 timeout=30
+  ProxyPassReverse /internal http://127.0.0.1:3011/internal
 </IfModule>
 
 # Fallback proxy via mod_rewrite when ProxyPass is not allowed in .htaccess
@@ -50,6 +54,7 @@
   RewriteCond %{REQUEST_URI} ^/avatars [NC,OR]
   RewriteCond %{REQUEST_URI} ^/medical-certificates [NC,OR]
   RewriteCond %{REQUEST_URI} ^/public/ [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/internal [NC,OR]
   RewriteCond %{REQUEST_URI} ^/health$ [NC]
   RewriteRule ^(.*)$ http://127.0.0.1:3011/$1 [P,L]
 
@@ -63,6 +68,7 @@
   RewriteCond %{REQUEST_URI} !^/avatars
   RewriteCond %{REQUEST_URI} !^/medical-certificates
   RewriteCond %{REQUEST_URI} !^/public/
+  RewriteCond %{REQUEST_URI} !^/internal
   RewriteCond %{REQUEST_URI} !^/health$
 
   # React SPA fallback

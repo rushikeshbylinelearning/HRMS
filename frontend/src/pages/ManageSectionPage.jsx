@@ -23,7 +23,8 @@ import {
   Insights as InsightsIcon,
   MoreVert as MoreVertIcon,
   Schedule as ScheduleIcon,
-  NotificationsActive as NotificationsActiveIcon
+  NotificationsActive as NotificationsActiveIcon,
+  SupportAgent as SupportAgentIcon
 } from '@mui/icons-material';
 import api from '../api/axios';
 import '../styles/ManageSectionPage.css';
@@ -99,6 +100,7 @@ const ManageSectionPage = () => {
       canViewAnalytics: false, // New field for analytics access
       canViewLiveAttendance: false,
       canManageResourceRequests: false,
+      canManageHRQueries: false,
       canManageBulkAttendanceActions: false,
       privilegeLevel: 'normal',
       restrictedFeatures: {
@@ -277,6 +279,11 @@ const privilegeOptions = useMemo(() => {
 
   const liveAttendanceEnabledCount = useMemo(
     () => users.filter((user) => user.featurePermissions?.canViewLiveAttendance).length,
+    [users]
+  );
+
+  const hrQueryEnabledCount = useMemo(
+    () => users.filter((user) => user.featurePermissions?.canManageHRQueries).length,
     [users]
   );
 
@@ -483,6 +490,7 @@ const privilegeOptions = useMemo(() => {
       canViewAnalytics: false, // New field for analytics access
       canViewLiveAttendance: false,
       canManageResourceRequests: false,
+      canManageHRQueries: false,
       canManageBulkAttendanceActions: false,
       privilegeLevel: 'normal',
       // Merge existing values from featurePermissions while adding defaults
@@ -1222,6 +1230,35 @@ const privilegeOptions = useMemo(() => {
                   <Switch
                     checked={safeFeaturePermissions.canManageResourceRequests}
                     onChange={(e) => handlePermissionChange(currentUser._id, 'canManageResourceRequests', e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4F46E5',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#4F46E5',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderTop: '1px solid #F3F4F6'
+                }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
+                      Can Manage HR Queries
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '11px' }}>
+                      View, respond to, and manage employee HR queries and resource requests
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={safeFeaturePermissions.canManageHRQueries}
+                    onChange={(e) => handlePermissionChange(currentUser._id, 'canManageHRQueries', e.target.checked)}
                     sx={{
                       '& .MuiSwitch-switchBase.Mui-checked': {
                         color: '#4F46E5',
@@ -2027,6 +2064,12 @@ const privilegeOptions = useMemo(() => {
             value: liveAttendanceEnabledCount,
             helper: 'Real-time board access',
             icon: <GroupsIcon />,
+          },
+          {
+            label: 'HR Queries',
+            value: hrQueryEnabledCount,
+            helper: 'Delegated HR query managers',
+            icon: <SupportAgentIcon />,
           },
           {
             label: 'Resource Requests',
@@ -3239,6 +3282,55 @@ const privilegeOptions = useMemo(() => {
                     onChange={(e) => setBulkSettings(prev => ({
                       ...prev,
                       featurePermissions: { ...prev.featurePermissions, canManageResourceRequests: e.target.checked }
+                    }))}
+                    sx={{
+                      width: 52,
+                      height: 28,
+                      padding: 0,
+                      '& .MuiSwitch-switchBase': {
+                        padding: 0,
+                        margin: '2px',
+                        transitionDuration: '300ms',
+                        '&.Mui-checked': {
+                          transform: 'translateX(24px)',
+                          color: '#fff',
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#e53935',
+                            opacity: 1,
+                            border: 0,
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        boxSizing: 'border-box',
+                        width: 24,
+                        height: 24,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      },
+                      '& .MuiSwitch-track': {
+                        borderRadius: 14,
+                        backgroundColor: '#D1D5DB',
+                        opacity: 1,
+                        transition: 'background-color 300ms ease',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.875rem' }}>
+                      Can Manage HR Queries
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem', mt: 0.3, display: 'block' }}>
+                      View, respond to, and manage employee HR queries
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={bulkSettings.featurePermissions.canManageHRQueries}
+                    onChange={(e) => setBulkSettings(prev => ({
+                      ...prev,
+                      featurePermissions: { ...prev.featurePermissions, canManageHRQueries: e.target.checked }
                     }))}
                     sx={{
                       width: 52,

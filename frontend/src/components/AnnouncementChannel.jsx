@@ -57,11 +57,17 @@ const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAd
   const handleStopTeaBreak = async () => {
     if (stoppingTeaBreak) return;
 
-    const breakLabel = activeTeaBreak?.teaBreakType === 'evening' ? 'Evening' : 'Morning';
+    const breakLabels = {
+      'morning': 'Morning tea',
+      'evening': 'Evening tea',
+      'lunch': 'Lunch'
+    };
+    const breakLabel = breakLabels[activeTeaBreak?.teaBreakType] || 'Tea';
+    
     const confirmed = window.confirm(
       activeTeaBreak
-        ? `End the ${breakLabel} tea break for all employees? Timers and break state will be cleared for everyone who is checked in.`
-        : 'End any active tea break for all employees?'
+        ? `End the ${breakLabel} break for all employees? Timers and break state will be cleared for everyone who is checked in.`
+        : 'End any active break for all employees?'
     );
     if (!confirmed) return;
 
@@ -74,7 +80,7 @@ const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAd
       setIsTeaBreakAnnouncement(false);
     } catch (error) {
       console.error("Error stopping tea break:", error);
-      alert(error.response?.data?.message || "Failed to end tea break for all");
+      alert(error.response?.data?.message || "Failed to end break for all");
     } finally {
       setStoppingTeaBreak(false);
     }
@@ -583,9 +589,16 @@ const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAd
       {isAdminOrHr && activeTeaBreak && (
         <div className="announcement-tea-break-active">
           <div className="announcement-tea-break-active-header">
-            <span className="announcement-tea-break-active-icon" aria-hidden="true">☕</span>
+            <span className="announcement-tea-break-active-icon" aria-hidden="true">
+              {activeTeaBreak.teaBreakType === 'lunch' ? '🍽️' : '☕'}
+            </span>
             <div className="announcement-tea-break-active-label">
-              {activeTeaBreak.teaBreakType === 'evening' ? 'Evening' : 'Morning'} tea break is live
+              {activeTeaBreak.teaBreakType === 'lunch' 
+                ? 'Lunch break is live'
+                : activeTeaBreak.teaBreakType === 'evening' 
+                  ? 'Evening tea break is live' 
+                  : 'Morning tea break is live'
+              }
             </div>
           </div>
           <button
@@ -609,17 +622,17 @@ const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAd
               onChange={(e) => setIsTeaBreakAnnouncement(e.target.checked)}
             />
             <span className="announcement-tea-break-checkbox-box" aria-hidden="true" />
-            <span className="announcement-tea-break-checkbox-label">This is a Tea Break announcement</span>
+            <span className="announcement-tea-break-checkbox-label">Apply bulk break to all employees</span>
           </label>
           {isTeaBreakAnnouncement && (
-            <div className="announcement-tea-break-selector" role="group" aria-label="Tea break type">
+            <div className="announcement-tea-break-selector" role="group" aria-label="Break type">
               <button
                 type="button"
                 className={`announcement-tea-break-option${teaBreakType === 'morning' ? ' active' : ''}`}
                 onClick={() => setTeaBreakType('morning')}
                 aria-pressed={teaBreakType === 'morning'}
               >
-                Morning Break
+                Morning Tea
               </button>
               <button
                 type="button"
@@ -627,7 +640,15 @@ const AnnouncementChannel = ({ onClose, embedded = false, onMessagesChange, onAd
                 onClick={() => setTeaBreakType('evening')}
                 aria-pressed={teaBreakType === 'evening'}
               >
-                Evening Break
+                Evening Tea
+              </button>
+              <button
+                type="button"
+                className={`announcement-tea-break-option${teaBreakType === 'lunch' ? ' active' : ''}`}
+                onClick={() => setTeaBreakType('lunch')}
+                aria-pressed={teaBreakType === 'lunch'}
+              >
+                Lunch Break
               </button>
             </div>
           )}

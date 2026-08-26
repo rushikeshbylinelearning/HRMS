@@ -1,32 +1,34 @@
 // frontend/src/components/payroll/EmployeeSalaryDetail.jsx
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Grid, Paper, Chip, IconButton, Divider, Alert, Select, MenuItem, FormControl, InputLabel, Card, CardContent, CardHeader, Avatar, LinearProgress } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Grid, Paper, Chip, IconButton, Divider, Alert, Select, MenuItem, FormControl, InputLabel, Card, CardContent, Avatar, LinearProgress, Tabs, Tab } from '@mui/material';
 import {
   Close,
-  CalendarToday,
-  AttachMoney,
-  TrendingUp,
-  TrendingDown,
   CheckCircle,
   Cancel,
   Schedule,
   Person,
-  Work,
   AccessTime,
-  MonetizationOn
+  CalendarToday,
+  TrendingDown,
 } from '@mui/icons-material';
 import axios from '../../api/axios';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import AttendanceCalendar from '../AttendanceCalendar';
+import {
+  parseISTDate,
+} from '../../utils/istTime';
 
 import { SkeletonBox } from '../SkeletonLoaders';
 const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
   const currentDate = new Date();
+  const [activeTab, setActiveTab] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [loading, setLoading] = useState(false);
   const [attendanceData, setAttendanceData] = useState([]);
+  // Raw logs in the format AttendanceCalendar expects (attendanceDate string, sessions, status fields)
+  const [calendarLogs, setCalendarLogs] = useState([]);
   const [salaryBreakdown, setSalaryBreakdown] = useState(null);
   const [error, setError] = useState('');
 
@@ -43,20 +45,39 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
     setError('');
     
     try {
-      // Fetch attendance data for the employee
+      // Fetch attendance data for the employee for the full month
       const startDate = new Date(selectedYear, selectedMonth - 1, 1);
       const endDate = new Date(selectedYear, selectedMonth, 0);
-      
-      const response = await axios.get(`/admin/attendance/user/${employee.id}`, {
-        params: {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: endDate.toISOString().split('T')[0]
+      const startStr = startDate.toISOString().split('T')[0];
+      const endStr = endDate.toISOString().split('T')[0];
+
+      // Use the attendance summary endpoint (same as AdminAttendanceSummaryPage)
+      // which returns logs with all resolved fields (holidayInfo, leaveInfo, status, etc.)
+      let attendanceLogs = [];
+      try {
+        const summaryRes = await axios.get(
+          `/attendance/summary?startDate=${startStr}&endDate=${endStr}&userId=${employee.id}&includeHolidays=true`
+        );
+        if (Array.isArray(summaryRes.data)) {
+          attendanceLogs = summaryRes.data;
+        } else {
+          attendanceLogs = Array.isArray(summaryRes.data.logs) ? summaryRes.data.logs : [];
         }
-      });
+      } catch (_) {
+        // Fallback: try the admin per-user attendance endpoint
+        const fallbackRes = await axios.get(`/admin/attendance/user/${employee.id}`, {
+          params: { startDate: startStr, endDate: endStr }
+        });
+        attendanceLogs = fallbackRes.data || [];
+      }
+
+      // ── Calendar logs (raw, for AttendanceCalendar component) ──────────────
+      // AttendanceCalendar.jsx reads: log.attendanceDate, log.clockInTime,
+      // log.clockOutTime, log.holidayInfo, log.leaveInfo, log.sessions,
+      // log.overriddenByAdmin, log.overrideReason, log.lateMinutes, etc.
+      setCalendarLogs(attendanceLogs);
       
-      const attendanceLogs = response.data || [];
-      
-      // Transform the API response to match our expected format
+      // ── Day-wise breakdown for salary computation ──────────────────────────
       const transformedAttendance = attendanceLogs.map(log => {
         const sessions = log.sessions || [];
         const workingHours = sessions.reduce((total, session) => {
@@ -66,60 +87,61 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
           }
           return total;
         }, 0);
-        
-        // Determine status based on log data
+
         let status = 'absent';
-        if (log.status === 'present' || log.clockInTime) {
-          status = 'present';
-        } else if (log.status === 'half-day') {
+        const s = (log.attendanceStatus || log.status || '').toLowerCase();
+        if (s === 'present' || log.clockInTime) {
+          status = log.payableMinutes != null && log.payableMinutes < 240 ? 'half-day' : 'present';
+        } else if (s.includes('half') || s === 'half-day') {
           status = 'half-day';
-        } else if (log.status === 'late') {
+        } else if (s === 'late') {
           status = 'late';
+        } else if (log.leaveInfo || s.includes('leave')) {
+          status = 'leave';
+        } else if (log.holidayInfo || s.includes('holiday')) {
+          status = 'holiday';
         }
-        
+
         return {
           date: log.attendanceDate,
-          status: status,
+          status,
           workingHours: Math.round(workingHours * 10) / 10,
-          overtimeHours: workingHours > 8 ? Math.round((workingHours - 8) * 10) / 10 : 0,
-          isHoliday: false,
-          isLeave: log.status === 'leave' || log.status === 'absent'
+          overtimeHours: workingHours > 9 ? Math.round((workingHours - 9) * 10) / 10 : 0,
+          isHoliday: !!(log.holidayInfo),
+          isLeave: !!(log.leaveInfo),
+          leaveType: log.leaveInfo?.requestType || log.leaveInfo?.leaveType || null,
         };
       });
-      
-      // Fill in all days of the month
+
+      // Fill in all days of the month (same as existing logic)
       const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
       const allDaysData = [];
-      
+
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(selectedYear, selectedMonth - 1, day);
         const dateStr = date.toISOString().split('T')[0];
         const dayOfWeek = date.getDay();
-        
-        // Find existing attendance record
         const existingRecord = transformedAttendance.find(rec => rec.date === dateStr);
-        
+
         if (existingRecord) {
           allDaysData.push(existingRecord);
         } else {
-          // No attendance record - mark as absent (unless it's Sunday)
           allDaysData.push({
             date: dateStr,
             status: dayOfWeek === 0 ? 'holiday' : 'absent',
             workingHours: 0,
             overtimeHours: 0,
             isHoliday: dayOfWeek === 0,
-            isLeave: false
+            isLeave: false,
           });
         }
       }
-      
+
       setAttendanceData(allDaysData);
       calculateSalaryBreakdown(allDaysData);
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-      setError('Failed to fetch attendance data');
-      // Generate mock data for demonstration
+    } catch (err) {
+      console.error('Error fetching attendance:', err);
+      setError('Failed to fetch attendance data. Showing estimated data.');
       generateMockAttendanceData();
     } finally {
       setLoading(false);
@@ -153,6 +175,7 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
       });
     }
     
+    setCalendarLogs([]); // no raw logs available in mock mode
     setAttendanceData(mockData);
     calculateSalaryBreakdown(mockData);
   };
@@ -290,98 +313,372 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
     if (!salaryBreakdown) return;
     
     try {
-      // Create a new PDF document
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      // Company Header
-      pdf.setFillColor(229, 57, 53); // Red color
-      pdf.rect(0, 0, pageWidth, 30, 'F');
-      
-      pdf.setTextColor(255, 255, 255);
+      const marginL = 14;
+      const marginR = 14;
+      const contentWidth = pageWidth - marginL - marginR;
+
+      const periodLabel = new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+      });
+      const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      // ── Colours ────────────────────────────────────────────────────────────
+      const colorPrimary  = [44, 62, 80];   // #2C3E50 dark blue-grey
+      const colorAccent   = [52, 73, 94];   // slightly lighter header
+      const colorRed      = [192, 57, 43];  // deductions / net banner
+      const colorGreen    = [39, 174, 96];
+      const colorWhite    = [255, 255, 255];
+      const colorLightBg  = [245, 246, 250];
+      const colorLineSep  = [220, 220, 225];
+      const colorTextDark = [30, 30, 40];
+      const colorTextGray = [100, 100, 115];
+
+      // ── Header banner ──────────────────────────────────────────────────────
+      pdf.setFillColor(...colorPrimary);
+      pdf.rect(0, 0, pageWidth, 36, 'F');
+
+      pdf.setTextColor(...colorWhite);
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('PAYSLIP', pageWidth / 2, 15, { align: 'center' });
-      
-      pdf.setFontSize(12);
-      pdf.text('Attendance Management System', pageWidth / 2, 22, { align: 'center' });
-      
-      // Employee Details
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Employee Details', 20, 50);
-      
-      pdf.setFontSize(12);
+      pdf.text('SALARY SLIP', pageWidth / 2, 14, { align: 'center' });
+
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Name: ${employee.name}`, 20, 60);
-      pdf.text(`Department: ${employee.department}`, 20, 67);
-      pdf.text(`Designation: ${employee.designation}`, 20, 74);
-      pdf.text(`Email: ${employee.email}`, 20, 81);
-      
-      // Period
-      const periodText = new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-IN', { 
-        month: 'long', 
-        year: 'numeric' 
-      });
-      pdf.text(`Period: ${periodText}`, pageWidth - 20, 60, { align: 'right' });
-      pdf.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - 20, 67, { align: 'right' });
-      
-      // Summary Section
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Monthly Summary', 20, 100);
-      
-      // Summary table
-      const summaryY = 110;
+      pdf.text('Attendance Management System  •  Confidential', pageWidth / 2, 21, { align: 'center' });
+
       pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      
-      pdf.text('Present Days:', 20, summaryY);
-      pdf.text(`${salaryBreakdown.summary.totalPresentDays}`, 60, summaryY);
-      
-      pdf.text('Half Days:', 20, summaryY + 7);
-      pdf.text(`${salaryBreakdown.summary.totalHalfDays}`, 60, summaryY + 7);
-      
-      pdf.text('Absent Days:', 20, summaryY + 14);
-      pdf.text(`${salaryBreakdown.summary.totalAbsentDays}`, 60, summaryY + 14);
-      
-      pdf.text('Overtime Hours:', 20, summaryY + 21);
-      pdf.text(`${salaryBreakdown.summary.totalOvertimeHours}h`, 60, summaryY + 21);
-      
-      // Salary Details
-      pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Salary Details', 20, summaryY + 40);
-      
-      const salaryY = summaryY + 50;
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      
-      pdf.text('Gross Salary:', 20, salaryY);
-      pdf.text(`₹${salaryBreakdown.summary.totalSalary.toLocaleString('en-IN')}`, 80, salaryY);
-      
-      pdf.text('Total Deductions:', 20, salaryY + 7);
-      pdf.text(`₹${salaryBreakdown.summary.totalDeductions.toLocaleString('en-IN')}`, 80, salaryY + 7);
-      
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
-      pdf.text('Net Salary:', 20, salaryY + 20);
-      pdf.text(`₹${salaryBreakdown.summary.netSalary.toLocaleString('en-IN')}`, 80, salaryY + 20);
-      
-      // Footer
+      pdf.text(periodLabel.toUpperCase(), pageWidth / 2, 30, { align: 'center' });
+
+      // ── Employee info card ──────────────────────────────────────────────────
+      let y = 44;
+      pdf.setFillColor(...colorLightBg);
+      pdf.roundedRect(marginL, y, contentWidth, 36, 3, 3, 'F');
+      pdf.setDrawColor(...colorLineSep);
+      pdf.roundedRect(marginL, y, contentWidth, 36, 3, 3, 'S');
+
+      const col1x = marginL + 5;
+      const col2x = marginL + contentWidth / 2 + 5;
+
       pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...colorPrimary);
+      pdf.text('EMPLOYEE DETAILS', col1x, y + 7);
+      pdf.text('PAY PERIOD INFORMATION', col2x, y + 7);
+
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(128, 128, 128);
-      pdf.text('This is a computer generated payslip. No signature required.', pageWidth / 2, pageHeight - 10, { align: 'center' });
-      
-      // Save the PDF
-      const fileName = `Payslip_${employee.name.replace(/\s+/g, '_')}_${selectedYear}_${selectedMonth.toString().padStart(2, '0')}.pdf`;
-      pdf.save(fileName);
-      
-    } catch (error) {
-      console.error('Error generating payslip:', error);
+      pdf.setTextColor(...colorTextDark);
+      pdf.setFontSize(9);
+
+      const infoL = [
+        ['Employee Name', employee.name || '—'],
+        ['Department',    employee.department || '—'],
+        ['Designation',   employee.designation || '—'],
+      ];
+      const infoR = [
+        ['Pay Period',      periodLabel],
+        ['Date of Issue',   today],
+        ['Employee Email',  employee.email || '—'],
+      ];
+      infoL.forEach(([lbl, val], i) => {
+        const iy = y + 14 + i * 7;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...colorTextGray);
+        pdf.text(lbl + ':', col1x, iy);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...colorTextDark);
+        pdf.text(String(val), col1x + 32, iy);
+      });
+      infoR.forEach(([lbl, val], i) => {
+        const iy = y + 14 + i * 7;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...colorTextGray);
+        pdf.text(lbl + ':', col2x, iy);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...colorTextDark);
+        pdf.text(String(val), col2x + 30, iy);
+      });
+
+      y += 42;
+
+      // ── Attendance summary bar ─────────────────────────────────────────────
+      pdf.setFillColor(...colorPrimary);
+      pdf.rect(marginL, y, contentWidth, 7, 'F');
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...colorWhite);
+      pdf.text('ATTENDANCE SUMMARY', col1x, y + 5);
+      y += 7;
+
+      pdf.setFillColor(...colorLightBg);
+      pdf.rect(marginL, y, contentWidth, 18, 'F');
+      pdf.setDrawColor(...colorLineSep);
+      pdf.rect(marginL, y, contentWidth, 18, 'S');
+
+      const attCols = [
+        ['Working Days',  String(salaryBreakdown.summary.totalPresentDays + salaryBreakdown.summary.totalHalfDays)],
+        ['Present Days',  String(salaryBreakdown.summary.totalPresentDays)],
+        ['Half Days',     String(salaryBreakdown.summary.totalHalfDays)],
+        ['Absent Days',   String(salaryBreakdown.summary.totalAbsentDays)],
+        ['LOP Days',      String(salaryBreakdown.summary.totalAbsentDays)],
+        ['Overtime Hrs',  String(salaryBreakdown.summary.totalOvertimeHours) + 'h'],
+      ];
+      const attColW = contentWidth / attCols.length;
+      attCols.forEach(([lbl, val], i) => {
+        const ax = marginL + i * attColW + attColW / 2;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(...colorPrimary);
+        pdf.text(val, ax, y + 8, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(...colorTextGray);
+        pdf.text(lbl, ax, y + 14, { align: 'center' });
+      });
+      y += 23;
+
+      // ── Earnings & Deductions header ───────────────────────────────────────
+      const halfW = (contentWidth - 4) / 2;
+
+      // Earnings column header
+      pdf.setFillColor(...colorGreen);
+      pdf.rect(marginL, y, halfW, 7, 'F');
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...colorWhite);
+      pdf.text('EARNINGS', marginL + halfW / 2, y + 5, { align: 'center' });
+
+      // Deductions column header
+      pdf.setFillColor(...colorRed);
+      pdf.rect(marginL + halfW + 4, y, halfW, 7, 'F');
+      pdf.text('DEDUCTIONS', marginL + halfW + 4 + halfW / 2, y + 5, { align: 'center' });
+      y += 7;
+
+      // Table data
+      const basic        = Math.round(employee.basic || (employee.ctc * (settings.basicPercentage || 40)) / 100 / 12);
+      const hra          = Math.round(employee.hra   || (employee.ctc * (settings.hraPercentage || 20)) / 100 / 12);
+      const allowances   = Math.round(employee.allowances || (employee.ctc * (settings.allowancesPercentage || 15)) / 100 / 12);
+      const overtimePay  = Math.round((salaryBreakdown.summary.totalOvertimeHours || 0) * (settings.overtimeRate || 0));
+      const grossSalary  = basic + hra + allowances + overtimePay;
+
+      const pf           = Math.round(basic * (settings.pfPercentage || 12) / 100);
+      const esi          = Math.round(grossSalary * (settings.esiPercentage || 0.75) / 100);
+      const profTax      = settings.professionalTax || 200;
+      const tds          = Math.round(grossSalary * (settings.tdsPercentage || 5) / 100);
+      const lopDeduction = salaryBreakdown.summary.totalAbsentDays > 0
+        ? Math.round((grossSalary / 26) * salaryBreakdown.summary.totalAbsentDays)
+        : 0;
+      const totalDeductions = pf + esi + profTax + tds + lopDeduction;
+      const netPay          = grossSalary - totalDeductions;
+
+      const earnRows = [
+        ['Basic Salary',    basic],
+        ['House Rent Allowance (HRA)', hra],
+        ['Special Allowances', allowances],
+        ['Overtime Pay',    overtimePay],
+        ['Performance Bonus', 0],
+        ['Other Earnings',   0],
+      ];
+      const deductRows = [
+        ['Provident Fund (PF)',    pf],
+        ['ESI',                    esi],
+        ['Professional Tax',       profTax],
+        ['Tax Deducted (TDS)',      tds],
+        ['Loss of Pay (LOP)',       lopDeduction],
+        ['Other Deductions',        0],
+      ];
+
+      const rowH = 7;
+      const maxRows = Math.max(earnRows.length, deductRows.length);
+
+      for (let i = 0; i < maxRows; i++) {
+        const ry = y + i * rowH;
+        // Alternate row background
+        if (i % 2 === 0) {
+          pdf.setFillColor(252, 252, 255);
+          pdf.rect(marginL, ry, halfW, rowH, 'F');
+          pdf.rect(marginL + halfW + 4, ry, halfW, rowH, 'F');
+        }
+
+        pdf.setFontSize(8.5);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...colorTextDark);
+
+        if (earnRows[i]) {
+          pdf.text(earnRows[i][0], marginL + 3, ry + 5);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(formatCurrency(earnRows[i][1]), marginL + halfW - 3, ry + 5, { align: 'right' });
+        }
+        if (deductRows[i]) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(deductRows[i][0], marginL + halfW + 7, ry + 5);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(...colorRed);
+          pdf.text(formatCurrency(deductRows[i][1]), marginL + halfW + 4 + halfW - 3, ry + 5, { align: 'right' });
+          pdf.setTextColor(...colorTextDark);
+        }
+      }
+      y += maxRows * rowH;
+
+      // Totals row
+      pdf.setFillColor(...colorLightBg);
+      pdf.rect(marginL, y, halfW, 8, 'F');
+      pdf.rect(marginL + halfW + 4, y, halfW, 8, 'F');
+      pdf.setDrawColor(...colorLineSep);
+      pdf.rect(marginL, y, halfW, 8, 'S');
+      pdf.rect(marginL + halfW + 4, y, halfW, 8, 'S');
+
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...colorGreen);
+      pdf.text('Gross Earnings', marginL + 3, y + 5.5);
+      pdf.text(formatCurrency(grossSalary), marginL + halfW - 3, y + 5.5, { align: 'right' });
+
+      pdf.setTextColor(...colorRed);
+      pdf.text('Total Deductions', marginL + halfW + 7, y + 5.5);
+      pdf.text(formatCurrency(totalDeductions), marginL + halfW + 4 + halfW - 3, y + 5.5, { align: 'right' });
+      y += 13;
+
+      // ── Net pay banner ──────────────────────────────────────────────────────
+      pdf.setFillColor(...colorPrimary);
+      pdf.roundedRect(marginL, y, contentWidth, 14, 3, 3, 'F');
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...colorWhite);
+      pdf.text('NET PAY (Take Home)', marginL + 6, y + 9);
+      pdf.setFontSize(14);
+      pdf.text(formatCurrency(netPay), marginL + contentWidth - 4, y + 9, { align: 'right' });
+      y += 19;
+
+      // ── CTC breakdown (compact, one row) ──────────────────────────────────
+      pdf.setFillColor(...colorLightBg);
+      pdf.rect(marginL, y, contentWidth, 12, 'F');
+      pdf.setDrawColor(...colorLineSep);
+      pdf.rect(marginL, y, contentWidth, 12, 'S');
+
+      const ctcItems = [
+        ['Annual CTC',    formatCurrency(employee.ctc || 0)],
+        ['Monthly CTC',   formatCurrency(Math.round((employee.ctc || 0) / 12))],
+        ['Gross Monthly', formatCurrency(grossSalary)],
+        ['Monthly Net',   formatCurrency(netPay)],
+      ];
+      const ctcColW = contentWidth / ctcItems.length;
+      ctcItems.forEach(([lbl, val], i) => {
+        const cx = marginL + i * ctcColW + ctcColW / 2;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9);
+        pdf.setTextColor(...colorPrimary);
+        pdf.text(val, cx, y + 5.5, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(...colorTextGray);
+        pdf.text(lbl, cx, y + 10, { align: 'center' });
+      });
+      y += 16;
+
+      // ── Day-wise summary (compact table, top 10 entries) ──────────────────
+      if (salaryBreakdown.dayWiseBreakdown && salaryBreakdown.dayWiseBreakdown.length > 0) {
+        pdf.setFillColor(...colorAccent);
+        pdf.rect(marginL, y, contentWidth, 7, 'F');
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...colorWhite);
+        pdf.text('DAY-WISE ATTENDANCE & EARNINGS SUMMARY', marginL + 3, y + 5);
+        y += 7;
+
+        // Table header
+        const cols = [
+          { label: 'Date',      w: 28 },
+          { label: 'Day',       w: 16 },
+          { label: 'Status',    w: 28 },
+          { label: 'Hrs',       w: 14 },
+          { label: 'Earnings',  w: 30 },
+          { label: 'Deduction', w: 30 },
+          { label: 'Net',       w: 36 },
+        ];
+        let cx2 = marginL;
+        pdf.setFillColor(230, 232, 238);
+        pdf.rect(marginL, y, contentWidth, 6, 'F');
+        cols.forEach(col => {
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(...colorPrimary);
+          pdf.text(col.label, cx2 + col.w / 2, y + 4.5, { align: 'center' });
+          cx2 += col.w;
+        });
+        y += 6;
+
+        const rows = salaryBreakdown.dayWiseBreakdown.slice(0, 20);
+        rows.forEach((day, i) => {
+          const ry = y + i * 6;
+          if (ry > pageHeight - 30) return; // don't overflow page
+
+          if (i % 2 === 0) {
+            pdf.setFillColor(252, 252, 255);
+            pdf.rect(marginL, ry, contentWidth, 6, 'F');
+          }
+
+          const dayDate  = new Date(day.date);
+          const dayName  = dayDate.toLocaleDateString('en-IN', { weekday: 'short' });
+          const dateDisp = dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+          const statusColors = {
+            present:  [39, 174, 96],
+            'half-day': [230, 81, 0],
+            absent:   [192, 57, 43],
+            holiday:  [142, 68, 173],
+            leave:    [41, 128, 185],
+            late:     [211, 84, 0],
+          };
+          const sc = statusColors[day.status] || colorTextGray;
+
+          let cx3 = marginL;
+          const cellData = [
+            { val: dateDisp,                       w: 28, color: colorTextDark,  bold: false },
+            { val: dayName,                         w: 16, color: colorTextGray,  bold: false },
+            { val: (day.status || '').toUpperCase().slice(0,8), w: 28, color: sc, bold: true  },
+            { val: day.workingHours + 'h',          w: 14, color: colorTextDark,  bold: false },
+            { val: formatCurrency(day.daySalary),   w: 30, color: colorGreen,     bold: true  },
+            { val: day.dayDeduction > 0 ? '-' + formatCurrency(day.dayDeduction) : '—', w: 30, color: colorRed, bold: false },
+            { val: formatCurrency(day.daySalary - day.dayDeduction), w: 36, color: colorPrimary, bold: true },
+          ];
+          cellData.forEach(cell => {
+            pdf.setFont('helvetica', cell.bold ? 'bold' : 'normal');
+            pdf.setFontSize(7);
+            pdf.setTextColor(...cell.color);
+            pdf.text(cell.val, cx3 + cell.w / 2, ry + 4.2, { align: 'center' });
+            cx3 += cell.w;
+          });
+        });
+        y += rows.length * 6 + 4;
+      }
+
+      // ── Footer ─────────────────────────────────────────────────────────────
+      const footerY = pageHeight - 14;
+      pdf.setDrawColor(...colorLineSep);
+      pdf.line(marginL, footerY - 2, marginL + contentWidth, footerY - 2);
+      pdf.setFontSize(7);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(...colorTextGray);
+      pdf.text(
+        'This is a computer-generated salary slip. No signature required. For queries contact HR.',
+        pageWidth / 2,
+        footerY + 1,
+        { align: 'center' }
+      );
+      pdf.text(`Generated on ${today}  •  Payroll Period: ${periodLabel}`, pageWidth / 2, footerY + 6, {
+        align: 'center',
+      });
+
+      // ── Save ──────────────────────────────────────────────────────────────
+      const safeName = (employee.name || 'Employee').replace(/\s+/g, '_');
+      pdf.save(`Salary_Slip_${safeName}_${selectedYear}_${String(selectedMonth).padStart(2, '0')}.pdf`);
+    } catch (err) {
+      console.error('Error generating payslip:', err);
       alert('Error generating payslip. Please try again.');
     }
   };
@@ -489,289 +786,194 @@ const EmployeeSalaryDetail = ({ open, onClose, employee, settings }) => {
             <LinearProgress sx={{ width: '200px', mt: 2, borderRadius: '4px' }} />
           </Box>
         ) : error ? (
-          <Alert severity="error" sx={{ m: 3, borderRadius: '12px' }}>
+          <Alert severity="warning" sx={{ m: 3, borderRadius: '12px' }}>
             {error}
           </Alert>
         ) : (
           <Box>
-            {/* Enhanced Summary Cards */}
-            {salaryBreakdown && (
-              <Box sx={{ p: 3, background: '#ffffff' }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
-                      background: 'linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%)',
-                      color: '#2e7d32',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 16px rgba(76, 175, 80, 0.15)',
-                      transition: 'transform 0.3s ease',
-                      border: '1px solid #c8e6c9',
-                      '&:hover': { transform: 'translateY(-2px)' }
-                    }}>
-                      <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                        <CheckCircle sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                          {salaryBreakdown.summary.totalPresentDays}
-                        </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                          Present Days
-                        </Typography>
-                      </CardContent>
-                    </Card>
+            {/* ── Tabs ── */}
+            <Box sx={{ borderBottom: '1px solid #e9ecef', px: 3, pt: 2 }}>
+              <Tabs
+                value={activeTab}
+                onChange={(_, v) => setActiveTab(v)}
+                sx={{
+                  '& .MuiTab-root': { fontWeight: 600, textTransform: 'none', fontSize: '0.95rem' },
+                  '& .Mui-selected': { color: '#2C3E50 !important' },
+                  '& .MuiTabs-indicator': { backgroundColor: '#2C3E50', height: 3, borderRadius: 2 },
+                }}
+              >
+                <Tab label="📅 Attendance Calendar" />
+                <Tab label="📊 Day-wise Salary Breakdown" />
+              </Tabs>
+            </Box>
+
+            {/* ── Tab 0: Attendance Calendar ─────────────────────────────────── */}
+            {activeTab === 0 && (
+              <Box sx={{ p: 3 }}>
+                {/* Summary cards */}
+                {salaryBreakdown && (
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {[
+                      { label: 'Present Days', value: salaryBreakdown.summary.totalPresentDays, icon: '✅', bg: '#e8f5e8', color: '#2e7d32' },
+                      { label: 'Half Days',    value: salaryBreakdown.summary.totalHalfDays,    icon: '⏱️', bg: '#fff3e0', color: '#ef6c00' },
+                      { label: 'Absent Days',  value: salaryBreakdown.summary.totalAbsentDays,  icon: '❌', bg: '#ffebee', color: '#c62828' },
+                      { label: 'Overtime Hrs', value: salaryBreakdown.summary.totalOvertimeHours + 'h', icon: '🕐', bg: '#e3f2fd', color: '#1565c0' },
+                    ].map(({ label, value, icon, bg, color }) => (
+                      <Grid item xs={6} sm={3} key={label}>
+                        <Card sx={{ background: bg, border: `1px solid ${color}33`, borderRadius: '12px', boxShadow: 'none' }}>
+                          <CardContent sx={{ textAlign: 'center', py: '12px !important', px: 1 }}>
+                            <Typography sx={{ fontSize: '1.5rem' }}>{icon}</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700, color }}>{value}</Typography>
+                            <Typography variant="caption" sx={{ color, opacity: 0.85 }}>{label}</Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
                   </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
-                      background: 'linear-gradient(135deg, #fff3e0 0%, #fff8e1 100%)',
-                      color: '#ef6c00',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 16px rgba(255, 152, 0, 0.15)',
-                      transition: 'transform 0.3s ease',
-                      border: '1px solid #ffcc80',
-                      '&:hover': { transform: 'translateY(-2px)' }
-                    }}>
-                      <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                        <Schedule sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                          {salaryBreakdown.summary.totalHalfDays}
-                        </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                          Half Days
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
-                      background: 'linear-gradient(135deg, #ffebee 0%, #fce4ec 100%)',
-                      color: '#c62828',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 16px rgba(244, 67, 54, 0.15)',
-                      transition: 'transform 0.3s ease',
-                      border: '1px solid #ffcdd2',
-                      '&:hover': { transform: 'translateY(-2px)' }
-                    }}>
-                      <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                        <Cancel sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                          {salaryBreakdown.summary.totalAbsentDays}
-                        </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                          Absent Days
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
-                      background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)',
-                      color: '#1565c0',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 16px rgba(33, 150, 243, 0.15)',
-                      transition: 'transform 0.3s ease',
-                      border: '1px solid #bbdefb',
-                      '&:hover': { transform: 'translateY(-2px)' }
-                    }}>
-                      <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                        <AccessTime sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                          {salaryBreakdown.summary.totalOvertimeHours}h
-                        </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                          Overtime Hours
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
+                )}
+
+                {/* Calendar — same component used in AdminAttendanceSummaryPage */}
+                <Box sx={{ '& .attendance-calendar-container': { margin: 0, boxShadow: 'none', border: '1px solid #e9ecef' } }}>
+                  <AttendanceCalendar
+                    logs={calendarLogs}
+                    currentDate={parseISTDate(`${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`)}
+                    onDayClick={() => {}}
+                  />
+                </Box>
+
+                {/* Legend */}
+                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                  {[
+                    { label: 'Present',  bg: '#d4edda', border: '#c3e6cb',  text: '#155724' },
+                    { label: 'Absent',   bg: '#f8d7da', border: '#f5c6cb',  text: '#721c24' },
+                    { label: 'Half Day', bg: '#ffe0b2', border: '#ff9800',  text: '#e65100' },
+                    { label: 'Holiday',  bg: '#e1bee7', border: '#ce93d8',  text: '#4a148c' },
+                    { label: 'Leave',    bg: '#bbdefb', border: '#90caf9',  text: '#0d47a1' },
+                    { label: 'Weekend',  bg: '#fff3cd', border: '#ffeaa7',  text: '#856404' },
+                    { label: 'Week Off', bg: '#fff8e1', border: '#ffd54f',  text: '#b8860b' },
+                  ].map(({ label, bg, border, text }) => (
+                    <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 14, height: 14, borderRadius: '3px', background: bg, border: `1px solid ${border}` }} />
+                      <Typography variant="caption" sx={{ color: text, fontWeight: 600 }}>{label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
             )}
 
-            {/* Enhanced Day-wise Breakdown */}
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#2C3E50' }}>
-                📅 Day-wise Salary Breakdown
-              </Typography>
-              
-              {/* Table Header */}
-              <Paper sx={{ 
-                p: 2, 
-                mb: 2, 
-                background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
-                border: '1px solid #e9ecef',
-                borderRadius: '12px'
-              }}>
-                <Grid container spacing={2} alignItems="center" sx={{ fontWeight: 600, color: '#2C3E50' }}>
-                  <Grid item xs={1}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Sr No</Typography>
-                  </Grid>
-                  <Grid item xs={2}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Date</Typography>
-                  </Grid>
-                  <Grid item xs={2}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Status</Typography>
-                  </Grid>
-                  <Grid item xs={2}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Hours</Typography>
-                  </Grid>
-                  <Grid item xs={2}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Amount</Typography>
-                  </Grid>
-                  <Grid item xs={2}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Deduction Reason</Typography>
-                  </Grid>
-                  <Grid item xs={1}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Net</Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-              
-              <Box sx={{ 
-                maxHeight: '500px', 
-                overflowY: 'auto',
-                borderRadius: '12px',
-                border: '1px solid #e9ecef'
-              }}>
-                {salaryBreakdown?.dayWiseBreakdown.map((day, index) => (
-                  <Paper 
-                    key={index} 
-                    sx={{ 
-                      p: 2, 
-                      mb: 1, 
-                      mx: 1,
-                      mt: index === 0 ? 1 : 0,
-                      border: '1px solid #e9ecef',
-                      borderRadius: '12px',
-                      background: day.status === 'present' ? 'linear-gradient(135deg, #f8fff8 0%, #ffffff 100%)' : 
-                                 day.status === 'absent' ? 'linear-gradient(135deg, #ffebee 0%, #ffffff 100%)' : 
-                                 day.status === 'holiday' ? 'linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%)' :
-                                 'linear-gradient(135deg, #fff3e0 0%, #ffffff 100%)',
-                      borderLeft: `4px solid ${
-                        day.status === 'present' ? '#4caf50' : 
-                        day.status === 'absent' ? '#f44336' : 
-                        day.status === 'holiday' ? '#9e9e9e' : '#ff9800'
-                      }`,
-                      transition: 'all 0.3s ease',
-                      '&:hover': { 
-                        transform: 'translateX(2px)',
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
-                      }
-                    }}
-                  >
+            {/* ── Tab 1: Day-wise Salary Breakdown ──────────────────────────── */}
+            {activeTab === 1 && (
+              <Box>
+                {/* Summary Cards */}
+                {salaryBreakdown && (
+                  <Box sx={{ p: 3, background: '#ffffff' }}>
+                    <Grid container spacing={3}>
+                      {[
+                        { label: 'Present Days', value: salaryBreakdown.summary.totalPresentDays, bg: 'linear-gradient(135deg,#e8f5e8,#f1f8e9)', color: '#2e7d32', border: '#c8e6c9', icon: <CheckCircle sx={{ fontSize: 40, mb: 1 }} /> },
+                        { label: 'Half Days',    value: salaryBreakdown.summary.totalHalfDays,    bg: 'linear-gradient(135deg,#fff3e0,#fff8e1)', color: '#ef6c00', border: '#ffcc80', icon: <Schedule    sx={{ fontSize: 40, mb: 1 }} /> },
+                        { label: 'Absent Days',  value: salaryBreakdown.summary.totalAbsentDays,  bg: 'linear-gradient(135deg,#ffebee,#fce4ec)', color: '#c62828', border: '#ffcdd2', icon: <Cancel      sx={{ fontSize: 40, mb: 1 }} /> },
+                        { label: 'Overtime Hrs', value: salaryBreakdown.summary.totalOvertimeHours + 'h', bg: 'linear-gradient(135deg,#e3f2fd,#f3e5f5)', color: '#1565c0', border: '#bbdefb', icon: <AccessTime sx={{ fontSize: 40, mb: 1 }} /> },
+                      ].map(({ label, value, bg, color, border, icon }) => (
+                        <Grid item xs={12} sm={6} md={3} key={label}>
+                          <Card sx={{ background: bg, color, borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', border: `1px solid ${border}`, transition: 'transform 0.3s ease', '&:hover': { transform: 'translateY(-2px)' } }}>
+                            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+                              {icon}
+                              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>{value}</Typography>
+                              <Typography variant="body1" sx={{ opacity: 0.9 }}>{label}</Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
+
+                {/* Day-wise table */}
+                <Box sx={{ px: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#2C3E50' }}>Day-wise Salary Breakdown</Typography>
+
+                  <Paper sx={{ p: 2, mb: 2, background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)', border: '1px solid #e9ecef', borderRadius: '12px' }}>
                     <Grid container spacing={2} alignItems="center">
-                      <Grid item xs={1}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#666' }}>
-                          {index + 1}
-                        </Typography>
-                      </Grid>
-                      
-                      <Grid item xs={2}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CalendarToday sx={{ fontSize: 16, color: '#666' }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
-                            {formatDate(day.date)}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      
-                      <Grid item xs={2}>
-                        {getStatusChip(day)}
-                      </Grid>
-                      
-                      <Grid item xs={2}>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Work sx={{ fontSize: 16 }} />
-                            {day.workingHours}h
-                          </Typography>
-                          {day.overtimeHours > 0 && (
-                            <Typography variant="body2" sx={{ color: '#2196f3', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <AccessTime sx={{ fontSize: 16 }} />
-                              +{day.overtimeHours}h OT
-                            </Typography>
-                          )}
-                        </Box>
-                      </Grid>
-                      
-                      <Grid item xs={2}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <MonetizationOn sx={{ fontSize: 18, color: day.daySalary > 0 ? '#4caf50' : '#f44336' }} />
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              fontWeight: 600,
-                              color: day.daySalary > 0 ? '#4caf50' : '#f44336'
-                            }}
-                          >
-                            {day.daySalary > 0 ? '+' : ''}{formatCurrency(day.daySalary)}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      
-                      <Grid item xs={2}>
-                        <Typography variant="body2" sx={{ color: '#666' }}>
-                          {day.dayDeduction > 0 ? (
-                            day.status === 'absent' ? 'Absent' :
-                            day.status === 'half-day' ? 'Half Day' :
-                            day.status === 'late' ? 'Late Arrival' :
-                            day.status === 'holiday' ? 'Holiday' : 'Leave'
-                          ) : '-'}
-                        </Typography>
-                      </Grid>
-                      
-                      <Grid item xs={1}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            fontWeight: 600,
-                            color: day.daySalary > day.dayDeduction ? '#4caf50' : '#f44336'
-                          }}
-                        >
-                          {formatCurrency(day.daySalary - day.dayDeduction)}
-                        </Typography>
-                      </Grid>
+                      <Grid item xs={1}><Typography variant="body2" sx={{ fontWeight: 700 }}>Sr No</Typography></Grid>
+                      <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 700 }}>Date</Typography></Grid>
+                      <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 700 }}>Status</Typography></Grid>
+                      <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 700 }}>Hours</Typography></Grid>
+                      <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 700 }}>Amount</Typography></Grid>
+                      <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 700 }}>Deduction Reason</Typography></Grid>
+                      <Grid item xs={1}><Typography variant="body2" sx={{ fontWeight: 700 }}>Net</Typography></Grid>
                     </Grid>
                   </Paper>
-                ))}
-              </Box>
-            </Box>
 
-            {/* Enhanced Total Summary */}
-            {salaryBreakdown && (
-              <Box sx={{ 
-                background: 'linear-gradient(135deg, #2C3E50 0%, #34495e 100%)',
-                color: 'white',
-                p: 4,
-                borderRadius: '12px',
-                margin: '24px'
-              }}>
-                <Grid container spacing={3} alignItems="center">
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                      📊 Monthly Summary
-                    </Typography>
-                    <Typography variant="body1" sx={{ opacity: 0.9, lineHeight: 1.6 }}>
-                      <strong>Working Days:</strong> {salaryBreakdown.summary.totalPresentDays + salaryBreakdown.summary.totalHalfDays} | 
-                      <strong> Absent Days:</strong> {salaryBreakdown.summary.totalAbsentDays} | 
-                      <strong> Overtime:</strong> {salaryBreakdown.summary.totalOvertimeHours}h
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                        {formatCurrency(salaryBreakdown.summary.netSalary)}
-                      </Typography>
-                      <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                        Net Salary for {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-IN', { 
-                          month: 'long', 
-                          year: 'numeric' 
-                        })}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
+                  <Box sx={{ maxHeight: '500px', overflowY: 'auto', borderRadius: '12px', border: '1px solid #e9ecef' }}>
+                    {salaryBreakdown?.dayWiseBreakdown.map((day, index) => (
+                      <Paper
+                        key={index}
+                        sx={{
+                          p: 2, mb: 1, mx: 1, mt: index === 0 ? 1 : 0,
+                          border: '1px solid #e9ecef', borderRadius: '12px',
+                          background: day.status === 'present' ? 'linear-gradient(135deg, #f8fff8 0%, #ffffff 100%)' :
+                                      day.status === 'absent'  ? 'linear-gradient(135deg, #ffebee 0%, #ffffff 100%)' :
+                                      day.status === 'holiday' ? 'linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%)' :
+                                      'linear-gradient(135deg, #fff3e0 0%, #ffffff 100%)',
+                          borderLeft: `4px solid ${day.status === 'present' ? '#4caf50' : day.status === 'absent' ? '#f44336' : day.status === 'holiday' ? '#9e9e9e' : '#ff9800'}`,
+                          transition: 'all 0.3s ease',
+                          '&:hover': { transform: 'translateX(2px)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' },
+                        }}
+                      >
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={1}><Typography variant="body2" sx={{ fontWeight: 600, color: '#666' }}>{index + 1}</Typography></Grid>
+                          <Grid item xs={2}><Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>{formatDate(day.date)}</Typography></Grid>
+                          <Grid item xs={2}>{getStatusChip(day)}</Grid>
+                          <Grid item xs={2}>
+                            <Typography variant="body2" color="text.secondary">{day.workingHours}h</Typography>
+                            {day.overtimeHours > 0 && <Typography variant="body2" sx={{ color: '#2196f3' }}>+{day.overtimeHours}h OT</Typography>}
+                          </Grid>
+                          <Grid item xs={2}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: day.daySalary > 0 ? '#4caf50' : '#f44336' }}>
+                              {day.daySalary > 0 ? '+' : ''}{formatCurrency(day.daySalary)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={2}>
+                            <Typography variant="body2" sx={{ color: '#666' }}>
+                              {day.dayDeduction > 0 ? (day.status === 'absent' ? 'Absent' : day.status === 'half-day' ? 'Half Day' : day.status === 'late' ? 'Late Arrival' : day.status === 'holiday' ? 'Holiday' : 'Leave') : '-'}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={1}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: day.daySalary > day.dayDeduction ? '#4caf50' : '#f44336' }}>
+                              {formatCurrency(day.daySalary - day.dayDeduction)}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Total Summary */}
+                {salaryBreakdown && (
+                  <Box sx={{ background: 'linear-gradient(135deg, #2C3E50 0%, #34495e 100%)', color: 'white', p: 4, borderRadius: '12px', margin: '24px' }}>
+                    <Grid container spacing={3} alignItems="center">
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>📊 Monthly Summary</Typography>
+                        <Typography variant="body1" sx={{ opacity: 0.9, lineHeight: 1.6 }}>
+                          <strong>Working Days:</strong> {salaryBreakdown.summary.totalPresentDays + salaryBreakdown.summary.totalHalfDays} |{' '}
+                          <strong>Absent Days:</strong> {salaryBreakdown.summary.totalAbsentDays} |{' '}
+                          <strong>Overtime:</strong> {salaryBreakdown.summary.totalOvertimeHours}h
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                            {formatCurrency(salaryBreakdown.summary.netSalary)}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Net Salary for {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>

@@ -185,6 +185,9 @@ class NewNotificationService {
             extra_break_rejection: 'Extra Break Rejected',
             policy_added: 'New Policy Added',
             policy_updated: 'Policy Updated',
+            hr_query_new: 'New HR Query',
+            hr_query_response: 'HR Query Message',
+            hr_query_status_changed: 'HR Query Status Update',
             system: 'System Notification',
             info: 'Information',
             success: 'Success',
@@ -225,6 +228,16 @@ class NewNotificationService {
      */
     handleNotificationClick(navigationData, notificationType, metadata) {
         if (!navigationData || !navigationData.page) return;
+        
+        // Handle HR QUERY notifications
+        if (notificationType === 'hr_query_new' || 
+            notificationType === 'hr_query_response' || 
+            notificationType === 'hr_query_status_changed') {
+            // Open the floating chat - it will auto-open the specific query if needed
+            // The FAB component will handle the navigation
+            window.location.reload(); // Refresh to ensure the FAB picks up the notification
+            return;
+        }
         
         // Handle POLICY notifications - navigate to profile page
         if (notificationType === 'policy_added' || notificationType === 'policy_updated') {

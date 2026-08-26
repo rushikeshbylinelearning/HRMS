@@ -5,6 +5,8 @@ const {
   getClockedInEmployeeIds,
   TEA_BREAK_DURATION_MS,
   TEA_BREAK_SAFETY_CUTOFF_MS,
+  LUNCH_BREAK_DURATION_MS,
+  LUNCH_BREAK_SAFETY_CUTOFF_MS,
 } = require('../services/teaBreakService');
 const { hasTeaBreakEnded, clearTeaBreakState } = require('../services/teaBreakState');
 
@@ -12,7 +14,7 @@ const RECURRING_INTERVAL_MS = 60 * 1000;
 
 const activeJobs = new Map();
 
-async function runEnforcementPass(announcementId, teaBreakStartedAt) {
+async function runEnforcementPass(announcementId, teaBreakStartedAt, breakType = 'tea') {
   const employeeIds = await getClockedInEmployeeIds();
   let pendingCount = 0;
 
@@ -20,7 +22,7 @@ async function runEnforcementPass(announcementId, teaBreakStartedAt) {
     if (hasTeaBreakEnded(announcementId, employeeId)) continue;
     pendingCount += 1;
     try {
-      await applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementId);
+      await applyTeaBreakOverrun(employeeId, teaBreakStartedAt, announcementId, breakType);
     } catch (err) {
       console.error(`[TeaBreak] Enforcement error for ${employeeId}:`, err.message);
     }
@@ -43,15 +45,18 @@ function stopEnforcement(announcementId) {
 /**
  * Schedule tea break overrun enforcement for a given announcement.
  */
-function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
+function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt, breakType = 'tea') {
   const key = String(announcementId);
   if (activeJobs.has(key)) {
     stopEnforcement(announcementId);
   }
 
   const started = new Date(teaBreakStartedAt);
-  const firstRunAt = new Date(started.getTime() + TEA_BREAK_DURATION_MS + 1000);
-  const cutoffAt = new Date(started.getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
+  const durationMs = breakType === 'lunch' ? LUNCH_BREAK_DURATION_MS : TEA_BREAK_DURATION_MS;
+  const safetyCutoffMs = breakType === 'lunch' ? LUNCH_BREAK_SAFETY_CUTOFF_MS : TEA_BREAK_SAFETY_CUTOFF_MS;
+  
+  const firstRunAt = new Date(started.getTime() + durationMs + 1000);
+  const cutoffAt = new Date(started.getTime() + safetyCutoffMs);
   const now = getISTNow();
 
   const runPass = async () => {
@@ -59,7 +64,7 @@ function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
       stopEnforcement(announcementId);
       return;
     }
-    const { pendingCount } = await runEnforcementPass(announcementId, teaBreakStartedAt);
+    const { pendingCount } = await runEnforcementPass(announcementId, teaBreakStartedAt, breakType);
     if (pendingCount === 0) {
       stopEnforcement(announcementId);
     }
@@ -75,11 +80,11 @@ function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
       }
       runPass().catch((err) => console.error('[TeaBreak] Recurring enforcement failed:', err));
     }, RECURRING_INTERVAL_MS);
-    activeJobs.set(key, { timeoutId: null, intervalId, teaBreakStartedAt });
+    activeJobs.set(key, { timeoutId: null, intervalId, teaBreakStartedAt, breakType });
   }, delay);
 
-  activeJobs.set(key, { timeoutId, intervalId: null, teaBreakStartedAt });
-  console.log(`[TeaBreak] Scheduled enforcement for ${announcementId} in ${Math.round(delay / 1000)}s`);
+  activeJobs.set(key, { timeoutId, intervalId: null, teaBreakStartedAt, breakType });
+  console.log(`[TeaBreak] Scheduled ${breakType} break enforcement for ${announcementId} in ${Math.round(delay / 1000)}s`);
 }
 
 /**
@@ -87,7 +92,7 @@ function scheduleTeaBreakEnforcement(announcementId, teaBreakStartedAt) {
  */
 async function restoreActiveTeaBreakJobs() {
   try {
-    const cutoff = new Date(getISTNow().getTime() - TEA_BREAK_SAFETY_CUTOFF_MS);
+    const cutoff = new Date(getISTNow().getTime() - LUNCH_BREAK_SAFETY_CUTOFF_MS); // Use longer cutoff to catch lunch breaks
     const active = await AnnouncementMessage.find({
       isTEABreak: true,
       teaBreakStartedAt: { $gte: cutoff },
@@ -99,9 +104,11 @@ async function restoreActiveTeaBreakJobs() {
 
     for (const ann of active) {
       if (!ann.teaBreakStartedAt) continue;
-      const endsAt = new Date(new Date(ann.teaBreakStartedAt).getTime() + TEA_BREAK_SAFETY_CUTOFF_MS);
+      const breakType = ann.teaBreakType === 'lunch' ? 'lunch' : 'tea';
+      const safetyCutoffMs = breakType === 'lunch' ? LUNCH_BREAK_SAFETY_CUTOFF_MS : TEA_BREAK_SAFETY_CUTOFF_MS;
+      const endsAt = new Date(new Date(ann.teaBreakStartedAt).getTime() + safetyCutoffMs);
       if (getISTNow() < endsAt) {
-        scheduleTeaBreakEnforcement(ann._id, ann.teaBreakStartedAt);
+        scheduleTeaBreakEnforcement(ann._id, ann.teaBreakStartedAt, breakType);
       }
     }
   } catch (err) {

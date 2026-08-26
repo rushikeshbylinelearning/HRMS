@@ -202,6 +202,8 @@ router.post('/login', validateLogin, loginGeofencingMiddleware, async (req, res)
         }
 
         // Check geofencing for non-admin users
+        // NOTE: Geofencing is now OPTIONAL for login to allow remote access
+        // Geofencing will still be enforced for attendance check-in/check-out
         if (user.role !== 'Admin' && user.role !== 'HR') {
             if (req.userLocation) {
                 const geofenceResult = await checkGeofence(
@@ -211,6 +213,10 @@ router.post('/login', validateLogin, loginGeofencingMiddleware, async (req, res)
                 );
 
                 if (!geofenceResult.isWithinGeofence) {
+                    // Log the violation but don't block login
+                    console.warn(`[Login] Geofence violation for ${user.email}: ${geofenceResult.distance}m from nearest office`);
+                    // You can choose to block login by uncommenting the lines below:
+                    /*
                     return res.status(403).json({
                         error: 'Access denied: You must be within office premises to log in',
                         code: 'GEOFENCE_VIOLATION',
@@ -222,13 +228,13 @@ router.post('/login', validateLogin, loginGeofencingMiddleware, async (req, res)
                             } : null
                         }
                     });
+                    */
                 }
             } else {
-                // No location provided for non-admin user
-                return res.status(400).json({
-                    error: 'Location access is required for login. Please enable location permissions.',
-                    code: 'LOCATION_REQUIRED'
-                });
+                // No location provided - allow login but log the event
+                console.warn(`[Login] No location data provided for ${user.email}`);
+                // You can choose to block login by uncommenting the line below:
+                // return res.status(400).json({ error: 'Location access is required for login. Please enable location permissions.', code: 'LOCATION_REQUIRED' });
             }
         }
 
@@ -1164,6 +1170,14 @@ router.post('/refresh', refreshRateLimiter, async (req, res) => {
         resolveEntry = resolve;
         rejectEntry = reject;
     });
+
+    // Suppress "unhandledRejection" on the shared promise — callers that
+    // coalesce onto this promise attach their own .catch() via the try/catch
+    // in the existingEntry branch above. Without this suppressor, Node ≥ 15
+    // (and especially v26 which defaults --unhandled-rejections=throw) will
+    // crash the process the moment rejectEntry() is called before any waiter
+    // has had a chance to attach a rejection handler.
+    rotationPromise.catch(() => {});
 
     const cacheEntry = { promise: rotationPromise, settledAt: null };
     refreshDedupCache.set(dedupKey, cacheEntry);

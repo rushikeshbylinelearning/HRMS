@@ -33,6 +33,11 @@ export const OnboardingProvider = ({ children }) => {
     const [tourPending, setTourPending] = useState(false);
     const firstLoginApiCalled = useRef(false);
 
+    // New state for standalone policy acknowledgements (for existing employees)
+    const [pendingPolicies, setPendingPolicies] = useState([]);
+    const [standalonePolicyModalOpen, setStandalonePolicyModalOpen] = useState(false);
+    const [currentStandalonePolicy, setCurrentStandalonePolicy] = useState(null);
+
     // Determine which step the user is at based on their onboarding object.
     // This is purely derived — never stores its own copy of user data.
     // Caller must only invoke this for employees eligible for onboarding
@@ -65,6 +70,9 @@ export const OnboardingProvider = ({ children }) => {
         try {
             const { data } = await api.get('/onboarding/status');
             setMandatoryPolicy(data.mandatoryPolicy || null);
+
+            // Check for pending standalone policy acknowledgements (for all employees)
+            loadPendingPolicies();
 
             // Pre-feature / non-eligible employees never see acknowledgement,
             // even if they were wrongly enrolled earlier.
@@ -189,6 +197,79 @@ export const OnboardingProvider = ({ children }) => {
         setStep(STEP.DONE);
     }, []);
 
+    // ─── Standalone Policy Acknowledgement Functions ─────────────────────────────
+
+    // Load pending policies for existing employees
+    const loadPendingPolicies = useCallback(async () => {
+        if (!user || authStatus !== 'authenticated') return;
+        if (user.role === 'Admin' || user.role === 'HR') return;
+
+        try {
+            const { data } = await api.get('/onboarding/pending-policies');
+            setPendingPolicies(data.pendingPolicies || []);
+            
+            // Auto-show modal if there are pending policies
+            if (data.pendingPolicies && data.pendingPolicies.length > 0 && !standalonePolicyModalOpen) {
+                setCurrentStandalonePolicy(data.pendingPolicies[0]);
+                setStandalonePolicyModalOpen(true);
+            }
+        } catch (e) {
+            console.error('[Onboarding] Failed to load pending policies:', e.message);
+        }
+    }, [user, authStatus, standalonePolicyModalOpen]);
+
+    // Record reading start for standalone policy
+    const recordStandaloneReadingStart = useCallback(async (logId) => {
+        try {
+            await api.post('/onboarding/policy/standalone-start-reading', { logId });
+        } catch (e) {
+            console.error('[Onboarding] recordStandaloneReadingStart failed:', e.message);
+        }
+    }, []);
+
+    // Accept standalone policy
+    const acceptStandalonePolicy = useCallback(async (payload) => {
+        setPolicyAcceptancePending(true);
+        try {
+            const { data } = await api.post('/onboarding/policy/standalone-accept', payload);
+            
+            // Remove the accepted policy from pending list
+            setPendingPolicies(prev => prev.filter(p => p.logId !== payload.logId));
+            
+            // Close modal and show next pending policy if any
+            const remaining = pendingPolicies.filter(p => p.logId !== payload.logId);
+            if (remaining.length > 0) {
+                setCurrentStandalonePolicy(remaining[0]);
+            } else {
+                setStandalonePolicyModalOpen(false);
+                setCurrentStandalonePolicy(null);
+            }
+            
+            return { success: true };
+        } catch (e) {
+            const msg = e.response?.data?.error || 'Failed to accept policy.';
+            return { success: false, error: msg };
+        } finally {
+            setPolicyAcceptancePending(false);
+        }
+    }, [pendingPolicies]);
+
+    // Manually open standalone policy modal
+    const openStandalonePolicyModal = useCallback((policyData = null) => {
+        if (policyData) {
+            setCurrentStandalonePolicy(policyData);
+        } else if (pendingPolicies.length > 0) {
+            setCurrentStandalonePolicy(pendingPolicies[0]);
+        }
+        setStandalonePolicyModalOpen(true);
+    }, [pendingPolicies]);
+
+    // Close standalone policy modal
+    const closeStandalonePolicyModal = useCallback(() => {
+        setStandalonePolicyModalOpen(false);
+        setCurrentStandalonePolicy(null);
+    }, []);
+
     const value = {
         STEP,
         step,
@@ -207,6 +288,15 @@ export const OnboardingProvider = ({ children }) => {
         completeProfile,
         dismissProfileBanner,
         reloadStatus: loadStatus,
+        // Standalone policy acknowledgement
+        pendingPolicies,
+        standalonePolicyModalOpen,
+        currentStandalonePolicy,
+        loadPendingPolicies,
+        recordStandaloneReadingStart,
+        acceptStandalonePolicy,
+        openStandalonePolicyModal,
+        closeStandalonePolicyModal,
     };
 
     return (

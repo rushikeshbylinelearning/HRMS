@@ -52,6 +52,9 @@ const BulkAttendanceAssistant = ({ onActionComplete }) => {
     const [executing, setExecuting] = useState(false);
     const [selectedAction, setSelectedAction] = useState(null);
     const [status, setStatus] = useState(null);
+    
+    // Check if we're on the admin attendance summary page to adjust FAB position
+    const isAdminSummaryPage = window.location.pathname === '/admin/attendance-summary';
 
     const fetchPreview = useCallback(async () => {
         setLoadingPreview(true);
@@ -172,7 +175,7 @@ const BulkAttendanceAssistant = ({ onActionComplete }) => {
                 />
             )}
 
-            <div className="baa-root">
+            <div className={`baa-root${isAdminSummaryPage ? ' baa-root--stacked' : ''}`}>
                 {open && (
                     <div className="baa-panel" role="dialog" aria-label="Bulk actions">
                     <header className="baa-panel__header">

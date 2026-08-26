@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from 'react';
-import AnonymousFeedback from './AnonymousFeedback';
+import HRQueryChat from '../HRQueryChat';
 import DocumentCenterModal from './DocumentCenterModal';
 
 const ProfilePolicies = memo(({
@@ -119,10 +119,10 @@ const ProfilePolicies = memo(({
                 hasPersonalEmail={hasPersonalEmail}
             />
 
-            {/* Anonymous Feedback */}
+            {/* HR Query Chat */}
             <div className="policies-section">
-                <h4 className="policies-section-title-bold">ANONYMOUS MESSAGE</h4>
-                <AnonymousFeedback />
+                <h4 className="policies-section-title-bold">ASK HR</h4>
+                <HRQueryChat />
             </div>
         </div>
     );

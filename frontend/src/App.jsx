@@ -22,6 +22,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PermissionProtectedRoute from './components/PermissionProtectedRoute';
 import IdleDetectionProvider from './components/IdleDetectionProvider';
 import { OnboardingProvider } from './context/OnboardingContext';
+import StandalonePolicyModal from './components/onboarding/StandalonePolicyModal';
 import './styles/OnboardingStyles.css';
 
 // Lazy load all pages
@@ -231,6 +232,8 @@ function App() {
                                 <NewNotificationProvider> {/* <-- CORRECT NESTING */}
                                     <IdleDetectionProvider>
                                         <OnboardingProvider>
+                                            {/* Standalone Policy Modal for existing employees */}
+                                            <StandalonePolicyModal />
                                         <Routes>
                                     {/* Public routes - accessible without authentication */}
                                     <Route path="/login" element={<LoginPage />} />

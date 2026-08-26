@@ -38,6 +38,7 @@ RewriteCond %{REQUEST_URI} ^/api [NC,OR]
 RewriteCond %{REQUEST_URI} ^/health$ [NC,OR]
 RewriteCond %{REQUEST_URI} ^/avatars [NC,OR]
 RewriteCond %{REQUEST_URI} ^/medical-certificates [NC,OR]
+RewriteCond %{REQUEST_URI} ^/internal [NC,OR]
 RewriteCond %{REQUEST_URI} ^/public/ [NC]
 RewriteRule .* http://127.0.0.1:3011%{REQUEST_URI} [P,L,QSA]
 

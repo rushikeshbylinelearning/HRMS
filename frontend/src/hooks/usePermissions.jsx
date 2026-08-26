@@ -23,6 +23,7 @@ export const usePermissions = () => {
       canViewAnalytics: false,
       canViewLiveAttendance: false,
       canManageResourceRequests: false,
+      canManageHRQueries: false,
       canManageBulkAttendanceActions: false,
       privilegeLevel: 'normal',
       restrictedFeatures: {
@@ -142,6 +143,13 @@ export const usePermissions = () => {
         return true;
       }
       return permissions.canManageBulkAttendanceActions === true;
+    },
+
+    manageHRQueries: () => {
+      if (['Admin', 'HR'].includes(user?.role)) {
+        return true;
+      }
+      return permissions.canManageHRQueries === true;
     },
   }), [permissions, user?.role]);
 

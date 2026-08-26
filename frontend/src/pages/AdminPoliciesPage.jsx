@@ -18,6 +18,7 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import FolderCopyOutlinedIcon from '@mui/icons-material/FolderCopyOutlined';
+import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import PageHeroHeader from '../components/PageHeroHeader';
 import PolicyUploadForm from '../components/PolicyUploadForm';
 import PolicyViewer from '../components/PolicyViewer';
@@ -25,6 +26,8 @@ import AnonymousMessagesList from '../components/AnonymousMessagesList';
 import PolicyListCompact from '../components/PolicyListCompact';
 import ComplianceDashboard from '../components/onboarding/ComplianceDashboard';
 import EmployeeDocumentsDashboard from '../components/employeeDocuments/EmployeeDocumentsDashboard';
+import PolicyAssignmentModal from '../components/admin/PolicyAssignmentModal';
+import HRQueryManagement from '../components/admin/HRQueryManagement';
 import api from '../api/axios';
 import '../styles/AdminPoliciesPage.css';
 
@@ -46,7 +49,7 @@ const scrollBoxSx = {
 
 const AdminPoliciesPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get('tab') === 'employee-documents' ? 3 : 0;
+    const initialTab = searchParams.get('tab') === 'employee-documents' ? 4 : 0;
     const [activeTab, setActiveTab] = useState(initialTab);
     const [policies, setPolicies] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -58,6 +61,7 @@ const AdminPoliciesPage = () => {
     const [policyToReplace, setPolicyToReplace] = useState(null);
     const [anonymousMessages, setAnonymousMessages] = useState([]);
     const [messagesLoading, setMessagesLoading] = useState(true);
+    const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
 
     useEffect(() => {
         loadPolicies();
@@ -66,7 +70,7 @@ const AdminPoliciesPage = () => {
 
     useEffect(() => {
         if (searchParams.get('tab') === 'employee-documents') {
-            setActiveTab(3);
+            setActiveTab(4);
             setSearchParams({}, { replace: true });
         }
     }, [searchParams, setSearchParams]);
@@ -205,6 +209,7 @@ const AdminPoliciesPage = () => {
                     }}
                 >
                     <Tab icon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Policies" />
+                    <Tab icon={<QuestionAnswerIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="HR Queries" />
                     <Tab icon={<ForumOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Anonymous Messages" />
                     <Tab icon={<VerifiedUserOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Onboarding Compliance" />
                     <Tab icon={<FolderCopyOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Employee Documents" />
@@ -276,7 +281,7 @@ const AdminPoliciesPage = () => {
                             <Box sx={{ mt: 3 }}>
                                 <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>
                                     To configure the mandatory onboarding policy, go to the
-                                    <strong style={{ color: '#6366f1', cursor: 'pointer' }} onClick={() => setActiveTab(2)}>
+                                    <strong style={{ color: '#6366f1', cursor: 'pointer' }} onClick={() => setActiveTab(3)}>
                                         {' '}Onboarding Compliance
                                     </strong>{' '}tab.
                                 </Typography>
@@ -285,8 +290,15 @@ const AdminPoliciesPage = () => {
                     </Box>
                 )}
 
-                {/* ── Tab 1: Anonymous Messages ────────────────────────────── */}
+                {/* ── Tab 1: HR Queries ─────────────────────────────────── */}
                 {activeTab === 1 && (
+                    <Box sx={{ px: { xs: 1, sm: 2 } }}>
+                        <HRQueryManagement />
+                    </Box>
+                )}
+
+                {/* ── Tab 2: Anonymous Messages ────────────────────────────── */}
+                {activeTab === 2 && (
                     <Box sx={cardBaseSx}>
                         <Typography variant="h6" fontWeight={700} color="#222" mb={3}>
                             Anonymous Messages
@@ -301,9 +313,22 @@ const AdminPoliciesPage = () => {
                     </Box>
                 )}
 
-                {/* ── Tab 2: Onboarding Compliance ─────────────────────────── */}
-                {activeTab === 2 && (
+                {/* ── Tab 3: Onboarding Compliance ─────────────────────────── */}
+                {activeTab === 3 && (
                     <Box sx={cardBaseSx}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                            <Typography variant="h6" fontWeight={700} color="#222">
+                                Onboarding Compliance
+                            </Typography>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => setAssignmentModalOpen(true)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Assign Policy to Employees
+                            </Button>
+                        </Box>
                         <ComplianceDashboard
                             policies={policies}
                             onRefreshPolicies={loadPolicies}
@@ -311,8 +336,8 @@ const AdminPoliciesPage = () => {
                     </Box>
                 )}
 
-                {/* ── Tab 3: Employee Documents ─────────────────────────────── */}
-                {activeTab === 3 && (
+                {/* ── Tab 4: Employee Documents ─────────────────────────────── */}
+                {activeTab === 4 && (
                     <Box sx={{ px: { xs: 0, sm: 0.5 } }}>
                         <EmployeeDocumentsDashboard />
                     </Box>
@@ -358,6 +383,19 @@ const AdminPoliciesPage = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Policy Assignment Modal */}
+            <PolicyAssignmentModal
+                open={assignmentModalOpen}
+                onClose={() => setAssignmentModalOpen(false)}
+                onSuccess={(result) => {
+                    setSnackbar({
+                        open: true,
+                        message: `Policy assigned successfully to ${result.results?.success?.length || 0} employee(s)`,
+                        severity: 'success'
+                    });
+                }}
+            />
         </Box>
     );
 };

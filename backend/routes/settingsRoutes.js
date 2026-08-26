@@ -346,7 +346,7 @@ router.post('/teams-status-overrides', [authenticateToken, isAdmin], async (req,
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'status must be one of: ' + validStatuses.join(', ') });
         }
-        const adminUser = await require('../models/User').findById(req.user.id).select('fullName').lean();
+        const adminUser = await require('../models/User').findById(req.user.userId).select('fullName').lean();
         await saveStatusOverride({
             employeeId: employeeId.toString(),
             employeeName: employeeName || '',

@@ -1,0 +1,11 @@
+# Files excluded from deployment to A2 Hosting / cPanel
+# Mirror AMS's .deployignore pattern
+
+.env
+node_modules/
+logs/
+*.log
+.git/
+.gitignore
+env.example
+README.md

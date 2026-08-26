@@ -15,7 +15,7 @@
 
 .baa-root {
     position: fixed;
-    right: 20px;
+    right: 24px;
     bottom: 20px;
     z-index: 1400;
     display: flex;
@@ -23,6 +23,11 @@
     align-items: flex-end;
     gap: 10px;
     pointer-events: none;
+}
+
+/* Adjust position when stacked above HR Query FAB */
+.baa-root.baa-root--stacked {
+    bottom: 96px;
 }
 
 .baa-fab {
@@ -53,6 +58,11 @@
 
 .baa-fab--open:hover {
     background: #111827;
+}
+
+/* Hide Bulk Actions FAB when HR Query drawer is open */
+body:has(.hr-query-drawer.MuiDrawer-root .MuiDrawer-paper) .baa-root {
+    display: none;
 }
 
 .baa-panel {
@@ -305,8 +315,12 @@
 
 @media (max-width: 600px) {
     .baa-root {
-        right: 14px;
+        right: 24px;
         bottom: 14px;
+    }
+    
+    .baa-root.baa-root--stacked {
+        bottom: 90px;
     }
 
     .baa-panel {
